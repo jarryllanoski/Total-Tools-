@@ -1,0 +1,538 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Hacer un pedido</title>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0a0a0f;
+  --card:#13131a;
+  --border:#1e1e2e;
+  --blue:#4f8ef7;
+  --green:#22c55e;
+  --red:#f87171;
+  --text:#f0f0f5;
+  --text2:#888;
+  --accent:#4f8ef7;
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{min-height:100vh;background:var(--bg);font-family:'Outfit',sans-serif;color:var(--text)}
+body{max-width:480px;margin:0 auto;padding:0 0 40px}
+
+/* HEADER */
+.hdr{padding:28px 20px 0;text-align:center;margin-bottom:28px}
+.hdr-logo{width:56px;height:56px;border-radius:16px;background:linear-gradient(135deg,#4f8ef7,#7c3aed);display:flex;align-items:center;justify-content:center;font-size:26px;margin:0 auto 14px}
+.hdr-biz{font-size:22px;font-weight:800;letter-spacing:-.5px}
+.hdr-sub{font-size:13px;color:var(--text2);margin-top:4px}
+
+/* STEPS */
+.steps{display:flex;gap:6px;padding:0 20px;margin-bottom:24px}
+.step{flex:1;height:3px;border-radius:2px;background:var(--border);transition:background .3s}
+.step.done{background:var(--blue)}
+.step.active{background:var(--blue);opacity:.5}
+
+/* FORM */
+.form-page{display:none;padding:0 20px;animation:fadeIn .3s ease}
+.form-page.active{display:block}
+@keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+
+.section-ttl{font-size:11px;font-weight:700;color:var(--text2);letter-spacing:1.2px;margin-bottom:14px}
+
+.fg{margin-bottom:16px}
+.fl{font-size:12px;font-weight:600;color:var(--text2);display:block;margin-bottom:6px;letter-spacing:.3px}
+.fi{width:100%;background:var(--card);border:1.5px solid var(--border);border-radius:10px;padding:13px 14px;color:var(--text);font-size:15px;font-family:'Outfit',sans-serif;outline:none;transition:border-color .2s}
+.fi:focus{border-color:var(--blue)}
+.fi::placeholder{color:var(--text2)}
+
+/* PHONE */
+.ph-wrap{display:flex;gap:0}
+.ph-pre{background:var(--card);border:1.5px solid var(--border);border-right:none;border-radius:10px 0 0 10px;padding:13px 12px;font-size:15px;color:var(--text2);font-family:'Outfit',sans-serif}
+.ph-wrap .fi{border-radius:0 10px 10px 0}
+
+/* COURIER OPTIONS */
+.courier-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:4px}
+.courier-opt{background:var(--card);border:1.5px solid var(--border);border-radius:10px;padding:12px;text-align:center;cursor:pointer;transition:all .15s;font-size:13px;font-weight:600}
+.courier-opt:active{transform:scale(.97)}
+.courier-opt.selected{border-color:var(--blue);background:rgba(79,142,247,.1);color:var(--blue)}
+.courier-opt .ico{font-size:20px;margin-bottom:4px}
+
+/* DATE OPTIONS */
+.dates-list{display:flex;flex-direction:column;gap:8px}
+.date-opt{background:var(--card);border:1.5px solid var(--border);border-radius:10px;padding:14px;cursor:pointer;transition:all .15s;display:flex;align-items:center;justify-content:space-between}
+.date-opt:active{transform:scale(.98)}
+.date-opt.selected{border-color:var(--blue);background:rgba(79,142,247,.1)}
+.date-opt-day{font-size:15px;font-weight:700}
+.date-opt-date{font-size:12px;color:var(--text2)}
+.date-opt-check{width:20px;height:20px;border-radius:50%;border:2px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:11px;transition:all .15s}
+.date-opt.selected .date-opt-check{background:var(--blue);border-color:var(--blue);color:#fff}
+
+/* SUMMARY */
+.summary-card{background:var(--card);border:1.5px solid var(--border);border-radius:12px;padding:16px;margin-bottom:16px}
+.summary-row{display:flex;justify-content:space-between;align-items:flex-start;padding:8px 0;border-bottom:1px solid var(--border)}
+.summary-row:last-child{border:none}
+.summary-lbl{font-size:12px;color:var(--text2);font-weight:500}
+.summary-val{font-size:13px;font-weight:600;text-align:right;max-width:60%}
+
+/* TEXTAREA */
+textarea.fi{resize:none;height:80px;line-height:1.5}
+
+/* BUTTONS */
+.btn-next{width:100%;background:var(--blue);border:none;border-radius:12px;padding:16px;color:#fff;font-size:16px;font-weight:700;cursor:pointer;font-family:'Outfit',sans-serif;transition:opacity .15s;margin-top:8px}
+.btn-next:active{opacity:.85}
+.btn-next:disabled{opacity:.4;cursor:not-allowed}
+.btn-back{width:100%;background:transparent;border:1.5px solid var(--border);border-radius:12px;padding:14px;color:var(--text2);font-size:14px;font-weight:600;cursor:pointer;font-family:'Outfit',sans-serif;margin-top:8px}
+
+/* SUCCESS */
+.success{text-align:center;padding:40px 20px}
+.success-icon{font-size:64px;margin-bottom:20px;animation:bounce .6s ease}
+@keyframes bounce{0%,100%{transform:scale(1)}50%{transform:scale(1.2)}}
+.success-ttl{font-size:24px;font-weight:800;margin-bottom:8px}
+.success-sub{font-size:14px;color:var(--text2);line-height:1.6}
+.success-id{background:var(--card);border:1.5px solid var(--border);border-radius:10px;padding:12px;margin:20px 0;font-size:13px;color:var(--blue);font-weight:700;letter-spacing:.5px}
+
+/* LOADING */
+.loading{display:flex;align-items:center;justify-content:center;gap:10px;padding:20px;color:var(--text2);font-size:14px}
+.spinner{width:20px;height:20px;border:2px solid var(--border);border-top-color:var(--blue);border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ERROR */
+.err-msg{background:rgba(248,113,113,.1);border:1px solid rgba(248,113,113,.3);border-radius:8px;padding:10px 14px;font-size:12px;color:var(--red);margin-top:6px;display:none}
+.err-msg.show{display:block}
+
+/* NO DAYS */
+.no-dates{text-align:center;padding:30px;color:var(--text2);font-size:14px}
+</style>
+</head>
+<body>
+
+<div class="hdr">
+  <div class="hdr-logo">📦</div>
+  <div class="hdr-biz" id="bizName">Mi Negocio</div>
+  <div class="hdr-sub" id="bizSub">Completa tu pedido en segundos</div>
+</div>
+
+<div class="steps" id="stepsBar">
+  <div class="step active" id="step0"></div>
+  <div class="step" id="step1"></div>
+  <div class="step" id="step2"></div>
+  <div class="step" id="step3"></div>
+</div>
+
+<!-- PAGE 0: DATOS PERSONALES -->
+<div class="form-page active" id="page0">
+  <div class="section-ttl">👤 TUS DATOS</div>
+  <div class="fg">
+    <label class="fl">NOMBRE COMPLETO</label>
+    <input class="fi" id="fName" placeholder="Ej: María García Torres" autocomplete="name">
+    <div class="err-msg" id="errName">Por favor ingresa tu nombre completo</div>
+  </div>
+  <div class="fg">
+    <label class="fl">TELÉFONO WHATSAPP</label>
+    <div class="ph-wrap">
+      <span class="ph-pre">+51</span>
+      <input class="fi" id="fPhone" placeholder="9XXXXXXXX" maxlength="9" type="tel" inputmode="numeric">
+    </div>
+    <div class="err-msg" id="errPhone">Ingresa un número de 9 dígitos</div>
+  </div>
+  <div class="fg">
+    <label class="fl">DIRECCIÓN DE ENTREGA</label>
+    <input class="fi" id="fAddress" placeholder="Distrito / Calle / Número / Referencia">
+    <div class="err-msg" id="errAddress">Por favor ingresa tu dirección</div>
+  </div>
+  <div class="fg">
+    <label class="fl">NOTAS (opcional)</label>
+    <textarea class="fi" id="fNotes" placeholder="Instrucciones especiales, referencias..."></textarea>
+  </div>
+  <button class="btn-next" onclick="goNext(0)">Continuar →</button>
+</div>
+
+<!-- PAGE 1: COURIER -->
+<div class="form-page" id="page1">
+  <div class="section-ttl">🚚 TIPO DE ENVÍO</div>
+  <div class="courier-grid" id="courierGrid">
+    <div class="loading"><div class="spinner"></div> Cargando...</div>
+  </div>
+  <div class="err-msg" id="errCourier">Selecciona un tipo de envío</div>
+  <button class="btn-next" onclick="goNext(1)">Continuar →</button>
+  <button class="btn-back" onclick="goBack(1)">← Volver</button>
+</div>
+
+<!-- PAGE 2: FECHA -->
+<div class="form-page" id="page2">
+  <div class="section-ttl">📅 FECHA DE ENTREGA</div>
+  <div id="datesList" class="dates-list">
+    <div class="loading"><div class="spinner"></div> Calculando fechas...</div>
+  </div>
+  <div class="err-msg" id="errDate">Selecciona una fecha</div>
+  <button class="btn-next" onclick="goNext(2)" style="margin-top:16px">Continuar →</button>
+  <button class="btn-back" onclick="goBack(2)">← Volver</button>
+</div>
+
+<!-- PAGE 3: RESUMEN -->
+<div class="form-page" id="page3">
+  <div class="section-ttl">✅ RESUMEN DEL PEDIDO</div>
+  <div class="summary-card">
+    <div class="summary-row">
+      <span class="summary-lbl">Nombre</span>
+      <span class="summary-val" id="sName">—</span>
+    </div>
+    <div class="summary-row">
+      <span class="summary-lbl">Teléfono</span>
+      <span class="summary-val" id="sPhone">—</span>
+    </div>
+    <div class="summary-row">
+      <span class="summary-lbl">Dirección</span>
+      <span class="summary-val" id="sAddress">—</span>
+    </div>
+    <div class="summary-row">
+      <span class="summary-lbl">Envío</span>
+      <span class="summary-val" id="sCourier">—</span>
+    </div>
+    <div class="summary-row">
+      <span class="summary-lbl">Fecha</span>
+      <span class="summary-val" id="sDate">—</span>
+    </div>
+    <div class="summary-row" id="sNotesRow" style="display:none">
+      <span class="summary-lbl">Notas</span>
+      <span class="summary-val" id="sNotes">—</span>
+    </div>
+  </div>
+  <button class="btn-next" id="btnEnviar" onclick="submitOrder()">📦 Confirmar pedido</button>
+  <button class="btn-back" onclick="goBack(3)">← Volver</button>
+</div>
+
+<!-- SUCCESS -->
+<div class="form-page" id="pageSuccess">
+  <div class="success">
+    <div class="success-icon">🎉</div>
+    <div class="success-ttl">¡Pedido recibido!</div>
+    <div class="success-sub">Tu pedido fue registrado exitosamente. Te contactaremos por WhatsApp para coordinar la entrega.</div>
+    <div class="success-id" id="successId">Pedido #000</div>
+    <button class="btn-next" onclick="newOrder()">Hacer otro pedido</button>
+  </div>
+</div>
+
+<script>
+// ── FIREBASE REST ─────────────────────────────────────────────────────
+const KEY = "AIzaSyBkbY-CFtNHfbaG864sXVnaAwBKZGW6SRI";
+const PRJ = "total-tools-24ce8";
+const BASE = `https://firestore.googleapis.com/v1/projects/${PRJ}/databases/(default)/documents`;
+
+// Lee el código de equipo del URL o localStorage
+const urlParams = new URLSearchParams(window.location.search);
+const TEAM_CODE = urlParams.get('equipo') || localStorage.getItem('_teamCode') || 'default';
+
+function toFs(v){
+  if(v===null||v===undefined) return{nullValue:null};
+  if(typeof v==='boolean') return{booleanValue:v};
+  if(typeof v==='number') return Number.isInteger(v)?{integerValue:String(v)}:{doubleValue:v};
+  if(typeof v==='string') return{stringValue:v};
+  if(Array.isArray(v)) return{arrayValue:{values:v.map(toFs)}};
+  if(typeof v==='object'){const f={};Object.keys(v).forEach(k=>{f[k]=toFs(v[k])});return{mapValue:{fields:f}};}
+  return{stringValue:String(v)};
+}
+function fromFs(fv){
+  if(!fv) return null;
+  if('nullValue'in fv) return null;
+  if('booleanValue'in fv) return fv.booleanValue;
+  if('integerValue'in fv) return parseInt(fv.integerValue);
+  if('doubleValue'in fv) return fv.doubleValue;
+  if('stringValue'in fv) return fv.stringValue;
+  if('arrayValue'in fv) return(fv.arrayValue.values||[]).map(fromFs);
+  if('mapValue'in fv){const o={};Object.keys(fv.mapValue.fields||{}).forEach(k=>{o[k]=fromFs(fv.mapValue.fields[k])});return o;}
+  return null;
+}
+async function fsGet(path){
+  const r=await fetch(`${BASE}/${path}?key=${KEY}`);
+  if(r.status===404) return null;
+  if(!r.ok) return null;
+  const doc=await r.json();
+  if(!doc.fields) return null;
+  const o={};Object.keys(doc.fields).forEach(k=>{o[k]=fromFs(doc.fields[k])});
+  return o;
+}
+async function fsPatch(path,obj){
+  const fields={};Object.keys(obj).forEach(k=>{fields[k]=toFs(obj[k])});
+  const r=await fetch(`${BASE}/${path}?key=${KEY}`,{
+    method:'PATCH',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({fields})
+  });
+  if(!r.ok) throw new Error(await r.text());
+}
+
+// ── STATE ──────────────────────────────────────────────────────────────
+let CFG = null;
+let _courier = '';
+let _date = '';
+let _dateLabel = '';
+
+// ── LOAD CONFIG ────────────────────────────────────────────────────────
+async function loadConfig(){
+  try {
+    CFG = await fsGet(`teams/${TEAM_CODE}/panel/config`);
+    if(!CFG) CFG = await fsGet('panel/config'); // fallback
+  } catch(e){}
+
+  if(CFG){
+    if(CFG.config && CFG.config.name) {
+      document.getElementById('bizName').textContent = CFG.config.name;
+      document.title = `Pedido — ${CFG.config.name}`;
+    }
+    if(CFG.config && CFG.config.city)
+      document.getElementById('bizSub').textContent = `📍 ${CFG.config.city} · Completa tu pedido`;
+  }
+  renderCouriers();
+  renderDates();
+}
+
+// ── COURIERS ───────────────────────────────────────────────────────────
+function courierIcon(name){
+  const n=name.toUpperCase();
+  if(n.includes('SHALOM')) return'🚌';
+  if(n.includes('OLVA')) return'📬';
+  if(n.includes('MARVISUR')) return'🚐';
+  if(n.includes('DELIVERY')||n.includes('MOTORIZADO')) return'🏍️';
+  if(n.includes('RETIRO')) return'🏪';
+  if(n.includes('ENCOMIENDA')) return'📦';
+  return'🚚';
+}
+
+function renderCouriers(){
+  const grid = document.getElementById('courierGrid');
+  let couriers = (CFG && CFG.couriers) || ['SHALOM','OLVA COURIER','DELIVERY','RETIRO EN TIENDA'];
+  // Filter by courierActive
+  if(CFG && CFG.courierActive){
+    couriers = couriers.filter(c => CFG.courierActive[c] !== false);
+  }
+  if(!couriers.length){
+    grid.innerHTML='<div class="no-dates">No hay opciones de envío disponibles</div>';
+    return;
+  }
+  grid.innerHTML = couriers.map(c=>`
+    <div class="courier-opt" onclick="selectCourier('${c}')" id="copt_${c.replace(/\s/g,'_')}">
+      <div class="ico">${courierIcon(c)}</div>
+      ${c}
+    </div>`).join('');
+}
+
+function selectCourier(name){
+  _courier = name;
+  document.querySelectorAll('.courier-opt').forEach(el=>el.classList.remove('selected'));
+  const id = 'copt_'+name.replace(/\s/g,'_');
+  const el = document.getElementById(id);
+  if(el) el.classList.add('selected');
+  document.getElementById('errCourier').classList.remove('show');
+}
+
+// ── DATES ──────────────────────────────────────────────────────────────
+function renderDates(){
+  const dispatch = (CFG && CFG.dispatch) || {days:[1,2,3,4,5], cutHour:'23:59', anticipation:0};
+  const days = dispatch.days || [1,2,3,4,5];
+  const anticipation = dispatch.anticipation || 0;
+  const [cutH, cutM] = (dispatch.cutHour||'23:59').split(':').map(Number);
+
+  const now = new Date();
+  const todayDay = now.getDay(); // 0=Sun
+  const pastCut = (now.getHours() > cutH) || (now.getHours() === cutH && now.getMinutes() >= cutM);
+  
+  const dayNames = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
+  const monthNames = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+
+  const available = [];
+  let checked = 0;
+  let offset = anticipation + (pastCut ? 1 : 0);
+  
+  for(let i=1; i<=30 && available.length<5; i++){
+    const d = new Date(now);
+    d.setDate(now.getDate() + i);
+    const wd = d.getDay();
+    if(days.includes(wd)){
+      if(checked >= offset){
+        available.push(d);
+      }
+      checked++;
+    }
+  }
+
+  if(!available.length){
+    document.getElementById('datesList').innerHTML='<div class="no-dates">📅 No hay fechas disponibles por el momento</div>';
+    return;
+  }
+
+  document.getElementById('datesList').innerHTML = available.map(d=>{
+    const iso = d.toISOString().split('T')[0];
+    const label = `${dayNames[d.getDay()]} ${d.getDate()} de ${monthNames[d.getMonth()]}`;
+    return`<div class="date-opt" onclick="selectDate('${iso}','${label}')" id="dopt_${iso}">
+      <div>
+        <div class="date-opt-day">${dayNames[d.getDay()]}</div>
+        <div class="date-opt-date">${d.getDate()} de ${monthNames[d.getMonth()]} ${d.getFullYear()}</div>
+      </div>
+      <div class="date-opt-check">✓</div>
+    </div>`;
+  }).join('');
+}
+
+function selectDate(iso, label){
+  _date = iso;
+  _dateLabel = label;
+  document.querySelectorAll('.date-opt').forEach(el=>el.classList.remove('selected'));
+  const el = document.getElementById('dopt_'+iso);
+  if(el) el.classList.add('selected');
+  document.getElementById('errDate').classList.remove('show');
+}
+
+// ── NAVIGATION ─────────────────────────────────────────────────────────
+let _currentPage = 0;
+
+function updateSteps(page){
+  for(let i=0;i<4;i++){
+    const s = document.getElementById('step'+i);
+    s.className = 'step';
+    if(i < page) s.classList.add('done');
+    else if(i === page) s.classList.add('active');
+  }
+}
+
+function goNext(from){
+  if(from===0){
+    const name = document.getElementById('fName').value.trim();
+    const phone = document.getElementById('fPhone').value.trim();
+    const addr = document.getElementById('fAddress').value.trim();
+    let ok=true;
+    if(!name){document.getElementById('errName').classList.add('show');ok=false;}
+    else document.getElementById('errName').classList.remove('show');
+    if(phone.length!==9||!/^\d+$/.test(phone)){document.getElementById('errPhone').classList.add('show');ok=false;}
+    else document.getElementById('errPhone').classList.remove('show');
+    if(!addr){document.getElementById('errAddress').classList.add('show');ok=false;}
+    else document.getElementById('errAddress').classList.remove('show');
+    if(!ok) return;
+  }
+  if(from===1 && !_courier){
+    document.getElementById('errCourier').classList.add('show');return;
+  }
+  if(from===2 && !_date){
+    document.getElementById('errDate').classList.add('show');return;
+  }
+  if(from===3) return;
+
+  // Show summary on page 3
+  if(from===2){
+    const name=document.getElementById('fName').value.trim();
+    const phone=document.getElementById('fPhone').value.trim();
+    const addr=document.getElementById('fAddress').value.trim();
+    const notes=document.getElementById('fNotes').value.trim();
+    document.getElementById('sName').textContent=name;
+    document.getElementById('sPhone').textContent='+51 '+phone;
+    document.getElementById('sAddress').textContent=addr;
+    document.getElementById('sCourier').textContent=_courier;
+    document.getElementById('sDate').textContent=_dateLabel;
+    if(notes){
+      document.getElementById('sNotes').textContent=notes;
+      document.getElementById('sNotesRow').style.display='flex';
+    } else {
+      document.getElementById('sNotesRow').style.display='none';
+    }
+  }
+
+  document.getElementById('page'+from).classList.remove('active');
+  _currentPage = from+1;
+  document.getElementById('page'+_currentPage).classList.add('active');
+  updateSteps(_currentPage);
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+
+function goBack(from){
+  document.getElementById('page'+from).classList.remove('active');
+  _currentPage = from-1;
+  document.getElementById('page'+_currentPage).classList.add('active');
+  updateSteps(_currentPage);
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+
+// ── SUBMIT ─────────────────────────────────────────────────────────────
+async function submitOrder(){
+  const btn = document.getElementById('btnEnviar');
+  btn.disabled=true;
+  btn.textContent='Enviando...';
+
+  const name=document.getElementById('fName').value.trim();
+  const phone=document.getElementById('fPhone').value.trim();
+  const addr=document.getElementById('fAddress').value.trim();
+  const notes=document.getElementById('fNotes').value.trim();
+
+  const id = 'p'+Date.now();
+  const shipment = {
+    id, name, phone,
+    address: addr,
+    courier: _courier,
+    date: _date,
+    status: 'NUEVO PEDIDO',
+    cost: '',
+    notes,
+    extra: {},
+    docGuia: null,
+    docTicket: null,
+    links: [],
+    sel: false,
+    chkGuia: false,
+    chkTicket: false,
+    createdAt: new Date().toISOString(),
+    fromForm: true
+  };
+
+  try {
+    const fields={};
+    Object.keys(shipment).forEach(k=>{fields[k]=toFs(shipment[k])});
+    const path = `teams/${TEAM_CODE}/panel/shipments/items/${id}`;
+    await fetch(`${BASE}/${path}?key=${KEY}`,{
+      method:'PATCH',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({fields})
+    });
+
+    // Also update config ts so panel detects new order
+    const cfgPath = `teams/${TEAM_CODE}/panel/config`;
+    await fetch(`${BASE}/${cfgPath}?key=${KEY}`,{
+      method:'PATCH',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({fields:{ts:toFs(Date.now())}})
+    });
+
+    // Show success
+    const num = id.slice(-4).toUpperCase();
+    document.getElementById('successId').textContent = `Pedido #${num}`;
+    document.getElementById('page3').classList.remove('active');
+    document.getElementById('pageSuccess').classList.add('active');
+    document.getElementById('stepsBar').style.display='none';
+    window.scrollTo({top:0,behavior:'smooth'});
+  } catch(e){
+    btn.disabled=false;
+    btn.textContent='📦 Confirmar pedido';
+    alert('Error al enviar el pedido. Verifica tu conexión e intenta de nuevo.');
+  }
+}
+
+function newOrder(){
+  // Reset form
+  document.getElementById('fName').value='';
+  document.getElementById('fPhone').value='';
+  document.getElementById('fAddress').value='';
+  document.getElementById('fNotes').value='';
+  _courier='';_date='';_dateLabel='';
+  document.querySelectorAll('.courier-opt').forEach(e=>e.classList.remove('selected'));
+  document.querySelectorAll('.date-opt').forEach(e=>e.classList.remove('selected'));
+  document.getElementById('pageSuccess').classList.remove('active');
+  document.getElementById('page0').classList.add('active');
+  document.getElementById('stepsBar').style.display='flex';
+  _currentPage=0;
+  updateSteps(0);
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+
+// ── INIT ───────────────────────────────────────────────────────────────
+loadConfig();
+</script>
+</body>
+</html>
