@@ -1,0 +1,1556 @@
+// app.js — Logica principal. Edita para agregar funciones, comportamiento, UI.
+const cap=s=>s.charAt(0).toUpperCase()+s.slice(1);
+const $=id=>document.getElementById(id);
+
+/* STATE */
+let _mem={};
+function lsGet(k){try{return localStorage.getItem(k)}catch(e){return _mem[k]||null}}
+function lsSet(k,v){try{localStorage.setItem(k,v)}catch(e){_mem[k]=v}}
+
+let S=JSON.parse(lsGet('dpanel')||'{}');
+if(!S.shipments)    S.shipments=[];
+if(!S.couriers)     S.couriers=[];
+if(!S.extraFields)  S.extraFields=[];
+if(!S.labels)       S.labels=[];
+if(!S.msgTemplates) S.msgTemplates={};
+if(!S.courierActive) S.courierActive={};
+if(!S.suppliers)    S.suppliers=[];
+if(!S.trash)        S.trash=[];
+if(!S.statusPin)    S.statusPin='1234';
+if(!S.dispatch)     S.dispatch={days:[1,2,3,4,5],cutHour:'11:30',anticipation:0};
+if(!S.config)       S.config={name:'Mi Negocio',phone:'999000000',city:'Lima, Perú'};
+const FIXED_LABELS=['NUEVO PEDIDO','EN PROCESO','POR ALISTAR','ENVIADO','FINALIZADO'];
+const FIXED_LABEL_ICONS={'NUEVO PEDIDO':'🟡','EN PROCESO':'🟠','POR ALISTAR':'🔵','ENVIADO':'🚚','FINALIZADO':'✅'};
+FIXED_LABELS.forEach(l=>{ if(!S.labels.includes(l)) S.labels.push(l); });
+['PENDIENTE','ENTREGADO'].forEach(old=>{ S.labels=S.labels.filter(l=>l!==old); });
+const customLabels=S.labels.filter(l=>!FIXED_LABELS.includes(l));
+S.labels=[...FIXED_LABELS,...customLabels];
+const FIXED_COURIERS=['SHALOM','OLVA COURIER','MARVISUR','DINSIDES','DELIVERY','RETIRO EN TIENDA','ENCOMIENDA'];
+FIXED_COURIERS.forEach(c=>{ if(!S.couriers.includes(c)) S.couriers.unshift(c); });
+
+// ── FIREBASE SAVE/LOAD ────────────────────────────────────────────────
+let _S_TS = Date.now();
+window._S_TS = _S_TS;
+let _fbSaveTimer = null;
+
+const save = () => {
+  _S_TS = Date.now();
+  window._S_TS = _S_TS;
+  lsSet('dpanel', JSON.stringify(S)); // always save locally first (instant)
+  // Debounce Firebase writes to avoid hammering on rapid changes
+  clearTimeout(_fbSaveTimer);
+  _fbSaveTimer = setTimeout(() => {
+    if(window._fbSave) window._fbSave(S);
+  }, 800);
+};
+
+// Firebase status indicator in header
+window._fbStatus = (status) => {
+  const el = document.getElementById('fbDot');
+  if(!el) return;
+  el.setAttribute('data-ready','1');
+  el.style.animation = 'none';
+  if(status === 'ok') {
+    el.style.background = 'var(--green)';
+    el.title = 'Sincronizado con Firebase ☁️';
+  } else {
+    el.style.background = 'var(--red)';
+    el.title = 'Error de sincronización ⚠️';
+  }
+};
+
+// Merge remote state preserving local images
+window._mergeRemote = (remote) => {
+  // Preserve base64 images from local state
+  if(remote.shipments) {
+    remote.shipments = remote.shipments.map(rs => {
+      const local = S.shipments.find(ls => ls.id === rs.id);
+      if(local) {
+        if(rs.docGuia && rs.docGuia.d === '[img]' && local.docGuia) rs.docGuia = local.docGuia;
+        if(rs.docTicket && rs.docTicket.d === '[img]' && local.docTicket) rs.docTicket = local.docTicket;
+      }
+      return rs;
+    });
+  }
+  if(remote.suppliers) {
+    remote.suppliers = remote.suppliers.map(rs => {
+      const local = (S.suppliers||[]).find(ls => ls.id === rs.id);
+      if(local && rs.cotiz && rs.cotiz.d === '[img]' && local.cotiz) rs.cotiz = local.cotiz;
+      return rs;
+    });
+  }
+  // Full replace — not just assign — so arrays like labels/couriers sync correctly
+  Object.keys(remote).forEach(k => { S[k] = remote[k]; });
+  lsSet('dpanel', JSON.stringify(S));
+  render();
+  renderChips();
+  toast('☁️ Datos sincronizados');
+};
+
+// On Firebase ready: load remote data if available
+const _initFirebase = async () => {
+  const indicator = document.getElementById('fbDot');
+  if(indicator) indicator.style.display = 'block';
+  try {
+    const remote = await window._fbLoad();
+    if(remote && Object.keys(remote).length > 0) {
+      // Firebase tiene datos — siempre es la fuente de verdad
+      window._mergeRemote(remote);
+    } else {
+      // Firebase vacío — solo subir si tenemos datos locales reales
+      const tieneLocal = S.shipments.length > 0 || S.suppliers.length > 0 ||
+                         (S.config && S.config.name && S.config.name !== 'Mi Negocio');
+      if(tieneLocal) {
+        window._fbSave && window._fbSave(S);
+      }
+      // Si no hay datos en ningún lado — app nueva, no hacer nada
+    }
+  } catch(e) { console.warn('Firebase init error:', e); }
+  // Start real-time listener
+  if(window._fbListen) window._fbListen();
+};
+
+// Firebase init handled in _init()
+// ─────────────────────────────────────────────────────────────────────
+
+/* TOAST */
+function toast(m){const e=$('toastEl');e.textContent=m;e.classList.add('show');clearTimeout(e._t);e._t=setTimeout(()=>e.classList.remove('show'),2600)}
+
+/* TABS */
+function goPage(id){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  $('page-'+id).classList.add('active');
+  ['envios','compartir','configurar'].forEach((n,i)=>{if(n===id)document.querySelectorAll('.tab')[i].classList.add('active')});
+  if(id==='configurar') loadCfgUI();
+  if(id==='compartir') updateShareLink();
+}
+
+/* OVERLAYS */
+function openOverlay(id){$(id).classList.add('open');}
+function closeOverlay(id){$(id).classList.remove('open');}
+document.querySelectorAll('.overlay').forEach(el=>el.addEventListener('click',e=>{if(e.target===el)el.classList.remove('open')}));
+
+/* HELPERS */
+function allStatuses(){ return S.labels; }
+function stIcon(st){ return FIXED_LABEL_ICONS[st]||(st==='PENDIENTE'?'🕐':st==='ENVIADO'?'🚚':st==='ENTREGADO'?'✅':'🏷️') }
+function stClass(st){ return st==='NUEVO PEDIDO'?'st-pend':st==='EN PROCESO'?'st-env':st==='POR ALISTAR'?'st-env':st==='FINALIZADO'?'st-ent':st==='ENVIADO'?'st-env':st==='ENTREGADO'?'st-ent':'st-cust' }
+function stSoptClass(st){ return st==='NUEVO PEDIDO'?'sopt-pend':st==='EN PROCESO'?'sopt-env':st==='POR ALISTAR'?'sopt-env':st==='FINALIZADO'?'sopt-ent':st==='ENVIADO'?'sopt-env':st==='ENTREGADO'?'sopt-ent':'sopt-cust' }
+function fillVars(tpl,s){return tpl.replace(/\{nombre\}/gi,s.name).replace(/\{telefono\}/gi,s.phone).replace(/\{direccion\}/gi,s.address).replace(/\{courier\}/gi,s.courier).replace(/\{fecha\}/gi,s.date||'—').replace(/\{costo\}/gi,s.cost?'S/ '+s.cost:'—').replace(/\{estado\}/gi,s.status)}
+
+/* STATS */
+function updateStats(){
+  if(_filt==='EN PROCESO'){
+    renderStatsAsSuppliers();
+    return;
+  }
+  $('statsArea').style.display='grid';
+  $('suppStatsArea').style.display='none';
+  $('sTotal').textContent=S.shipments.length;
+  $('sPend').textContent=S.shipments.filter(x=>x.status==='NUEVO PEDIDO'||x.status==='EN PROCESO').length;
+  $('sEnv').textContent=S.shipments.filter(x=>x.status==='POR ALISTAR'||x.status==='ENVIADO').length;
+  $('sEnt').textContent=S.shipments.filter(x=>x.status==='FINALIZADO').length;
+}
+
+function renderStatsAsSuppliers(){
+  $('statsArea').style.display='none';
+  $('suppStatsArea').style.display='block';
+  if(!S.suppliers) S.suppliers=[];
+  const suppWithItems=S.suppliers.filter(sup=>(sup.items||[]).length>0);
+  const allReady=suppWithItems.length>0&&suppWithItems.every(sup=>sup.items.every(x=>x.done));
+  const enProceso=S.shipments.filter(x=>x.status==='EN PROCESO');
+  $('suppStatsArea').innerHTML=`
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+      <div style="font-family:'Syne',sans-serif;font-weight:700;font-size:14px;color:var(--text)">🏭 Proveedores</div>
+      <div style="display:flex;gap:7px;align-items:center">
+        <div style="display:flex;align-items:center;gap:5px;background:var(--bg2);border:1px solid var(--bd);border-radius:8px;padding:5px 9px">
+          <span style="font-size:12px">🔍</span>
+          <input id="suppGlobalSearch" placeholder="Pega código..."
+          onkeydown="if(!(event.ctrlKey||event.metaKey))event.preventDefault()"
+          oninput="const v=this.value;this.value='';if(v.trim())globalSuppSearch(v);"
+          style="background:none;border:none;outline:none;color:var(--text);font-size:11px;width:90px;caret-color:transparent">
+        </div>
+        <button onclick="openOverlay('suppNewOverlay')" style="background:var(--blue);border:none;border-radius:7px;color:#fff;padding:6px 12px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap">＋ Agregar</button>
+      </div>
+    </div>
+    <div id="globalSuppResult" style="display:none;background:var(--bg3);border:1px solid var(--bd);border-radius:8px;padding:9px 12px;margin-bottom:8px;font-size:12px;line-height:1.8"></div>
+    <div class="supp-cards">
+      ${S.suppliers.map(sup=>{
+        const pending=(sup.items||[]).filter(x=>!x.done).length;
+        const total=(sup.items||[]).length;
+        return`<div class="supp-card ${pending>0?'has-pending':''}" onclick="openSupplier('${sup.id}')">
+          <div class="supp-card-name">${sup.name}</div>
+          <div class="supp-card-phone">
+            <span style="font-size:11px;color:var(--blue)">📞 ${sup.phone}</span>
+            <button onclick="event.stopPropagation();sendSuppList('${sup.id}')"
+              style="background:rgba(46,160,67,.15);border:1px solid rgba(46,160,67,.3);color:var(--green);border-radius:6px;padding:3px 8px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap">
+              💬 Enviar
+            </button>
+          </div>
+          ${total>0?`<div class="supp-card-items">
+            ${(sup.items||[]).slice(0,4).map(it=>`<div class="supp-item-row">
+              <div class="supp-item-dot ${it.done?'done':''}"></div>
+              <span class="supp-item-text ${it.done?'done':''}" style="font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${it.text}</span>
+            </div>`).join('')}
+            ${total>4?`<div style="font-size:10px;color:var(--text2)">+${total-4} más...</div>`:''}
+          </div>`:`<div style="font-size:11px;color:var(--text2);font-style:italic;margin-top:4px">Lista vacía</div>`}
+          ${pending>0?`<div style="margin-top:6px;font-size:10px;font-weight:700;color:var(--red)">⚠️ ${pending} pendiente${pending>1?'s':''}</div>`:
+            total>0?`<div style="margin-top:6px;font-size:10px;font-weight:700;color:var(--green)">✅ Todo listo</div>`:''}
+        </div>`;
+      }).join('')}
+      ${!S.suppliers.length?`<div style="font-size:12px;color:var(--text2);padding:20px;text-align:center;width:100%">Toca ＋ para agregar tu primer proveedor</div>`:''}
+    </div>
+    ${allReady&&enProceso.length>0?`
+    <button onclick="moveAllToPorAlistar()" style="width:100%;margin-top:10px;padding:12px;background:linear-gradient(135deg,var(--green),#1a7f37);border:none;border-radius:10px;color:#fff;font-weight:700;font-size:14px;font-family:'Syne',sans-serif;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px">
+      ✅ Todo en stock — Pasar ${enProceso.length} pedido${enProceso.length>1?'s':''} a POR ALISTAR
+    </button>`:`
+    <div style="margin-top:10px;padding:9px 12px;background:var(--bg2);border-radius:8px;font-size:11px;color:var(--text2);text-align:center">
+      ${S.suppliers.length===0?'Agrega proveedores para gestionar el stock':'⏳ Aún hay pendientes — completa las listas para continuar'}
+    </div>`}
+  `;
+}
+
+function openAllLabels(){
+  const all=allStatuses();
+  $('allLabelsList').innerHTML=[
+    `<button class="sopt" style="background:rgba(56,139,253,.1);border-color:rgba(56,139,253,.4);color:var(--blue)" onclick="setFilt('');closeOverlay('allLabelsOverlay')">📋 TODOS</button>`,
+    ...all.map(st=>`<button class="sopt ${stSoptClass(st)}" onclick="setFilt('${st}');closeOverlay('allLabelsOverlay')">${stIcon(st)} ${st}<span style="float:right;font-size:11px;opacity:.6">${S.shipments.filter(x=>x.status===st).length}</span></button>`)
+  ].join('');
+  openOverlay('allLabelsOverlay');
+}
+
+/* ADVANCED SEARCH */
+let _adv={dateFrom:'',dateTo:'',couriers:[],costMin:'',costMax:'',doc:'any',sort:'newest'};
+let _advActive=false;
+
+function openAdvSearch(){
+  $('asCourierList').innerHTML=S.couriers.map(c=>`<div class="as-courier-chip ${_adv.couriers.includes(c)?'active':''}" onclick="toggleAsCourier('${c.replace(/'/g,"\\'")}')">🚚 ${c}</div>`).join('');
+  $('asDateFrom').value=_adv.dateFrom; $('asDateTo').value=_adv.dateTo;
+  $('asCostMin').value=_adv.costMin; $('asCostMax').value=_adv.costMax;
+  ['asDocAny','asDocGuia','asDocTicket','asDocNone'].forEach(id=>$(id)?.classList.remove('active'));
+  const dm={any:'asDocAny',guia:'asDocGuia',ticket:'asDocTicket',none:'asDocNone'};
+  $(dm[_adv.doc])?.classList.add('active');
+  const sm={newest:'sortNewest',oldest:'sortOldest',name:'sortName',cost:'sortCost'};
+  ['sortNewest','sortOldest','sortName','sortCost'].forEach(id=>$(id)?.classList.remove('active'));
+  $(sm[_adv.sort])?.classList.add('active');
+  openOverlay('advSearchOverlay');
+}
+function toggleAsCourier(c){
+  const idx=_adv.couriers.indexOf(c);
+  if(idx>=0) _adv.couriers.splice(idx,1); else _adv.couriers.push(c);
+  document.querySelectorAll('.as-courier-chip').forEach(el=>el.classList.toggle('active',_adv.couriers.includes(el.textContent.replace('🚚 ','').trim())));
+}
+function setAsDoc(v){ _adv.doc=v; const dm={any:'asDocAny',guia:'asDocGuia',ticket:'asDocTicket',none:'asDocNone'}; ['asDocAny','asDocGuia','asDocTicket','asDocNone'].forEach(id=>$(id)?.classList.remove('active')); $(dm[v])?.classList.add('active'); }
+function setSort(v){ _adv.sort=v; const sm={newest:'sortNewest',oldest:'sortOldest',name:'sortName',cost:'sortCost'}; ['sortNewest','sortOldest','sortName','sortCost'].forEach(id=>$(id)?.classList.remove('active')); $(sm[v])?.classList.add('active'); }
+function applyAdvSearch(){ _adv.dateFrom=$('asDateFrom').value; _adv.dateTo=$('asDateTo').value; _adv.costMin=$('asCostMin').value; _adv.costMax=$('asCostMax').value; _advActive=hasAdvFilters(); closeOverlay('advSearchOverlay'); render(); }
+function clearAdvSearch(){ _adv={dateFrom:'',dateTo:'',couriers:[],costMin:'',costMax:'',doc:'any',sort:'newest'}; _advActive=false; render(); }
+function hasAdvFilters(){ return !!(  _adv.dateFrom||_adv.dateTo||_adv.couriers.length||_adv.costMin||_adv.costMax||_adv.doc!=='any'||_adv.sort!=='newest'); }
+function updateAdvBar(){
+  const bar=$('activeFiltersBar');
+  if(!_advActive){bar.style.display='none'; $('advSearchBtn').style.color='var(--text2)'; return;}
+  $('advSearchBtn').style.color='var(--blue)';
+  const tags=[];
+  if(_adv.dateFrom||_adv.dateTo) tags.push(`📅 ${_adv.dateFrom||'...'} → ${_adv.dateTo||'...'}`);
+  if(_adv.couriers.length) tags.push(`🚚 ${_adv.couriers.join(', ')}`);
+  if(_adv.costMin||_adv.costMax) tags.push(`💰 S/${_adv.costMin||0}–${_adv.costMax||'∞'}`);
+  if(_adv.doc!=='any') tags.push({guia:'🚚 Con guía',ticket:'🧾 Con ticket',none:'Sin docs'}[_adv.doc]||'');
+  if(_adv.sort!=='newest') tags.push({oldest:'📅 Más antiguo',name:'🔤 A-Z',cost:'💰 Mayor costo'}[_adv.sort]||'');
+  bar.style.cssText='display:flex;gap:5px;flex-wrap:wrap;margin-bottom:6px;align-items:center';
+  bar.innerHTML=tags.map(t=>`<div class="active-filter-tag">${t}</div>`).join('')+
+    `<div class="active-filter-tag" style="cursor:pointer;background:rgba(247,129,102,.12);border-color:rgba(247,129,102,.3);color:var(--red)" onclick="clearAdvSearch()">✕ Limpiar</div>`;
+}
+
+/* BULK STATUS CHANGE */
+function bulkChangeStatus(){
+  const sel=S.shipments.filter(x=>x.sel);
+  if(!sel.length){ toast('No hay clientes seleccionados'); return; }
+  openPin(()=>{
+    $('bulkStatusInfo').textContent=`Selecciona el nuevo estado para ${sel.length} cliente${sel.length>1?'s':''}`;
+    $('bulkStatusOpts').innerHTML=allStatuses().map(st=>`
+      <button class="sopt ${stSoptClass(st)}" onclick="applyBulkStatus('${st}')">
+        <span>${stIcon(st)} ${st}</span>
+      </button>`).join('');
+    openOverlay('bulkStatusOverlay');
+  });
+}
+
+function applyBulkStatus(st){
+  const sel=S.shipments.filter(x=>x.sel);
+  sel.forEach(s=>{ s.status=st; s.sel=false; });
+  save(); render();
+  closeOverlay('bulkStatusOverlay');
+  toast(`✅ ${sel.length} cliente${sel.length>1?'s':''} → ${stIcon(st)} ${st}`);
+}
+
+function clearSearch(){ $('fSearch').value=''; $('fSearch').focus(); render(); }
+
+/* FILTER CHIPS */
+let _filt='';
+let _chipSort={}; // per-label sort: {label: 'courier_date'|'date'|'name'|'cost'}
+
+function renderChips(){
+  const all=allStatuses();
+  const lbl={'PENDIENTE':'🕐 Pendiente','ENVIADO':'🚚 Enviado','ENTREGADO':'✅ Entregado'};
+  const todosChip=$('chipTodos');
+  if(todosChip) todosChip.className='chip '+(_filt===''?'active':'');
+  $('filterChips').innerHTML=all.map(v=>{
+    const sortIcon=_chipSort[v]&&_chipSort[v]!=='courier_date'?'⚙️':'';
+    return`<div class="chip ${_filt===v?'active':''}"
+      onclick="setFilt('${v}')"
+      ondblclick="openChipSort('${v}')"
+    >${stIcon(v)} ${v}${sortIcon?` <span style="font-size:9px">${sortIcon}</span>`:''}</div>`;
+  }).join('');
+}
+function setFilt(v){_filt=v;renderChips();render()}
+
+function openChipSort(label){
+  _filt=label; renderChips(); render();
+  const cur=_chipSort[label]||'courier_date';
+  $('chipSortTitle').textContent=`${stIcon(label)} ${label}`;
+  ['courier_date','date','name','cost','cost_desc'].forEach(id=>{
+    const el=$('cs_'+id); if(el) el.classList.toggle('active',cur===id);
+  });
+  openOverlay('chipSortOverlay');
+}
+function setChipSort(v){
+  _chipSort[_filt]=v;
+  ['courier_date','date','name','cost','cost_desc'].forEach(id=>{
+    const el=$('cs_'+id); if(el) el.classList.toggle('active',v===id);
+  });
+  render(); renderChips();
+  toast('↕️ Orden actualizado');
+}
+
+/* RENDER */
+function render(){
+  updateStats(); updateAdvBar();
+  const sel=S.shipments.filter(x=>x.sel);
+  const srch=$('fSearch').value.toLowerCase();
+  let data=S.shipments;
+  if(_filt) data=data.filter(x=>x.status===_filt);
+  if(srch) data=data.filter(x=>x.name.toLowerCase().includes(srch)||x.phone.includes(srch)||x.address.toLowerCase().includes(srch)||x.courier.toLowerCase().includes(srch));
+
+  // Advanced filters
+  if(_advActive){
+    if(_adv.dateFrom) data=data.filter(x=>x.date&&x.date>=_adv.dateFrom);
+    if(_adv.dateTo)   data=data.filter(x=>x.date&&x.date<=_adv.dateTo);
+    if(_adv.couriers.length) data=data.filter(x=>_adv.couriers.includes(x.courier));
+    if(_adv.costMin)  data=data.filter(x=>parseFloat(x.cost||0)>=parseFloat(_adv.costMin));
+    if(_adv.costMax)  data=data.filter(x=>parseFloat(x.cost||0)<=parseFloat(_adv.costMax));
+    if(_adv.doc==='guia')   data=data.filter(x=>x.docGuia);
+    if(_adv.doc==='ticket') data=data.filter(x=>x.docTicket);
+    if(_adv.doc==='none')   data=data.filter(x=>!x.docGuia&&!x.docTicket);
+    // Sort
+    if(_adv.sort==='oldest') data=[...data].sort((a,b)=>(a.date||'').localeCompare(b.date||''));
+    else if(_adv.sort==='newest') data=[...data].sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+    else if(_adv.sort==='name') data=[...data].sort((a,b)=>a.name.localeCompare(b.name));
+    else if(_adv.sort==='cost') data=[...data].sort((a,b)=>parseFloat(b.cost||0)-parseFloat(a.cost||0));
+  } else {
+    // Default sort: by courier then by date
+    const sort=_filt?(_chipSort[_filt]||'courier_date'):'courier_date';
+    if(sort==='courier_date')      data=[...data].sort((a,b)=>a.courier.localeCompare(b.courier)||b.date.localeCompare(a.date));
+    else if(sort==='date')         data=[...data].sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+    else if(sort==='name')         data=[...data].sort((a,b)=>a.name.localeCompare(b.name));
+    else if(sort==='cost')         data=[...data].sort((a,b)=>parseFloat(a.cost||0)-parseFloat(b.cost||0));
+    else if(sort==='cost_desc')    data=[...data].sort((a,b)=>parseFloat(b.cost||0)-parseFloat(a.cost||0));
+  }
+  const groups={};
+  data.forEach(x=>{if(!groups[x.courier])groups[x.courier]=[];groups[x.courier].push(x)});
+  const area=$('cardsArea');
+  if(!data.length){area.innerHTML='<div class="empty-st"><div style="font-size:36px">📭</div><p style="margin-top:10px">Sin envíos. Presiona ➕</p></div>';return}
+  area.innerHTML=Object.entries(groups).map(([courier,items])=>`
+    <div class="cgroup">
+      <div class="cgroup-hdr"><div class="cgroup-bar"></div><span>🚚</span><div class="cgroup-name">${courier}</div><div class="cgroup-cnt">${items.length}</div></div>
+      ${items.map(s=>cardHTML(s)).join('')}
+    </div>`).join('');
+}
+
+function cardHTML(s){
+  const gChk=s.chkGuia||false, tChk=s.chkTicket||false;
+  const msgs=S.msgTemplates[s.status]||['',''];
+  const m1=msgs[0]&&msgs[0].trim(), m2=msgs[1]&&msgs[1].trim();
+  const pvtNote=s.privateNote||'';
+  return `<div class="card">
+    <div class="card-top">
+      <div class="chk ${s.sel?'on':''}" onclick="toggleSel('${s.id}')">${s.sel?'✓':''}</div>
+      <div class="cname" 
+        onclick="togglePvtNote('${s.id}')" 
+        ondblclick="event.stopPropagation();openPrivateNote('${s.id}')"
+        style="cursor:pointer;flex:1;user-select:none">
+        ${s.name}${pvtNote?` <span style="font-size:11px;color:var(--purple);opacity:.7">🔒</span>`:''}
+      </div>
+      <button class="wa-btn" onclick="openWA('${s.id}')">💬</button>
+    </div>
+    ${pvtNote?`<div class="pvt-note" id="pvt_${s.id}" style="display:none" ondblclick="openPrivateNote('${s.id}')">🔒 ${pvtNote}</div>`:''}
+    <div class="card-meta">
+      <span class="meta">📞 ${s.phone}</span>
+      <span class="meta">📅 ${s.date||'—'}</span>
+      ${s.cost?`<span class="meta">💰 S/ ${s.cost}</span>`:''}
+    </div>
+    <div class="card-addr">🏠 ${s.address}</div>
+    ${s.notes?`<div class="card-note">📝 ${s.notes}</div>`:''}
+    ${cardDocs(s,gChk,tChk)}
+    ${(m1||m2)?`<div class="card-msgs">
+      ${m1?`<button class="card-msg card-msg-a" onclick="quickMsg('${s.id}',0)"><span class="card-msg-ltr">A</span><span class="card-msg-txt">${fillVars(m1,s).substring(0,70)}${fillVars(m1,s).length>70?'…':''}</span></button>`:''}
+      ${m2?`<button class="card-msg card-msg-b" onclick="quickMsg('${s.id}',1)"><span class="card-msg-ltr">B</span><span class="card-msg-txt">${fillVars(m2,s).substring(0,70)}${fillVars(m2,s).length>70?'…':''}</span></button>`:''}
+    </div>`:''}
+    <div class="card-actions">
+      <button class="btn-st ${stClass(s.status)}" onclick="openStatus('${s.id}')" style="${!_filt?'opacity:.5;cursor:default':''}">
+        ${stIcon(s.status)} ${s.status}${!_filt?' 🔒':''}
+      </button>
+      <button class="btn-edit" onclick="openForm('${s.id}')">✏️</button>
+      <button class="btn-del" onclick="openDel('${s.id}')">🗑️</button>
+    </div>
+  </div>`;
+}
+
+function cardDocs(s,gChk,tChk){
+  const has=s.docGuia||s.docTicket||(s.links&&s.links.length);
+  if(!has)return'';
+  return`<div class="card-docs">
+    ${s.docGuia?`<div class="doc-thumb" style="border:2px solid ${gChk?'var(--green)':'var(--bd)'}">
+      <div onclick="qView('${s.id}','guia')">${s.docGuia.t&&s.docGuia.t.startsWith('image/')?`<img src="${s.docGuia.d}" style="width:52px;height:66px;object-fit:cover;display:block">`:`<div class="doc-thumb-pdf"><span style="font-size:20px">📄</span></div>`}</div>
+      <div class="doc-lbl">GUÍA</div>
+      <div class="doc-chk ${gChk?'on-g':''}" onclick="event.stopPropagation();togDoc('${s.id}','guia')">${gChk?'✓':''}</div>
+    </div>`:''}
+    ${s.docTicket?`<div class="doc-thumb" style="border:2px solid ${tChk?'var(--purple)':'var(--bd)'}">
+      <div onclick="qView('${s.id}','ticket')">${s.docTicket.t&&s.docTicket.t.startsWith('image/')?`<img src="${s.docTicket.d}" style="width:52px;height:66px;object-fit:cover;display:block">`:`<div class="doc-thumb-pdf"><span style="font-size:20px">🧾</span></div>`}</div>
+      <div class="doc-lbl">TICKET</div>
+      <div class="doc-chk ${tChk?'on-t':''}" onclick="event.stopPropagation();togDoc('${s.id}','ticket')">${tChk?'✓':''}</div>
+    </div>`:''}
+    ${(s.links||[]).map(l=>`<div class="link-chip">🔗 ${l.n}</div>`).join('')}
+  </div>`;
+}
+
+/* SELECT */
+function toggleSel(id){const s=S.shipments.find(x=>x.id===id);if(!s)return;s.sel=!s.sel;save();render()}
+function selAll(){const all=S.shipments.every(x=>x.sel);S.shipments.forEach(x=>x.sel=!all);save();render()}
+
+/* DOC TOGGLE */
+function togDoc(id,slot){const s=S.shipments.find(x=>x.id===id);if(!s)return;if(slot==='guia')s.chkGuia=!s.chkGuia;else s.chkTicket=!s.chkTicket;save();render()}
+
+/* QUICK MSG */
+function quickMsg(id,idx){
+  const s=S.shipments.find(x=>x.id===id);if(!s)return;
+  const msgs=S.msgTemplates[s.status]||['',''];
+  const tpl=msgs[idx];if(!tpl||!tpl.trim())return;
+  window.open(`https://wa.me/51${s.phone}?text=${encodeURIComponent(fillVars(tpl,s))}`,'_blank');
+}
+
+/* SUPPLIERS */
+let _suppId=null;
+
+function globalSuppSearch(raw){
+  if(!raw) raw=($('suppGlobalSearch').value||'');
+  if(!raw.trim()) return;
+
+  const codeRegex=/\b([A-Z]{1,6}[0-9][A-Z0-9\-]{2,})\b/g;
+  const extracted=[];
+  let m;
+  while((m=codeRegex.exec(raw))!==null){
+    const c=m[1].replace(/\s+/g,'');
+    if(!extracted.includes(c)) extracted.push(c);
+  }
+  raw.split(/[\n,]+/).forEach(line=>{
+    const t=line.trim().replace(/\s+/g,'');
+    if(t.length>3&&!extracted.includes(t)) extracted.push(t);
+  });
+
+  if(!extracted.length) return;
+
+  let marked=0;
+  extracted.forEach(q=>{
+    S.suppliers.forEach(sup=>{
+      (sup.items||[]).forEach((it,i)=>{
+        // Get just the code part (before first space)
+        const itemCode=it.text.trim().split(/\s+/)[0].toLowerCase();
+        const searchCode=q.toLowerCase();
+        if(itemCode===searchCode&&!it.done){
+          sup.items[i].done=true;
+          marked++;
+        }
+      });
+    });
+  });
+
+  if(marked>0){ 
+    save(); 
+    // Force full re-render of suppliers panel
+    const area=$('suppStatsArea');
+    if(area) area.innerHTML='';
+    render(); 
+    toast(`✅ ${marked} ítem${marked>1?'s':''} marcado${marked>1?'s':''}`); 
+  }
+
+  // Clear silently
+  const inp=$('suppGlobalSearch'); if(inp) inp.value='';
+}
+
+function renderSuppliersPanel(){
+  if(!S.suppliers) S.suppliers=[];
+  return`<div class="supp-panel">
+    <div class="supp-panel-hdr">
+      <div class="supp-panel-ttl">🏭 Proveedores</div>
+      <span style="font-size:11px;color:var(--text2)">${S.suppliers.length} proveedor${S.suppliers.length!==1?'es':''}</span>
+    </div>
+    <div class="supp-cards">
+      ${S.suppliers.map(sup=>{
+        const pending=sup.items?sup.items.filter(x=>!x.done).length:0;
+        const total=sup.items?sup.items.length:0;
+        return`<div class="supp-card ${pending>0?'has-pending':''}" onclick="openSupplier('${sup.id}')">
+          <div class="supp-card-name">${sup.name}</div>
+          <div class="supp-card-phone">
+            <span>📞 ${sup.phone}</span>
+            <button onclick="event.stopPropagation();window.open('https://wa.me/51${sup.phone}','_blank')" style="background:rgba(46,160,67,.15);border:1px solid rgba(46,160,67,.3);color:var(--green);border-radius:6px;width:24px;height:24px;font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0">💬</button>
+          </div>
+          ${total>0?`<div class="supp-card-items">
+            ${sup.items.slice(0,4).map(it=>`<div class="supp-item-row">
+              <div class="supp-item-dot ${it.done?'done':''}"></div>
+              <span class="supp-item-text ${it.done?'done':''}">${it.text}</span>
+            </div>`).join('')}
+            ${total>4?`<div style="font-size:10px;color:var(--text2);margin-top:2px">+${total-4} más...</div>`:''}
+          </div>`:`<div style="font-size:11px;color:var(--text2);font-style:italic">Sin items aún</div>`}
+          ${pending>0?`<div style="margin-top:8px;font-size:10px;font-weight:700;color:var(--red)">⚠️ ${pending} pendiente${pending>1?'s':''}</div>`:''}
+        </div>`;
+      }).join('')}
+      <div class="supp-add-card" onclick="openOverlay('suppNewOverlay')">＋</div>
+    </div>
+  </div>`;
+}
+
+function openSupplier(id){
+  _suppId=id;
+  const sup=S.suppliers.find(x=>x.id===id); if(!sup) return;
+  $('suppName').textContent='🏭 '+sup.name;
+  $('suppPhone').innerHTML=`📞 ${sup.phone} <button onclick="window.open('https://wa.me/51${sup.phone}','_blank')" style="background:rgba(46,160,67,.15);border:1px solid rgba(46,160,67,.3);color:var(--green);border-radius:7px;padding:4px 10px;font-size:12px;font-weight:700;cursor:pointer">💬 WhatsApp</button>`;
+  renderCotizArea(sup);
+  renderSuppItems(sup);
+  $('suppNewItem').value='';
+  const srch=$('suppSearch'); if(srch) srch.value='';
+  openOverlay('suppOverlay');
+}
+function toggleAllSuppItems(){
+  const sup=S.suppliers.find(x=>x.id===_suppId); if(!sup||!sup.items||!sup.items.length) return;
+  const allDone=sup.items.every(x=>x.done);
+  sup.items.forEach(x=>x.done=!allDone);
+  save(); render(); renderSuppItems(sup);
+  toast(allDone?'☐ Todo desmarcado':'✅ Todo marcado');
+}
+
+function filterSuppItems(){
+  const sup=S.suppliers.find(x=>x.id===_suppId); if(!sup) return;
+  const q=($('suppSearch').value||'').toLowerCase().trim();
+  renderSuppItems(sup);
+  if(!q) return;
+  $('suppItemsList').querySelectorAll('[data-supp-text]').forEach(row=>{
+    const text=row.getAttribute('data-supp-text').toLowerCase();
+    row.style.display=text.includes(q)?'flex':'none';
+  });
+}
+
+function bulkVerifySupp(){
+  const sup=S.suppliers.find(x=>x.id===_suppId); if(!sup||!sup.items||!sup.items.length) return;
+  const q=($('suppSearch').value||'').toLowerCase().trim();
+  // If searching, only verify filtered items; otherwise all
+  const allDone=q
+    ? sup.items.filter(it=>it.text.toLowerCase().includes(q)).every(x=>x.done)
+    : sup.items.every(x=>x.done);
+  if(q){
+    sup.items.forEach(it=>{ if(it.text.toLowerCase().includes(q)) it.done=!allDone; });
+  } else {
+    sup.items.forEach(it=>it.done=!allDone);
+  }
+  save(); render(); filterSuppItems();
+  toast(allDone?'☐ Desmarcados':'✅ '+( q?'Filtrados':'Todos')+' marcados');
+}
+
+function renderSuppItems(sup){
+  if(!sup.items||!sup.items.length){
+    $('suppItemsList').innerHTML='<div style="text-align:center;padding:16px;color:var(--text2);font-size:12px">Sin items. Agrega productos o tareas pendientes.</div>';
+    return;
+  }
+  $('suppItemsList').innerHTML=sup.items.map((it,i)=>`
+    <div data-supp-text="${it.text.replace(/"/g,'&quot;')}" style="display:flex;align-items:center;gap:12px;padding:14px 0;border-bottom:1px solid var(--bd)">
+      <div onclick="toggleSuppItem('${sup.id}',${i})" style="width:28px;height:28px;border-radius:8px;border:2px solid ${it.done?'var(--green)':'var(--bd)'};background:${it.done?'var(--green)':'transparent'};display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;color:#fff;font-size:14px;font-weight:700">${it.done?'✓':''}</div>
+      <span style="flex:1;font-size:15px;font-weight:500;cursor:pointer;${it.done?'text-decoration:line-through;opacity:.45':''}"
+        ontouchstart="suppTapStart('${sup.id}',${i},this,event)"
+        ontouchmove="suppTapMove(event)"
+        ontouchend="suppTapEnd(event)"
+        onclick="toggleSuppItem('${sup.id}',${i})"
+      >${it.text}</span>
+      <button onclick="delSuppItem('${sup.id}',${i})" style="background:none;border:none;color:var(--red);font-size:20px;cursor:pointer;opacity:.7;padding:0 4px;flex-shrink:0">✕</button>
+    </div>`).join('');
+}
+
+let _suppTapTimer=null,_suppTapId=null,_suppTapIdx=null,_suppTapEl=null,_suppTapX=0,_suppTapY=0;
+function suppTapStart(suppId,idx,el,e){
+  _suppTapId=suppId;_suppTapIdx=idx;_suppTapEl=el;
+  _suppTapX=e.touches?e.touches[0].clientX:0;
+  _suppTapY=e.touches?e.touches[0].clientY:0;
+  _suppTapTimer=setTimeout(()=>{ editSuppItem(suppId,idx,el); _suppTapTimer=null; },700);
+}
+function suppTapMove(e){
+  if(!_suppTapTimer) return;
+  const dx=Math.abs((e.touches?e.touches[0].clientX:0)-_suppTapX);
+  const dy=Math.abs((e.touches?e.touches[0].clientY:0)-_suppTapY);
+  if(dx>8||dy>8){ clearTimeout(_suppTapTimer); _suppTapTimer=null; }
+}
+function suppTapEnd(e){
+  if(_suppTapTimer){ clearTimeout(_suppTapTimer); _suppTapTimer=null; }
+}
+
+function editSuppItem(suppId,idx,el){
+  const sup=S.suppliers.find(x=>x.id===suppId); if(!sup) return;
+  const old=sup.items[idx].text;
+  const input=document.createElement('input');
+  input.value=old;
+  input.style.cssText='flex:1;background:var(--bg2);border:1px solid var(--blue);border-radius:6px;padding:4px 8px;font-size:15px;color:var(--text);outline:none;width:100%';
+  el.replaceWith(input);
+  input.focus();
+  input.select();
+  const save_=()=>{
+    const v=input.value.trim();
+    if(v) sup.items[idx].text=v;
+    save(); renderSuppItems(sup);
+  };
+  input.onblur=save_;
+  input.onkeydown=e=>{ if(e.key==='Enter') input.blur(); if(e.key==='Escape'){ sup.items[idx].text=old; renderSuppItems(sup); } };
+}
+
+function setSuppItemState(){}
+
+function addSuppItem(){
+  const sup=S.suppliers.find(x=>x.id===_suppId); if(!sup) return;
+  const v=$('suppNewItem').value.trim(); if(!v) return;
+  if(!sup.items) sup.items=[];
+  sup.items.push({text:v,done:false});
+  $('suppNewItem').value='';
+  save(); render(); renderSuppItems(sup);
+}
+
+function toggleSuppItem(suppId,idx){
+  const sup=S.suppliers.find(x=>x.id===suppId); if(!sup) return;
+  sup.items[idx].done=!sup.items[idx].done;
+  save(); render(); renderSuppItems(sup);
+}
+
+function delSuppItem(suppId,idx){
+  const sup=S.suppliers.find(x=>x.id===suppId); if(!sup) return;
+  sup.items.splice(idx,1);
+  save(); render(); renderSuppItems(sup);
+}
+
+function moveAllToPorAlistar(){
+  openPin(()=>{
+    const count=S.shipments.filter(x=>x.status==='EN PROCESO').length;
+    S.shipments.forEach(x=>{ if(x.status==='EN PROCESO') x.status='POR ALISTAR'; });
+    save(); render();
+    toast(`🔵 ${count} pedido${count>1?'s':''} → POR ALISTAR`);
+  });
+}
+
+function sendSuppList(suppId){
+  const sup=S.suppliers.find(x=>x.id===suppId); if(!sup) return;
+  if(!sup.phone){ toast('⚠️ Sin número de teléfono'); return; }
+  const pending=(sup.items||[]).filter(x=>!x.done);
+  if(!pending.length){ toast('✅ Sin pendientes para enviar'); return; }
+  let msg=`Hola! 👋 Te paso la lista de lo que necesito:\n\n`;
+  pending.forEach((it,i)=>{ msg+=`${i+1}. ${it.text}\n`; });
+  msg+=`\nGracias 🙏`;
+  window.open(`https://wa.me/51${sup.phone}?text=${encodeURIComponent(msg)}`,'_blank');
+}
+
+function saveNewSupplier(){
+  const name=$('suppNewName').value.trim();
+  const phone=$('suppNewPhone').value.trim();
+  if(!name){toast('⚠️ Ingresa el nombre');return}
+  S.suppliers.push({id:'sup_'+Date.now(),name,phone,items:[]});
+  $('suppNewName').value=''; $('suppNewPhone').value='';
+  save(); render(); closeOverlay('suppNewOverlay');
+  toast('✅ Proveedor agregado');
+}
+
+function openSuppSwitch(){
+  if(S.suppliers.length<=1){toast('Solo tienes un proveedor');return}
+  const existing=document.getElementById('suppSwitchMenu');
+  if(existing){existing.remove();return}
+  const sheet=document.getElementById('suppOverlay').querySelector('.sheet');
+  sheet.style.position='relative';
+  const div=document.createElement('div');
+  div.id='suppSwitchMenu';
+  div.style.cssText='position:absolute;top:55px;left:18px;right:18px;background:var(--bg2);border:1px solid var(--bd);border-radius:12px;overflow:hidden;z-index:20;box-shadow:0 8px 24px rgba(0,0,0,.6)';
+  div.innerHTML='<div style="padding:9px 14px;font-size:10px;font-weight:700;color:var(--text2);letter-spacing:.8px;border-bottom:1px solid var(--bd)">CAMBIAR PROVEEDOR</div>'+
+    S.suppliers.map(s=>'<div onclick="switchSupplier(\''+s.id+'\')" style="padding:13px 14px;font-size:14px;font-weight:700;cursor:pointer;border-bottom:1px solid var(--bd);color:'+(s.id===_suppId?'var(--blue)':'var(--text)')+'">🏭 '+s.name+(s.id===_suppId?' <span style="font-size:10px;opacity:.6">● actual</span>':'')+'</div>').join('')+
+    '<div onclick="document.getElementById(\'suppSwitchMenu\').remove()" style="padding:11px 14px;font-size:13px;color:var(--text2);cursor:pointer;text-align:center">Cancelar</div>';
+  sheet.appendChild(div);
+}
+function switchSupplier(id){
+  const m=document.getElementById('suppSwitchMenu');if(m)m.remove();
+  openSupplier(id);
+}
+
+function renderCotizArea(sup){
+  const area=$('suppCotizArea'); if(!area) return;
+  if(sup.cotiz){
+    const isPdf=sup.cotiz.t&&sup.cotiz.t.includes('pdf');
+    area.innerHTML=`<div class="cotiz-wrap">
+      <div class="cotiz-hdr">
+        <div style="display:flex;align-items:center;gap:6px;flex:1;min-width:0">
+          <span style="font-size:12px;flex-shrink:0">📎</span>
+          <div style="display:flex;align-items:center;gap:4px;background:var(--bg2);border:1px solid var(--bd);border-radius:7px;padding:3px 8px;flex:1">
+            <span style="font-size:10px;flex-shrink:0">🔍</span>
+            <input id="suppSearch" placeholder="Buscar código..." oninput="filterSuppItems()"
+              style="background:none;border:none;outline:none;color:var(--text);font-size:11px;width:100%;min-width:0">
+          </div>
+        </div>
+        <div style="display:flex;gap:5px;align-items:center;flex-shrink:0;margin-left:6px">
+          <button class="cotiz-btn cotiz-add" style="padding:3px 9px;font-size:10px" onclick="toggleCotizImg('cotizImgArea_${sup.id}')">👁 Ver</button>
+          <button class="cotiz-btn cotiz-add" style="padding:3px 9px;font-size:10px" onclick="openCotizMenu()">🔄</button>
+          <button class="cotiz-btn cotiz-del" style="padding:3px 9px;font-size:10px" onclick="delCotiz('${sup.id}')">🗑️</button>
+        </div>
+      </div>
+      <div id="cotizImgArea_${sup.id}" style="display:none">
+        ${isPdf
+          ?`<div class="cotiz-pdf-box" style="padding:12px"><span style="font-size:28px">📄</span><button onclick="window.open(S.suppliers.find(x=>x.id==='${sup.id}').cotiz.d)" style="margin-top:6px;background:rgba(56,139,253,.12);border:1px solid rgba(56,139,253,.25);color:var(--blue);border-radius:6px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer">Abrir PDF</button></div>`
+          :`<img class="cotiz-img" style="max-height:180px" src="${sup.cotiz.d}" onclick="openViewer(S.suppliers.find(x=>x.id==='${sup.id}').cotiz,'📄 Cotización ${sup.name}')">`
+        }
+      </div>
+    </div>`;
+  } else {
+    area.innerHTML=`<div style="display:flex;align-items:center;justify-content:space-between;background:var(--bg3);border:1px dashed var(--bd);border-radius:8px;padding:8px 12px">
+      <span style="font-size:11px;color:var(--text2)">📎 Sin cotización</span>
+      <button onclick="openCotizMenu()" style="background:rgba(56,139,253,.12);border:1px solid rgba(56,139,253,.25);color:var(--blue);border-radius:6px;padding:4px 10px;font-size:11px;font-weight:700;cursor:pointer">＋ Subir</button>
+    </div>`;
+  }
+}
+
+function toggleCotizImg(id){
+  const el=document.getElementById(id); if(!el) return;
+  el.style.display=el.style.display==='none'?'block':'none';
+}
+
+function openCotizMenu(){
+  const existing=document.getElementById('cotizMenu');
+  if(existing){existing.remove();return}
+  const div=document.createElement('div');
+  div.id='cotizMenu';
+  div.style.cssText='background:var(--bg2);border:1px solid var(--bd);border-radius:12px;overflow:hidden;margin-top:6px';
+  div.innerHTML=`
+    <div onclick="$('cotizCam').click();this.closest('#cotizMenu').remove()" style="padding:12px 14px;font-size:13px;font-weight:600;cursor:pointer;border-bottom:1px solid var(--bd);color:var(--text)">📷 Tomar foto</div>
+    <div onclick="$('cotizGal').click();this.closest('#cotizMenu').remove()" style="padding:12px 14px;font-size:13px;font-weight:600;cursor:pointer;border-bottom:1px solid var(--bd);color:var(--text)">🖼️ Galería</div>
+    <div onclick="$('cotizPdf').click();this.closest('#cotizMenu').remove()" style="padding:12px 14px;font-size:13px;font-weight:600;cursor:pointer;border-bottom:1px solid var(--bd);color:var(--text)">📄 PDF</div>
+    <div onclick="this.closest('#cotizMenu').remove()" style="padding:11px 14px;font-size:13px;color:var(--text2);cursor:pointer;text-align:center">Cancelar</div>`;
+  $('suppCotizArea').appendChild(div);
+}
+
+function loadCotiz(input){
+  const file=input.files[0]; if(!file) return;
+  if(file.size>10*1024*1024){toast('⚠️ Máximo 10MB');return}
+  const r=new FileReader();
+  r.onload=e=>{
+    const sup=S.suppliers.find(x=>x.id===_suppId); if(!sup) return;
+    sup.cotiz={d:e.target.result,n:file.name,t:file.type};
+    save(); renderCotizArea(sup);
+    toast('✅ Cotización subida');
+  };
+  r.readAsDataURL(file);
+  input.value='';
+}
+
+function delCotiz(suppId){
+  const sup=S.suppliers.find(x=>x.id===suppId); if(!sup) return;
+  sup.cotiz=null; save(); renderCotizArea(sup);
+  toast('🗑️ Cotización eliminada');
+}
+function openEditSupplier(){
+  const sup=S.suppliers.find(x=>x.id===_suppId); if(!sup) return;
+  $('suppEditName').value=sup.name;
+  $('suppEditPhone').value=sup.phone;
+  openOverlay('suppEditOverlay');
+}
+function saveEditSupplier(){
+  const sup=S.suppliers.find(x=>x.id===_suppId); if(!sup) return;
+  const name=$('suppEditName').value.trim();
+  const phone=$('suppEditPhone').value.trim();
+  if(!name){toast('⚠️ Ingresa el nombre');return}
+  sup.name=name; sup.phone=phone;
+  save(); render();
+  // Update header in suppOverlay
+  $('suppName').textContent='🏭 '+name;
+  $('suppPhone').innerHTML=`📞 ${phone} <button onclick="window.open('https://wa.me/51${phone}','_blank')" style="background:rgba(46,160,67,.15);border:1px solid rgba(46,160,67,.3);color:var(--green);border-radius:7px;padding:4px 10px;font-size:12px;font-weight:700;cursor:pointer">💬 WhatsApp</button>`;
+  closeOverlay('suppEditOverlay');
+  toast('✅ Proveedor actualizado');
+}
+let _pvtNoteId=null;
+function togglePvtNote(id){
+  const el=$('pvt_'+id); if(!el) return;
+  el.style.display=el.style.display==='none'?'block':'none';
+}
+function openPrivateNote(id){
+  _pvtNoteId=id;
+  const s=S.shipments.find(x=>x.id===id); if(!s) return;
+  $('pvtNoteName').textContent='📦 '+s.name;
+  $('pvtNoteInput').value=s.privateNote||'';
+  $('pvtNoteDelBtn').style.display=s.privateNote?'block':'none';
+  openOverlay('pvtNoteOverlay');
+}
+function savePvtNote(){
+  const s=S.shipments.find(x=>x.id===_pvtNoteId); if(!s) return;
+  s.privateNote=$('pvtNoteInput').value.trim();
+  save(); render(); closeOverlay('pvtNoteOverlay');
+  toast('🔒 Nota privada guardada');
+}
+function deletePvtNote(){
+  const s=S.shipments.find(x=>x.id===_pvtNoteId); if(!s) return;
+  s.privateNote='';
+  save(); render(); closeOverlay('pvtNoteOverlay');
+  toast('🗑️ Nota eliminada');
+}
+
+/* STATUS */
+let _stId=null;
+function openStatus(id){
+  if(!_filt){ toast('⚠️ Filtra por una etiqueta primero'); return; }
+  // Require PIN
+  openPin(()=>{ _doOpenStatus(id); });
+}
+
+function _doOpenStatus(id){
+  _stId=id;
+  const s=S.shipments.find(x=>x.id===id);if(!s)return;
+  const sel=S.shipments.filter(x=>x.sel);
+  const all=allStatuses();
+  const curIdx=all.indexOf(s.status);
+  $('stClientName').textContent= sel.length>1
+    ? `📦 ${sel.length} clientes seleccionados`
+    : `📦 ${s.name}`;
+  $('stCurrentLbl').textContent= sel.length>1
+    ? `Estado actual de "${s.name}": ${stIcon(s.status)} ${s.status}`
+    : '';
+  $('statusOpts').innerHTML=all.map((st,i)=>{
+    const isCur=i===curIdx;
+    const canFwd=i===curIdx+1;
+    const canBck=i===curIdx-1;
+    // Special: from NUEVO PEDIDO (idx 0) allow jump to POR ALISTAR (idx 2)
+    const canJump=all[curIdx]==='NUEVO PEDIDO' && st==='POR ALISTAR';
+    const ok=canFwd||canBck||canJump;
+    return`<button class="sopt ${stSoptClass(st)}"
+      style="
+        ${isCur?'border-width:3px;opacity:1;filter:brightness(1.3);box-shadow:0 0 0 3px rgba(255,255,255,.1)':''}
+        ${!isCur&&!ok?'opacity:.2;cursor:not-allowed':''}
+        ${!isCur&&ok?'opacity:.65':''}
+      "
+      onclick="${ok?`applyStatus('${st}')`:''}"
+      ${isCur||!ok?'disabled':''}>
+      <span>${stIcon(st)} ${st}</span>
+      <span style="font-size:11px;font-weight:600;opacity:.8">
+        ${isCur?'● ACTUAL':canJump?'⏩ saltar':canFwd?'▶ avanzar':canBck?'◀ retroceder':''}
+      </span>
+    </button>`;
+  }).join('');
+  openOverlay('statusOverlay');
+}
+function applyStatus(st){
+  const s=S.shipments.find(x=>x.id===_stId);if(!s)return;
+  const sel=S.shipments.filter(x=>x.sel);
+  if(sel.length>1){
+    // Apply to all selected
+    sel.forEach(x=>{ x.status=st; x.sel=false; });
+    save(); render(); closeOverlay('statusOverlay');
+    toast(`${stIcon(st)} ${st} → ${sel.length} clientes`);
+  } else {
+    s.status=st; s.sel=false;
+    save(); render(); closeOverlay('statusOverlay');
+    toast(`${stIcon(st)} ${st}`);
+  }
+}
+
+/* DELETE → TRASH */
+function openDel(id){
+  const s=S.shipments.find(x=>x.id===id);if(!s)return;
+  $('delMsg').textContent=`¿Mover "${s.name}" a la papelera?`;
+  $('delYes').style.background='var(--red)';
+  $('delYes').textContent='Mover a papelera';
+  $('delYes').onclick=()=>{
+    S.trash.push({shipment:s, deletedAt:Date.now()});
+    S.shipments=S.shipments.filter(x=>x.id!==id);
+    // Borrar de Firestore inmediatamente
+    if(window._fbDeleteShipment) window._fbDeleteShipment(id);
+    save();render();closeOverlay('delOverlay');toast('🗑️ Movido a papelera');
+  };
+  openOverlay('delOverlay');
+}
+function delSelected(){
+  const sel=S.shipments.filter(x=>x.sel);if(!sel.length){toast('Selecciona envíos');return}
+  $('delMsg').textContent=`¿Mover ${sel.length} envío(s) a la papelera?`;
+  $('delYes').style.background='var(--red)';
+  $('delYes').textContent='Mover a papelera';
+  $('delYes').onclick=()=>{
+    sel.forEach(s=>{
+      S.trash.push({shipment:s, deletedAt:Date.now()});
+      // Borrar de Firestore inmediatamente
+      if(window._fbDeleteShipment) window._fbDeleteShipment(s.id);
+    });
+    S.shipments=S.shipments.filter(x=>!x.sel);
+    save();render();closeOverlay('delOverlay');toast(`🗑️ ${sel.length} movidos a papelera`);
+  };
+  openOverlay('delOverlay');
+}
+
+/* PIN */
+let _pinEntry='', _pinCallback=null;
+function openPin(cb){
+  _pinEntry=''; _pinCallback=cb;
+  updatePinDots();
+  $('pinMsg').textContent='Ingresa la clave para cambiar el estado';
+  $('pinMsg').style.color='var(--text2)';
+  openOverlay('pinOverlay');
+}
+function pinTap(d){
+  if(_pinEntry.length>=4) return;
+  _pinEntry+=d;
+  updatePinDots();
+  if(_pinEntry.length===4) setTimeout(checkPin,150);
+}
+function pinDel(){
+  _pinEntry=_pinEntry.slice(0,-1);
+  updatePinDots();
+}
+function updatePinDots(){
+  for(let i=0;i<4;i++){
+    const dot=$('pd'+i);
+    dot.classList.toggle('filled',i<_pinEntry.length);
+    dot.classList.remove('error');
+  }
+}
+function checkPin(){
+  if(_pinEntry===S.statusPin){
+    closeOverlay('pinOverlay');
+    if(_pinCallback){ _pinCallback(); _pinCallback=null; }
+  } else {
+    $('pinMsg').textContent='❌ Clave incorrecta';
+    $('pinMsg').style.color='var(--red)';
+    for(let i=0;i<4;i++) $('pd'+i).classList.add('error');
+    setTimeout(()=>{ _pinEntry=''; updatePinDots(); $('pinMsg').textContent='Ingresa la clave'; $('pinMsg').style.color='var(--text2)'; },700);
+  }
+}
+let _trashTapTimer=null, _trashTaps=0;
+function onTrashBtnTap(){
+  _trashTaps++;
+  clearTimeout(_trashTapTimer);
+  if(_trashTaps>=2){ _trashTaps=0; openTrash(); return; }
+  _trashTapTimer=setTimeout(()=>{ 
+    _trashTaps=0;
+    delSelected(); // single tap = delete selected
+  },350);
+}
+
+function openTrash(){
+  // Auto-purge items older than 30 days
+  const now=Date.now();
+  const before=S.trash.length;
+  S.trash=S.trash.filter(x=>(now-x.deletedAt)<30*24*60*60*1000);
+  if(S.trash.length!==before) save();
+
+  if(!S.trash.length){
+    $('trashList').innerHTML='<div style="text-align:center;padding:24px;color:var(--text2)">🗑️<br><br>La papelera está vacía</div>';
+  } else {
+    $('trashList').innerHTML=S.trash.map((item,i)=>{
+      const days=Math.floor((Date.now()-item.deletedAt)/(24*60*60*1000));
+      const remaining=30-days;
+      const warn=remaining<=5;
+      return`<div class="trash-item">
+        <div class="trash-item-info">
+          <div class="trash-item-name">${item.shipment.name}</div>
+          <div class="trash-item-meta">📞 ${item.shipment.phone} · 🚚 ${item.shipment.courier}</div>
+          <div class="trash-item-meta">📅 Eliminado hace ${days===0?'hoy':days+' día'+(days>1?'s':'')}</div>
+        </div>
+        <span class="trash-item-days ${warn?'trash-days-warn':'trash-days-ok'}">${remaining}d</span>
+        <button class="trash-restore" onclick="restoreTrash(${i})">↩ Recuperar</button>
+      </div>`;
+    }).join('');
+  }
+  openOverlay('trashOverlay');
+}
+
+function restoreTrash(i){
+  const item=S.trash[i];if(!item)return;
+  item.shipment.sel=false;
+  S.shipments.push(item.shipment);
+  S.trash.splice(i,1);
+  save();render();openTrash();toast(`✅ ${item.shipment.name} recuperado`);
+}
+
+function emptyTrash(){
+  if(!S.trash.length){toast('La papelera ya está vacía');return}
+  $('delMsg').textContent=`¿Eliminar definitivamente ${S.trash.length} envío(s)? Esto no se puede deshacer.`;
+  $('delYes').style.background='var(--red)';
+  $('delYes').textContent='Eliminar definitivamente';
+  $('delYes').onclick=()=>{S.trash=[];save();closeOverlay('delOverlay');openTrash();toast('🗑️ Papelera vaciada')};
+  openOverlay('delOverlay');
+}
+
+/* WA SHEET */
+let _waId=null, _waMsgIdx=-1;
+function openWA(id){
+  _waId=id; _waMsgIdx=-1;
+  const s=S.shipments.find(x=>x.id===id);if(!s)return;
+  const gChk=s.chkGuia||false, tChk=s.chkTicket||false;
+  const msgs=S.msgTemplates[s.status]||['',''];
+  const hasMsg=(msgs[0]&&msgs[0].trim())||(msgs[1]&&msgs[1].trim());
+
+  // Sin docs marcados y sin mensajes → WhatsApp directo
+  if(!gChk&&!tChk&&!hasMsg){
+    window.open(`https://wa.me/51${s.phone}`,'_blank');
+    return;
+  }
+
+  // Sin docs marcados pero con mensajes → abrir sheet solo con mensajes
+  // Con docs marcados → abrir sheet completo
+  $('waInfo').innerHTML=`<div style="font-weight:700;font-size:14px;margin-bottom:4px">${s.name}</div><div style="color:var(--blue)">📞 +51 ${s.phone}</div><div style="color:var(--text2);font-size:12px;margin-top:2px">🏠 ${s.address}</div>`;
+  let html='';
+  if(s.docGuia||s.docTicket){
+    html+=`<div style="font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;margin-bottom:8px">Documentos a enviar:</div><div class="wa-doc-grid">`;
+    if(s.docGuia){html+=waDT(s.docGuia,gChk,'guia','var(--green)');}
+    if(s.docTicket){html+=waDT(s.docTicket,tChk,'ticket','var(--purple)');}
+    html+='</div>';
+  }
+  if(hasMsg){
+    html+=`<div style="font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;margin:12px 0 8px">Mensaje a enviar:</div>`;
+    html+=`<div id="waMN" class="wa-msg-none sel" onclick="selWAMsg(-1)">✉️ Sin mensaje</div>`;
+    if(msgs[0]&&msgs[0].trim())html+=`<div id="waM0" class="wa-msg-opt" onclick="selWAMsg(0)"><div class="wa-msg-lbl">MENSAJE A</div><div class="wa-msg-txt">${fillVars(msgs[0],s)}</div></div>`;
+    if(msgs[1]&&msgs[1].trim())html+=`<div id="waM1" class="wa-msg-opt" onclick="selWAMsg(1)"><div class="wa-msg-lbl">MENSAJE B</div><div class="wa-msg-txt">${fillVars(msgs[1],s)}</div></div>`;
+  }
+  $('waBody').innerHTML=html;
+  openOverlay('waOverlay');
+}
+function waDT(doc,chk,slot,color){
+  return`<div onclick="event.stopPropagation();togWADoc('${slot}')" style="position:relative;cursor:pointer;border-radius:9px;overflow:hidden;border:2px solid ${chk?color:'var(--bd)'};${chk?'box-shadow:0 0 0 2px rgba(46,160,67,.25)':''}">
+    ${doc.t&&doc.t.startsWith('image/')?`<img src="${doc.d}" style="width:80px;height:100px;object-fit:cover;display:block">`:`<div class="wa-doc-pdf"><span style="font-size:28px">${slot==='guia'?'📄':'🧾'}</span></div>`}
+    <div class="wa-doc-lbl">${slot==='guia'?'GUÍA':'TICKET'}</div>
+    <div id="waChk_${slot}" class="wa-doc-chk" style="background:${chk?(slot==='guia'?'var(--green)':'var(--purple)'):'rgba(0,0,0,.3)'};">${chk?'✓':''}</div>
+  </div>`;
+}
+function togWADoc(slot){
+  const s=S.shipments.find(x=>x.id===_waId);if(!s)return;
+  if(slot==='guia')s.chkGuia=!s.chkGuia;else s.chkTicket=!s.chkTicket;
+  save();render();openWA(_waId);
+}
+function selWAMsg(idx){
+  _waMsgIdx=idx;
+  ['waMN','waM0','waM1'].forEach(id=>{const e=$(id);if(e)e.classList.remove('sel')});
+  const el=$(idx===-1?'waMN':'waM'+idx);if(el)el.classList.add('sel');
+}
+async function doWASend(){
+  const s=S.shipments.find(x=>x.id===_waId);if(!s)return;
+  const gChk=s.chkGuia||false,tChk=s.chkTicket||false;
+  const phone='51'+s.phone;
+  let msg='';
+  if(_waMsgIdx>=0){const msgs=S.msgTemplates[s.status]||['',''];const t=msgs[_waMsgIdx];if(t&&t.trim())msg=fillVars(t,s)}
+  if(!gChk&&!tChk){window.open(msg?`https://wa.me/${phone}?text=${encodeURIComponent(msg)}`:`https://wa.me/${phone}`,'_blank');closeOverlay('waOverlay');return}
+  closeOverlay('waOverlay');
+  const docs=[];
+  if(gChk&&s.docGuia)docs.push({doc:s.docGuia,label:'Guia'});
+  if(tChk&&s.docTicket)docs.push({doc:s.docTicket,label:'Ticket'});
+  if(navigator.share){
+    try{
+      async function b2f(d,n){const r=await fetch(d);const b=await r.blob();return new File([b],n,{type:b.type})}
+      const files=await Promise.all(docs.map(({doc,label})=>b2f(doc.d,`${label}.${doc.t.includes('pdf')?'pdf':doc.t.includes('png')?'png':'jpg'}`)));
+      if(navigator.canShare&&navigator.canShare({files})){await navigator.share({files,title:s.name,text:msg||''});setTimeout(()=>window.open(`https://wa.me/${phone}${msg?'?text='+encodeURIComponent(msg):''}`,`_blank`),800);return}
+    }catch(e){if(e.name==='AbortError')return}
+  }
+  // Fallback screen
+  const div=document.createElement('div');
+  div.style.cssText='position:fixed;inset:0;background:#0d1117;z-index:600;overflow-y:auto;padding:16px';
+  div.innerHTML=`<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+    <div style="font-family:Syne,sans-serif;font-weight:700;font-size:16px">📤 Compartir documentos</div>
+    <button onclick="this.closest('div[style]').remove()" style="background:rgba(247,129,102,.15);border:1px solid rgba(247,129,102,.3);color:#f78166;border-radius:7px;width:32px;height:32px;font-size:16px;cursor:pointer">✕</button>
+  </div>
+  <div style="background:#161b22;border:1px solid #30363d;border-radius:10px;padding:12px;margin-bottom:12px;font-size:12px;color:#8b949e;line-height:1.7">
+    1️⃣ Toca <b style="color:#388bfd">Descargar</b> cada documento<br>
+    2️⃣ Ve a tu galería y compártelo a WhatsApp<br>
+    3️⃣ Toca <b style="color:#25d366">Abrir WhatsApp</b> abajo
+  </div>
+  ${docs.map(({doc,label})=>`<div style="background:#1c2333;border:1px solid #30363d;border-radius:10px;overflow:hidden;margin-bottom:10px">
+    <div style="padding:10px 12px;border-bottom:1px solid #30363d;display:flex;justify-content:space-between;align-items:center">
+      <span style="font-size:12px;font-weight:700">${label}</span>
+      <a href="${doc.d}" download="${label}.${doc.t.includes('pdf')?'pdf':'jpg'}" style="background:#388bfd;color:#fff;border-radius:7px;padding:5px 12px;font-size:11px;font-weight:700;text-decoration:none">⬇ Descargar</a>
+    </div>
+    ${doc.t&&doc.t.startsWith('image/')?`<img src="${doc.d}" style="width:100%;max-height:200px;object-fit:contain;background:#0d1117;display:block">`:`<div style="padding:20px;text-align:center;font-size:32px">📄</div>`}
+  </div>`).join('')}
+  <a href="https://wa.me/${phone}${msg?'?text='+encodeURIComponent(msg):''}" target="_blank" style="display:block;width:100%;padding:13px;background:#25d366;border-radius:10px;color:#fff;font-weight:700;font-size:14px;text-align:center;text-decoration:none;margin-top:4px">💬 Abrir WhatsApp</a>
+  <div style="height:30px"></div>`;
+  document.body.appendChild(div);
+}
+
+/* DOC MENU */
+function trigInp(inputId,slot){closeDocMenu(slot);setTimeout(()=>$(inputId).click(),50)}
+function toggleDocMenu(slot){const m=$('menu'+cap(slot));const o=m.classList.contains('open');document.querySelectorAll('.doc-menu').forEach(x=>x.classList.remove('open'));if(!o)m.classList.add('open')}
+function closeDocMenu(slot){const e=$('menu'+cap(slot));if(e)e.classList.remove('open')}
+document.addEventListener('click',e=>{if(!e.target.closest('.doc-sw')&&!e.target.classList.contains('doc-add'))document.querySelectorAll('.doc-menu').forEach(m=>m.classList.remove('open'))});
+
+/* DOC SLOTS */
+let _docs={guia:null,ticket:null};
+function loadDoc(input,slot){
+  const file=input.files[0];if(!file)return;
+  if(file.size>8*1024*1024){toast('⚠️ Máximo 8MB');return}
+  const r=new FileReader();
+  r.onload=e=>{_docs[slot]={d:e.target.result,n:file.name,t:file.type};refreshSlot(slot);toast(slot==='guia'?'🚚 Guía subida ✓':'🧾 Ticket subido ✓')};
+  r.readAsDataURL(file);
+}
+function refreshSlot(slot){
+  const doc=_docs[slot],Slot=cap(slot),isG=slot==='guia';
+  const prev=$('prev'+Slot),act=$('act'+Slot),btn=$('addBtn'+Slot),lbl=$('lbl'+Slot);
+  if(!doc){prev.innerHTML=`<div class="doc-empty"><div style="font-size:28px">${isG?'🚚':'🧾'}</div><div style="font-size:11px;font-weight:700">${isG?'Guía courier':'Ticket / Boleta'}</div></div>`;if(btn)btn.style.display='block';act.style.display='none';lbl.className='doc-tap';return}
+  lbl.className='doc-tap '+(isG?'fg':'ft');if(btn)btn.style.display='none';act.style.display='flex';
+  if(doc.t&&doc.t.startsWith('image/')){prev.innerHTML=`<div class="doc-full"><img src="${doc.d}" style="width:100%;height:100%;object-fit:cover;display:block"><div class="doc-ok">✓</div></div>`}
+  else{const sn=doc.n.length>16?doc.n.substring(0,16)+'…':doc.n;prev.innerHTML=`<div class="doc-full"><div class="doc-full-pdf"><span style="font-size:32px">📄</span><span style="font-size:10px;color:var(--text2);text-align:center;padding:0 6px;word-break:break-all">${sn}</span></div><div class="doc-ok">✓ PDF</div></div>`}
+}
+function clearSlot(slot){_docs[slot]=null;const Slot=cap(slot);['Cam','Gal','Pdf'].forEach(s=>{const e=$('in'+Slot+s);if(e)e.value=''});refreshSlot(slot);toast('Documento quitado')}
+function viewSlot(slot){const d=_docs[slot];if(!d)return;openViewer(d,slot==='guia'?'🚚 Guía':'🧾 Ticket')}
+
+/* VIEWER */
+let _curDoc=null;
+function openViewer(doc,title){_curDoc=doc;if(doc.t&&doc.t.startsWith('image/')){$('viewerImg').src=doc.d;$('viewerTtl').textContent=title;$('viewer').classList.add('open')}else{const a=document.createElement('a');a.href=doc.d;a.target='_blank';a.click()}}
+function closeViewer(){$('viewer').classList.remove('open');$('viewerImg').src=''}
+function dlDoc(){if(!_curDoc)return;const a=document.createElement('a');a.href=_curDoc.d;a.download=_curDoc.n||'doc';a.click()}
+function qView(shipId,slot){const s=S.shipments.find(x=>x.id===shipId);if(!s)return;const d=slot==='guia'?s.docGuia:s.docTicket;if(!d)return;openViewer(d,slot==='guia'?'🚚 Guía Courier':'🧾 Ticket / Boleta')}
+$('viewer').addEventListener('click',e=>{if(e.target===$('viewer'))closeViewer()});
+
+/* LINKS */
+let _links=[];
+function addLink(){const v=$('fLink').value.trim();if(!v){toast('Ingresa un link');return}if(!v.startsWith('http')){toast('⚠️ Link inválido');return}const n=v.length>36?v.substring(0,36)+'…':v;_links.push({u:v,n});renderLinks();$('fLink').value='';toast('🔗 Agregado')}
+function removeLink(i){_links.splice(i,1);renderLinks()}
+function renderLinks(){$('linkListForm').innerHTML=_links.map((l,i)=>`<div class="link-item"><span>🔗</span><div class="link-name">${l.n}</div><a href="${l.u}" target="_blank" style="color:var(--blue);font-size:12px;text-decoration:none">↗</a><button class="link-del" type="button" onclick="removeLink(${i})">✕</button></div>`).join('')}
+
+/* FORM */
+let _editId=null;
+function openForm(id){
+  _editId=id;$('formTitle').textContent=id?'Editar Envío':'Nuevo Envío';
+  const activeCouriers = S.couriers.filter(c => S.courierActive[c] !== false);
+  $('fCourier').innerHTML = (activeCouriers.length ? activeCouriers : S.couriers).map(c=>`<option>${c}</option>`).join('');
+  $('fStatus').innerHTML=allStatuses().map(s=>`<option>${s}</option>`).join('');
+  $('extraForm').innerHTML=S.extraFields.map(f=>`<div class="fg"><label class="fl">${f}</label><input class="fi xf" data-f="${f}" placeholder="${f}..."></div>`).join('');
+  _docs={guia:null,ticket:null};_links=[];
+  refreshSlot('guia');refreshSlot('ticket');renderLinks();
+  ['inGuiaCam','inGuiaGal','inGuiaPdf','inTicketCam','inTicketGal','inTicketPdf'].forEach(i=>{const e=$(i);if(e)e.value=''});
+  if(id){
+    const s=S.shipments.find(x=>x.id===id);
+    $('fName').value=s.name;$('fPhone').value=s.phone;$('fAddr').value=s.address;
+    $('fCourier').value=s.courier;$('fDate').value=s.date;$('fStatus').value=s.status;
+    $('fCost').value=s.cost||'';$('fNotes').value=s.notes||'';
+    document.querySelectorAll('.xf').forEach(el=>{el.value=(s.extra&&s.extra[el.dataset.f])||''});
+    if(s.docGuia){_docs.guia=s.docGuia;refreshSlot('guia')}
+    if(s.docTicket){_docs.ticket=s.docTicket;refreshSlot('ticket')}
+    _links=s.links?JSON.parse(JSON.stringify(s.links)):[];renderLinks();
+  }else{
+    ['fName','fPhone','fAddr','fCost','fNotes'].forEach(i=>$(i).value='');
+    $('fDate').valueAsDate=new Date();
+  }
+  openOverlay('formOverlay');
+}
+function saveShipment(){
+  const name=$('fName').value.trim(),phone=$('fPhone').value.trim(),addr=$('fAddr').value.trim();
+  if(!name||!phone||!addr){toast('⚠️ Nombre, teléfono y dirección requeridos');return}
+  const extra={};document.querySelectorAll('.xf').forEach(el=>extra[el.dataset.f]=el.value);
+  const data={name,phone,address:addr,courier:$('fCourier').value,date:$('fDate').value,status:$('fStatus').value,cost:$('fCost').value,notes:$('fNotes').value.trim(),extra,docGuia:_docs.guia,docTicket:_docs.ticket,links:JSON.parse(JSON.stringify(_links)),sel:false,chkGuia:false,chkTicket:false};
+  if(_editId){const idx=S.shipments.findIndex(x=>x.id===_editId);S.shipments[idx]={...S.shipments[idx],...data};toast('✅ Actualizado')}
+  else{data.id='id_'+Date.now();data.createdAt=new Date().toISOString();S.shipments.push(data);toast('✅ Envío registrado')}
+  save();closeOverlay('formOverlay');render();
+}
+
+/* EXCEL EXPORT / IMPORT */
+function exportExcel(){
+  if(!S.shipments.length){ toast('Sin envíos para exportar'); return; }
+  if(typeof XLSX==='undefined'){ toast('⚠️ Cargando librería...'); return; }
+  const rows=S.shipments.map(s=>({
+    'Nombre':s.name||'',
+    'Teléfono':s.phone||'',
+    'Dirección':s.address||'',
+    'Courier':s.courier||'',
+    'Fecha':s.date||'',
+    'Estado':s.status||'',
+    'Costo':s.cost||'',
+    'Notas':s.notes||'',
+    'Nota privada':s.privateNote||''
+  }));
+  const ws=XLSX.utils.json_to_sheet(rows);
+  ws['!cols']=[{wch:25},{wch:13},{wch:35},{wch:15},{wch:12},{wch:18},{wch:8},{wch:30},{wch:30}];
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,'Envíos');
+  const date=new Date().toLocaleDateString('es-PE').replace(/\//g,'-');
+  XLSX.writeFile(wb,`TotalTools_Envios_${date}.xlsx`);
+  toast('📊 Excel descargado');
+}
+
+function importExcel(input){
+  const file=input.files[0]; if(!file) return;
+  const res=$('importResult');
+  res.style.display='block'; res.innerHTML='⏳ Procesando...'; res.style.color='var(--text2)';
+  const reader=new FileReader();
+  reader.onload=e=>{
+    try{
+      const wb=XLSX.read(e.target.result,{type:'binary'});
+      const ws=wb.Sheets[wb.SheetNames[0]];
+      const rows=XLSX.utils.sheet_to_json(ws);
+      if(!rows.length){ res.innerHTML='⚠️ El archivo está vacío'; return; }
+      let added=0, skipped=0;
+      rows.forEach(row=>{
+        const name=(row['Nombre']||row['nombre']||'').toString().trim();
+        const phone=(row['Teléfono']||row['Telefono']||row['telefono']||'').toString().trim();
+        const address=(row['Dirección']||row['Direccion']||row['direccion']||'').toString().trim();
+        if(!name||!phone){ skipped++; return; }
+        if(S.shipments.find(x=>x.name===name&&x.phone===phone)){ skipped++; return; }
+        S.shipments.push({
+          id:'xl_'+Date.now()+'_'+Math.random().toString(36).slice(2,6),
+          name, phone, address,
+          courier:(row['Courier']||row['courier']||S.couriers[0]||'').toString().trim(),
+          date:(row['Fecha']||row['fecha']||new Date().toISOString().split('T')[0]).toString().trim(),
+          status:(row['Estado']||row['estado']||'NUEVO PEDIDO').toString().trim(),
+          cost:(row['Costo']||row['costo']||'').toString().trim(),
+          notes:(row['Notas']||row['notas']||'').toString().trim(),
+          privateNote:(row['Nota privada']||'').toString().trim(),
+          extra:{},docGuia:null,docTicket:null,links:[],
+          sel:false,chkGuia:false,chkTicket:false,
+          createdAt:new Date().toISOString()
+        });
+        added++;
+      });
+      save(); render();
+      res.style.color=added>0?'var(--green)':'var(--red)';
+      res.innerHTML=`✅ ${added} pedido${added!==1?'s':''} importado${added!==1?'s':''}${skipped>0?` · ${skipped} omitido${skipped!==1?'s':''} (duplicados o sin datos)`:''}`;
+      if(added>0) toast(`✅ ${added} pedidos importados`);
+    }catch(err){
+      res.style.color='var(--red)';
+      res.innerHTML='❌ Error al leer el archivo.';
+    }
+    input.value='';
+  };
+  reader.readAsBinaryString(file);
+}
+
+/* EXPORT CSV */
+function doCSV(){if(!S.shipments.length){toast('Sin envíos');return}const h=['Nombre','Teléfono','Dirección','Courier','Fecha','Estado','Costo','Notas'];const rows=S.shipments.map(s=>[s.name,s.phone,`"${s.address}"`,s.courier,s.date,s.status,s.cost,`"${s.notes}"`]);const csv=[h,...rows].map(r=>r.join(',')).join('\n');const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));a.download=`envios_${new Date().toLocaleDateString('es')}.csv`;a.click();toast('📊 CSV exportado')}
+
+function doPrint(){
+  const list=S.shipments.filter(x=>x.sel).length?S.shipments.filter(x=>x.sel):S.shipments;
+  if(!list.length){toast('Sin envíos');return}
+  const qr=phone=>`https://api.qrserver.com/v1/create-qr-code/?size=80x80&data=${encodeURIComponent(phone)}`;
+  const w=window.open('','_blank');
+  w.document.write(`<!DOCTYPE html><html><head><title>Envíos</title><style>body{font-family:Arial,sans-serif;padding:20px;font-size:12px}.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px}.card{border:1px solid #ddd;border-radius:8px;padding:12px;display:flex;gap:10px;page-break-inside:avoid}.info{flex:1}.name{font-weight:700;font-size:13px;margin-bottom:3px}.phone{color:#1a56db;margin-bottom:3px}.addr{color:#555;font-size:11px;line-height:1.4;margin-bottom:4px}.badge{display:inline-block;padding:2px 8px;border-radius:12px;font-size:10px;font-weight:700}.PENDIENTE{background:#fef3c7;color:#92400e}.ENVIADO{background:#dbeafe;color:#1e40af}.ENTREGADO{background:#d1fae5;color:#065f46}.qr{display:flex;flex-direction:column;align-items:center;gap:3px;flex-shrink:0}.qr img{width:72px;height:72px}.qr span{font-size:9px;color:#888}@media print{.grid{gap:8px}}</style></head><body>
+    <h2 style="margin-bottom:16px">📦 Envíos — ${S.config.name} · ${new Date().toLocaleDateString('es-PE')}</h2>
+    <div class="grid">${list.map(s=>`<div class="card"><div class="info"><div class="name">${s.name}</div><div class="phone">📞 ${s.phone}</div><div class="addr">🏠 ${s.address}</div><div style="font-size:10px;color:#777;margin:3px 0">🚚 ${s.courier} · 📅 ${s.date||'—'}${s.cost?` · S/ ${s.cost}`:''}</div><span class="badge ${s.status}">${s.status}</span>${s.notes?`<div style="font-size:10px;color:#777;margin-top:3px">📝 ${s.notes}</div>`:''}</div><div class="qr"><img src="${qr(s.phone)}" alt="QR"><span>${s.phone}</span></div></div>`).join('')}</div>
+    <script>window.onload=()=>window.print()<\/script></body></html>`);
+  w.document.close();
+}
+
+function getFormLink(){
+  const base = window.location.origin + window.location.pathname.replace('index.html','').replace(/\/$/, '');
+  return `${base}/formulario.html`;
+}
+function updateShareLink(){
+  const link = getFormLink();
+  const el = document.getElementById('shareUrl');
+  if(el) el.textContent = link;
+}
+function copyLink(){ 
+  const link = getFormLink();
+  navigator.clipboard.writeText(link).then(()=>toast('🔗 Link copiado')).catch(()=>{
+    // Fallback para navegadores sin clipboard API
+    const ta = document.createElement('textarea');
+    ta.value = link; document.body.appendChild(ta);
+    ta.select(); document.execCommand('copy');
+    document.body.removeChild(ta);
+    toast('🔗 Link copiado');
+  });
+}
+function shareWA(){ window.open(`https://wa.me/?text=${encodeURIComponent('📦 Registra tu pedido aquí: '+getFormLink())}`); }
+function shareTG(){ window.open(`https://t.me/share/url?url=${encodeURIComponent(getFormLink())}`); }
+function changePIN(){
+  openPin(()=>{
+    _pinEntry=''; updatePinDots();
+    $('pinMsg').textContent='Ingresa la NUEVA clave (4 dígitos)';
+    $('pinMsg').style.color='var(--blue)';
+    openOverlay('pinOverlay');
+    _pinCallback=()=>{ S.statusPin=_pinEntry; save(); toast('🔐 Clave actualizada a: '+_pinEntry); };
+  });
+}
+/* CONFIG */
+function loadCfgUI(){
+  $('cfgName').value=S.config.name||'';$('cfgPhone').value=S.config.phone||'';$('cfgCity').value=S.config.city||'';
+
+  // DISPATCH DAYS
+  const days=[{n:'Lun',v:1},{n:'Mar',v:2},{n:'Mié',v:3},{n:'Jue',v:4},{n:'Vie',v:5},{n:'Sáb',v:6},{n:'Dom',v:0}];
+  $('dispatchDays').innerHTML=days.map(d=>`
+    <button class="day-btn ${(S.dispatch.days||[]).includes(d.v)?'active':''}"
+      onclick="toggleDispatchDay(${d.v})">${d.n}</button>`).join('');
+  // HOUR SELECT
+  const hours=[];
+  for(let h=0;h<24;h++) for(let m=0;m<60;m+=30){
+    const hh=h.toString().padStart(2,'0');
+    const mm=m.toString().padStart(2,'0');
+    const ap=h<12?'a.m.':'p.m.';
+    const h12=h===0?12:h>12?h-12:h;
+    hours.push({val:`${hh}:${mm}`,label:`${h12}:${mm} ${ap}`});
+  }
+  $('dispatchCutHour').innerHTML=hours.map(h=>`<option value="${h.val}" ${S.dispatch.cutHour===h.val?'selected':''}>${h.label}</option>`).join('');
+  $('dispatchAnticip').value=S.dispatch.anticipation||0;
+
+  // LABELS — fixed (non-deletable) + custom
+  let labHTML='';
+  // Show FIXED_LABELS as fixed (no delete)
+  FIXED_LABELS.forEach((l)=>{
+    const msgs=S.msgTemplates[l]||['',''];
+    const has=(msgs[0]&&msgs[0].trim())||(msgs[1]&&msgs[1].trim());
+    labHTML+=`<div class="cfl-item">
+      <span class="cfl-icon">${FIXED_LABEL_ICONS[l]||'🏷️'}</span>
+      <span class="cfl-name">${l}</span>
+      <span class="cfl-fixed-badge">Fija</span>
+      ${has?`<div class="cfl-has-msg"></div>`:''}
+      <div class="cfl-actions">
+        <button class="cfl-btn cfl-btn-msg" onclick="openLabelEdit('${l}',null)">💬</button>
+      </div>
+    </div>`;
+  });
+  // Custom only (not fixed)
+  const customLabels=S.labels.filter(l=>!FIXED_LABELS.includes(l));
+  customLabels.forEach((l)=>{
+    const i=S.labels.indexOf(l);
+    const msgs=S.msgTemplates[l]||['',''];
+    const has=(msgs[0]&&msgs[0].trim())||(msgs[1]&&msgs[1].trim());
+    labHTML+=`<div class="cfl-item">
+      <span class="cfl-drag">⠿</span>
+      <span class="cfl-icon">🏷️</span>
+      <span class="cfl-name">${l}</span>
+      ${has?`<div class="cfl-has-msg"></div>`:''}
+      <div class="cfl-actions">
+        <button class="cfl-btn cfl-btn-edit" onclick="openLabelEdit('${l}',${i})">✏️</button>
+        <button class="cfl-btn cfl-btn-msg" onclick="openLabelEdit('${l}',${i})">💬</button>
+        <button class="cfl-btn cfl-btn-del" onclick="confirmDelItem('label',${i})">🗑️</button>
+      </div>
+    </div>`;
+  });
+  $('labelsList').innerHTML=labHTML;
+
+  // COURIERS — fixed + custom, with active toggle
+  $('couriersList').innerHTML=S.couriers.map((c,i)=>{
+    const isActive = S.courierActive[c]!==false;
+    const isFixed  = FIXED_COURIERS.includes(c);
+    return`<div class="cfl-item">
+      <div class="courier-toggle ${isActive?'on':''}" onclick="toggleCourierActive('${c.replace(/'/g,"\\'")}')">
+        <div class="courier-toggle-dot"></div>
+      </div>
+      <span class="cfl-icon">🚚</span>
+      <span class="cfl-name" style="${isActive?'':'opacity:.35'}">${c}</span>
+      ${isFixed?`<span class="cfl-fixed-badge">Fijo</span>`:''}
+      ${!isActive?`<span style="font-size:9px;color:var(--text2);background:var(--bg2);padding:1px 6px;border-radius:8px;border:1px solid var(--bd)">Oculto</span>`:''}
+      <div class="cfl-actions">
+        ${!isFixed?`<button class="cfl-btn cfl-btn-edit" onclick="openCourierEdit(${i})">✏️</button>`:''}
+        ${!isFixed?`<button class="cfl-btn cfl-btn-del" onclick="confirmDelItem('courier',${i})">🗑️</button>`:''}
+      </div>
+    </div>`;
+  }).join('');
+
+  // EXTRA FIELDS
+  $('extraFieldsList').innerHTML=S.extraFields.map((f,i)=>`
+    <div class="cfl-item">
+      <span class="cfl-icon">📝</span>
+      <span class="cfl-name">${f}</span>
+      <div class="cfl-actions">
+        <button class="cfl-btn cfl-btn-edit" onclick="openExtraEdit(${i})" title="Editar">✏️</button>
+        <button class="cfl-btn cfl-btn-del" onclick="confirmDelItem('extra',${i})" title="Eliminar">🗑️</button>
+      </div>
+    </div>`).join('');
+}
+
+/* LABEL EDIT SHEET */
+let _editLabelSt=null, _editLabelIdx=null;
+function openLabelEdit(st, idx){
+  _editLabelSt=st; _editLabelIdx=idx;
+  const msgs=S.msgTemplates[st]||['',''];
+  const isFixed=idx===null;
+  const icon=st==='PENDIENTE'?'🕐':st==='ENVIADO'?'🚚':st==='ENTREGADO'?'✅':'🏷️';
+  $('labelEditContent').innerHTML=`
+    <div class="lbl-sheet-name">${icon} ${st}</div>
+    <div class="lbl-sheet-sub">${isFixed?'Etiqueta fija — solo puedes editar sus mensajes':'Edita el nombre y mensajes de esta etiqueta'}</div>
+    ${!isFixed?`<div class="fg"><label class="fl">Nombre de la etiqueta</label><input class="fi" id="leNameInp" value="${st}" maxlength="30" placeholder="Nombre..."></div>`:''}
+    <div style="font-size:11px;font-weight:700;color:var(--text2);letter-spacing:.8px;text-transform:uppercase;margin-bottom:10px">💬 Mensajes predeterminados</div>
+    <div class="lbl-msg-wrap">
+      <div class="lbl-msg-head"><div class="lbl-msg-letter lbl-msg-letter-a">A</div><span style="font-size:11px;color:var(--text2)">Mensaje A</span></div>
+      <textarea class="msg-ta" id="leMsgA" placeholder="Hola {nombre}, tu pedido está en camino 🚚...">${msgs[0]||''}</textarea>
+    </div>
+    <div class="lbl-msg-wrap">
+      <div class="lbl-msg-head"><div class="lbl-msg-letter lbl-msg-letter-b">B</div><span style="font-size:11px;color:var(--text2)">Mensaje B</span></div>
+      <textarea class="msg-ta" id="leMsgB" placeholder="Hola {nombre}, tu pedido fue entregado ✅...">${msgs[1]||''}</textarea>
+    </div>
+    <div class="lbl-vars-box">Variables: {nombre} {telefono} {direccion} {courier} {fecha} {costo} {estado}</div>
+    <div style="height:12px"></div>`;
+  openOverlay('labelEditOverlay');
+}
+
+function saveLabelEdit(){
+  if(!_editLabelSt) return;
+  // Save messages
+  const msgA=$('leMsgA').value.trim();
+  const msgB=$('leMsgB').value.trim();
+  if(!S.msgTemplates[_editLabelSt]) S.msgTemplates[_editLabelSt]=['',''];
+  S.msgTemplates[_editLabelSt][0]=msgA;
+  S.msgTemplates[_editLabelSt][1]=msgB;
+  // Rename label if custom
+  if(_editLabelIdx!==null){
+    const newName=$('leNameInp').value.trim().toUpperCase();
+    if(newName&&newName!==_editLabelSt){
+      // Move messages to new name
+      S.msgTemplates[newName]=S.msgTemplates[_editLabelSt];
+      delete S.msgTemplates[_editLabelSt];
+      S.labels[_editLabelIdx]=newName;
+    }
+  }
+  save(); renderChips(); loadCfgUI();
+  closeOverlay('labelEditOverlay');
+  toast('✅ Guardado');
+}
+
+/* COURIER / EXTRA INLINE EDIT */
+function openCourierEdit(i){
+  const v=S.couriers[i];
+  $('delMsg').textContent='';
+  // Reuse del overlay as quick edit
+  const overlay=document.getElementById('delOverlay');
+  const sheet=overlay.querySelector('.sheet');
+  sheet.innerHTML=`<div class="sheet-handle"></div>
+    <div class="sheet-title">✏️ Editar Courier</div>
+    <div class="fg"><label class="fl">Nombre</label><input class="fi" id="editCourierInp" value="${v}" maxlength="40"></div>
+    <div class="confirm-btns">
+      <button class="cbtn-no" onclick="closeOverlay('delOverlay')">Cancelar</button>
+      <button class="cbtn-yes" style="background:var(--blue)" onclick="S.couriers[${i}]=document.getElementById('editCourierInp').value.trim()||S.couriers[${i}];save();loadCfgUI();closeOverlay('delOverlay');toast('✅ Guardado')">Guardar</button>
+    </div>`;
+  openOverlay('delOverlay');
+}
+
+function openExtraEdit(i){
+  const v=S.extraFields[i];
+  const overlay=document.getElementById('delOverlay');
+  const sheet=overlay.querySelector('.sheet');
+  sheet.innerHTML=`<div class="sheet-handle"></div>
+    <div class="sheet-title">✏️ Editar Campo</div>
+    <div class="fg"><label class="fl">Nombre</label><input class="fi" id="editExtraInp" value="${v}" maxlength="40"></div>
+    <div class="confirm-btns">
+      <button class="cbtn-no" onclick="closeOverlay('delOverlay')">Cancelar</button>
+      <button class="cbtn-yes" style="background:var(--blue)" onclick="S.extraFields[${i}]=document.getElementById('editExtraInp').value.trim()||S.extraFields[${i}];save();loadCfgUI();closeOverlay('delOverlay');toast('✅ Guardado')">Guardar</button>
+    </div>`;
+  openOverlay('delOverlay');
+}
+
+function saveConfig(){
+  S.config.name=$('cfgName').value.trim()||'Mi Negocio';
+  S.config.phone=$('cfgPhone').value.trim()||'999000000';
+  S.config.city=$('cfgCity').value.trim();
+  // Save dispatch
+  S.dispatch.cutHour=$('dispatchCutHour').value;
+  S.dispatch.anticipation=parseInt($('dispatchAnticip').value)||0;
+  $('hdrName').textContent=S.config.name;
+  $('hdrPhone').textContent=S.config.phone;
+  save(); renderChips(); toast('✅ Configuración guardada');
+}
+let _dragIdx=null;
+function dragStart(e,i){_dragIdx=i;e.currentTarget.classList.add('dragging');e.dataTransfer.effectAllowed='move'}
+function dragOver(e){e.preventDefault();e.dataTransfer.dropEffect='move';document.querySelectorAll('.label-drag-row').forEach(r=>r.classList.remove('drag-over'));e.currentTarget.classList.add('drag-over')}
+function dropLabel(e,toIdx){
+  e.preventDefault();
+  if(_dragIdx===null||_dragIdx===toIdx)return;
+  const moved=S.labels.splice(_dragIdx,1)[0];
+  // Don't allow moving fixed labels
+  if(FIXED_LABELS.includes(moved)){S.labels.splice(_dragIdx,0,moved);return}
+  S.labels.splice(toIdx,0,moved);
+  save();renderChips();loadCfgUI();
+}
+function dragEnd(){document.querySelectorAll('.label-drag-row').forEach(r=>{r.classList.remove('dragging');r.classList.remove('drag-over')});_dragIdx=null}
+
+// Inline add functions
+function addLabelInline(){
+  S.labels.push('NUEVA ETIQUETA');
+  save();renderChips();loadCfgUI();
+  // Auto-open the last card
+  const newIdx=S.labels.length-1;
+  const bodyEl=document.getElementById(`body_lc_${newIdx}`);
+  const arrEl=document.getElementById(`arr_lc_${newIdx}`);
+  if(bodyEl){bodyEl.classList.add('open');if(arrEl)arrEl.classList.add('open')}
+  // Scroll to it
+  const card=document.getElementById(`lc_${newIdx}`);
+  if(card)setTimeout(()=>card.scrollIntoView({behavior:'smooth',block:'center'}),100);
+}
+function addCourierInline(){
+  const inp=$('newCourierInp');const v=inp.value.trim();
+  if(!v){toast('Escribe el nombre del courier');return}
+  S.couriers.push(v);save();loadCfgUI();inp.value='';
+}
+function addExtraInline(){
+  const inp=$('newExtraInp');const v=inp.value.trim();
+  if(!v){toast('Escribe el nombre del campo');return}
+  S.extraFields.push(v);save();loadCfgUI();inp.value='';
+}
+
+// Protected delete — requires hold confirmation
+function confirmDelItem(type,idx){
+  let name='';
+  if(type==='label') name=S.labels[idx];
+  else if(type==='courier') name=S.couriers[idx];
+  else name=S.extraFields[idx];
+  if(type==='courier'&&FIXED_COURIERS.includes(name)){toast('⚠️ Este courier es fijo y no se puede eliminar');return}
+  $('delMsg').textContent=`¿Eliminar "${name}"? Esto no se puede deshacer.`;
+  $('delYes').style.background='var(--red)';
+  $('delYes').onclick=()=>{
+    if(type==='label'){S.labels.splice(idx,1);renderChips()}
+    else if(type==='courier') S.couriers.splice(idx,1);
+    else S.extraFields.splice(idx,1);
+    save();loadCfgUI();closeOverlay('delOverlay');toast('🗑️ Eliminado');
+  };
+  openOverlay('delOverlay');
+}
+function toggleDispatchDay(v){
+  if(!S.dispatch.days) S.dispatch.days=[];
+  const idx=S.dispatch.days.indexOf(v);
+  if(idx>=0) S.dispatch.days.splice(idx,1);
+  else S.dispatch.days.push(v);
+  save();
+  // Update buttons in place
+  document.querySelectorAll('.day-btn').forEach(btn=>{
+    const bv=parseInt(btn.getAttribute('onclick').match(/\d+/)[0]);
+    btn.classList.toggle('active',S.dispatch.days.includes(bv));
+  });
+}
+
+function toggleCourierActive(name){
+  S.courierActive[name] = S.courierActive[name]===false ? true : false;
+  save(); loadCfgUI();
+  toast(S.courierActive[name]===false ? `🚚 ${name} oculto del formulario` : `🚚 ${name} visible en formulario`);
+}
+
+/* QR SCANNER */
+let _qrStream=null,_qrAF=null,_qrCanvas=null,_qrCtx=null;
+function openQR(){if(!('BarcodeDetector' in window)){if(window.jsQR){startQR();return}const s=document.createElement('script');s.src='https://cdnjs.cloudflare.com/ajax/libs/jsQR/1.4.0/jsQR.min.js';s.onload=startQR;s.onerror=()=>toast('⚠️ Necesitas conexión para el escáner');document.head.appendChild(s);return}startQR()}
+async function startQR(){$('qrOverlay').classList.add('open');$('qrFound').style.display='none';try{_qrStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}});const v=$('qrVideo');v.srcObject=_qrStream;v.play();_qrCanvas=document.createElement('canvas');_qrCtx=_qrCanvas.getContext('2d');v.addEventListener('loadedmetadata',()=>{_qrCanvas.width=v.videoWidth;_qrCanvas.height=v.videoHeight;scanLoop()})}catch(e){closeQR();toast('⚠️ No se pudo acceder a la cámara')}}
+async function scanLoop(){const v=$('qrVideo');if(!v.srcObject)return;_qrCtx.drawImage(v,0,0,_qrCanvas.width,_qrCanvas.height);let res=null;if('BarcodeDetector' in window){try{const bd=new BarcodeDetector({formats:['qr_code']});const c=await bd.detect(_qrCanvas);if(c.length)res=c[0].rawValue}catch(e){}}if(!res&&window.jsQR){const img=_qrCtx.getImageData(0,0,_qrCanvas.width,_qrCanvas.height);const c=jsQR(img.data,img.width,img.height);if(c)res=c.data}if(res){handleQR(res);return}_qrAF=requestAnimationFrame(scanLoop)}
+function handleQR(raw){let phone=raw.replace(/\D/g,'');if(phone.startsWith('51')&&phone.length===11)phone=phone.slice(2);if(phone.length!==9){toast('QR no reconocido');_qrAF=requestAnimationFrame(scanLoop);return}const f=$('qrFound');f.textContent=`✅ ${phone}`;f.style.display='block';const m=S.shipments.find(s=>s.phone===phone);setTimeout(()=>{closeQR();$('fSearch').value=phone;_filt='';renderChips();render();if(m){setTimeout(()=>{document.querySelectorAll('.card').forEach(c=>{if(c.innerHTML.includes(phone)){c.style.background='rgba(56,139,253,.15)';setTimeout(()=>c.style.background='',1500)}})},200);toast(`✅ ${m.name}`)}else{toast(`⚠️ No encontrado: ${phone}`)}},800)}
+function closeQR(){if(_qrAF)cancelAnimationFrame(_qrAF);if(_qrStream)_qrStream.getTracks().forEach(t=>t.stop());_qrStream=null;_qrAF=null;$('qrVideo').srcObject=null;$('qrOverlay').classList.remove('open')}
+
+/* INIT */
+function _init(){
+  $('hdrName').textContent=S.config.name;
+  $('hdrPhone').textContent=S.config.phone;
+  renderChips();
+  render();
+  updateShareLink();
+  // Firebase
+  if(window._fbReady){
+    _initFirebase();
+  } else {
+    setTimeout(_initFirebase, 500);
+  }
+}
+if(document.readyState==='loading'){
+  document.addEventListener('DOMContentLoaded',_init);
+}else{
+  _init();
+}
