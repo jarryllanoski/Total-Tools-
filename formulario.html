@@ -1,0 +1,1140 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<meta name="color-scheme" content="dark">
+<title>Hacer un pedido</title>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0a0a0f;
+  --card:#13131a;
+  --border:#1e1e2e;
+  --blue:#4f8ef7;
+  --green:#22c55e;
+  --red:#f87171;
+  --text:#f0f0f5;
+  --text2:#888;
+  --accent:#4f8ef7;
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{min-height:100vh;background:var(--bg) !important;font-family:'Outfit',sans-serif;color:var(--text) !important;color-scheme:dark}
+body{max-width:480px;margin:0 auto;padding:0 0 40px}
+
+/* HEADER */
+.hdr{padding:28px 20px 0;text-align:center;margin-bottom:28px}
+.hdr-logo{width:56px;height:56px;border-radius:16px;background:linear-gradient(135deg,#4f8ef7,#7c3aed);display:flex;align-items:center;justify-content:center;font-size:26px;margin:0 auto 14px}
+.hdr-biz{font-size:22px;font-weight:800;letter-spacing:-.5px}
+.hdr-sub{font-size:13px;color:var(--text2);margin-top:4px}
+
+/* STEPS */
+.steps{display:flex;gap:6px;padding:0 20px;margin-bottom:24px}
+.step{flex:1;height:3px;border-radius:2px;background:var(--border);transition:background .3s}
+.step.done{background:var(--blue)}
+.step.active{background:var(--blue);opacity:.5}
+
+/* FORM */
+.form-page{display:none;padding:0 20px;animation:fadeIn .3s ease}
+.form-page.active{display:block}
+@keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+
+.section-ttl{font-size:11px;font-weight:700;color:var(--text2);letter-spacing:1.2px;margin-bottom:14px}
+
+.fg{margin-bottom:16px}
+.fl{font-size:12px;font-weight:600;color:var(--text2);display:block;margin-bottom:6px;letter-spacing:.3px}
+.fi{width:100%;background:var(--card);border:1.5px solid var(--border);border-radius:10px;padding:13px 14px;color:var(--text) !important;font-size:15px;font-family:'Outfit',sans-serif;outline:none;transition:border-color .2s;-webkit-text-fill-color:var(--text) !important}
+.fi:focus{border-color:var(--blue)}
+.fi::placeholder{color:var(--text2) !important;-webkit-text-fill-color:var(--text2) !important}
+
+/* PHONE */
+.ph-wrap{display:flex;gap:0}
+.ph-pre{background:var(--card);border:1.5px solid var(--border);border-right:none;border-radius:10px 0 0 10px;padding:13px 12px;font-size:15px;color:var(--text2);font-family:'Outfit',sans-serif}
+.ph-wrap .fi{border-radius:0 10px 10px 0}
+
+/* COURIER OPTIONS */
+.courier-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:4px}
+.courier-opt{background:var(--card);border:1.5px solid var(--border);border-radius:10px;padding:12px;text-align:center;cursor:pointer;transition:all .15s;font-size:13px;font-weight:600}
+.courier-opt:active{transform:scale(.97)}
+.courier-opt.selected{border-color:var(--blue);background:rgba(79,142,247,.1);color:var(--blue)}
+.courier-opt .ico{font-size:20px;margin-bottom:4px}
+
+/* DATE OPTIONS */
+.dates-list{display:flex;flex-direction:column;gap:8px}
+.date-opt{background:var(--card);border:1.5px solid var(--border);border-radius:10px;padding:14px;cursor:pointer;transition:all .15s;display:flex;align-items:center;justify-content:space-between}
+.date-opt:active{transform:scale(.98)}
+.date-opt.selected{border-color:var(--blue);background:rgba(79,142,247,.1)}
+.date-opt-day{font-size:15px;font-weight:700}
+.date-opt-date{font-size:12px;color:var(--text2)}
+.date-opt-check{width:20px;height:20px;border-radius:50%;border:2px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:11px;transition:all .15s}
+.date-opt.selected .date-opt-check{background:var(--blue);border-color:var(--blue);color:#fff}
+
+/* SUMMARY */
+.summary-card{background:var(--card);border:1.5px solid var(--border);border-radius:12px;padding:16px;margin-bottom:16px}
+.summary-row{display:flex;justify-content:space-between;align-items:flex-start;padding:8px 0;border-bottom:1px solid var(--border)}
+.summary-row:last-child{border:none}
+.summary-lbl{font-size:12px;color:var(--text2);font-weight:500}
+.summary-val{font-size:13px;font-weight:600;text-align:right;max-width:60%}
+
+/* TEXTAREA */
+textarea.fi{resize:none;height:80px;line-height:1.5}
+
+/* BUTTONS */
+.btn-next{width:100%;background:var(--blue);border:none;border-radius:12px;padding:16px;color:#fff;font-size:16px;font-weight:700;cursor:pointer;font-family:'Outfit',sans-serif;transition:opacity .15s;margin-top:8px}
+.btn-next:active{opacity:.85}
+.btn-next:disabled{opacity:.4;cursor:not-allowed}
+.btn-back{width:100%;background:transparent;border:1.5px solid var(--border);border-radius:12px;padding:14px;color:var(--text2);font-size:14px;font-weight:600;cursor:pointer;font-family:'Outfit',sans-serif;margin-top:8px}
+
+/* SUCCESS */
+.success{text-align:center;padding:40px 20px}
+.success-icon{font-size:64px;margin-bottom:20px;animation:bounce .6s ease}
+@keyframes bounce{0%,100%{transform:scale(1)}50%{transform:scale(1.2)}}
+.success-ttl{font-size:24px;font-weight:800;margin-bottom:8px}
+.success-sub{font-size:14px;color:var(--text2);line-height:1.6}
+.success-id{background:var(--card);border:1.5px solid var(--border);border-radius:10px;padding:12px;margin:20px 0;font-size:13px;color:var(--blue);font-weight:700;letter-spacing:.5px}
+
+/* LOADING */
+.loading{display:flex;align-items:center;justify-content:center;gap:10px;padding:20px;color:var(--text2);font-size:14px}
+.spinner{width:20px;height:20px;border:2px solid var(--border);border-top-color:var(--blue);border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ERROR */
+.err-msg{background:rgba(248,113,113,.1);border:1px solid rgba(248,113,113,.3);border-radius:8px;padding:10px 14px;font-size:12px;color:var(--red);margin-top:6px;display:none}
+.err-msg.show{display:block}
+
+/* NO DAYS */
+.no-dates{text-align:center;padding:30px;color:var(--text2);font-size:14px}
+</style>
+</head>
+<body>
+
+<div class="hdr">
+  <div class="hdr-logo">📦</div>
+  <div class="hdr-biz" id="bizName">Mi Negocio</div>
+  <div class="hdr-sub" id="bizSub">Completa tu pedido en segundos</div>
+</div>
+
+<div class="steps" id="stepsBar">
+  <div class="step active" id="step0"></div>
+  <div class="step" id="step1"></div>
+  <div class="step" id="step2"></div>
+  <div class="step" id="step3"></div>
+</div>
+
+<!-- PAGE 0: DATOS PERSONALES -->
+<div class="form-page active" id="page0">
+  <div class="section-ttl">👤 TUS DATOS</div>
+  <div class="fg">
+    <label class="fl">NOMBRE COMPLETO</label>
+    <input class="fi" id="fName" placeholder="Ej: María García Torres" autocomplete="name">
+    <div class="err-msg" id="errName">Por favor ingresa tu nombre completo</div>
+  </div>
+  <div class="fg">
+    <label class="fl">TELÉFONO WHATSAPP</label>
+    <div class="ph-wrap">
+      <span class="ph-pre">+51</span>
+      <input class="fi" id="fPhone" placeholder="9XXXXXXXX" maxlength="9" type="tel" inputmode="numeric">
+    </div>
+    <div class="err-msg" id="errPhone">Ingresa un número de 9 dígitos</div>
+  </div>
+  <div class="fg">
+    <label class="fl">DIRECCIÓN DE ENTREGA</label>
+    <input class="fi" id="fAddress" placeholder="Distrito / Calle / Número / Referencia">
+    <div class="err-msg" id="errAddress">Por favor ingresa tu dirección</div>
+  </div>
+  <div class="fg">
+    <label class="fl">NOTAS (opcional)</label>
+    <textarea class="fi" id="fNotes" placeholder="Instrucciones especiales, referencias..."></textarea>
+  </div>
+  <button class="btn-next" onclick="goNext(0)">Continuar →</button>
+</div>
+
+<!-- PAGE 1: COURIER -->
+<div class="form-page" id="page1">
+  <div class="section-ttl">🚚 TIPO DE ENVÍO</div>
+  <div class="courier-grid" id="courierGrid">
+    <div class="loading"><div class="spinner"></div> Cargando...</div>
+  </div>
+  <div class="err-msg" id="errCourier">Selecciona un tipo de envío</div>
+
+  <!-- BUSCAR AGENCIA - SELECTOR EN CASCADA -->
+  <div id="agencyFinder" style="display:none;margin-top:14px;background:#13131a;border:1.5px solid #1e1e2e;border-radius:12px;padding:14px">
+    <div id="agencyTitle" style="font-size:11px;font-weight:700;color:#4f8ef7;letter-spacing:.8px;margin-bottom:12px">📍 ¿DÓNDE ESTÁ TU AGENCIA?</div>
+    
+    <!-- PASO 1: DEPARTAMENTO -->
+    <div class="fg" style="margin-bottom:10px">
+      <label class="fl">DEPARTAMENTO</label>
+      <select id="selDept" onchange="onDeptChange()" style="width:100%;background:#0a0a0f;border:1.5px solid #1e1e2e;border-radius:8px;padding:12px;color:#f0f0f5;font-size:14px;font-family:'Outfit',sans-serif;outline:none;appearance:none;-webkit-appearance:none">
+        <option value="">Selecciona tu departamento...</option>
+      </select>
+    </div>
+
+    <!-- PASO 2: PROVINCIA -->
+    <div class="fg" id="provGroup" style="display:none;margin-bottom:10px">
+      <label class="fl">PROVINCIA</label>
+      <select id="selProv" onchange="onProvChange()" style="width:100%;background:#0a0a0f;border:1.5px solid #1e1e2e;border-radius:8px;padding:12px;color:#f0f0f5;font-size:14px;font-family:'Outfit',sans-serif;outline:none;appearance:none;-webkit-appearance:none">
+        <option value="">Selecciona tu provincia...</option>
+      </select>
+    </div>
+
+    <!-- PASO 3: DISTRITO -->
+    <div class="fg" id="distGroup" style="display:none;margin-bottom:10px">
+      <label class="fl">DISTRITO</label>
+      <select id="selDist" onchange="onDistChange()" style="width:100%;background:#0a0a0f;border:1.5px solid #1e1e2e;border-radius:8px;padding:12px;color:#f0f0f5;font-size:14px;font-family:'Outfit',sans-serif;outline:none;appearance:none;-webkit-appearance:none">
+        <option value="">Selecciona tu distrito...</option>
+      </select>
+    </div>
+
+    <!-- PASO 4: AGENCIA -->
+    <div class="fg" id="agcGroup" style="display:none;margin-bottom:0">
+      <label class="fl">AGENCIA / DIRECCIÓN</label>
+      <div id="agcList" style="display:flex;flex-direction:column;gap:6px"></div>
+    </div>
+
+    <!-- SELECCIONADA -->
+    <div id="agencySelected" style="display:none;margin-top:10px;background:rgba(79,142,247,.1);border:1.5px solid rgba(79,142,247,.3);border-radius:8px;padding:10px 12px">
+      <div style="font-size:10px;font-weight:700;color:#4f8ef7;letter-spacing:.5px;margin-bottom:4px">✅ AGENCIA SELECCIONADA</div>
+      <div id="agencySelectedText" style="font-size:13px;font-weight:600;color:#f0f0f5;line-height:1.4"></div>
+      <button onclick="resetAgency()" style="margin-top:6px;background:none;border:none;color:#888;font-size:11px;cursor:pointer;font-family:'Outfit',sans-serif">✏️ Cambiar agencia</button>
+    </div>
+  </div>
+
+  <button class="btn-next" onclick="goNext(1)">Continuar →</button>
+  <button class="btn-back" onclick="goBack(1)">← Volver</button>
+</div>
+
+<!-- PAGE 2: FECHA -->
+<div class="form-page" id="page2">
+  <div class="section-ttl">📅 FECHA DE ENTREGA</div>
+  <div id="datesList" class="dates-list">
+    <div class="loading"><div class="spinner"></div> Calculando fechas...</div>
+  </div>
+  <div class="err-msg" id="errDate">Selecciona una fecha</div>
+  <button class="btn-next" onclick="goNext(2)" style="margin-top:16px">Continuar →</button>
+  <button class="btn-back" onclick="goBack(2)">← Volver</button>
+</div>
+
+<!-- PAGE 3: RESUMEN -->
+<div class="form-page" id="page3">
+  <div class="section-ttl">✅ RESUMEN DEL PEDIDO</div>
+  <div class="summary-card">
+    <div class="summary-row">
+      <span class="summary-lbl">Nombre</span>
+      <span class="summary-val" id="sName">—</span>
+    </div>
+    <div class="summary-row">
+      <span class="summary-lbl">Teléfono</span>
+      <span class="summary-val" id="sPhone">—</span>
+    </div>
+    <div class="summary-row">
+      <span class="summary-lbl">Dirección</span>
+      <span class="summary-val" id="sAddress">—</span>
+    </div>
+    <div class="summary-row">
+      <span class="summary-lbl">Envío</span>
+      <span class="summary-val" id="sCourier">—</span>
+    </div>
+    <div class="summary-row" id="sAgenciaRow" style="display:none">
+      <span class="summary-lbl">Agencia</span>
+      <span class="summary-val" id="sAgencia">—</span>
+    </div>
+    <div class="summary-row">
+      <span class="summary-lbl">Fecha</span>
+      <span class="summary-val" id="sDate">—</span>
+    </div>
+    <div class="summary-row" id="sNotesRow" style="display:none">
+      <span class="summary-lbl">Notas</span>
+      <span class="summary-val" id="sNotes">—</span>
+    </div>
+  </div>
+  <button class="btn-next" id="btnEnviar" onclick="submitOrder()">📦 Confirmar pedido</button>
+  <button class="btn-back" onclick="goBack(3)">← Volver</button>
+</div>
+
+<!-- SUCCESS -->
+<div class="form-page" id="pageSuccess">
+  <div class="success">
+    <div class="success-icon">🎉</div>
+    <div class="success-ttl">¡Pedido recibido!</div>
+    <div class="success-sub">Tu pedido fue registrado exitosamente. Te contactaremos por WhatsApp para coordinar la entrega.</div>
+    <div class="success-id" id="successId">Pedido #000</div>
+    <button class="btn-next" onclick="newOrder()">Hacer otro pedido</button>
+  </div>
+</div>
+
+<script>
+// ── FIREBASE REST ─────────────────────────────────────────────────────
+const KEY = "AIzaSyBkbY-CFtNHfbaG864sXVnaAwBKZGW6SRI";
+const PRJ = "total-tools-24ce8";
+const BASE = `https://firestore.googleapis.com/v1/projects/${PRJ}/databases/(default)/documents`;
+
+// Fixed paths — same as main panel
+const CFG_PATH = 'panel/config';
+const SHIP_BASE = 'panel/shipments/items';
+
+function toFs(v){
+  if(v===null||v===undefined) return{nullValue:null};
+  if(typeof v==='boolean') return{booleanValue:v};
+  if(typeof v==='number') return Number.isInteger(v)?{integerValue:String(v)}:{doubleValue:v};
+  if(typeof v==='string') return{stringValue:v};
+  if(Array.isArray(v)) return{arrayValue:{values:v.map(toFs)}};
+  if(typeof v==='object'){const f={};Object.keys(v).forEach(k=>{f[k]=toFs(v[k])});return{mapValue:{fields:f}};}
+  return{stringValue:String(v)};
+}
+function fromFs(fv){
+  if(!fv) return null;
+  if('nullValue'in fv) return null;
+  if('booleanValue'in fv) return fv.booleanValue;
+  if('integerValue'in fv) return parseInt(fv.integerValue);
+  if('doubleValue'in fv) return fv.doubleValue;
+  if('stringValue'in fv) return fv.stringValue;
+  if('arrayValue'in fv) return(fv.arrayValue.values||[]).map(fromFs);
+  if('mapValue'in fv){const o={};Object.keys(fv.mapValue.fields||{}).forEach(k=>{o[k]=fromFs(fv.mapValue.fields[k])});return o;}
+  return null;
+}
+async function fsGet(path){
+  const r=await fetch(`${BASE}/${path}?key=${KEY}`);
+  if(r.status===404) return null;
+  if(!r.ok) return null;
+  const doc=await r.json();
+  if(!doc.fields) return null;
+  const o={};Object.keys(doc.fields).forEach(k=>{o[k]=fromFs(doc.fields[k])});
+  return o;
+}
+async function fsPatch(path,obj){
+  const fields={};Object.keys(obj).forEach(k=>{fields[k]=toFs(obj[k])});
+  const r=await fetch(`${BASE}/${path}?key=${KEY}`,{
+    method:'PATCH',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({fields})
+  });
+  if(!r.ok) throw new Error(await r.text());
+}
+
+// ── STATE ──────────────────────────────────────────────────────────────
+let CFG = null;
+let _courier = '';
+let _date = '';
+let _dateLabel = '';
+let _agencia = '';
+
+// ── LOAD CONFIG ────────────────────────────────────────────────────────
+async function loadConfig(){
+  try {
+    CFG = await fsGet(CFG_PATH);
+  } catch(e){}
+
+  if(CFG){
+    if(CFG.config && CFG.config.name) {
+      document.getElementById('bizName').textContent = CFG.config.name;
+      document.title = `Pedido — ${CFG.config.name}`;
+    }
+    if(CFG.config && CFG.config.city)
+      document.getElementById('bizSub').textContent = `📍 ${CFG.config.city} · Completa tu pedido`;
+  }
+  renderCouriers();
+  renderDates();
+}
+
+// ── COURIERS ───────────────────────────────────────────────────────────
+function courierIcon(name){
+  const n=name.toUpperCase();
+  if(n.includes('SHALOM')) return'🚌';
+  if(n.includes('OLVA')) return'📬';
+  if(n.includes('MARVISUR')) return'🚐';
+  if(n.includes('DELIVERY')||n.includes('MOTORIZADO')) return'🏍️';
+  if(n.includes('RETIRO')) return'🏪';
+  if(n.includes('ENCOMIENDA')) return'📦';
+  return'🚚';
+}
+
+function renderCouriers(){
+  const grid = document.getElementById('courierGrid');
+  let couriers = (CFG && CFG.couriers) || ['SHALOM','OLVA COURIER','DELIVERY','RETIRO EN TIENDA'];
+  // Filter by courierActive
+  if(CFG && CFG.courierActive){
+    couriers = couriers.filter(c => CFG.courierActive[c] !== false);
+  }
+  if(!couriers.length){
+    grid.innerHTML='<div class="no-dates">No hay opciones de envío disponibles</div>';
+    return;
+  }
+  grid.innerHTML = couriers.map(c=>`
+    <div class="courier-opt" onclick="selectCourier('${c}')" id="copt_${c.replace(/\s/g,'_')}">
+      <div class="ico">${courierIcon(c)}</div>
+      ${c}
+    </div>`).join('');
+}
+
+// ── AGENCY CASCADE DATA ────────────────────────────────────────────────
+const AGENCY_DATA = {
+  SHALOM: {
+    'Lima': {
+      'Lima': {
+        'Ate Vitarte': ['Av. Marco Puente Llanos 309 Mz A Lt 3 (ref: frente al grifo Repsol)', 'Av. Nicolás Ayllón 1352', 'Av. Nicolás Ayllón 3080 (Puente Santa Anita)'],
+        'Barranco': ['Av. República de Panamá (Agencia Barranco)'],
+        'Breña': ['Av. Venezuela 1670 (ref: al costado del Policlínico de Breña)'],
+        'Carabayllo': ['Av. Túpac Amaru 443 (ref: paradero Establo, a 1 cdra. de Urb. Santa Isabel)'],
+        'Cercado de Lima': ['Av. Óscar R. Benavides 860', 'Av. México 1187 (Agencia Central Shalom)'],
+        'Chorrillos': ['Av. Guardia Civil (Agencia Chorrillos)'],
+        'Comas': ['Av. Universitaria 7241 (a 2 cdras. del Metro de Belaunde)', 'Av. Túpac Amaru 4708-4710 (ref: paradero Estación Naranjal)'],
+        'El Agustino': ['Av. 1° de Mayo 3071, Urb. Huancayo (ref: frente al grifo Repsol)'],
+        'Independencia': ['Av. Túpac Amaru 4931 (ref: 1 cdra. del paradero Estación Naranjal)'],
+        'Jesús María': ['Av. San Felipe (Agencia San Felipe)', 'Av. Mariscal Luzuriaga 584-586 (ref: 1.5 cdras. del parque San José)'],
+        'La Molina': ['Av. La Fontana 440 - CC La Rotonda II Local 1018', 'Av. Los Fresnos 1305 Tda 2 - Urb. Portada del Sol', 'Av. La Molina 3551 Tda-7 - Urb. El Sol de La Molina', 'Av. Flora Tristán 885 - Urb. Santa Patricia III Etapa'],
+        'La Victoria': ['Jr. Luna Pizarro 701', 'Jr. Antonio Raimondi 125'],
+        'Lince': ['Av. Angamos Este (Agencia Lince)'],
+        'Los Olivos': ['Av. Las Palmeras 5236', 'C. Manuel Ascencio Segura 309 (ref: Los Olivos)', 'Av. Gerardo Unger 6917'],
+        'Lurigancho - Chosica': ['Carretera Central Km 17 Mz E Lt 5 (ref: paradero entrada Huaycan, al costado grifo Repsol)'],
+        'Magdalena del Mar': ['Av. Brasil (Agencia Magdalena)'],
+        'Miraflores': ['Av. José Pardo 533'],
+        'Pueblo Libre': ['Av. La Marina 1640 (ref: a 1 cdra. del CC Plaza San Miguel)', 'Av. Brasil (Agencia Pueblo Libre)'],
+        'Puente Piedra': ['Panamericana Norte Km 32.5 (ref: a 1/2 cdra. del Puente Arica, al costado del grifo Repsol)', 'Fundo Tambo Inga Mz. A Lt. 8 (ref: paradero Naranjito, antes del Cementerio Buen Retiro)'],
+        'Rímac': ['Jr. Trujillo (Agencia Rímac)'],
+        'San Borja': ['Av. Javier Prado Este 1810', 'Av. Aviación (Agencia Aviación San Borja)'],
+        'San Juan de Lurigancho': ['Av. Próceres de la Independencia 1295', 'Av. Santa Rosa 773 (ref: alt. cdra. 13, paradero Canto Grande)', 'Jr. Saturno 386 (ref: alt. paradero 21 Las Flores, a 3 cdras. de Plaza Vea)', 'Av. 13 de Enero 2057'],
+        'San Juan de Miraflores': ['Av. De Los Héroes 228 (Estación Atocongo)', 'Av. Pachacutec 6547'],
+        'San Luis': ['Av. Nicolás Ayllón (Agencia San Luis)'],
+        'San Martín de Porres': ['Av. Perú 1589', 'Av. Canta Callao 10 Parcela 2A Local 109 (ref: frente a Tottus)', 'Av. Canta Callao Mz A Lt 3 Urb. Arizona 2da Etapa', 'Av. Los Próceres 535', 'Av. Universitaria (Fiori - ref: frente al parque Santa Rosa)'],
+        'San Miguel': ['Av. La Marina (Agencia San Miguel)'],
+        'Santa Anita': ['Av. Huancaray Mz A Lote 14 (ref: a 2 cdras. de la av. recolectora)'],
+        'Santiago de Surco': ['Av. Primavera 120 (Chacarilla)', 'Av. República de Panamá 5115 (ref: costado del grifo Repsol)'],
+        'Surquillo': ['Av. República de Panamá 5115'],
+        'Villa El Salvador': ['Av. Pastor Sevilla', 'Av. César Vallejo - Villa El Salvador'],
+        'Villa María del Triunfo': ['Av. Pachacutec (Agencia VMT)'],
+      },
+      'Cañete': {
+        'San Vicente de Cañete': ['Urb. San Vicente de Cañete (Agencia Cañete)'],
+        'Imperial': ['Fundo Santa Adela Mz A Lotes 8 y 9 - Carretera Cañete a Yauyos (ref: al costado del restaurant La Ruta Brava)'],
+      },
+      'Huaura': {
+        'Huacho': ['Prolongación Salaverry 764 (ref: cruce con la av. La Paz)', 'Av. Mercedes Indacochea 1276 (ref: intersección con Pedro Ruiz Gallo, a 2 cdras. de la UNJFSC)'],
+        'Hualmay': ['Av. Las Malvinas Mz C Lote 16 Urb. El Rosario Sur (ref: a espaldas de la plaza de armas)'],
+      },
+      'Huaral': {
+        'Huaral': ['Av. Chancay S/N Urb. San Martín de Porres Mz D Lt 101 (ref: frente al estadio Unión Huaral)'],
+        'Chancay': ['Prolongación San Martín 403 (ref: a 1 cdra. de la av. Panamericana Norte)'],
+      },
+      'Barranca': {
+        'Barranca': ['Urb. Las Vegas Mz C Lt 22 (ref: entre el colegio Fe Alegría y el mercado Buena Vista)'],
+      },
+      'Huarochirí': {
+        'Lurigancho': ['Av. Sinchi Roca Mz P Lt 16A AAHH Las Praderas de Jicamarca (ref: cerca al arco portón de Jicamarca)'],
+      },
+    },
+    'Callao': {
+      'Callao': {
+        'Callao': ['Av. Elmer Faucett 492-484 (ref: frente al grifo Repsol)', 'Av. Saenz Peña 414-416 (ref: cruce con av. Marco Polo)', 'Av. La Marina 530 Urb. Benjamín Doigg Lossio La Perla (ref: a 3 cdras. del óvalo de La Perla)'],
+        'Bellavista': ['Av. Elmer Faucett 1641 Urb. Jardines Virú Mz B Lt 46 (ref: a 2 cdras. del cruce Faucett con Venezuela)'],
+        'Ventanilla': ['Calle Columba 102 (ref: Paradero Tercero Naval, frente al grifo Repsol)', 'Av. 225 Mz H Sub Lt T.11 Asoc. Proy. Esp. Ciudad Pachacutec (ref: a 1 cdra. del cruce con av. Los Proyectistas)'],
+        'Mi Perú': ['Av. Víctor Raúl Haya de la Torre Mz A Lt 02 AA.HH. Confraternidad III Sector (ref: cruce con av.)'],
+      },
+    },
+    'Arequipa': {
+      'Arequipa': {
+        'Arequipa (Cercado)': ['Calle Deán Valdivia 388 (ref: esquina con Blondel)', 'Av. Goyoneche 1422 (ref: esquina Francisco Bolognesi)'],
+        'Cayma': ['Av. Ejército 1025-B Cayma (ref: agencia Cayma)'],
+        'Cerro Colorado': ['Nuevo Horizonte Mz H Lote 12 (ref: con av. 54 a 4 cdras. de Inkafarma)'],
+        'Hunter (Jacobo Hunter)': ['Calle Argentina 405-A (ref: frente al cajero de Caja Arequipa, esquina Banco Caja Arequipa)'],
+        'La Joya': ['Lateral 12 C Lt 32 El Cruce La Joya (ref: al costado del grifo Primax de La Joya)', 'Asoc. Urbanizadora Peruarbo Sector Perú Zona I Mz B4 Lt 4 Autopista La Joya (ref: autopista Arequipa-La Joya, a 2 cdras. del sauna Candamo)'],
+        'Mariano Melgar': ['Calle Ancash 202 (ref: a la altura del coliseo del niño)'],
+        'Miraflores (Arequipa)': ['Urb. Residencial Felipe Santiago Salaverry - Calle Tte. Rodríguez Mz H Lt 11 (ref: a media cdra. de la compañía de bomberos)'],
+        'Paucarpata': ['Calle Belén 100-A Urb. Manuel Prado (ref: a espaldas del CC Mall Aventura Porongoche)', 'Av. Jesús 1100 Paucarpata (ref: con esquina Arturo Villegas 101)'],
+        'Sabandía': ['Av. Lote Colonizadores 4 Parcela 180 Majes (ref: agencia Majes)'],
+        'Socabaya': ['Av. Socabaya 301 Urb. San Martín de Socabaya (ref: frente al parque Víctor Barriga)', 'AA.HH. Municipal Horacio Zeballos Gamez Sector E Mz 1 Lt 18 (ref: al costado del colegio Joule / a 2 cdras. del penal)'],
+        'Uchumayo': ['Urb. El Carmen M.E. Lt 1 Congata (ref: a dos cdras. de la comisaría Congata)'],
+        'Yura': ['Mz O Lt 4 Zona 2 Ciudad de Dios (ref: carretera Yura)'],
+      },
+      'Camaná': {
+        'Camaná': ['Calle Agustín Gamarra 451 Cercado (ref: al frente del delivery Caseritos)'],
+        'Mollendo': ['Av. Industrial 1 Terminal Terrestre de Mollendo'],
+      },
+      'Caravelí': {
+        'Chala': ['Av. Emancipación Lt 3 Mz 51 (ref: a media cdra. del parque del niño Chalino)'],
+      },
+      'Castilla': {
+        'Aplao': ['Ubica en la Mz X1 Lt 07 Calle 8 de Setiembre Aplao (ref: a 1 cdra. de Ministerio Público Fiscalía)'],
+      },
+      'Caylloma': {
+        'Majes': ['Calle Yarabamba Mz Y Lt 7 Villa El Pedregal (ref: a media cdra. de la notaria Terán Béjar)'],
+      },
+    },
+    'Cusco': {
+      'Cusco': {
+        'Cusco (Cercado)': ['Prolong. Av. Arequipa 1010 S/N (ref: al costado del grifo Guadalupe en el óvalo San Andrés)'],
+        'San Sebastián': ['Av. Agropecuaria Mz F-7 S/N Urb. Residencial Huancaro (ref: frente puerta 2 feria de Huancaro)'],
+      },
+      'Canchis': {
+        'Sicuani': ['Jr. Inambari 208 (ref: al frente del BCP y de Caja Piura)'],
+        'Combapata': ['Av. Señor de Huanca S/N (ref: al costado del grifo Señor de Qoylluriti, a orillas de la carretera a Sicuani)'],
+      },
+      'Calca': {
+        'Calca': ['Av. Vilcanota Mz A Lt 4 (ref: frente al grifo Petro Perú o el óvalo Puma, entrada de Calca)'],
+        'Pisac': ['Av. Vilcanota S/N (ref: a media cdra. del puente de Pisac / carretera a Taray)'],
+      },
+      'Chumbivilcas': {
+        'Santo Tomás': ['Agencia Santo Tomás - Chumbivilcas'],
+      },
+      'Espinar': {
+        'Espinar': ['Av. Tintaya 215 Espinar (ref: a 2 cdras. de los bomberos)'],
+      },
+      'La Convención': {
+        'Maranura': ['Jr. Palmeras Mz N Lt 06 (ref: al costado de muebles Maranura)'],
+      },
+      'Quispicanchi': {
+        'Urcos': ['Mayupata S/N Paucarbamba (ref: frente al estadio municipal de Urcos / frente al terminal terrestre de Urcos)'],
+      },
+    },
+    'Puno': {
+      'Puno': {
+        'Puno': ['Urb. Aziruni Tepro I Etapa Mz 18 Lt 52 Jr Los Rosales - Salcedo (ref: a 1 cdra. de la av. Estudiante / a 2 cdras. de SENATI Puno)'],
+      },
+      'San Román': {
+        'Juliaca': ['Agencia Juliaca Central', 'Agencia Juliaca 2'],
+      },
+    },
+    'La Libertad': {
+      'Trujillo': {
+        'Trujillo': ['Agencia La Perla - Trujillo', 'Agencia Calle Liverpool - Trujillo'],
+        'La Esperanza': ['Agencia La Esperanza'],
+        'El Porvenir': ['Agencia El Porvenir'],
+        'Florencia de Mora': ['Agencia Florencia de Mora'],
+        'Víctor Larco Herrera': ['Agencia Víctor Larco'],
+      },
+    },
+    'Lambayeque': {
+      'Chiclayo': {
+        'Chiclayo': ['Agencia Chiclayo Central'],
+        'La Victoria (Chiclayo)': ['Agencia La Victoria - Chiclayo'],
+        'José Leonardo Ortiz': ['Agencia José Leonardo Ortiz'],
+      },
+      'Ferreñafe': {
+        'Ferreñafe': ['Agencia Ferreñafe'],
+      },
+    },
+    'Piura': {
+      'Piura': {
+        'Piura': ['Agencia Piura Central'],
+        'Castilla': ['Agencia Castilla - Piura'],
+        'Catacaos': ['Agencia Catacaos'],
+      },
+      'Sullana': {
+        'Sullana': ['Agencia Sullana Central'],
+      },
+      'Talara': {
+        'Pariñas': ['Asociación California C-03 frente a carretera Negritos (ref: al costado del restaurante Mi Torete)', 'Mz N-10 AA.HH 9 de Octubre Talara Alta (ref: a 1 cdra. antes de AMECFA)', 'Parque 22-03 Lateral Talara Baja (ref: frente a MINSA)'],
+        'El Alto': ['Av. Bolognesi O-37 Centro El Alto (ref: a espaldas de la municipalidad)'],
+        'Lobitos': ['Av. Panamericana Norte P-29 Urb. Cercado Zona Urbana (ref: al frente de grifo de Troncos / grifo San Pedro)'],
+        'Máncora': ['Av. Grau 432 Máncora (ref: frente al paradero de autos de Los Órganos en toda la Panamericana Norte)'],
+      },
+      'Paita': {
+        'Bayóvar': ['Av. Bayóvar 311 (ref: al costado de Antena 10 Radio)'],
+      },
+    },
+    'Tumbes': {
+      'Tumbes': {
+        'Tumbes': ['Agencia Tumbes Central'],
+      },
+    },
+    'Loreto': {
+      'Maynas': {
+        'Iquitos': ['Agencia Iquitos Central'],
+        'San Juan Bautista': ['Agencia San Juan Bautista - Loreto'],
+      },
+    },
+    'Ucayali': {
+      'Coronel Portillo': {
+        'Pucallpa': ['Agencia Pucallpa Central'],
+        'Yarinacocha': ['Agencia Yarinacocha'],
+      },
+    },
+    'San Martín': {
+      'San Martín': {
+        'Tarapoto': ['Agencia Tarapoto Central'],
+        'Morales': ['Agencia Morales'],
+        'La Banda de Shilcayo': ['Agencia La Banda de Shilcayo'],
+      },
+      'Mariscal Cáceres': {
+        'Campanilla': ['Jr. Julio Romero Castro S/N Campanilla (ref: frente a la Plaza de Armas)'],
+      },
+    },
+    'Cajamarca': {
+      'Cajamarca': {
+        'Cajamarca': ['Jr. Los Nogales 426 (ref: agencia Cajamarca)'],
+        'San Ignacio': ['Pasaje Tres 113 Urb. Santa Rosa (ref: frente al estado municipal)'],
+      },
+      'San Marcos': {
+        'San Marcos': ['Jr. Adolfo Amorín Bueno 140 (ref: al frente de la plaza agropecuaria)'],
+      },
+      'San Miguel': {
+        'San Miguel': ['Jr. Bolognesi 717 (ref: al costado del coliseo y el paradero de Llapa y Cochán)'],
+      },
+      'San Pablo': {
+        'San Pablo': ['Jr. Tnte. Lorenzo Iglesia 910 (ref: agencia San Pablo)'],
+      },
+      'Contumazá': {
+        'Tembladera': ['Jr. Bolognesi S/N Tembladera - Yonán (ref: al frente del parque Víctor Raúl Haya de la Torre)'],
+      },
+      'Cutervo': {
+        'Cutervo': ['Av. Salomón Vilchez Murga S/N Cdra 9 (ref: frente a la clínica Cutervo)'],
+      },
+    },
+    'Amazonas': {
+      'Bagua': {
+        'Bagua': ['Jr. Amazonas C-9 Mz 126 Lt 25 (ref: frente al parque Jerusalén / costado de avícola Yaceg)'],
+        'Pedro Ruiz': ['Av. Sacsahuaman 513 (ref: a media cdra. de la UGEL)'],
+      },
+      'Chachapoyas': {
+        'Chachapoyas': ['Jr. Grau 270 (ref: junto a la Agencia de Viajes Monteverde)', 'Av. Chachapoyas 1094 Sector Gonchillo (ref: a 2 cdras. de la clínica Señor de los Milagros)'],
+      },
+      'Luya': {
+        'Luya': ['Jr. Ramón Castilla S/N (ref: entre el colegio secundario Ramón Castilla y el Jr. José Gálvez, a media cdra. del agente de venta de pasajes de Civa)'],
+      },
+    },
+    'Áncash': {
+      'Huaraz': {
+        'Huaraz': ['Agencia Huaraz Central'],
+        'Independencia (Huaraz)': ['Agencia Independencia - Huaraz'],
+      },
+      'Carhuaz': {
+        'Carhuaz': ['Carretera Central S/N Cent. Carhuaz (ref: media cdra. antes de llegar al estadio municipal Capitán Carlos Mejía)'],
+      },
+      'Santa': {
+        'Chimbote': ['Agencia Chimbote Central'],
+        'Nuevo Chimbote': ['Agencia Nuevo Chimbote'],
+      },
+    },
+    'Junín': {
+      'Huancayo': {
+        'Huancayo': ['Agencia Huancayo Central', 'Agencia Huancayo 2'],
+        'El Tambo': ['Agencia El Tambo - Huancayo'],
+        'Chilca': ['Agencia Chilca'],
+      },
+    },
+    'Ica': {
+      'Ica': {
+        'Ica': ['Agencia Ica Central'],
+      },
+      'Chincha': {
+        'Chincha Alta': ['Agencia Chincha'],
+      },
+    },
+    'Ayacucho': {
+      'Huamanga': {
+        'Ayacucho': ['AA.HH Complejo Artesanal T1 Lt1 (ref: a 1 cdra. de la puerta 2 del terminal terrestre Libertadores de América)'],
+      },
+    },
+    'Apurímac': {
+      'Abancay': {
+        'Abancay': ['Agencia Abancay - Shalom'],
+      },
+      'Andahuaylas': {
+        'Andahuaylas': ['Agencia Andahuaylas - Shalom'],
+      },
+    },
+    'Moquegua': {
+      'Mariscal Nieto': {
+        'Moquegua': ['Agencia Moquegua Central'],
+      },
+    },
+    'Tacna': {
+      'Tacna': {
+        'Tacna': ['Agencia Tacna Central'],
+        'Ciudad Nueva': ['Agencia Ciudad Nueva - Tacna'],
+      },
+    },
+    'Madre de Dios': {
+      'Tambopata': {
+        'Puerto Maldonado': ['Agencia Puerto Maldonado'],
+      },
+    },
+    'Huancavelica': {
+      'Huancavelica': {
+        'Huancavelica': ['Agencia Huancavelica'],
+      },
+    },
+    'Pasco': {
+      'Pasco': {
+        'Cerro de Pasco': ['Agencia Cerro de Pasco'],
+      },
+    },
+    'Huánuco': {
+      'Huánuco': {
+        'Huánuco': ['Av. 27 de Noviembre Cdra. 20 S/N Villón Bajo (ref: al costado del grifo Primax)', 'Jr. Pedro Ortiz Montoya 148 (ref: esquina con av. Amazonas)'],
+        'Amarilis': ['Agencia Amarilis'],
+      },
+    },
+  },
+  OLVA: {
+    'Lima': {
+      'Lima': {
+        'Cercado de Lima': ['Pje. Acuña 131', 'Av. Inca Garcilaso de la Vega 1358', 'Av. Simón Bolívar 1427', 'Prol. Paseo de la República 1515', 'Av. Gral. Álvarez de Arenales 1775'],
+        'San Borja': ['Av. Aviación 3532'],
+        'Miraflores': ['Av. Comandante Espinar 659'],
+        'San Isidro': ['Av. República de Panamá 3603', 'Calle Begonias 774 (Mail Boxes ETC)'],
+        'Los Olivos': ['Av. Carlos Izaguirre 1006 (Urb. Palmeras)'],
+        'La Molina': ['CC La Fontana, Av. Javier Prado Este', 'CC La Rotonda II, Av. La Molina (Tda 1017)'],
+        'La Victoria': ['Jr. Antonio Bazo 1280 (Gamarra)'],
+        'San Luis': ['Av. del Aire 1322'],
+        'San Juan de Miraflores': ['Av. San Juan 713'],
+        'Santa Anita': ['Av. Santa Rosa 131'],
+        'Jesús María': ['Av. Gral. Salaverry 2370 (CC Real Plaza Salaverry, frente a UTP postgrado)'],
+        'Lurigancho - Chosica': ['Av. Lima Sur 853 - Chosica'],
+        'San Martín de Porres': ['Av. Universitaria Norte 6971-6973'],
+      },
+      'Callao': {
+        'Callao': ['Av. Argentina 4458 (Almacén Central)', 'Av. Sáenz Peña 1463'],
+        'Pueblo Libre': ['Prolongación Ayacucho 1290 (Qinti Express)'],
+      },
+    },
+    'Arequipa': {
+      'Arequipa': {
+        'Cercado (Arequipa)': ['Calle Moral 105'],
+        'Cayma': ['Av. Ejército 1025-B'],
+        'La Tomilla': ['Av. Ramón Castilla 1021 (ref: cerca al Estadio Ulises Montes R.)'],
+        'Cercado (Plaza Américas)': ['Calle Miguel Grau 214 - Plaza de las Américas'],
+        'Cercado (Pizarro)': ['Av. Pizarro 127 - Sub Lote 4'],
+        'Arequipa (Shuton)': ['Av. Carlos Shuton Mz A-21 Lt 1'],
+        'IV Centenario': ['Calle Mayta Capac 601 IV Centenario, Cercado'],
+        'Aplao': ['Av. 03 de Abril Mz C2 Lote 3 Aplao'],
+        'Castilla (Arequipa)': ['Av. Ramón Castilla 1021 La Tomilla'],
+      },
+    },
+    'Cajamarca': {
+      'Cajamarca': {
+        'Cajamarca': ['Jr. Los Nogales 426'],
+      },
+    },
+    'Cusco': {
+      'Cusco': {
+        'San Sebastián': ['Av. Agropecuaria Mz F-7 S/N Urb. Residencial Huancaro (frente puerta 2 feria de Huancaro)'],
+      },
+    },
+    'Piura': {
+      'Piura': {
+        'Ayabaca': ['Av. Grau 273 esq. c/Salverry - Ayabaca'],
+        'Huancabamba': ['Av. Aquiles Escala 210 Barrio San Francisco'],
+      },
+    },
+  }
+};
+
+function getAgencyData(courierName){
+  const n = courierName.toUpperCase();
+  if(n.includes('SHALOM')) return {key:'SHALOM', name:'SHALOM'};
+  if(n.includes('OLVA')) return {key:'OLVA', name:'OLVA COURIER'};
+  return null;
+}
+
+let _currentAgencyKey = null;
+
+function initCascade(agencyKey){
+  _currentAgencyKey = agencyKey;
+  const data = AGENCY_DATA[agencyKey];
+  const sel = document.getElementById('selDept');
+  sel.innerHTML = '<option value="">Selecciona tu departamento...</option>';
+  Object.keys(data).sort().forEach(dept => {
+    sel.innerHTML += `<option value="${dept}">${dept}</option>`;
+  });
+  document.getElementById('provGroup').style.display = 'none';
+  document.getElementById('distGroup').style.display = 'none';
+  document.getElementById('agcGroup').style.display = 'none';
+  document.getElementById('agencySelected').style.display = 'none';
+}
+
+function onDeptChange(){
+  const dept = document.getElementById('selDept').value;
+  const provSel = document.getElementById('selProv');
+  provSel.innerHTML = '<option value="">Selecciona tu provincia...</option>';
+  document.getElementById('distGroup').style.display = 'none';
+  document.getElementById('agcGroup').style.display = 'none';
+  if(!dept){ document.getElementById('provGroup').style.display='none'; return; }
+  const provs = AGENCY_DATA[_currentAgencyKey][dept];
+  Object.keys(provs).sort().forEach(prov => {
+    provSel.innerHTML += `<option value="${prov}">${prov}</option>`;
+  });
+  document.getElementById('provGroup').style.display = 'block';
+}
+
+function onProvChange(){
+  const dept = document.getElementById('selDept').value;
+  const prov = document.getElementById('selProv').value;
+  const distSel = document.getElementById('selDist');
+  distSel.innerHTML = '<option value="">Selecciona tu distrito...</option>';
+  document.getElementById('agcGroup').style.display = 'none';
+  if(!prov){ document.getElementById('distGroup').style.display='none'; return; }
+  const dists = AGENCY_DATA[_currentAgencyKey][dept][prov];
+  Object.keys(dists).sort().forEach(dist => {
+    distSel.innerHTML += `<option value="${dist}">${dist}</option>`;
+  });
+  document.getElementById('distGroup').style.display = 'block';
+}
+
+function onDistChange(){
+  const dept = document.getElementById('selDept').value;
+  const prov = document.getElementById('selProv').value;
+  const dist = document.getElementById('selDist').value;
+  if(!dist){ document.getElementById('agcGroup').style.display='none'; return; }
+  const addrs = AGENCY_DATA[_currentAgencyKey][dept][prov][dist];
+  document.getElementById('agcList').innerHTML = addrs.map((addr,i) => `
+    <div onclick="selectAgency('${dept}','${prov}','${dist}',${i})" 
+      style="background:#0a0a0f;border:1.5px solid #1e1e2e;border-radius:8px;padding:12px;cursor:pointer;transition:border-color .15s"
+      id="agcOpt_${i}">
+      <div style="font-size:12px;color:#4f8ef7;font-weight:700;margin-bottom:2px">📍 Agencia ${i+1}</div>
+      <div style="font-size:13px;color:#f0f0f5;line-height:1.4">${addr}</div>
+    </div>`).join('');
+  document.getElementById('agcGroup').style.display = 'block';
+}
+
+function selectAgency(dept, prov, dist, idx){
+  const addr = AGENCY_DATA[_currentAgencyKey][dept][prov][dist][idx];
+  _agencia = `${dist}, ${prov}, ${dept} — ${addr}`;
+  document.querySelectorAll('[id^="agcOpt_"]').forEach(el => el.style.borderColor = '#1e1e2e');
+  const opt = document.getElementById('agcOpt_'+idx);
+  if(opt) opt.style.borderColor = '#4f8ef7';
+  document.getElementById('agencySelectedText').textContent = _agencia;
+  document.getElementById('agencySelected').style.display = 'block';
+}
+
+function resetAgency(){
+  _agencia = '';
+  document.getElementById('agencySelected').style.display = 'none';
+  document.getElementById('selDept').value = '';
+  onDeptChange();
+}
+
+function selectCourier(name){
+  _courier = name;
+  document.querySelectorAll('.courier-opt').forEach(el=>el.classList.remove('selected'));
+  const id = 'copt_'+name.replace(/\s/g,'_');
+  const el = document.getElementById(id);
+  if(el) el.classList.add('selected');
+  document.getElementById('errCourier').classList.remove('show');
+
+  const agency = getAgencyData(name);
+  const finder = document.getElementById('agencyFinder');
+  if(agency){
+    finder.style.display = 'block';
+    document.getElementById('agencyTitle').textContent = `📍 ¿DÓNDE ESTÁ TU AGENCIA ${agency.name}?`;
+    initCascade(agency.key);
+    _agencia = '';
+  } else {
+    finder.style.display = 'none';
+    _agencia = '';
+  }
+}
+  SHALOM: {
+    // LIMA NORTE
+    'Puente Piedra': ['Panamericana Norte Km 32.5, a 1/2 cuadra del Puente Arica (al costado del grifo Repsol)'],
+    'Carabayllo': ['Av. Túpac Amaru 443 (referencia: paradero Establo, a 1 cuadra de Urb. Santa Isabel)'],
+    'Comas': ['Av. Universitaria 7241 (a 2 cuadras del Metro de Belaunde)', 'Av. Túpac Amaru 4708-4710 (ref: a 1 cuadra del paradero Estación Naranjal)'],
+    'Independencia': ['Av. Túpac Amaru 4708 (ref: paradero Estación Naranjal)'],
+    'Los Olivos': ['Av. Las Palmeras 5236', 'C. Manuel Ascencio Segura 309', 'Av. Gerardo Unger 6917'],
+    'San Martín de Porres - SMP': ['Av. Perú 1589', 'Av. Canta Callao 10, Parcela 2A Local 109 (frente a Tottus)', 'Av. Canta Callao Mz A Lt 3, Urb. Arizona 2da Etapa', 'Av. Los Próceres 535'],
+    'Ventanilla': ['Calle Columba 102 (ref: Paradero Tercero Naval, frente al grifo Repsol)'],
+    // LIMA CENTRO
+    'La Victoria - Agencia Central': ['Av. México 1187 (Agencia Central Shalom)'],
+    'La Victoria': ['Jr. Luna Pizarro 701', 'Jr. Antonio Raimondi 125'],
+    'Cercado de Lima': ['Av. Óscar R. Benavides 860'],
+    'Breña': ['Av. Venezuela 1670 (ref: al costado del Policlínico de Breña)'],
+    'Jesús María': ['Av. San Felipe (Agencia San Felipe)'],
+    'Pueblo Libre': ['Av. La Marina 1640 (ref: a 1 cuadra del CC Plaza San Miguel)', 'Av. Brasil (Agencia Av. Brasil)'],
+    'Fiori - Los Olivos': ['Av. Miguel Ángel 177-183 (ref: frente al Parque Santa Rosa)'],
+    // LIMA ESTE
+    'San Juan de Lurigancho - SJL': ['Av. Próceres de la Independencia 1295', 'Av. Santa Rosa 773 (ref: altura cuadra 13, paradero Canto Grande)', 'Jr. Saturno 386 (ref: altura paradero 21 de Las Flores, a 3 cuadras de Plaza Vea)', 'Av. 13 de Enero 2057'],
+    'Ate Vitarte': ['Av. Marco Puente Llanos 309, Mz A Lt 3', 'Av. Nicolás Ayllón 1352', 'Av. Nicolás Ayllón 3080 (Puente Santa Anita)'],
+    'Santa Anita': ['Av. Huancaray Mz A Lote 14 (ref: a 2 cuadras de la av. recolectora)'],
+    'El Agustino': ['Av. 1° de Mayo 3071, Urb. Huancayo (ref: frente al grifo Repsol)'],
+    'Huaycan': ['Carretera Central Km 17, Mz E Lt 5 (ref: paradero entrada de Huaycan, al costado del grifo Repsol)'],
+    'Cieneguilla': ['Km 11.5 Autopista Cieneguilla, entrada de Manchay (ref: a media cuadra de Mi Banco)'],
+    'La Fontana - La Molina': ['Av. La Fontana 440, La Molina (CC La Rotonda II, local 1018)'],
+    // LIMA SUR
+    'San Juan de Miraflores - SJM': ['Av. De Los Héroes 228 (Estación Atocongo)', 'Av. Pachacutec 6547'],
+    'Villa El Salvador': ['Av. Pastor Sevilla', 'Av. César Vallejo'],
+    'Surquillo': ['Av. República de Panamá 5115 (ref: costado del grifo Repsol)'],
+    'Miraflores': ['Av. José Pardo 533'],
+    'San Borja': ['Av. Javier Prado Este 1810', 'Av. Aviación (Agencia Aviación)'],
+    'Surco': ['Av. Primavera 120 (Chacarilla)'],
+    'Callao': ['Av. Elmer Faucett 492-484 (ref: frente al grifo Repsol)', 'Av. Elmer Faucett 1802 (Bellavista)'],
+    // LIMA NORTE - PROVINCIAS
+    'Barranca': ['Urb. Las Vegas Mz C Lt 22 (ref: entre el colegio Fe Alegría y el mercado Buena Vista)'],
+    'Huacho': ['Prolongación Salaverry 764 (ref: cruce con la av. La Paz)'],
+    'Huaral': ['Av. Chancay S/N, Urb. San Martín de Porres, Mz D Lt 101 (ref: frente al estadio Unión Huaral)'],
+    'Cañete': ['Urb. San Vicente de Cañete'],
+    // PROVINCIAS
+    'Arequipa': ['Agencia Central Arequipa', 'Agencia Cayma', 'Agencia Ciudad Municipal', 'Agencia Miraflores Arequipa', 'Agencia Paucarpata', 'Agencia Socabaya', 'Agencia Mariano Melgar', 'Agencia Mollendo', 'Agencia Las Flores'],
+    'Trujillo': ['Agencia La Perla - Trujillo', 'Agencia Calle Liverpool - Trujillo'],
+    'Chiclayo': ['Agencia Chiclayo Central'],
+    'Piura': ['Agencia Piura Central'],
+    'Cusco': ['Agencia Cusco Central'],
+    'Huancayo': ['Agencia Huancayo Central'],
+    'Juliaca': ['Agencia Juliaca'],
+    'Puno': ['Agencia Puno'],
+    'Iquitos': ['Agencia Iquitos'],
+    'Tacna': ['Agencia Tacna'],
+    'Ica': ['Agencia Ica'],
+    'Ayacucho': ['Agencia Ayacucho'],
+    'Huánuco': ['Agencia Huánuco'],
+    'Cajamarca': ['Agencia Cajamarca'],
+    'Chimbote': ['Agencia Chimbote'],
+    'Tarapoto': ['Agencia Tarapoto'],
+    'Pucallpa': ['Agencia Pucallpa'],
+    'Huaraz': ['Agencia Huaraz'],
+    'Abancay': ['Agencia Abancay'],
+    'Andahuaylas': ['Agencia Andahuaylas'],
+    'Tumbes': ['Agencia Tumbes'],
+    'Sullana': ['Agencia Sullana'],
+  },
+  OLVA: {
+    'Lima - Cercado': ['Pje. Acuña 131', 'Av. Inca Garcilaso de la Vega 1358', 'Av. Simón Bolívar 1427', 'Prol. Paseo de la República 1515', 'Av. Gral. Alvarez de Arenales 1775'],
+    'Lima - San Borja': ['Av. Aviación 3532'],
+    'Lima - Miraflores': ['Av. Comandante Espinar 659'],
+    'Lima - San Isidro': ['Av. República de Panamá 3603', 'Calle Begonias 774 (Mail Boxes ETC)'],
+    'Lima - Los Olivos': ['Av. Carlos Izaguirre 1006 (Urb. Palmeras)'],
+    'Lima - La Molina': ['CC La Fontana, Av. Javier Prado Este', 'CC La Rotonda II, Av. La Molina'],
+    'Lima - La Victoria': ['Jr. Antonio Bazo 1280 (Gamarra)'],
+    'Lima - San Luis': ['Av. del Aire 1322'],
+    'Lima - SJM': ['Av. San Juan 713'],
+    'Lima - Santa Anita': ['Av. Santa Rosa 131'],
+    'Lima - Callao': ['Av. Argentina 4458 (Almacén Central)', 'Av. Sáenz Peña 1463'],
+    'Lima - Pueblo Libre': ['Prolongación Ayacucho 1290 (Qinti Express)'],
+    'Lima - Lurigancho': ['Av. Lima Sur 853 - Chosica'],
+    'Lima - SMP': ['Av. Universitaria Norte 6971-6973'],
+    'Lima - Surco': ['Agencia Surco'],
+    'Arequipa': ['Calle Moral 105, Cercado', 'Av. Ejército 1025-B, Cayma', 'Av. Ramón Castilla 1021, La Tomilla', 'Calle Miguel Grau 214, Plaza de las Américas', 'Av. Pizarro 127, Sub Lote 4', 'Av. Carlos Shuton Mz A-21', 'Calle Mayta Capac 601, IV Centenario'],
+    'Cajamarca': ['Jr. Los Nogales 426'],
+    'Cusco': ['Av. Agropecuaria Mz F-7, Urb. Huancaro'],
+    'Trujillo': ['Agencia Trujillo Central', 'Av. Pizarro 127'],
+    'Chiclayo': ['Agencia Chiclayo'],
+    'Piura': ['Agencia Piura', 'Av. Grau 273, Ayabaca'],
+    'Huancabamba': ['Av. Aquiles Escala 210, Barrio San Francisco'],
+    'Juliaca': ['Agencia Juliaca'],
+    'Tacna': ['Agencia Tacna'],
+    'Ica': ['Agencia Ica'],
+    'Huánuco': ['Agencia Huánuco'],
+    'Ayacucho': ['Av. Grau 273'],
+    'Tarapoto': ['Agencia Tarapoto'],
+    'Pucallpa': ['Agencia Pucallpa'],
+    'Chimbote': ['Agencia Chimbote'],
+    'Tumbes': ['Agencia Tumbes'],
+  }
+};
+
+
+// ── DATES ──────────────────────────────────────────────────────────────
+function renderDates(){
+  const dispatch = (CFG && CFG.dispatch) || {days:[1,2,3,4,5], cutHour:'23:59', anticipation:0};
+  const days = dispatch.days || [1,2,3,4,5];
+  const anticipation = dispatch.anticipation || 0;
+  const [cutH, cutM] = (dispatch.cutHour||'23:59').split(':').map(Number);
+
+  const now = new Date();
+  const todayDay = now.getDay(); // 0=Sun
+  const pastCut = (now.getHours() > cutH) || (now.getHours() === cutH && now.getMinutes() >= cutM);
+  
+  const dayNames = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
+  const monthNames = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+
+  const available = [];
+  let checked = 0;
+  let offset = anticipation + (pastCut ? 1 : 0);
+  
+  for(let i=1; i<=30 && available.length<5; i++){
+    const d = new Date(now);
+    d.setDate(now.getDate() + i);
+    const wd = d.getDay();
+    if(days.includes(wd)){
+      if(checked >= offset){
+        available.push(d);
+      }
+      checked++;
+    }
+  }
+
+  if(!available.length){
+    document.getElementById('datesList').innerHTML='<div class="no-dates">📅 No hay fechas disponibles por el momento</div>';
+    return;
+  }
+
+  document.getElementById('datesList').innerHTML = available.map(d=>{
+    const iso = d.toISOString().split('T')[0];
+    const label = `${dayNames[d.getDay()]} ${d.getDate()} de ${monthNames[d.getMonth()]}`;
+    return`<div class="date-opt" onclick="selectDate('${iso}','${label}')" id="dopt_${iso}">
+      <div>
+        <div class="date-opt-day">${dayNames[d.getDay()]}</div>
+        <div class="date-opt-date">${d.getDate()} de ${monthNames[d.getMonth()]} ${d.getFullYear()}</div>
+      </div>
+      <div class="date-opt-check">✓</div>
+    </div>`;
+  }).join('');
+}
+
+function selectDate(iso, label){
+  _date = iso;
+  _dateLabel = label;
+  document.querySelectorAll('.date-opt').forEach(el=>el.classList.remove('selected'));
+  const el = document.getElementById('dopt_'+iso);
+  if(el) el.classList.add('selected');
+  document.getElementById('errDate').classList.remove('show');
+}
+
+// ── NAVIGATION ─────────────────────────────────────────────────────────
+let _currentPage = 0;
+
+function updateSteps(page){
+  for(let i=0;i<4;i++){
+    const s = document.getElementById('step'+i);
+    s.className = 'step';
+    if(i < page) s.classList.add('done');
+    else if(i === page) s.classList.add('active');
+  }
+}
+
+function goNext(from){
+  try{
+  if(from===0){
+    const name = document.getElementById('fName').value.trim();
+    const phone = document.getElementById('fPhone').value.trim().replace(/\s/g,'');
+    const addr = document.getElementById('fAddress').value.trim();
+    let ok=true;
+    if(!name){document.getElementById('errName').classList.add('show');ok=false;}
+    else document.getElementById('errName').classList.remove('show');
+    if(phone.length<8||phone.length>11||!/^\d+$/.test(phone)){document.getElementById('errPhone').classList.add('show');ok=false;}
+    else document.getElementById('errPhone').classList.remove('show');
+    if(!addr){document.getElementById('errAddress').classList.add('show');ok=false;}
+    else document.getElementById('errAddress').classList.remove('show');
+    if(!ok) return;
+  }
+  if(from===1 && !_courier){
+    document.getElementById('errCourier').classList.add('show');return;
+  }
+  if(from===2 && !_date){
+    document.getElementById('errDate').classList.add('show');return;
+  }
+  if(from===3) return;
+
+  if(from===2){
+    const name=document.getElementById('fName').value.trim();
+    const phone=document.getElementById('fPhone').value.trim();
+    const addr=document.getElementById('fAddress').value.trim();
+    const notes=document.getElementById('fNotes').value.trim();
+    document.getElementById('sName').textContent=name;
+    document.getElementById('sPhone').textContent='+51 '+phone;
+    document.getElementById('sAddress').textContent=addr;
+    document.getElementById('sCourier').textContent=_courier;
+    if(_agencia){
+      document.getElementById('sAgencia').textContent=_agencia;
+      document.getElementById('sAgenciaRow').style.display='flex';
+    } else {
+      document.getElementById('sAgenciaRow').style.display='none';
+    }
+    document.getElementById('sDate').textContent=_dateLabel;
+    if(notes){
+      document.getElementById('sNotes').textContent=notes;
+      document.getElementById('sNotesRow').style.display='flex';
+    } else {
+      document.getElementById('sNotesRow').style.display='none';
+    }
+  }
+
+  document.getElementById('page'+from).classList.remove('active');
+  _currentPage = from+1;
+  document.getElementById('page'+_currentPage).classList.add('active');
+  updateSteps(_currentPage);
+  window.scrollTo({top:0,behavior:'smooth'});
+  }catch(e){alert('Error: '+e.message);}
+}
+
+function goBack(from){
+  document.getElementById('page'+from).classList.remove('active');
+  _currentPage = from-1;
+  document.getElementById('page'+_currentPage).classList.add('active');
+  updateSteps(_currentPage);
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+
+// ── SUBMIT ─────────────────────────────────────────────────────────────
+async function submitOrder(){
+  const btn = document.getElementById('btnEnviar');
+  btn.disabled=true;
+  btn.textContent='Enviando...';
+
+  const name=document.getElementById('fName').value.trim();
+  const phone=document.getElementById('fPhone').value.trim();
+  const addr=document.getElementById('fAddress').value.trim();
+  const notes=document.getElementById('fNotes').value.trim();
+
+  const notesWithAgencia = [notes, _agencia ? `Agencia: ${_agencia}` : ''].filter(Boolean).join(' | ');
+
+  const id = 'p'+Date.now();
+  const shipment = {
+    id, name, phone,
+    address: addr,
+    courier: _courier,
+    date: _date,
+    status: 'NUEVO PEDIDO',
+    cost: '',
+    notes: notesWithAgencia,
+    extra: {},
+    docGuia: null,
+    docTicket: null,
+    links: [],
+    sel: false,
+    chkGuia: false,
+    chkTicket: false,
+    createdAt: new Date().toISOString(),
+    fromForm: true
+  };
+
+  try {
+    const fields={};
+    Object.keys(shipment).forEach(k=>{fields[k]=toFs(shipment[k])});
+    const path = `${SHIP_BASE}/${id}`;
+    await fetch(`${BASE}/${path}?key=${KEY}`,{
+      method:'PATCH',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({fields})
+    });
+
+    // Update config ts so panel detects new order
+    await fetch(`${BASE}/${CFG_PATH}?key=${KEY}`,{
+      method:'PATCH',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({fields:{ts:toFs(Date.now())}})
+    });
+
+    // Show success
+    const num = id.slice(-4).toUpperCase();
+    document.getElementById('successId').textContent = `Pedido #${num}`;
+    document.getElementById('page3').classList.remove('active');
+    document.getElementById('pageSuccess').classList.add('active');
+    document.getElementById('stepsBar').style.display='none';
+    window.scrollTo({top:0,behavior:'smooth'});
+  } catch(e){
+    btn.disabled=false;
+    btn.textContent='📦 Confirmar pedido';
+    alert('Error al enviar el pedido. Verifica tu conexión e intenta de nuevo.');
+  }
+}
+
+function newOrder(){
+  // Reset form
+  document.getElementById('fName').value='';
+  document.getElementById('fPhone').value='';
+  document.getElementById('fAddress').value='';
+  document.getElementById('fNotes').value='';
+  _courier='';_date='';_dateLabel='';_agencia='';
+  document.querySelectorAll('.courier-opt').forEach(e=>e.classList.remove('selected'));
+  document.querySelectorAll('.date-opt').forEach(e=>e.classList.remove('selected'));
+  document.getElementById('pageSuccess').classList.remove('active');
+  document.getElementById('page0').classList.add('active');
+  document.getElementById('stepsBar').style.display='flex';
+  _currentPage=0;
+  updateSteps(0);
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+
+// ── INIT ───────────────────────────────────────────────────────────────
+loadConfig();
+</script>
+</body>
+</html>
