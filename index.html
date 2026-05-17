@@ -1,0 +1,618 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Mi Panel de Envíos</title>
+
+<!-- ============================================================
+     index.html — Estructura HTML del Panel de Envíos
+     ============================================================
+     QUÉ HACE: Solo la estructura (esqueleto) de la app.
+     CUÁNDO EDITAR:
+       - Agregar una nueva sección o tab → edita aquí
+       - Cambiar textos fijos visibles → edita aquí
+       - NO pongas lógica JS ni estilos aquí
+     ARCHIVOS RELACIONADOS:
+       - style.css   → todo el diseño visual
+       - firebase.js → conexión con Firebase
+       - app.js      → toda la lógica
+     ============================================================ -->
+
+<!-- Firebase: conexión con la nube -->
+<script src="firebase.js"></script>
+
+<!-- Estilos visuales -->
+<link rel="stylesheet" href="style.css">
+
+<body>
+
+<!-- HEADER -->
+<div class="hdr">
+  <div class="hdr-logo" onclick="openOverlay('excelOverlay')" style="cursor:pointer" title="Importar / Exportar Excel">📦</div>
+  <div style="flex:1;min-width:0">
+    <div style="display:flex;align-items:center;gap:6px">
+      <div class="hdr-title" id="hdrName" style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Mi Negocio</div>
+      <div id="fbDot" title="Conectando..." style="width:8px;height:8px;border-radius:50%;background:var(--text2);flex-shrink:0;transition:background .6s;animation:fbPulse 1.5s infinite" onclick="toast('☁️ Firebase: '+this.title)"></div>
+    </div>
+    <div class="hdr-phone" id="hdrPhone">999000000</div>
+  </div>
+  <div style="display:flex;flex-direction:column;align-items:flex-end;gap:3px;flex-shrink:0">
+    <div class="hdr-badge">PLAN PRO</div>
+  </div>
+  <button class="hdr-out">↪</button>
+</div>
+<style>
+@keyframes fbPulse{0%,100%{opacity:1}50%{opacity:.4}}
+#fbDot[data-ready]{animation:none}
+
+</head>
+<body>
+
+<!-- HEADER -->
+<div class="hdr">
+  <div class="hdr-logo" onclick="openOverlay('excelOverlay')" style="cursor:pointer" title="Importar / Exportar Excel">📦</div>
+  <div style="flex:1;min-width:0">
+    <div style="display:flex;align-items:center;gap:6px">
+      <div class="hdr-title" id="hdrName" style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Mi Negocio</div>
+      <div id="fbDot" title="Conectando..." style="width:8px;height:8px;border-radius:50%;background:var(--text2);flex-shrink:0;transition:background .6s;animation:fbPulse 1.5s infinite" onclick="toast('☁️ Firebase: '+this.title)"></div>
+    </div>
+    <div class="hdr-phone" id="hdrPhone">999000000</div>
+  </div>
+  <div style="display:flex;flex-direction:column;align-items:flex-end;gap:3px;flex-shrink:0">
+    <div class="hdr-badge">PLAN PRO</div>
+  </div>
+  <button class="hdr-out">↪</button>
+</div>
+
+
+<!-- TABS -->
+<div class="tabs">
+  <div class="tab active" onclick="goPage('envios')">🚚 Envíos</div>
+  <div class="tab" onclick="goPage('compartir')">🔗 Compartir</div>
+  <div class="tab" onclick="goPage('configurar')">⚙️ Config</div>
+</div>
+
+<!-- ENVÍOS -->
+<div class="page active" id="page-envios">
+  <div class="stats" id="statsArea">
+    <div class="stat"><div class="stat-n c-green" id="sTotal">0</div><div class="stat-l">Total envíos</div></div>
+    <div class="stat"><div class="stat-n c-red" id="sPend">0</div><div class="stat-l">🟡 Nuevos / En proceso</div></div>
+    <div class="stat"><div class="stat-n c-blue" id="sEnv">0</div><div class="stat-l">🔵 Por alistar / Enviado</div></div>
+    <div class="stat"><div class="stat-n c-purple" id="sEnt">0</div><div class="stat-l">✅ Finalizados</div></div>
+  </div>
+  <div id="suppStatsArea" style="display:none;margin-bottom:12px;background:var(--bg3);border-radius:11px;border:1px solid var(--bd);padding:12px"></div>
+  <div class="toolbar">
+    <div class="tb-top">
+      <div class="tb-search" style="flex:1">
+        <span style="cursor:pointer" onclick="clearSearch()">🔍</span>
+        <input id="fSearch" placeholder="Buscar nombre, tel, dirección..." oninput="render()">
+        <button id="advSearchBtn" onclick="openAdvSearch()" style="background:none;border:none;cursor:pointer;font-size:15px;padding:0 2px;color:var(--text2)" title="Búsqueda avanzada">⚙️</button>
+      </div>
+      <button class="qr-scan-btn" onclick="openQR()" title="Escanear QR">📷</button>
+    </div>
+    <div id="activeFiltersBar" style="display:none;margin-bottom:6px"></div>
+    <div style="display:flex;align-items:center;gap:7px;margin-bottom:8px">
+      <div id="chipTodos" class="chip active" onclick="setFilt('')" ondblclick="openAllLabels()" style="flex-shrink:0">TODOS</div>
+      <div class="chips-wrap" id="filterChips" style="flex:1;margin:0"></div>
+    </div>
+    <div class="tb-btns">
+      <button class="tb-btn" onclick="selAll()">☑️</button>
+      <button class="tb-btn" onclick="doPrint()">🖨️</button>
+      <button class="tb-btn" onclick="doCSV()">📊</button>
+      <button class="tb-btn" onclick="render()">🔄</button>
+      <button class="tb-btn pri" onclick="openForm(null)">➕</button>
+      <button class="tb-btn danger" onclick="onTrashBtnTap()" title="Doble toque para abrir papelera">🗑️</button>
+    </div>
+  </div>
+  <div id="cardsArea"></div>
+  <div class="powered">POWERED BY MI PANEL LOCAL</div>
+</div>
+
+<!-- COMPARTIR -->
+<div class="page" id="page-compartir">
+  <div class="share-card">
+    <div class="share-icon">🔗</div>
+    <div class="share-ttl">¡Listo para compartir!</div>
+    <div class="share-sub">Tus clientes llenan sus datos en este link y tú recibes el pedido automáticamente.</div>
+    <div class="link-box" id="shareUrl" onclick="copyLink()" style="font-size:11px;word-break:break-all">—</div>
+    <button class="btn-copy" onclick="copyLink()">📋 Copiar Link</button>
+  </div>
+  <div class="cfg-sec">
+    <div class="cfg-ttl">📨 Compartir por</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="tb-btn" style="width:auto;padding:0 14px;height:38px;font-size:12px" onclick="shareWA()">📱 WhatsApp</button>
+      <button class="tb-btn" style="width:auto;padding:0 14px;height:38px;font-size:12px" onclick="copyLink()">🔗 Copiar</button>
+      <button class="tb-btn" style="width:auto;padding:0 14px;height:38px;font-size:12px" onclick="shareTG()">✈️ Telegram</button>
+    </div>
+  </div>
+  <div class="cfg-sec" style="background:rgba(46,160,67,.05);border-color:rgba(46,160,67,.2)">
+    <div class="cfg-ttl">ℹ️ Cómo funciona</div>
+    <div style="font-size:12px;color:var(--text2);line-height:1.7">
+      1. Comparte el link con tu cliente<br>
+      2. El cliente llena nombre, teléfono, dirección, courier y fecha<br>
+      3. El pedido aparece automáticamente en tu panel como <b style="color:var(--text)">🟡 NUEVO PEDIDO</b>
+    </div>
+  </div>
+</div>
+
+<!-- CONFIGURAR -->
+<div class="page" id="page-configurar">
+  <div class="cfg-hdr">
+    <div class="cfg-ptl">Configuración</div>
+    <button class="cfg-save" onclick="saveConfig()">💾 Guardar</button>
+  </div>
+
+
+  <!-- DATOS -->
+  <div class="cfg-sec">
+    <div class="cfg-ttl">🏪 Datos públicos</div>
+    <div class="fg"><label class="fl">Nombre del negocio</label><input class="fi" id="cfgName" placeholder="Mi Negocio"></div>
+    <div class="fg"><label class="fl">WhatsApp</label>
+      <div class="ph-wrap"><span class="ph-pre">+51</span><input class="fi" id="cfgPhone" placeholder="978772252" maxlength="9"></div>
+    </div>
+    <div class="fg"><label class="fl">Ciudad</label><input class="fi" id="cfgCity" placeholder="Lima, Perú"></div>
+  </div>
+
+  <!-- DESPACHO -->
+  <div class="cfg-sec">
+    <div class="cfg-ttl">📅 Días y horario de despacho</div>
+    <div class="fl" style="margin-bottom:8px">DÍAS DE DESPACHO</div>
+    <div class="dispatch-days" id="dispatchDays"></div>
+    <div class="frow" style="margin-top:14px">
+      <div class="fg">
+        <label class="fl">HORA DE CORTE</label>
+        <select class="fs" id="dispatchCutHour"></select>
+      </div>
+      <div class="fg">
+        <label class="fl">ANTICIPACIÓN (DÍAS)</label>
+        <input class="fi" id="dispatchAnticip" type="number" min="0" max="30" placeholder="0">
+      </div>
+    </div>
+    <div style="font-size:11px;color:var(--text2);margin-top:10px;line-height:1.5">* La <b>Hora de corte</b> es el límite del día para recibir pedidos. La <b>Anticipación</b> define cuántos días mínimos necesitas para preparar el envío.</div>
+  </div>
+
+  <!-- ETIQUETAS -->
+  <div class="cfg-sec">
+    <div class="cfg-ttl">🏷️ Etiquetas de estado</div>
+    <div id="labelsList"></div>
+    <button class="cfl-add-btn" onclick="addLabelInline()">＋ Agregar etiqueta</button>
+  </div>
+
+  <!-- COURIERS -->
+  <div class="cfg-sec">
+    <div class="cfg-ttl">🚚 Couriers</div>
+    <div style="font-size:11px;color:var(--text2);margin-bottom:10px">Los fijos no se pueden borrar. Activa o desactiva cuáles aparecen al registrar un envío.</div>
+    <div id="couriersList"></div>
+    <div class="cfl-add-row">
+      <input class="fi" id="newCourierInp" placeholder="Nuevo courier..." maxlength="30" onkeydown="if(event.key==='Enter')addCourierInline()">
+      <button class="cfl-plus" onclick="addCourierInline()">＋</button>
+    </div>
+  </div>
+
+  <!-- CAMPOS EXTRA -->
+  <div class="cfg-sec">
+    <div class="cfg-ttl">📝 Campos extra</div>
+    <div id="extraFieldsList"></div>
+    <div class="cfl-add-row">
+      <input class="fi" id="newExtraInp" placeholder="Nuevo campo..." maxlength="30" onkeydown="if(event.key==='Enter')addExtraInline()">
+      <button class="cfl-plus" onclick="addExtraInline()">＋</button>
+    </div>
+  </div>
+
+  <!-- NOTIFICACIONES -->
+  <div class="cfg-sec">
+    <div class="cfg-ttl">🔔 Notificaciones</div>
+    <div class="tgl-row"><div><div class="tgl-n">Notificar por WhatsApp</div><div class="tgl-s">Al registrar nuevo envío</div></div><div class="tgl on" onclick="this.classList.toggle('on')"></div></div>
+    <div class="tgl-row"><div><div class="tgl-n">Notificar al cliente</div><div class="tgl-s">Cuando cambia el estado</div></div><div class="tgl" onclick="this.classList.toggle('on')"></div></div>
+    <div class="tgl-row" style="border:none">
+      <div><div class="tgl-n">🔐 Clave para cambiar estado</div><div class="tgl-s">Actualmente: ****</div></div>
+      <button class="cfl-btn cfl-btn-edit" onclick="changePIN()">✏️</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL NUEVO/EDITAR -->
+<div class="overlay" id="formOverlay">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-title" id="formTitle">Nuevo Envío</div>
+    <div class="frow">
+      <div class="fg"><label class="fl">Nombre *</label><input class="fi" id="fName" placeholder="Nombre completo"></div>
+      <div class="fg"><label class="fl">Teléfono *</label><input class="fi" id="fPhone" placeholder="9XXXXXXXX" maxlength="9"></div>
+    </div>
+    <div class="fg"><label class="fl">Dirección *</label><input class="fi" id="fAddr" placeholder="Av., Mz., Lote..."></div>
+    <div class="frow">
+      <div class="fg"><label class="fl">Courier</label><select class="fs" id="fCourier"></select></div>
+      <div class="fg"><label class="fl">Fecha</label><input class="fi" id="fDate" type="date"></div>
+    </div>
+    <div class="frow">
+      <div class="fg"><label class="fl">Estado</label><select class="fs" id="fStatus"></select></div>
+      <div class="fg"><label class="fl">Costo S/</label><input class="fi" id="fCost" type="number" placeholder="0.00" min="0" step="0.5"></div>
+    </div>
+    <div class="fg"><label class="fl">Notas</label><input class="fi" id="fNotes" placeholder="Llamar antes..."></div>
+    <div id="extraForm"></div>
+    <div class="docs-sec">
+      <div class="docs-ttl">📎 DOCUMENTOS DEL ENVÍO</div>
+      <div class="docs-grid">
+        <div class="doc-slot">
+          <div class="doc-sw">
+            <div class="doc-tap" id="lblGuia"><div id="prevGuia"><div class="doc-empty"><div style="font-size:28px">🚚</div><div style="font-size:11px;font-weight:700">Guía courier</div></div></div></div>
+            <div class="doc-menu" id="menuGuia">
+              <div class="doc-mi" onclick="trigInp('inGuiaCam','guia')">📷 Tomar foto</div>
+              <div class="doc-mi" onclick="trigInp('inGuiaGal','guia')">🖼️ Galería</div>
+              <div class="doc-mi" onclick="trigInp('inGuiaPdf','guia')">📄 PDF / doc</div>
+              <div class="doc-mi" style="color:var(--red)" onclick="closeDocMenu('guia')">✕ Cancelar</div>
+            </div>
+          </div>
+          <input type="file" id="inGuiaCam" accept="image/*" capture="environment" style="position:fixed;top:-9999px;opacity:0;width:1px;height:1px" onchange="loadDoc(this,'guia')">
+          <input type="file" id="inGuiaGal" accept="image/*" style="position:fixed;top:-9999px;opacity:0;width:1px;height:1px" onchange="loadDoc(this,'guia')">
+          <input type="file" id="inGuiaPdf" accept=".pdf,.doc,.docx,application/pdf" style="position:fixed;top:-9999px;opacity:0;width:1px;height:1px" onchange="loadDoc(this,'guia')">
+          <button class="doc-add" id="addBtnGuia" type="button" onclick="toggleDocMenu('guia')">＋ Agregar</button>
+          <div id="actGuia" style="display:none" class="doc-act">
+            <button class="doc-abtn doc-view" type="button" onclick="viewSlot('guia')">👁 Ver</button>
+            <button class="doc-abtn doc-del" type="button" onclick="clearSlot('guia')">✕ Quitar</button>
+          </div>
+        </div>
+        <div class="doc-slot">
+          <div class="doc-sw">
+            <div class="doc-tap" id="lblTicket"><div id="prevTicket"><div class="doc-empty"><div style="font-size:28px">🧾</div><div style="font-size:11px;font-weight:700">Ticket / Boleta</div></div></div></div>
+            <div class="doc-menu" id="menuTicket">
+              <div class="doc-mi" onclick="trigInp('inTicketCam','ticket')">📷 Tomar foto</div>
+              <div class="doc-mi" onclick="trigInp('inTicketGal','ticket')">🖼️ Galería</div>
+              <div class="doc-mi" onclick="trigInp('inTicketPdf','ticket')">📄 PDF / doc</div>
+              <div class="doc-mi" style="color:var(--red)" onclick="closeDocMenu('ticket')">✕ Cancelar</div>
+            </div>
+          </div>
+          <input type="file" id="inTicketCam" accept="image/*" capture="environment" style="position:fixed;top:-9999px;opacity:0;width:1px;height:1px" onchange="loadDoc(this,'ticket')">
+          <input type="file" id="inTicketGal" accept="image/*" style="position:fixed;top:-9999px;opacity:0;width:1px;height:1px" onchange="loadDoc(this,'ticket')">
+          <input type="file" id="inTicketPdf" accept=".pdf,.doc,.docx,application/pdf" style="position:fixed;top:-9999px;opacity:0;width:1px;height:1px" onchange="loadDoc(this,'ticket')">
+          <button class="doc-add" id="addBtnTicket" type="button" onclick="toggleDocMenu('ticket')">＋ Agregar</button>
+          <div id="actTicket" style="display:none" class="doc-act">
+            <button class="doc-abtn doc-view" type="button" onclick="viewSlot('ticket')">👁 Ver</button>
+            <button class="doc-abtn doc-del" type="button" onclick="clearSlot('ticket')">✕ Quitar</button>
+          </div>
+        </div>
+      </div>
+      <div style="border-top:1px solid var(--bd);padding-top:10px">
+        <div style="font-size:10px;color:var(--text2);margin-bottom:7px">🔗 Agregar link (Drive, Mega, etc.)</div>
+        <div class="link-row">
+          <input class="fi" id="fLink" placeholder="https://..." style="flex:1">
+          <button class="link-add" type="button" onclick="addLink()">+ Add</button>
+        </div>
+        <div class="link-list" id="linkListForm"></div>
+      </div>
+    </div>
+    <button class="btn-pri" onclick="saveShipment()">💾 Guardar envío</button>
+    <button class="btn-sec" onclick="closeOverlay('formOverlay')">Cancelar</button>
+  </div>
+</div>
+
+<!-- LABEL EDIT SHEET -->
+<div class="overlay" id="labelEditOverlay">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div id="labelEditContent"></div>
+    <button class="btn-pri" onclick="saveLabelEdit()">💾 Guardar cambios</button>
+    <button class="btn-sec" onclick="closeOverlay('labelEditOverlay')">Cancelar</button>
+  </div>
+</div>
+
+<!-- ALL LABELS SHEET -->
+<div class="overlay" id="allLabelsOverlay">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-title">🏷️ Todas las etiquetas</div>
+    <div style="font-size:11px;color:var(--text2);margin-bottom:14px">Toca una para filtrar</div>
+    <div id="allLabelsList" class="status-opts"></div>
+    <button class="btn-sec" onclick="closeOverlay('allLabelsOverlay')">Cerrar</button>
+  </div>
+</div>
+
+<!-- STATUS SHEET -->
+<div class="overlay" id="statusOverlay">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div style="font-size:13px;color:var(--text2);text-align:center;margin-bottom:4px" id="stClientName"></div>
+    <div style="font-size:11px;color:var(--text2);text-align:center;margin-bottom:14px" id="stCurrentLbl"></div>
+    <div class="status-opts" id="statusOpts"></div>
+    <button class="btn-sec" onclick="closeOverlay('statusOverlay')">Cancelar</button>
+  </div>
+</div>
+
+<!-- SUPPLIER OVERLAY -->
+<div class="overlay" id="suppOverlay">
+  <div class="sheet" style="max-height:90vh;min-height:60vh">
+    <div class="sheet-handle"></div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+      <div class="sheet-title" style="margin:0;cursor:pointer;user-select:none" id="suppName" ondblclick="openSuppSwitch()">Proveedor</div>
+      <button onclick="openEditSupplier()" style="background:rgba(56,139,253,.12);border:1px solid rgba(56,139,253,.3);color:var(--blue);border-radius:7px;padding:5px 10px;font-size:11px;font-weight:700;cursor:pointer">✏️ Editar</button>
+    </div>
+    <div id="suppPhone" style="color:var(--blue);font-size:13px;margin-bottom:10px;display:flex;align-items:center;gap:8px"></div>
+
+    <!-- COTIZACIÓN COMPACTA -->
+    <div id="suppCotizArea" style="margin-bottom:8px"></div>
+
+    <!-- LISTA HEADER -->
+    <div style="font-size:10px;font-weight:700;color:var(--text2);letter-spacing:.8px;margin-bottom:6px;cursor:pointer;user-select:none" ondblclick="toggleAllSuppItems()">📋 PENDIENTES</div>
+    <div id="suppItemsList" style="min-height:120px;max-height:35vh;overflow-y:auto;margin-bottom:10px"></div>
+    <div style="display:flex;gap:8px;margin-bottom:4px">
+      <input class="fi" id="suppNewItem" placeholder="Agregar producto o tarea..." style="flex:1" onkeydown="if(event.key==='Enter')addSuppItem()">
+      <button class="cfl-plus" onclick="addSuppItem()">＋</button>
+    </div>
+    <button class="btn-sec" onclick="closeOverlay('suppOverlay')">Cerrar</button>
+    <input type="file" id="cotizCam" accept="image/*" capture="environment" style="display:none" onchange="loadCotiz(this)">
+    <input type="file" id="cotizGal" accept="image/*" style="display:none" onchange="loadCotiz(this)">
+    <input type="file" id="cotizPdf" accept=".pdf,application/pdf" style="display:none" onchange="loadCotiz(this)">
+  </div>
+</div>
+
+<!-- SUPPLIER NEW OVERLAY -->
+<div class="overlay" id="suppNewOverlay">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-title">➕ Nuevo proveedor</div>
+    <div class="fg"><label class="fl">Nombre del proveedor</label><input class="fi" id="suppNewName" placeholder="Ej: Distribuidora ABC..."></div>
+    <div class="fg"><label class="fl">Teléfono WhatsApp</label>
+      <div class="ph-wrap"><span class="ph-pre">+51</span><input class="fi" id="suppNewPhone" placeholder="9XXXXXXXX" maxlength="9" type="tel"></div>
+    </div>
+    <button class="btn-pri" onclick="saveNewSupplier()">💾 Guardar proveedor</button>
+    <button class="btn-sec" onclick="closeOverlay('suppNewOverlay')">Cancelar</button>
+  </div>
+</div>
+
+<!-- SUPPLIER EDIT OVERLAY -->
+<div class="overlay" id="suppEditOverlay">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-title">✏️ Editar proveedor</div>
+    <div class="fg"><label class="fl">Nombre</label><input class="fi" id="suppEditName" placeholder="Nombre del proveedor..."></div>
+    <div class="fg"><label class="fl">Teléfono WhatsApp</label>
+      <div class="ph-wrap"><span class="ph-pre">+51</span><input class="fi" id="suppEditPhone" placeholder="9XXXXXXXX" maxlength="9" type="tel"></div>
+    </div>
+    <button class="btn-pri" onclick="saveEditSupplier()">💾 Guardar cambios</button>
+    <button class="btn-sec" onclick="closeOverlay('suppEditOverlay')">Cancelar</button>
+  </div>
+</div>
+
+<!-- PRIVATE NOTE OVERLAY -->
+<div class="overlay" id="pvtNoteOverlay">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+      <div class="sheet-title" style="margin:0;flex:1" id="pvtNoteName"></div>
+      <span style="font-size:10px;background:rgba(163,113,247,.15);color:var(--purple);border:1px solid rgba(163,113,247,.3);padding:3px 8px;border-radius:10px;font-weight:700">🔒 PRIVADO</span>
+    </div>
+    <div style="font-size:11px;color:var(--text2);margin-bottom:12px;line-height:1.5">Esta nota solo es visible en tu panel. No aparece en mensajes ni al compartir datos del cliente.</div>
+    <textarea id="pvtNoteInput" class="msg-ta" style="height:100px" placeholder="Escribe tu nota privada aquí...&#10;Ej: Cliente difícil, pagar contra entrega, llamar antes..."></textarea>
+    <button class="btn-pri" onclick="savePvtNote()" style="margin-top:10px">💾 Guardar nota</button>
+    <button class="btn-sec" id="pvtNoteDelBtn" onclick="deletePvtNote()" style="color:var(--red);border-color:rgba(247,129,102,.3)">🗑️ Eliminar nota</button>
+    <button class="btn-sec" onclick="closeOverlay('pvtNoteOverlay')">Cancelar</button>
+  </div>
+</div>
+
+<!-- CHIP SORT OVERLAY -->
+<div class="overlay" id="chipSortOverlay">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-title" id="chipSortTitle"></div>
+    <div style="font-size:12px;color:var(--text2);margin-bottom:14px">Elige cómo ordenar esta vista</div>
+    <div class="status-opts">
+      <button class="sopt sopt-env active" id="cs_courier_date" onclick="setChipSort('courier_date')">
+        <span>🚚 Courier + 📅 Fecha</span><span style="font-size:10px;opacity:.7">Predeterminado</span>
+      </button>
+      <button class="sopt sopt-env" id="cs_date" onclick="setChipSort('date')">
+        <span>📅 Fecha más reciente</span><span style="font-size:10px;opacity:.7"></span>
+      </button>
+      <button class="sopt sopt-env" id="cs_name" onclick="setChipSort('name')">
+        <span>🔤 Nombre A-Z</span><span style="font-size:10px;opacity:.7"></span>
+      </button>
+      <button class="sopt sopt-env" id="cs_cost" onclick="setChipSort('cost')">
+        <span>💰 Menor costo primero</span><span style="font-size:10px;opacity:.7"></span>
+      </button>
+      <button class="sopt sopt-env" id="cs_cost_desc" onclick="setChipSort('cost_desc')">
+        <span>💰 Mayor costo primero</span><span style="font-size:10px;opacity:.7"></span>
+      </button>
+    </div>
+    <button class="btn-sec" onclick="closeOverlay('chipSortOverlay')">Cerrar</button>
+  </div>
+</div>
+
+<!-- BULK STATUS SHEET -->
+<div class="overlay" id="bulkStatusOverlay">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-title">🏷️ Cambiar estado masivo</div>
+    <div style="font-size:13px;color:var(--text2);margin-bottom:14px" id="bulkStatusInfo"></div>
+    <div class="status-opts" id="bulkStatusOpts"></div>
+    <button class="btn-sec" onclick="closeOverlay('bulkStatusOverlay')">Cancelar</button>
+  </div>
+</div>
+
+<!-- ADVANCED SEARCH -->
+<div class="overlay" id="advSearchOverlay">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <div class="sheet-title" style="margin:0">🔍 Búsqueda avanzada</div>
+      <button onclick="clearAdvSearch()" style="background:none;border:none;color:var(--text2);font-size:12px;cursor:pointer;text-decoration:underline">Limpiar todo</button>
+    </div>
+
+    <!-- FECHA -->
+    <div style="font-size:10px;font-weight:700;color:var(--text2);letter-spacing:.8px;text-transform:uppercase;margin-bottom:8px">📅 Rango de fecha</div>
+    <div class="frow" style="margin-bottom:14px">
+      <div class="fg"><label class="fl">Desde</label><input class="fi" type="date" id="asDateFrom"></div>
+      <div class="fg"><label class="fl">Hasta</label><input class="fi" type="date" id="asDateTo"></div>
+    </div>
+
+    <!-- COURIER -->
+    <div style="font-size:10px;font-weight:700;color:var(--text2);letter-spacing:.8px;text-transform:uppercase;margin-bottom:8px">🚚 Courier</div>
+    <div id="asCourierList" style="display:flex;flex-wrap:wrap;gap:7px;margin-bottom:14px"></div>
+
+    <!-- COSTO -->
+    <div style="font-size:10px;font-weight:700;color:var(--text2);letter-spacing:.8px;text-transform:uppercase;margin-bottom:8px">💰 Rango de costo (S/)</div>
+    <div class="frow" style="margin-bottom:14px">
+      <div class="fg"><label class="fl">Mínimo</label><input class="fi" type="number" id="asCostMin" placeholder="0" min="0"></div>
+      <div class="fg"><label class="fl">Máximo</label><input class="fi" type="number" id="asCostMax" placeholder="999" min="0"></div>
+    </div>
+
+    <!-- CON DOCUMENTOS -->
+    <div style="font-size:10px;font-weight:700;color:var(--text2);letter-spacing:.8px;text-transform:uppercase;margin-bottom:8px">📎 Documentos</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px">
+      <div class="as-opt" id="asDocAny" onclick="setAsDoc('any')">Cualquiera</div>
+      <div class="as-opt" id="asDocGuia" onclick="setAsDoc('guia')">🚚 Con guía</div>
+      <div class="as-opt" id="asDocTicket" onclick="setAsDoc('ticket')">🧾 Con ticket</div>
+      <div class="as-opt" id="asDocNone" onclick="setAsDoc('none')">Sin documentos</div>
+    </div>
+
+    <!-- ORDENAR -->
+    <div style="font-size:10px;font-weight:700;color:var(--text2);letter-spacing:.8px;text-transform:uppercase;margin-bottom:8px">↕️ Ordenar por</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px">
+      <div class="as-opt" id="sortNewest" onclick="setSort('newest')">📅 Más reciente</div>
+      <div class="as-opt" id="sortOldest" onclick="setSort('oldest')">📅 Más antiguo</div>
+      <div class="as-opt" id="sortName" onclick="setSort('name')">🔤 Nombre A-Z</div>
+      <div class="as-opt" id="sortCost" onclick="setSort('cost')">💰 Mayor costo</div>
+    </div>
+
+    <button class="btn-pri" onclick="applyAdvSearch()">🔍 Aplicar filtros</button>
+    <button class="btn-sec" onclick="closeOverlay('advSearchOverlay')">Cancelar</button>
+  </div>
+</div>
+
+<!-- PIN OVERLAY -->
+<div class="overlay" id="pinOverlay">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-title">🔐 Clave requerida</div>
+    <div style="font-size:13px;color:var(--text2);margin-bottom:16px" id="pinMsg">Ingresa la clave para cambiar el estado</div>
+    <div style="display:flex;gap:10px;justify-content:center;margin-bottom:16px" id="pinDots">
+      <div class="pin-dot" id="pd0"></div>
+      <div class="pin-dot" id="pd1"></div>
+      <div class="pin-dot" id="pd2"></div>
+      <div class="pin-dot" id="pd3"></div>
+    </div>
+    <div class="pin-grid">
+      <button class="pin-btn" onclick="pinTap('1')">1</button>
+      <button class="pin-btn" onclick="pinTap('2')">2</button>
+      <button class="pin-btn" onclick="pinTap('3')">3</button>
+      <button class="pin-btn" onclick="pinTap('4')">4</button>
+      <button class="pin-btn" onclick="pinTap('5')">5</button>
+      <button class="pin-btn" onclick="pinTap('6')">6</button>
+      <button class="pin-btn" onclick="pinTap('7')">7</button>
+      <button class="pin-btn" onclick="pinTap('8')">8</button>
+      <button class="pin-btn" onclick="pinTap('9')">9</button>
+      <button class="pin-btn pin-btn-del" onclick="pinDel()">⌫</button>
+      <button class="pin-btn" onclick="pinTap('0')">0</button>
+      <button class="pin-btn pin-btn-cancel" onclick="closeOverlay('pinOverlay')">✕</button>
+    </div>
+  </div>
+</div>
+
+<!-- EXCEL OVERLAY -->
+<div class="overlay" id="excelOverlay">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-title">📊 Importar / Exportar Excel</div>
+
+    <!-- EXPORT -->
+    <div style="background:var(--bg3);border-radius:11px;border:1px solid var(--bd);padding:14px;margin-bottom:12px">
+      <div style="font-size:11px;font-weight:700;color:var(--blue);letter-spacing:.8px;text-transform:uppercase;margin-bottom:10px">⬇ Exportar</div>
+      <button onclick="exportExcel()" class="btn-pri" style="margin-bottom:8px">📊 Descargar todos los envíos en Excel</button>
+      <div style="font-size:11px;color:var(--text2);line-height:1.5">Descarga un archivo .xlsx con todos tus pedidos actuales. Guárdalo como respaldo o ábrelo en Excel/Sheets.</div>
+    </div>
+
+    <!-- IMPORT -->
+    <div style="background:var(--bg3);border-radius:11px;border:1px solid var(--bd);padding:14px;margin-bottom:12px">
+      <div style="font-size:11px;font-weight:700;color:var(--green);letter-spacing:.8px;text-transform:uppercase;margin-bottom:10px">⬆ Importar</div>
+      <div style="font-size:11px;color:var(--text2);line-height:1.5;margin-bottom:10px">Sube un archivo Excel exportado desde este panel para restaurar o agregar pedidos masivamente.</div>
+      <input type="file" id="importExcelFile" accept=".xlsx,.xls,.csv" style="display:none" onchange="importExcel(this)">
+      <button onclick="$('importExcelFile').click()" class="btn-sec" style="border-color:rgba(46,160,67,.4);color:var(--green)">📂 Seleccionar archivo Excel</button>
+      <div id="importResult" style="margin-top:10px;font-size:12px;display:none"></div>
+    </div>
+
+    <!-- FORMAT INFO -->
+    <div style="background:rgba(56,139,253,.08);border:1px solid rgba(56,139,253,.2);border-radius:9px;padding:12px;margin-bottom:12px">
+      <div style="font-size:11px;font-weight:700;color:var(--blue);margin-bottom:6px">📋 Columnas del archivo:</div>
+      <div style="font-size:11px;color:var(--text2);line-height:1.8">
+        Nombre · Teléfono · Dirección · Courier · Fecha · Estado · Costo · Notas
+      </div>
+    </div>
+
+    <button class="btn-sec" onclick="closeOverlay('excelOverlay')">Cerrar</button>
+  </div>
+</div>
+
+<!-- TRASH OVERLAY -->
+<div class="overlay" id="trashOverlay">
+  <div class="sheet" style="max-height:85vh">
+    <div class="sheet-handle"></div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+      <div class="sheet-title" style="margin:0">🗑️ Papelera</div>
+      <button onclick="emptyTrash()" style="background:rgba(247,129,102,.12);border:1px solid rgba(247,129,102,.3);color:var(--red);border-radius:7px;padding:6px 12px;font-size:11px;font-weight:700;cursor:pointer">Vaciar todo</button>
+    </div>
+    <div style="font-size:11px;color:var(--text2);margin-bottom:12px">Los envíos se eliminan definitivamente después de 30 días.</div>
+    <div id="trashList" style="overflow-y:auto;max-height:55vh"></div>
+    <button class="btn-sec" onclick="closeOverlay('trashOverlay')">Cerrar</button>
+  </div>
+</div>
+
+<!-- DELETE -->
+<div class="overlay" id="delOverlay">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-title">🗑️ ¿Eliminar?</div>
+    <div style="font-size:13px;color:var(--text2);margin-bottom:18px" id="delMsg"></div>
+    <div class="confirm-btns">
+      <button class="cbtn-no" onclick="closeOverlay('delOverlay')">Cancelar</button>
+      <button class="cbtn-yes" id="delYes">Sí, eliminar</button>
+    </div>
+  </div>
+</div>
+
+<!-- WA SHEET -->
+<div class="overlay" id="waOverlay">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-title">💬 Enviar por WhatsApp</div>
+    <div id="waInfo" style="background:var(--bg3);border-radius:10px;padding:12px;margin-bottom:14px;font-size:13px"></div>
+    <div id="waBody"></div>
+    <button class="btn-pri" onclick="event.stopPropagation();doWASend()">💬 Abrir WhatsApp</button>
+    <button class="btn-sec" onclick="closeOverlay('waOverlay')">Cancelar</button>
+  </div>
+</div>
+
+<!-- IMAGE VIEWER -->
+<div class="viewer" id="viewer">
+  <div class="viewer-hdr">
+    <div class="viewer-ttl" id="viewerTtl"></div>
+    <button class="viewer-x" onclick="closeViewer()">✕</button>
+  </div>
+  <img class="viewer-img" id="viewerImg" src="" alt="">
+  <div class="viewer-ftr">
+    <button class="viewer-btn" onclick="dlDoc()">⬇ Descargar</button>
+  </div>
+</div>
+
+<!-- QR SCANNER -->
+<div id="qrOverlay">
+  <div class="qr-hdr">
+    <div class="qr-ttl">📷 Escanear QR del cliente</div>
+    <button class="qr-x" onclick="closeQR()">✕</button>
+  </div>
+  <video id="qrVideo" playsinline muted autoplay></video>
+  <div class="qr-frame"></div>
+  <div class="qr-found" id="qrFound">✅ ¡Encontrado!</div>
+  <div class="qr-hint">Apunta al código QR del número de celular</div>
+</div>
+
+<div class="toast" id="toastEl"></div>
+
+
+<!-- Librerías externas -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+<!-- Lógica principal de la app -->
+<script src="app.js"></script>
+
+</body>
+</html>
