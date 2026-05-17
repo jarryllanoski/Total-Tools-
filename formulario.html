@@ -1,0 +1,505 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<meta name="color-scheme" content="dark">
+<title>Hacer un pedido</title>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+:root{--bg:#080810;--card:#0f0f1a;--card2:#13131f;--bd:#1e1e30;--blue:#4f8ef7;--green:#22c55e;--red:#f87171;--purple:#a78bfa;--text:#f0f0f8;--text2:#6b7280}
+html,body{min-height:100vh;background:var(--bg);font-family:"Outfit",sans-serif;color:var(--text);color-scheme:dark}
+body{max-width:460px;margin:0 auto}
+.hdr{padding:32px 20px 24px;text-align:center;background:linear-gradient(180deg,rgba(79,142,247,.08) 0%,transparent 100%)}
+.hdr-logo{width:64px;height:64px;border-radius:20px;background:linear-gradient(135deg,var(--blue),var(--purple));display:flex;align-items:center;justify-content:center;font-size:30px;margin:0 auto 14px;box-shadow:0 8px 24px rgba(79,142,247,.3)}
+.hdr-biz{font-size:24px;font-weight:900;letter-spacing:-.5px}
+.hdr-sub{font-size:13px;color:var(--text2);margin-top:4px}
+.form-wrap{padding:0 16px 40px}
+.section{margin-bottom:8px}
+.slabel{font-size:10px;font-weight:800;color:var(--text2);letter-spacing:1.5px;padding:0 4px;margin-bottom:6px;display:block}
+.fi{width:100%;background:var(--card);border:1.5px solid var(--bd);border-radius:12px;padding:14px 16px;color:var(--text) !important;-webkit-text-fill-color:var(--text) !important;font-size:15px;font-family:"Outfit",sans-serif;outline:none;transition:border-color .2s}
+.fi:focus{border-color:var(--blue);background:var(--card2)}
+.fi::placeholder{color:var(--text2) !important;-webkit-text-fill-color:var(--text2) !important}
+textarea.fi{resize:none;height:72px;line-height:1.5}
+.ph-row{display:flex}
+.ph-pre{background:var(--card);border:1.5px solid var(--bd);border-right:none;border-radius:12px 0 0 12px;padding:14px 12px;font-size:15px;color:var(--text2);font-family:"Outfit",sans-serif}
+.ph-row .fi{border-radius:0 12px 12px 0}
+.courier-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.c-opt{background:var(--card);border:1.5px solid var(--bd);border-radius:12px;padding:12px 10px;text-align:center;cursor:pointer;transition:all .15s;font-size:12px;font-weight:700;color:var(--text2)}
+.c-opt:active{transform:scale(.97)}
+.c-opt.sel{border-color:var(--blue);background:rgba(79,142,247,.1);color:var(--blue)}
+.c-opt .ico{font-size:22px;display:block;margin-bottom:4px}
+.cascade{background:var(--card);border:1.5px solid var(--bd);border-radius:12px;overflow:hidden;margin-top:8px}
+.c-sel{width:100%;background:transparent;border:none;border-bottom:1px solid var(--bd);padding:13px 16px;color:var(--text) !important;-webkit-text-fill-color:var(--text) !important;font-size:14px;font-family:"Outfit",sans-serif;outline:none;appearance:none;-webkit-appearance:none;cursor:pointer}
+.c-sel:last-child{border-bottom:none}
+.c-sel option{background:#13131f}
+.agc-list{padding:8px}
+.agc-item{padding:11px 12px;border-radius:8px;cursor:pointer;transition:background .15s;border:1.5px solid transparent;margin-bottom:6px}
+.agc-item:last-child{margin-bottom:0}
+.agc-item.sel{border-color:var(--blue);background:rgba(79,142,247,.1)}
+.agc-name{font-size:11px;color:var(--blue);font-weight:700;margin-bottom:2px}
+.agc-addr{font-size:12px;color:var(--text);line-height:1.4}
+.sel-badge{background:rgba(34,197,94,.1);border:1.5px solid rgba(34,197,94,.3);border-radius:10px;padding:10px 14px;margin-top:8px;display:none}
+.sel-badge-ttl{font-size:10px;font-weight:800;color:var(--green);letter-spacing:.8px;margin-bottom:3px}
+.sel-badge-txt{font-size:12px;color:var(--text);line-height:1.4}
+.sel-badge-btn{font-size:11px;color:var(--text2);background:none;border:none;cursor:pointer;font-family:"Outfit",sans-serif;margin-top:4px;display:block}
+.dates{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px;scrollbar-width:none}
+.dates::-webkit-scrollbar{display:none}
+.date-opt{flex-shrink:0;background:var(--card);border:1.5px solid var(--bd);border-radius:12px;padding:12px 14px;cursor:pointer;text-align:center;min-width:72px;transition:all .15s}
+.date-opt.sel{border-color:var(--blue);background:rgba(79,142,247,.1)}
+.date-day{font-size:11px;font-weight:700;color:var(--text2)}
+.date-num{font-size:22px;font-weight:900;color:var(--blue);line-height:1.1}
+.date-mon{font-size:10px;color:var(--text2);font-weight:600}
+.err{font-size:11px;color:var(--red);padding:4px 4px 0;display:none}
+.err.show{display:block}
+.divider{height:1px;background:var(--bd);margin:16px 0}
+.btn-submit{width:100%;background:linear-gradient(135deg,var(--blue),var(--purple));border:none;border-radius:14px;padding:18px;color:#fff;font-size:17px;font-weight:800;cursor:pointer;font-family:"Outfit",sans-serif;margin-top:20px;box-shadow:0 8px 24px rgba(79,142,247,.3);letter-spacing:-.2px}
+.btn-submit:active{opacity:.85}
+.btn-submit:disabled{opacity:.4}
+.success{display:none;text-align:center;padding:60px 20px}
+.success.show{display:block}
+.suc-ico{font-size:72px;margin-bottom:20px;animation:pop .5s ease}
+@keyframes pop{0%{transform:scale(.5);opacity:0}80%{transform:scale(1.1)}100%{transform:scale(1);opacity:1}}
+.suc-ttl{font-size:28px;font-weight:900;margin-bottom:8px}
+.suc-sub{font-size:14px;color:var(--text2);line-height:1.6;margin-bottom:24px}
+.suc-id{background:var(--card);border:1.5px solid var(--bd);border-radius:12px;padding:14px;font-size:14px;color:var(--blue);font-weight:700;margin-bottom:20px}
+.btn-wa{width:100%;background:#25d366;border:none;border-radius:14px;padding:16px;color:#fff;font-size:15px;font-weight:800;cursor:pointer;font-family:"Outfit",sans-serif;margin-bottom:10px;display:flex;align-items:center;justify-content:center;gap:8px}
+.btn-nuevo{width:100%;background:var(--card);border:1.5px solid var(--bd);border-radius:14px;padding:14px;color:var(--text2);font-size:14px;font-weight:600;cursor:pointer;font-family:"Outfit",sans-serif}
+.loading-overlay{display:none;position:fixed;inset:0;background:rgba(8,8,16,.85);align-items:center;justify-content:center;flex-direction:column;gap:14px;z-index:99}
+.loading-overlay.show{display:flex}
+.spin{width:40px;height:40px;border:3px solid var(--bd);border-top-color:var(--blue);border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+
+<div id="mainForm">
+<div class="hdr">
+  <div class="hdr-logo">📦</div>
+  <div class="hdr-biz" id="bizName">Mi Negocio</div>
+  <div class="hdr-sub" id="bizSub">Completa tu pedido rapido y facil</div>
+</div>
+
+<div class="form-wrap">
+  <div class="section">
+    <span class="slabel">TUS DATOS</span>
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <input class="fi" id="fName" placeholder="Nombre completo" autocomplete="name">
+      <div class="err" id="errName">Ingresa tu nombre completo</div>
+      <div class="ph-row">
+        <span class="ph-pre">+51</span>
+        <input class="fi" id="fPhone" placeholder="9XXXXXXXX" maxlength="9" type="tel" inputmode="numeric">
+      </div>
+      <div class="err" id="errPhone">Ingresa tu numero de WhatsApp (9 digitos)</div>
+      <input class="fi" id="fAddress" placeholder="Direccion de entrega (distrito, calle, numero)">
+      <div class="err" id="errAddress">Ingresa tu direccion</div>
+      <textarea class="fi" id="fNotes" placeholder="Notas adicionales (opcional)..."></textarea>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <div class="section">
+    <span class="slabel">TIPO DE ENVIO</span>
+    <div class="courier-grid" id="courierGrid">
+      <div style="grid-column:1/-1;text-align:center;padding:20px;color:var(--text2)">Cargando...</div>
+    </div>
+    <div class="err" id="errCourier">Selecciona el tipo de envio</div>
+
+    <div id="agencyBox" style="display:none;margin-top:10px">
+      <span class="slabel" id="agencyLabel">AGENCIA</span>
+      <div class="cascade">
+        <select class="c-sel" id="selDept" onchange="onDept()">
+          <option value="">Selecciona departamento...</option>
+        </select>
+        <select class="c-sel" id="selProv" onchange="onProv()" style="display:none">
+          <option value="">Selecciona provincia...</option>
+        </select>
+        <select class="c-sel" id="selDist" onchange="onDist()" style="display:none">
+          <option value="">Selecciona distrito...</option>
+        </select>
+        <div id="agcList" class="agc-list" style="display:none"></div>
+      </div>
+      <div class="sel-badge" id="agcBadge">
+        <div class="sel-badge-ttl">AGENCIA SELECCIONADA</div>
+        <div class="sel-badge-txt" id="agcBadgeTxt"></div>
+        <button class="sel-badge-btn" onclick="resetAgency()">Cambiar agencia</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <div class="section">
+    <span class="slabel">FECHA DE ENTREGA</span>
+    <div class="dates" id="datesList">
+      <div style="padding:20px;color:var(--text2);font-size:13px">Cargando...</div>
+    </div>
+    <div class="err" id="errDate">Selecciona una fecha</div>
+  </div>
+
+  <button class="btn-submit" onclick="submitOrder()">Confirmar pedido</button>
+</div>
+</div>
+
+<div class="success" id="successPage">
+  <div class="suc-ico">🎉</div>
+  <div class="suc-ttl">Pedido enviado!</div>
+  <div class="suc-sub">Tu pedido fue registrado exitosamente. Te contactaremos pronto para coordinar la entrega.</div>
+  <div class="suc-id" id="sucId">Pedido #0000</div>
+  <button class="btn-wa" onclick="openWA()"><span style="font-size:20px">💬</span> Confirmar por WhatsApp</button>
+  <button class="btn-nuevo" onclick="resetForm()">Hacer otro pedido</button>
+</div>
+
+<div class="loading-overlay" id="loadingOverlay">
+  <div class="spin"></div>
+  <div style="color:var(--text2);font-size:14px">Enviando pedido...</div>
+</div>
+
+<script>
+const KEY="AIzaSyBkbY-CFtNHfbaG864sXVnaAwBKZGW6SRI";
+const PRJ="total-tools-24ce8";
+const BASE="https://firestore.googleapis.com/v1/projects/"+PRJ+"/databases/(default)/documents";
+const CFG_PATH="panel/config";
+const SHIP_BASE="panel/shipments/items";
+
+function toFs(v){
+  if(v===null||v===undefined) return{nullValue:null};
+  if(typeof v==="boolean") return{booleanValue:v};
+  if(typeof v==="number") return Number.isInteger(v)?{integerValue:String(v)}:{doubleValue:v};
+  if(typeof v==="string") return{stringValue:v};
+  if(Array.isArray(v)) return{arrayValue:{values:v.map(toFs)}};
+  if(typeof v==="object"){const f={};Object.keys(v).forEach(k=>{f[k]=toFs(v[k])});return{mapValue:{fields:f}};}
+  return{stringValue:String(v)};
+}
+function fromFs(fv){
+  if(!fv) return null;
+  if("nullValue"in fv) return null;
+  if("booleanValue"in fv) return fv.booleanValue;
+  if("integerValue"in fv) return parseInt(fv.integerValue);
+  if("doubleValue"in fv) return fv.doubleValue;
+  if("stringValue"in fv) return fv.stringValue;
+  if("arrayValue"in fv) return(fv.arrayValue.values||[]).map(fromFs);
+  if("mapValue"in fv){const o={};Object.keys(fv.mapValue.fields||{}).forEach(k=>{o[k]=fromFs(fv.mapValue.fields[k])});return o;}
+  return null;
+}
+async function fsGet(path){
+  try{
+    const r=await fetch(BASE+"/"+path+"?key="+KEY);
+    if(r.status===404) return null;
+    const doc=await r.json();
+    if(!doc.fields) return null;
+    const o={};Object.keys(doc.fields).forEach(k=>{o[k]=fromFs(doc.fields[k])});
+    return o;
+  }catch(e){return null;}
+}
+
+let CFG=null,_courier="",_agencia="",_date="",_dateLabel="",_agencyKey=null,_waPhone="999000000",_waMsg="";
+
+async function loadConfig(){
+  CFG=await fsGet(CFG_PATH);
+  if(CFG&&CFG.config){
+    document.getElementById("bizName").textContent=CFG.config.name||"Mi Negocio";
+    document.title=CFG.config.name||"Hacer un pedido";
+    if(CFG.config.city) document.getElementById("bizSub").textContent=""+CFG.config.city;
+    if(CFG.config.phone) _waPhone=CFG.config.phone;
+  }
+  renderCouriers();
+  renderDates();
+}
+
+function cIcon(n){
+  n=n.toUpperCase();
+  if(n.includes("SHALOM")) return"🚌";
+  if(n.includes("OLVA")) return"📬";
+  if(n.includes("MARVISUR")) return"🚐";
+  if(n.includes("DELIVERY")||n.includes("MOTORIZADO")) return"🏍️";
+  if(n.includes("RETIRO")) return"🏪";
+  if(n.includes("ENCOMIENDA")) return"📦";
+  return"🚚";
+}
+
+function renderCouriers(){
+  const grid=document.getElementById("courierGrid");
+  let list=(CFG&&CFG.couriers)||["SHALOM","OLVA COURIER","DELIVERY","RETIRO EN TIENDA"];
+  if(CFG&&CFG.courierActive) list=list.filter(c=>CFG.courierActive[c]!==false);
+  if(!list.length){grid.innerHTML="<div style='grid-column:1/-1;text-align:center;padding:20px;color:var(--text2)'>No hay opciones</div>";return;}
+  grid.innerHTML=list.map(c=>{const sid='co_'+c.replace(/[^a-zA-Z0-9]/g,'_');return '<div class="c-opt" id="'+sid+'" data-c="'+c+'"><span class="ico">'+cIcon(c)+'</span>'+c+'</div>';}).join('');document.querySelectorAll('.c-opt').forEach(el=>el.addEventListener('click',function(){selCourier(this.dataset.c)}));
+}
+
+function selCourier(name){
+  _courier=name;
+  document.querySelectorAll(".c-opt").forEach(e=>e.classList.remove("sel"));
+  const el=document.getElementById("co_"+name.replace(/[^a-zA-Z0-9]/g,"_"));
+  if(el) el.classList.add("sel");
+  document.getElementById("errCourier").classList.remove("show");
+  const n=name.toUpperCase();
+  const box=document.getElementById("agencyBox");
+  if(n.includes("SHALOM")){
+    box.style.display="block";
+    document.getElementById("agencyLabel").textContent="AGENCIA SHALOM";
+    _agencyKey="SHALOM";initCascade();_agencia="";
+  }else if(n.includes("OLVA")){
+    box.style.display="block";
+    document.getElementById("agencyLabel").textContent="AGENCIA OLVA COURIER";
+    _agencyKey="OLVA";initCascade();_agencia="";
+  }else{
+    box.style.display="none";_agencia="";_agencyKey=null;
+  }
+}
+
+const AD={
+  SHALOM:{
+    "Lima":{
+      "Lima":{
+        "Ate Vitarte":["Av. Marco Puente Llanos 309 Mz A Lt 3","Av. Nicolas Ayllon 1352","Av. Nicolas Ayllon 3080"],
+        "Barranco":["Av. Republica de Panama (Agencia Barranco)"],
+        "Brena":["Av. Venezuela 1670 (al costado del Policlinico de Brena)"],
+        "Carabayllo":["Av. Tupac Amaru 443 (paradero Establo)"],
+        "Cercado de Lima":["Av. Oscar R. Benavides 860","Av. Mexico 1187 (Agencia Central)"],
+        "Comas":["Av. Universitaria 7241","Av. Tupac Amaru 4708-4710 (Estacion Naranjal)"],
+        "El Agustino":["Av. 1ro de Mayo 3071 Urb. Huancayo (frente al grifo Repsol)"],
+        "Independencia":["Av. Tupac Amaru 4931 (paradero Estacion Naranjal)"],
+        "Jesus Maria":["Av. San Felipe (Agencia San Felipe)"],
+        "La Molina":["Av. La Fontana 440 CC La Rotonda II Local 1018","Av. Los Fresnos 1305 Tda 2"],
+        "La Victoria":["Jr. Luna Pizarro 701","Jr. Antonio Raimondi 125"],
+        "Los Olivos":["Av. Las Palmeras 5236","C. Manuel Ascencio Segura 309","Av. Gerardo Unger 6917"],
+        "Lurigancho - Chosica":["Carretera Central Km 17 Mz E Lt 5 (entrada Huaycan)"],
+        "Miraflores":["Av. Jose Pardo 533"],
+        "Pueblo Libre":["Av. La Marina 1640"],
+        "Puente Piedra":["Panamericana Norte Km 32.5 (a 1/2 cdra del Puente Arica, costado grifo Repsol)","Fundo Tambo Inga Mz A Lt 8 (paradero Naranjito, antes del Cementerio Buen Retiro)"],
+        "San Borja":["Av. Javier Prado Este 1810","Av. Aviacion (Agencia Aviacion)"],
+        "San Juan de Lurigancho":["Av. Proceres de la Independencia 1295","Av. Santa Rosa 773 (paradero Canto Grande)","Jr. Saturno 386 (paradero 21 Las Flores)","Av. 13 de Enero 2057"],
+        "San Juan de Miraflores":["Av. De Los Heroes 228 (Estacion Atocongo)","Av. Pachacutec 6547"],
+        "San Martin de Porres":["Av. Peru 1589","Av. Canta Callao 10 Parcela 2A Local 109 (frente a Tottus)","Av. Los Proceres 535"],
+        "San Miguel":["Av. La Marina (Agencia San Miguel)"],
+        "Santa Anita":["Av. Huancaray Mz A Lote 14"],
+        "Santiago de Surco":["Av. Primavera 120 (Chacarilla)","Av. Republica de Panama 5115"],
+        "Villa El Salvador":["Av. Pastor Sevilla","Av. Cesar Vallejo"],
+        "Villa Maria del Triunfo":["Av. Pachacutec (Agencia VMT)"]
+      },
+      "Barranca":{"Barranca":["Urb. Las Vegas Mz C Lt 22 (entre colegio Fe Alegria y mercado Buena Vista)"]},
+      "Canete":{"San Vicente de Canete":["Agencia San Vicente de Canete"]},
+      "Huaral":{"Huaral":["Av. Chancay S/N Urb. San Martin de Porres Mz D Lt 101"]},
+      "Huaura":{"Huacho":["Prolongacion Salaverry 764","Av. Mercedes Indacochea 1276"]}
+    },
+    "Callao":{
+      "Callao":{
+        "Callao":["Av. Elmer Faucett 492-484 (frente al grifo Repsol)","Av. Saenz Pena 414-416","Av. La Marina 530 La Perla"],
+        "Bellavista":["Av. Elmer Faucett 1641 Urb. Jardines Viru"],
+        "Ventanilla":["Calle Columba 102 (Paradero Tercero Naval, frente al grifo Repsol)"]
+      }
+    },
+    "Arequipa":{
+      "Arequipa":{
+        "Arequipa Cercado":["Calle Dean Valdivia 388 (esquina con Blondel)"],
+        "Cayma":["Av. Ejercito 1025-B"],
+        "Cerro Colorado":["Nuevo Horizonte Mz H Lote 12"],
+        "Jacobo Hunter":["Calle Argentina 405-A"],
+        "La Joya":["Lateral 12 C Lt 32 El Cruce La Joya (costado grifo Primax)"],
+        "Mariano Melgar":["Calle Ancash 202"],
+        "Paucarpata":["Calle Belen 100-A Urb. Manuel Prado","Av. Jesus 1100"],
+        "Socabaya":["Av. Socabaya 301 Urb. San Martin de Socabaya"],
+        "Mollendo":["Av. Industrial 1 Terminal Terrestre"]
+      }
+    },
+    "Cusco":{"Cusco":{"Cusco Cercado":["Prolong. Av. Arequipa 1010 S/N"],"San Sebastian":["Av. Agropecuaria Mz F-7 Urb. Huancaro"]},"Canchis":{"Sicuani":["Jr. Inambari 208"]}},
+    "La Libertad":{"Trujillo":{"Trujillo":["Agencia La Perla","Agencia Calle Liverpool"],"La Esperanza":["Agencia La Esperanza"],"El Porvenir":["Agencia El Porvenir"]}},
+    "Lambayeque":{"Chiclayo":{"Chiclayo":["Agencia Chiclayo Central"],"Jose Leonardo Ortiz":["Agencia Jose Leonardo Ortiz"]}},
+    "Piura":{"Piura":{"Piura":["Agencia Piura Central"],"Castilla":["Agencia Castilla"]},"Sullana":{"Sullana":["Agencia Sullana"]}},
+    "Tumbes":{"Tumbes":{"Tumbes":["Agencia Tumbes"]}},
+    "Loreto":{"Maynas":{"Iquitos":["Agencia Iquitos Central"]}},
+    "Ucayali":{"Coronel Portillo":{"Pucallpa":["Agencia Pucallpa Central"]}},
+    "San Martin":{"San Martin":{"Tarapoto":["Agencia Tarapoto Central"]}},
+    "Cajamarca":{"Cajamarca":{"Cajamarca":["Jr. Los Nogales 426"]}},
+    "Amazonas":{"Chachapoyas":{"Chachapoyas":["Jr. Grau 270 (junto a Agencia de Viajes Monteverde)"]}},
+    "Ancash":{"Santa":{"Chimbote":["Agencia Chimbote Central"]},"Huaraz":{"Huaraz":["Agencia Huaraz Central"]}},
+    "Junin":{"Huancayo":{"Huancayo":["Agencia Huancayo Central"],"El Tambo":["Agencia El Tambo"]}},
+    "Ica":{"Ica":{"Ica":["Agencia Ica Central"]}},
+    "Ayacucho":{"Huamanga":{"Ayacucho":["AA.HH Complejo Artesanal T1 Lt1 (1 cdra del terminal terrestre)"]}},
+    "Apurimac":{"Abancay":{"Abancay":["Agencia Abancay"]},"Andahuaylas":{"Andahuaylas":["Agencia Andahuaylas"]}},
+    "Puno":{"San Roman":{"Juliaca":["Agencia Juliaca Central"]},"Puno":{"Puno":["Agencia Puno"]}},
+    "Tacna":{"Tacna":{"Tacna":["Agencia Tacna Central"]}},
+    "Moquegua":{"Mariscal Nieto":{"Moquegua":["Agencia Moquegua"]}},
+    "Huanuco":{"Huanuco":{"Huanuco":["Av. 27 de Noviembre Cdra. 20 Villon Bajo"]}},
+    "Pasco":{"Pasco":{"Cerro de Pasco":["Agencia Cerro de Pasco"]}},
+    "Madre de Dios":{"Tambopata":{"Puerto Maldonado":["Agencia Puerto Maldonado"]}}
+  },
+  OLVA:{
+    "Lima":{
+      "Lima":{
+        "Cercado de Lima":["Pje. Acuna 131","Av. Inca Garcilaso de la Vega 1358","Av. Simon Bolivar 1427","Prol. Paseo de la Republica 1515"],
+        "San Borja":["Av. Aviacion 3532"],
+        "Miraflores":["Av. Comandante Espinar 659"],
+        "San Isidro":["Av. Republica de Panama 3603"],
+        "Los Olivos":["Av. Carlos Izaguirre 1006 Urb. Palmeras"],
+        "La Molina":["CC La Fontana Av. Javier Prado Este","CC La Rotonda II Av. La Molina Tda 1017"],
+        "La Victoria":["Jr. Antonio Bazo 1280 (Gamarra)"],
+        "San Luis":["Av. del Aire 1322"],
+        "San Juan de Miraflores":["Av. San Juan 713"],
+        "Santa Anita":["Av. Santa Rosa 131"],
+        "Jesus Maria":["Av. Gral. Salaverry 2370 CC Real Plaza"],
+        "Lurigancho - Chosica":["Av. Lima Sur 853 Chosica"],
+        "San Martin de Porres":["Av. Universitaria Norte 6971-6973"]
+      },
+      "Callao":{"Callao":["Av. Argentina 4458 (Almacen Central)","Av. Saenz Pena 1463"]}
+    },
+    "Arequipa":{
+      "Arequipa":{
+        "Arequipa Cercado":["Calle Moral 105"],
+        "Cayma":["Av. Ejercito 1025-B"],
+        "La Tomilla":["Av. Ramon Castilla 1021"],
+        "Paucarpata":["Calle Belen 100-A"],
+        "Mariano Melgar":["Av. Pizarro 127 Sub Lote 4"]
+      }
+    },
+    "Cajamarca":{"Cajamarca":{"Cajamarca":["Jr. Los Nogales 426"]}},
+    "La Libertad":{"Trujillo":{"Trujillo":["Agencia Trujillo Central"]}},
+    "Lambayeque":{"Chiclayo":{"Chiclayo":["Agencia Chiclayo"]}},
+    "Piura":{"Piura":{"Piura":["Agencia Piura"],"Ayabaca":["Av. Grau 273 esq. Salverry"]}},
+    "Cusco":{"Cusco":{"San Sebastian":["Av. Agropecuaria Mz F-7 Urb. Huancaro"]}}
+  }
+};
+
+function initCascade(){
+  const data=AD[_agencyKey];
+  const s=document.getElementById("selDept");
+  s.innerHTML="<option value=''>Selecciona departamento...</option>";
+  Object.keys(data).sort().forEach(d=>s.innerHTML+="<option value='"+d+"'>"+d+"</option>");
+  document.getElementById("selProv").style.display="none";
+  document.getElementById("selDist").style.display="none";
+  document.getElementById("agcList").style.display="none";
+  document.getElementById("agcBadge").style.display="none";
+  s.value="";
+}
+function onDept(){
+  const dept=document.getElementById("selDept").value;
+  const sp=document.getElementById("selProv");
+  sp.innerHTML="<option value=''>Selecciona provincia...</option>";
+  document.getElementById("selDist").style.display="none";
+  document.getElementById("agcList").style.display="none";
+  if(!dept){sp.style.display="none";return;}
+  Object.keys(AD[_agencyKey][dept]).sort().forEach(p=>sp.innerHTML+="<option value='"+p+"'>"+p+"</option>");
+  sp.style.display="block";sp.value="";
+}
+function onProv(){
+  const dept=document.getElementById("selDept").value;
+  const prov=document.getElementById("selProv").value;
+  const sd=document.getElementById("selDist");
+  sd.innerHTML="<option value=''>Selecciona distrito...</option>";
+  document.getElementById("agcList").style.display="none";
+  if(!prov){sd.style.display="none";return;}
+  Object.keys(AD[_agencyKey][dept][prov]).sort().forEach(d=>sd.innerHTML+="<option value='"+d+"'>"+d+"</option>");
+  sd.style.display="block";sd.value="";
+}
+function onDist(){
+  const dept=document.getElementById("selDept").value;
+  const prov=document.getElementById("selProv").value;
+  const dist=document.getElementById("selDist").value;
+  const list=document.getElementById("agcList");
+  if(!dist){list.style.display="none";return;}
+  const addrs=AD[_agencyKey][dept][prov][dist];
+  list.innerHTML=addrs.map((a,i)=>'<div class="agc-item" id="ai_'+i+'" data-i="'+i+'"><div class="agc-name">Agencia '+(i+1)+'</div><div class="agc-addr">'+a+'</div></div>').join('');list.querySelectorAll('.agc-item').forEach(el=>el.addEventListener('click',function(){selAgency(dept,prov,dist,parseInt(this.dataset.i))}));
+  list.style.display="block";
+}
+function selAgency(dept,prov,dist,idx){
+  const addr=AD[_agencyKey][dept][prov][dist][idx];
+  _agencia=dist+", "+dept+" - "+addr;
+  document.querySelectorAll(".agc-item").forEach(e=>e.classList.remove("sel"));
+  const el=document.getElementById("ai_"+idx);
+  if(el) el.classList.add("sel");
+  const badge=document.getElementById("agcBadge");
+  badge.style.display="block";
+  document.getElementById("agcBadgeTxt").textContent=_agencia;
+}
+function resetAgency(){_agencia="";document.getElementById("agcBadge").style.display="none";initCascade();}
+
+function renderDates(){
+  const dispatch=(CFG&&CFG.dispatch)||{days:[1,2,3,4,5],cutHour:"23:59",anticipation:0};
+  const days=dispatch.days||[1,2,3,4,5];
+  const anticipation=dispatch.anticipation||0;
+  const parts=(dispatch.cutHour||"23:59").split(":");
+  const cutH=parseInt(parts[0]),cutM=parseInt(parts[1]);
+  const now=new Date();
+  const pastCut=(now.getHours()>cutH)||(now.getHours()===cutH&&now.getMinutes()>=cutM);
+  const dayN=["Dom","Lun","Mar","Mie","Jue","Vie","Sab"];
+  const monN=["ene","feb","mar","abr","may","jun","jul","ago","sep","oct","nov","dic"];
+  const available=[];
+  let checked=0;
+  const offset=anticipation+(pastCut?1:0);
+  for(let i=1;i<=30&&available.length<7;i++){
+    const d=new Date(now);d.setDate(now.getDate()+i);
+    const wd=d.getDay();
+    if(days.includes(wd)){if(checked>=offset)available.push(d);checked++;}
+  }
+  if(!available.length){document.getElementById("datesList").innerHTML="<div style='padding:20px;color:var(--text2)'>No hay fechas disponibles</div>";return;}
+  document.getElementById('datesList').innerHTML=available.map(d=>{const iso=d.toISOString().split('T')[0];const lbl=dayN[d.getDay()]+' '+d.getDate()+' '+monN[d.getMonth()];return '<div class="date-opt" id="do_'+iso+'" data-iso="'+iso+'" data-lbl="'+lbl+'"><div class="date-day">'+dayN[d.getDay()]+'</div><div class="date-num">'+d.getDate()+'</div><div class="date-mon">'+monN[d.getMonth()]+'</div></div>';}).join('');
+  document.querySelectorAll('.date-opt').forEach(el=>el.addEventListener('click',function(){selDate(this.dataset.iso,this.dataset.lbl)}));
+}
+function selDate(iso,lbl){
+  _date=iso;_dateLabel=lbl;
+  document.querySelectorAll(".date-opt").forEach(e=>e.classList.remove("sel"));
+  const el=document.getElementById("do_"+iso);
+  if(el) el.classList.add("sel");
+  document.getElementById("errDate").classList.remove("show");
+}
+
+async function submitOrder(){
+  const name=document.getElementById("fName").value.trim();
+  const phone=document.getElementById("fPhone").value.trim().replace(/\s/g,"");
+  const addr=document.getElementById("fAddress").value.trim();
+  const notes=document.getElementById("fNotes").value.trim();
+  let ok=true;
+  if(!name){document.getElementById("errName").classList.add("show");ok=false;}
+  else document.getElementById("errName").classList.remove("show");
+  if(phone.length<8||!/^\d+$/.test(phone)){document.getElementById("errPhone").classList.add("show");ok=false;}
+  else document.getElementById("errPhone").classList.remove("show");
+  if(!addr){document.getElementById("errAddress").classList.add("show");ok=false;}
+  else document.getElementById("errAddress").classList.remove("show");
+  if(!_courier){document.getElementById("errCourier").classList.add("show");ok=false;}
+  if(!_date){document.getElementById("errDate").classList.add("show");ok=false;}
+  if(!ok) return;
+  document.getElementById("loadingOverlay").classList.add("show");
+  const id="p"+Date.now();
+  const notasFull=[notes,_agencia?"Agencia: "+_agencia:""].filter(Boolean).join(" | ");
+  const shipment={id,name,phone,address:addr,courier:_courier,date:_date,status:"NUEVO PEDIDO",cost:"",notes:notasFull,extra:{},docGuia:null,docTicket:null,links:[],sel:false,chkGuia:false,chkTicket:false,createdAt:new Date().toISOString(),fromForm:true};
+  try{
+    const fields={};Object.keys(shipment).forEach(k=>{fields[k]=toFs(shipment[k])});
+    await fetch(BASE+"/"+SHIP_BASE+"/"+id+"?key="+KEY,{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({fields})});
+    await fetch(BASE+"/"+CFG_PATH+"?key="+KEY,{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({fields:{ts:toFs(Date.now())}})});
+    _waMsg="*NUEVO PEDIDO* 📦\n\n👤 *Cliente:* "+name+"\n📱 *WhatsApp:* +51"+phone+"\n🏠 *Direccion:* "+addr+"\n🚚 *Courier:* "+_courier+"\n"+(_agencia?"📍 *Agencia:* "+_agencia+"\n":"")+"📅 *Fecha:* "+_dateLabel+"\n"+(notes?"📝 *Notas:* "+notes+"\n":"")+"\n🆔 Pedido #"+id.slice(-4).toUpperCase();
+    document.getElementById("sucId").textContent="Pedido #"+id.slice(-4).toUpperCase();
+    document.getElementById("loadingOverlay").classList.remove("show");
+    document.getElementById("mainForm").style.display="none";
+    document.getElementById("successPage").classList.add("show");
+  }catch(e){
+    document.getElementById("loadingOverlay").classList.remove("show");
+    alert("Error al enviar. Verifica tu conexion e intenta de nuevo.");
+  }
+}
+
+function openWA(){
+  const msg=encodeURIComponent(_waMsg);
+  window.open("https://wa.me/51"+_waPhone+"?text="+msg,"_blank");
+}
+
+function resetForm(){
+  _courier="";_agencia="";_date="";_dateLabel="";_agencyKey=null;
+  document.getElementById("fName").value="";
+  document.getElementById("fPhone").value="";
+  document.getElementById("fAddress").value="";
+  document.getElementById("fNotes").value="";
+  document.getElementById("successPage").classList.remove("show");
+  document.getElementById("mainForm").style.display="block";
+  document.querySelectorAll(".c-opt").forEach(e=>e.classList.remove("sel"));
+  document.querySelectorAll(".date-opt").forEach(e=>e.classList.remove("sel"));
+  document.getElementById("agencyBox").style.display="none";
+  window.scrollTo({top:0,behavior:"smooth"});
+}
+
+
+loadConfig();
+</script>
+</body>
+</html>
