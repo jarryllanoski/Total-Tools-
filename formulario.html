@@ -303,19 +303,12 @@ function selCourier(name){
   document.getElementById("errCourier").classList.remove("show");
   var n=name.toUpperCase();
   var box=document.getElementById("agencyBox");
-  _agencia="";
-  window._shalomAgencia=null; // ★ SHALOM: limpiar agencia al cambiar courier
+  _agencia="";window._shalomAgencia=null;
   if(n.includes("SHALOM")){
     box.style.display="block";
     _agencyKey="SHALOM";
-    // ★ SHALOM: usar buscador dinámico en lugar de la cascada estática
-    if(typeof ShalomAPI!=="undefined"){
-      ShalomAPI.initBuscadorFormulario();
-    } else {
-      // fallback: cascada estática si shalom.js no cargó
-      document.getElementById("agencyLabel").textContent="AGENCIA SHALOM";
-      initCascade();
-    }
+    // ★ SHALOM: buscador dinámico con API real
+    _initShalomBuscador();
   }else if(n.includes("OLVA")){
     box.style.display="block";
     document.getElementById("agencyLabel").textContent="AGENCIA OLVA COURIER";
@@ -524,15 +517,17 @@ async function submitOrder(){
   document.getElementById("loadingOverlay").classList.add("show");
   var id="p"+Date.now();
   var trackCode=id.slice(-4).toUpperCase();
-  // ★ SHALOM: si es courier Shalom y el cliente eligió agencia dinámica, usarla
+  // ★ SHALOM: si eligió agencia con buscador dinámico, usar esa
   var _agenciaFinal=_agencia;
   if(_courier.toUpperCase().includes("SHALOM")&&window._shalomAgencia){
     var _ag=window._shalomAgencia;
-    var _agParts=[_ag.nombre,_ag.direccion,_ag.zona,_ag.provincia,_ag.departamento].filter(Boolean);
+    var _agParts=[_ag.nombre,_ag.direccion,_ag.distrito,_ag.provincia,_ag.departamento].filter(Boolean);
     _agenciaFinal=_agParts.join(", ");
   }
   var notasFull=[notes,_agenciaFinal?"Agencia: "+_agenciaFinal:""].filter(Boolean).join(" | ");
-  var shipment={id:id,name:name,phone:phone,address:addr,courier:_courier,date:_date,status:"NUEVO PEDIDO",cost:"",notes:notasFull,extra:{},docGuia:null,docTicket:null,links:[],sel:false,chkGuia:false,chkTicket:false,createdAt:new Date().toISOString(),fromForm:true};
+  // Guardar agencia en el shipment
+  var _agenciaGuardada=_agenciaFinal;
+  var shipment={id:id,name:name,phone:phone,address:addr,courier:_courier,date:_date,status:"NUEVO PEDIDO",cost:"",notes:notasFull,extra:{},docGuia:null,docTicket:null,links:[],sel:false,chkGuia:false,chkTicket:false,createdAt:new Date().toISOString(),fromForm:true,shippingCourier:_courier,shippingAgency:_agenciaGuardada||""};
   try{
     var fields={};
     Object.keys(shipment).forEach(function(k){fields[k]=toFs(shipment[k]);});
@@ -636,6 +631,174 @@ function resetTracking(){
   document.getElementById("trackInput").value="";
 }
 
+// ★ SHALOM: buscador dinámico de agencias
+// ⚠️  API KEY EXPUESTA SOLO PARA PRUEBA. NO USAR EN PRODUCCIÓN. MOVER A FIREBASE FUNCTIONS.
+var _SHALOM_KEY = 'sk_be883ea11609f97321db6e0ef243d8a83578a96841fb986506fd12b0e6924652';
+var _shalomDebTimer = null;
+var _shalomAgenciaCache = [];
+
+function _initShalomBuscador(){
+  var box = document.getElementById('agencyBox');
+  box.innerHTML = [
+    '<span class="slabel" style="margin-top:4px;display:block">AGENCIA SHALOM</span>',
+    '<div style="position:relative;margin-top:6px">',
+    '  <input id="shalomAgInput" class="fi" autocomplete="off"',
+    '    placeholder="Escribe ciudad o distrito (ej: Miraflores, Chiclayo...)">',
+    '  <div id="shalomSpin" style="display:none;position:absolute;right:14px;top:50%;',
+    '    transform:translateY(-50%);width:16px;height:16px;border:2px solid #1e1e30;',
+    '    border-top-color:var(--blue);border-radius:50%;animation:spin .7s linear infinite"></div>',
+    '  <div id="shalomDrop" style="display:none;position:absolute;left:0;right:0;',
+    '    top:calc(100%+4px);background:#0f0f1a;border:1.5px solid #1e1e30;',
+    '    border-radius:12px;overflow:hidden;z-index:60;',
+    '    box-shadow:0 8px 24px rgba(0,0,0,.7);max-height:280px;overflow-y:auto"></div>',
+    '</div>',
+    '<div id="shalomSelBadge" style="display:none;margin-top:8px;',
+    '  background:rgba(34,197,94,.08);border:1.5px solid rgba(34,197,94,.22);',
+    '  border-radius:10px;padding:11px 14px">',
+    '  <div style="font-size:10px;font-weight:800;color:#22c55e;margin-bottom:5px">✅ AGENCIA SELECCIONADA</div>',
+    '  <div id="shalomSelTxt" style="font-size:12px;color:var(--text);line-height:1.6"></div>',
+    '  <button onclick="_shalomReset()" style="background:none;border:none;color:var(--text2);',
+    '    font-size:11px;cursor:pointer;font-family:Outfit,sans-serif;margin-top:5px;padding:0">',
+    '    ✕ Cambiar agencia</button>',
+    '</div>',
+  ].join('');
+
+  var inp  = document.getElementById('shalomAgInput');
+  var drop = document.getElementById('shalomDrop');
+  var spin = document.getElementById('shalomSpin');
+
+  inp.addEventListener('input', function(){
+    window._shalomAgencia = null;
+    document.getElementById('shalomSelBadge').style.display = 'none';
+    var q = this.value.trim();
+    clearTimeout(_shalomDebTimer);
+    if (q.length < 2) { drop.style.display = 'none'; spin.style.display = 'none'; return; }
+    spin.style.display = 'block';
+    _shalomDebTimer = setTimeout(function(){ _shalomBuscar(q); }, 350);
+  });
+  inp.addEventListener('keydown', function(e){
+    if (e.key === 'Escape') { drop.style.display = 'none'; drop.innerHTML = ''; }
+  });
+  document.addEventListener('click', function(e){
+    if (!e.target.closest('#agencyBox')) drop.style.display = 'none';
+  });
+}
+
+async function _shalomBuscar(q) {
+  var drop = document.getElementById('shalomDrop');
+  var spin = document.getElementById('shalomSpin');
+  try {
+    // 1. Intentar JSON local primero
+    var local = await _shalomBuscarLocal(q);
+    spin.style.display = 'none';
+    if (local && local.length) { _shalomRenderDrop(local); return; }
+    // 2. Fallback: API Shalom
+    var r = await fetch('https://shalom-api.lat/api/buscar?q=' + encodeURIComponent(q), {
+      headers: { 'x-api-key': _SHALOM_KEY }
+    });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    var json = await r.json();
+    var lista = json.data || json.agencias || json || [];
+    if (!Array.isArray(lista)) lista = [];
+    var agencias = lista.slice(0, 8).map(function(raw){
+      return {
+        nombre:       raw.lugar_over || raw.nombre || '—',
+        direccion:    raw.direccion  || '',
+        distrito:     raw.zona       || raw.distrito || '',
+        provincia:    raw.provincia  || '',
+        departamento: raw.departamento || '',
+        referencia:   raw.referencia || '',
+        telefono:     raw.telefono   || '',
+        horario:      raw.hora_atencion || raw.horario || '',
+      };
+    });
+    _shalomRenderDrop(agencias);
+  } catch(e) {
+    spin.style.display = 'none';
+    if (drop) {
+      drop.innerHTML = '<div style="padding:14px;font-size:13px;color:var(--text2);text-align:center">Sin resultados</div>';
+      drop.style.display = 'block';
+    }
+  }
+}
+
+async function _shalomBuscarLocal(q) {
+  try {
+    if (!window._shalomJsonData) {
+      var r = await fetch('./data/agencias-shalom.json');
+      if (!r.ok) return [];
+      var json = await r.json();
+      window._shalomJsonData = json.agencias || [];
+    }
+    if (!window._shalomJsonData.length) return [];
+    var qu = q.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+    return window._shalomJsonData.filter(function(ag){
+      var hay = [ag.nombre,ag.distrito,ag.provincia,ag.departamento,ag.direccion]
+        .join(' ').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+      return hay.includes(qu);
+    }).slice(0, 8);
+  } catch(e) { return []; }
+}
+
+function _shalomRenderDrop(agencias) {
+  var drop = document.getElementById('shalomDrop');
+  if (!drop) return;
+  if (!agencias.length) {
+    drop.innerHTML = '<div style="padding:14px;font-size:13px;color:var(--text2);text-align:center">Sin resultados</div>';
+    drop.style.display = 'block';
+    return;
+  }
+  _shalomAgenciaCache = agencias;
+  drop.innerHTML = agencias.map(function(ag, i){
+    var geo = [ag.distrito, ag.provincia, ag.departamento].filter(Boolean).join(' · ');
+    return '<div onclick="_shalomSel(' + i + ')" style="padding:12px 14px;cursor:pointer;' +
+      'border-bottom:1px solid #1a1a2a;transition:background .12s" ' +
+      'onmouseenter="this.style.background='rgba(79,142,247,.07)'" ' +
+      'onmouseleave="this.style.background=''">' +
+      '<div style="font-size:13px;font-weight:700;color:var(--text)">' + _esc2(ag.nombre) + '</div>' +
+      (ag.direccion ? '<div style="font-size:11px;color:var(--text2);margin-top:2px">' + _esc2(ag.direccion) + '</div>' : '') +
+      (geo ? '<div style="font-size:10px;color:var(--blue);margin-top:2px">' + _esc2(geo) + '</div>' : '') +
+      (ag.horario ? '<div style="font-size:10px;color:var(--text2);margin-top:1px">🕐 ' + _esc2(ag.horario) + '</div>' : '') +
+      '</div>';
+  }).join('');
+  drop.style.display = 'block';
+}
+
+function _shalomSel(i) {
+  var ag = _shalomAgenciaCache[i]; if (!ag) return;
+  window._shalomAgencia = ag;
+  var drop = document.getElementById('shalomDrop');
+  var badge = document.getElementById('shalomSelBadge');
+  var selTxt = document.getElementById('shalomSelTxt');
+  var inp = document.getElementById('shalomAgInput');
+  if (drop) { drop.style.display = 'none'; drop.innerHTML = ''; }
+  var partes = [ag.nombre];
+  if (ag.direccion) partes.push(ag.direccion);
+  var geo = [ag.distrito, ag.provincia, ag.departamento].filter(Boolean).join(', ');
+  if (geo) partes.push(geo);
+  if (ag.referencia) partes.push('Ref: ' + ag.referencia);
+  if (ag.telefono)   partes.push('📞 ' + ag.telefono);
+  if (ag.horario)    partes.push('🕐 ' + ag.horario);
+  selTxt.innerHTML = partes.map(function(p){ return '<div>' + _esc2(p) + '</div>'; }).join('');
+  badge.style.display = 'block';
+  if (inp) inp.value = ag.nombre + (ag.distrito ? ' — ' + ag.distrito : '');
+}
+
+function _shalomReset() {
+  window._shalomAgencia = null;
+  var inp = document.getElementById('shalomAgInput');
+  var drop = document.getElementById('shalomDrop');
+  var badge = document.getElementById('shalomSelBadge');
+  if (inp) inp.value = '';
+  if (drop) { drop.style.display = 'none'; drop.innerHTML = ''; }
+  if (badge) badge.style.display = 'none';
+  if (inp) inp.focus();
+}
+
+function _esc2(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
 // Check URL params
 var urlP=new URLSearchParams(window.location.search);
 var trackCode=urlP.get("tracking");
@@ -647,18 +810,6 @@ if(trackCode){
 }else{
   loadConfig();
 }
-</script>
-<!-- ★ SHALOM: módulo externo cargado al final para no bloquear el form -->
-<script src="shalom.js"></script>
-<script>
-// ★ SHALOM: inicializar tracking en el formulario
-// El buscador de agencias se activa en selCourier() cuando eligen SHALOM
-window.addEventListener('load', function(){
-  if(typeof ShalomAPI !== 'undefined'){
-    ShalomAPI.initTrackingFormulario();
-    console.log('[formulario] ShalomAPI tracking listo');
-  }
-});
 </script>
 </body>
 </html>
