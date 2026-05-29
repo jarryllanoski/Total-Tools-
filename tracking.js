@@ -13,7 +13,8 @@
    CONFIGURACIÓN
 ══════════════════════════════════════════════ */
 var TRK = {
-  FIREBASE_URL: 'https://us-central1-total-tools-24ce8.cloudfunctions.net/shalomTracking',
+  FIREBASE_URL:     'https://us-central1-total-tools-24ce8.cloudfunctions.net/shalomTracking',
+  FETCH_TIMEOUT_MS: 15000,              // 15s por intento antes de abortar
   AUTO_INTERVAL_MS: 6 * 60 * 60 * 1000, // 6 horas (base)
   KEYWORDS_ENTREGADO: ['entregado','entrega realizada','entrega completa','recogido','recojo completado','delivered'],
   KEYWORDS_DESTINO:   ['llegó a destino','llego a destino','en agencia destino','disponible para recojo',
@@ -47,29 +48,31 @@ function _esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;'
    LLAMADA A FIREBASE FUNCTION
 ══════════════════════════════════════════════ */
 async function consultarShalom(orderNumber, orderCode) {
-  console.log('[Tracking] CONSULTANDO SHALOM', orderNumber, orderCode);
-  var DELAYS = [0, 1500, 3500, 7000]; // 3 reintentos: 1.5s, 3.5s, 7s
+  var DELAYS = [0, 1500, 3500, 7000]; // 3 reintentos con backoff
   for (var attempt = 0; attempt < DELAYS.length; attempt++) {
     if (DELAYS[attempt] > 0) {
       await new Promise(function(res){ setTimeout(res, DELAYS[attempt]); });
-      console.log('[Tracking] Reintento', attempt, 'de', DELAYS.length - 1);
     }
+    var ctrl  = new AbortController();
+    var timer = setTimeout(function(){ ctrl.abort(); }, TRK.FETCH_TIMEOUT_MS);
     try {
       var r = await fetch(TRK.FIREBASE_URL, {
-        method: 'POST',
+        method:  'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+        signal:  ctrl.signal,
+        body:    JSON.stringify({
           orderNumber: String(orderNumber).trim(),
           orderCode:   String(orderCode || '').trim()
         })
       });
+      clearTimeout(timer);
       if (!r.ok) throw new Error('HTTP ' + r.status);
-      var raw = await r.json();
-      console.log('[Tracking] RESPUESTA SHALOM', raw);
-      return raw;
+      return await r.json();
     } catch(e) {
-      console.warn('[Tracking] Error intento ' + (attempt + 1) + ':', e.message);
-      if (attempt === DELAYS.length - 1) return null;
+      clearTimeout(timer);
+      if (attempt < DELAYS.length - 1) continue;
+      console.warn('[Tracking] Sin respuesta tras', DELAYS.length, 'intentos');
+      return null;
     }
   }
   return null;
@@ -270,7 +273,6 @@ async function autoTrackingCheck() {
   });
 
   if (!pendientes.length) { _autoRunning = false; return; }
-  console.log('[Tracking] Auto-check:', pendientes.length, 'pedidos');
 
   for (var i = 0; i < pendientes.length; i++) {
     var ship = pendientes[i];
@@ -558,15 +560,13 @@ Tracking._guardarEdicion = function(shipId) {
 /* ── consultarAhora ──────────────────────────────────────────────── */
 Tracking.consultarAhora = async function(shipId) {
   var ship = _findShip(shipId);
-  console.log('[Tracking] CLICK CONSULTAR | ID recibido:', shipId);
-  console.log('[Tracking] Shipments disponibles:', (_getShipments()||[]).map(function(s){ return s.id+'|'+s.name; }));
+  // Debug solo en desarrollo — no exponer IDs ni guías en consola de producción
 
   if (!ship) {
     console.warn('[Tracking] Pedido no encontrado con ID:', shipId);
     if (typeof window.toast === 'function') window.toast('⚠️ Error: pedido no encontrado');
     return;
   }
-  console.log('[Tracking] Pedido encontrado:', ship.name, '| Guía:', ship.trackingOrderNumber||ship.shalomGuia||'SIN GUÍA');
 
   // Leer guía desde cualquier campo disponible
   var guia   = ship.trackingOrderNumber || ship.shalomGuia   || '';
@@ -584,6 +584,10 @@ Tracking.consultarAhora = async function(shipId) {
 
   var raw      = await consultarShalom(guia, codigo);
   var resultado = aplicarResultado(ship, raw, 'manual');
+
+  // Resetear botón antes de render (guard: si render falla, no queda bloqueado)
+  var btnR = document.getElementById('btn-consult-'+shipId);
+  if (btnR) { btnR.innerHTML = '🔄 Actualizar'; btnR.disabled = false; }
 
   if (typeof window.save   === 'function') window.save();
   if (typeof window.render === 'function') window.render();

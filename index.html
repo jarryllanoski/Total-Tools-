@@ -41,8 +41,23 @@
   }
 
   // ── REST helpers ──────────────────────────────────────────────────────
+  // Wrapper con timeout — evita que Firebase cuelgue la app indefinidamente
+  async function fsFetch(url, opts, ms){
+    ms = ms || 12000;
+    const ctrl  = new AbortController();
+    const timer = setTimeout(function(){ ctrl.abort(); }, ms);
+    try {
+      const r = await fetch(url, Object.assign({}, opts, { signal: ctrl.signal }));
+      clearTimeout(timer);
+      return r;
+    } catch(e) {
+      clearTimeout(timer);
+      throw e;
+    }
+  }
+
   async function fsGet(path){
-    const r=await fetch(`${BASE}/${path}?key=${KEY}`);
+    const r=await fsFetch(`${BASE}/${path}?key=${KEY}`);
     if(r.status===404) return null;
     if(!r.ok) throw new Error(await r.text());
     const doc=await r.json();
@@ -52,17 +67,18 @@
   }
   async function fsPatch(path,obj){
     const fields={};Object.keys(obj).forEach(k=>{fields[k]=toFs(obj[k])});
-    const r=await fetch(`${BASE}/${path}?key=${KEY}`,{
+    const r=await fsFetch(`${BASE}/${path}?key=${KEY}`,{
       method:'PATCH',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({fields})
     });
     if(!r.ok) throw new Error(await r.text());
   }
   async function fsDel(path){
-    await fetch(`${BASE}/${path}?key=${KEY}`,{method:'DELETE'});
+    const r=await fsFetch(`${BASE}/${path}?key=${KEY}`,{method:'DELETE'});
+    if(!r.ok && r.status!==404) throw new Error('DELETE failed: '+r.status);
   }
   async function fsList(col){
-    const r=await fetch(`${BASE}/${col}?key=${KEY}&pageSize=500`);
+    const r=await fsFetch(`${BASE}/${col}?key=${KEY}&pageSize=500`);
     if(!r.ok) return[];
     const data=await r.json();
     return(data.documents||[]).map(doc=>{
@@ -1330,9 +1346,9 @@ async function _fbSaveWithRetry(data, attempt){
       const delay = [3000, 8000, 20000][attempt];
       setTimeout(() => _fbSaveWithRetry(data, attempt+1), delay);
     } else {
-      // Después de 3 intentos fallidos, dejar marcado como pendiente
-      // Se subirá cuando vuelva la conexión
-      console.warn('Firebase save failed after 3 attempts, will retry on reconnect');
+      // Marcar como pendiente — el indicador visual se activa
+      lsSet('dpanel_pending', '1');
+      window._fbStatus&&window._fbStatus('err');
     }
   }
 }
@@ -1685,6 +1701,8 @@ function render(){
     </div>`).join('');
 }
 
+function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+
 function cardHTML(s){
   const gChk=s.chkGuia||false, tChk=s.chkTicket||false;
   const msgs=S.msgTemplates[s.status]||['',''];
@@ -1739,7 +1757,7 @@ function cardDocs(s,gChk,tChk){
       <div class="doc-lbl">TICKET</div>
       <div class="doc-chk ${tChk?'on-t':''}" onclick="event.stopPropagation();togDoc('${s.id}','ticket')">${tChk?'✓':''}</div>
     </div>`:''}
-    ${(s.links||[]).map(l=>`<div class="link-chip">🔗 ${l.n}</div>`).join('')}
+    ${(s.links||[]).map(l=>`<div class="link-chip">🔗 ${esc(l.n)}</div>`).join('')}
   </div>`;
 }
 

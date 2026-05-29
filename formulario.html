@@ -459,8 +459,18 @@ function fsDocToObj(doc){
   return o;
 }
 
+// Wrapper con timeout para evitar que Firebase cuelgue el formulario
+function fsFetch(url, opts, ms){
+  ms = ms || 10000;
+  const ctrl  = new AbortController();
+  const timer = setTimeout(function(){ ctrl.abort(); }, ms);
+  return fetch(url, Object.assign({}, opts, { signal: ctrl.signal }))
+    .then(function(r){ clearTimeout(timer); return r; })
+    .catch(function(e){ clearTimeout(timer); throw e; });
+}
+
 async function fsGet(path){
-  const r=await fetch(`${FB_BASE}/${path}?key=${FB_KEY}`);
+  const r=await fsFetch(`${FB_BASE}/${path}?key=${FB_KEY}`);
   if(!r.ok) throw new Error(`HTTP ${r.status}`);
   return r.json();
 }
@@ -468,7 +478,7 @@ async function fsGet(path){
 async function fsPatch(path, obj){
   const fields={};
   for(const k in obj) fields[k]=toFs(obj[k]);
-  const r=await fetch(`${FB_BASE}/${path}?key=${FB_KEY}`,{
+  const r=await fsFetch(`${FB_BASE}/${path}?key=${FB_KEY}`,{
     method:'PATCH',
     headers:{'Content-Type':'application/json'},
     body:JSON.stringify({fields})
@@ -478,7 +488,7 @@ async function fsPatch(path, obj){
 }
 
 async function fsListDocs(collectionPath){
-  const r=await fetch(`${FB_BASE}/${collectionPath}?key=${FB_KEY}`);
+  const r=await fsFetch(`${FB_BASE}/${collectionPath}?key=${FB_KEY}`);
   if(!r.ok) throw new Error(`HTTP ${r.status}`);
   const d=await r.json();
   return (d.documents||[]);
@@ -1347,7 +1357,7 @@ async function submitOrder(){
       }).catch(()=>{});
     }
     showOverlay(false);
-    localStorage.setItem('dpanel_order_'+wsId, JSON.stringify({trackCode, orderId:order.id, name:order.name}));
+    try{ localStorage.setItem('dpanel_order_'+wsId, JSON.stringify({trackCode, orderId:order.id, name:order.name})); }catch(_){}
     renderSuccessStep(order, trackCode);
   }catch(e){
     showOverlay(false);

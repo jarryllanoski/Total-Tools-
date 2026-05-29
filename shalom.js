@@ -52,32 +52,36 @@
      CACHE LOCAL DE AGENCIAS
      Se carga una sola vez desde el JSON local.
   ══════════════════════════════════════════════════════════ */
-  var _localAgencias   = null;   // null = no cargado aún
-  var _localCargando   = false;
-  var _localCallbacks  = [];
+  var _localAgencias = null;  // null = sin cargar, [] = cargado (vacío o con datos)
+  var _localPromise  = null;  // Promise singleton — evita race condition y fetches duplicados
 
-  async function cargarLocal() {
-    if (_localAgencias !== null) return _localAgencias;
-    if (_localCargando) {
-      // Esperar a que termine la carga en curso
-      return new Promise(function (resolve) { _localCallbacks.push(resolve); });
-    }
-    _localCargando = true;
-    try {
-      var r = await fetch(CFG.LOCAL_JSON + '?v=' + (window._shalomJSONVersion || '1'));
-      if (!r.ok) throw new Error('HTTP ' + r.status);
-      var json = await r.json();
-      var lista = json.agencias || json.data || json || [];
-      _localAgencias = Array.isArray(lista) ? lista : [];
-      console.log('[ShalomAPI] JSON local cargado:', _localAgencias.length, 'agencias');
-    } catch (e) {
-      console.warn('[ShalomAPI] JSON local no disponible:', e.message, '— se usará API como fallback');
-      _localAgencias = [];   // vacío = usar fallback API
-    }
-    _localCargando = false;
-    _localCallbacks.forEach(function (cb) { cb(_localAgencias); });
-    _localCallbacks = [];
-    return _localAgencias;
+  function cargarLocal() {
+    if (_localAgencias !== null) return Promise.resolve(_localAgencias);
+    if (_localPromise)           return _localPromise;  // todos los callers comparten el mismo Promise
+
+    _localPromise = (function() {
+      var ctrl  = new AbortController();
+      var timer = setTimeout(function(){ ctrl.abort(); }, 8000); // 8s máximo
+
+      return fetch(CFG.LOCAL_JSON + '?v=' + (window._shalomJSONVersion || '1'), { signal: ctrl.signal })
+        .then(function(r) {
+          clearTimeout(timer);
+          if (!r.ok) throw new Error('HTTP ' + r.status);
+          return r.json();
+        })
+        .then(function(json) {
+          var lista = json.agencias || json.data || json || [];
+          _localAgencias = Array.isArray(lista) ? lista : [];
+          return _localAgencias;
+        })
+        .catch(function() {
+          clearTimeout(timer);
+          _localAgencias = [];   // vacío = usar API como fallback
+          return _localAgencias;
+        });
+    })();
+
+    return _localPromise;
   }
 
   /* ══════════════════════════════════════════════════════════
