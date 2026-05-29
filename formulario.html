@@ -172,6 +172,16 @@ textarea.fi{resize:vertical;line-height:1.5}
 </style>
 </head>
 <body>
+
+<!-- BANDA DE ENTORNO — solo visible en produccion-preparacion, no en main -->
+<div id="env-banner" style="
+  position:fixed;bottom:0;left:0;right:0;z-index:99999;
+  background:#f59e0b;color:#000;text-align:center;
+  font-size:12px;font-weight:700;padding:5px;letter-spacing:.5px;
+  font-family:system-ui,sans-serif;pointer-events:none;">
+  🔧 MODO PRUEBA — rama: produccion-preparacion (no es la versión live)
+</div>
+
 <div class="container" id="app">
   <div class="loading-screen"><div class="spin"></div><div class="spin-lbl">Cargando...</div></div>
 </div>
