@@ -35,7 +35,8 @@
     BASE_URL: 'https://shalom-api.lat',
 
     // ── Solo para MODE: 'firebase' ────────────────────────
-    FIREBASE_URL: 'https://us-central1-TUPROYECTO.cloudfunctions.net/shalom',
+    FIREBASE_URL:         'https://us-central1-total-tools-24ce8.cloudfunctions.net/agenciasShalom',
+    FIREBASE_AGENCIAS_URL:'https://us-central1-total-tools-24ce8.cloudfunctions.net/agenciasShalom',
 
     // ── Agencias locales ─────────────────────────────────
     // Ruta al JSON generado por extraer-agencias.js

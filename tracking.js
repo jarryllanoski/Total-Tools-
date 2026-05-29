@@ -48,22 +48,31 @@ function _esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;'
 ══════════════════════════════════════════════ */
 async function consultarShalom(orderNumber, orderCode) {
   console.log('[Tracking] CONSULTANDO SHALOM', orderNumber, orderCode);
-  try {
-    var r = await fetch(TRK.FIREBASE_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        orderNumber: String(orderNumber).trim(),
-        orderCode:   String(orderCode || '').trim()
-      })
-    });
-    var raw = await r.json();
-    console.log('[Tracking] RESPUESTA SHALOM', raw);
-    return raw;
-  } catch(e) {
-    console.warn('[Tracking] Error fetch:', e.message);
-    return null;
+  var DELAYS = [0, 1500, 3500, 7000]; // 3 reintentos: 1.5s, 3.5s, 7s
+  for (var attempt = 0; attempt < DELAYS.length; attempt++) {
+    if (DELAYS[attempt] > 0) {
+      await new Promise(function(res){ setTimeout(res, DELAYS[attempt]); });
+      console.log('[Tracking] Reintento', attempt, 'de', DELAYS.length - 1);
+    }
+    try {
+      var r = await fetch(TRK.FIREBASE_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          orderNumber: String(orderNumber).trim(),
+          orderCode:   String(orderCode || '').trim()
+        })
+      });
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      var raw = await r.json();
+      console.log('[Tracking] RESPUESTA SHALOM', raw);
+      return raw;
+    } catch(e) {
+      console.warn('[Tracking] Error intento ' + (attempt + 1) + ':', e.message);
+      if (attempt === DELAYS.length - 1) return null;
+    }
   }
+  return null;
 }
 
 /* ══════════════════════════════════════════════

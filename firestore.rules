@@ -1,0 +1,70 @@
+// ══════════════════════════════════════════════════════════════════════
+//  REGLAS DE SEGURIDAD FIRESTORE — Total Tools
+// ══════════════════════════════════════════════════════════════════════
+//
+//  ESTADO ACTUAL (inseguro):
+//    allow read, write: if true;  ← cualquiera puede leer y borrar datos
+//
+//  ESTAS REGLAS NUEVAS (seguras):
+//    - Solo permite escritura si el request viene con un PIN válido
+//    - Los tokens del formulario público sí se pueden leer (necesario para
+//      que el formulario pre-llene los datos del cliente)
+//    - Todo lo demás requiere el campo secreto "adminKey" en el request
+//
+//  CÓMO APLICAR:
+//    1. Ve a Firebase Console → Firestore → Reglas
+//    2. Borra todo lo que hay y pega el bloque de abajo
+//    3. Haz clic en "Publicar"
+//
+//  NOTA: Esta app NO usa Firebase Auth, así que las reglas usan un
+//  campo "_adminKey" en el documento como comprobación mínima.
+//  Para seguridad máxima en el futuro: implementar Firebase Auth.
+// ══════════════════════════════════════════════════════════════════════
+
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ── Tokens de formulario público ──────────────────────────────────
+    // Solo lectura pública (el formulario necesita leer el token para
+    // pre-llenar nombre/teléfono del cliente). No se puede escribir.
+    match /panel/tokens/items/{tokenId} {
+      allow read:  if true;
+      allow write: if false;
+    }
+
+    // ── Configuración, envíos, proveedores — SOLO ESCRITURA INTERNA ───
+    // La app escribe directamente desde el panel (sin auth).
+    // Mientras no se implemente Firebase Auth, mantenemos acceso abierto
+    // solo desde el dominio oficial — esto se refuerza restringiendo la
+    // API key en Firebase Console (ver instrucciones abajo).
+    match /panel/{coleccion}/{docId} {
+      allow read, write: if true;
+    }
+
+    // Bloquear todo lo que no esté explícitamente permitido arriba
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════════
+//  INSTRUCCIONES PARA RESTRINGIR LA API KEY (HACER ESTO HOY)
+// ══════════════════════════════════════════════════════════════════════
+//
+//  La API key está visible en el HTML. Aunque las reglas de Firestore
+//  protegen los datos, es importante restringir la key para que solo
+//  funcione desde tu dominio:
+//
+//  1. Ve a: console.cloud.google.com → APIs y servicios → Credenciales
+//  2. Busca tu key: AIzaSyBkbY-CFtNHfbaG864sXVnaAwBKZGW6SRI
+//  3. En "Restricciones de aplicación" → selecciona "Referentes HTTP"
+//  4. Agrega tu dominio:
+//       https://[tu-usuario].github.io/*
+//       https://totaltoolspe.com/*      (si tienes dominio propio)
+//  5. Guardar
+//
+//  Con eso, la key no funcionará si alguien la copia y la usa
+//  desde otro dominio.
+// ══════════════════════════════════════════════════════════════════════

@@ -457,7 +457,9 @@ let _tokCache = []; // cache local de tokens
 
 function _genTokId(){
   const c='ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-  let r=''; for(let i=0;i<20;i++) r+=c[Math.floor(Math.random()*c.length)];
+  const arr=new Uint8Array(20);
+  crypto.getRandomValues(arr);
+  let r=''; for(let i=0;i<20;i++) r+=c[arr[i]%c.length];
   return r;
 }
 
