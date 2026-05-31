@@ -286,6 +286,11 @@ function renderLinks(){$('linkListForm').innerHTML=_links.map((l,i)=>`<div class
 /* FORM */
 let _editId=null;
 function openForm(id){
+  // Resetear acordeón de documentos a cerrado
+  var body = document.getElementById('docsBody');
+  var arrow = document.getElementById('docsArrow');
+  if(body) body.classList.remove('open');
+  if(arrow) arrow.classList.remove('open');
   _editId=id;$('formTitle').textContent=id?'Editar Envío':'Nuevo Envío';
   const activeCouriers = S.couriers.filter(c => S.courierActive[c] !== false);
   $('fCourier').innerHTML = (activeCouriers.length ? activeCouriers : S.couriers).map(c=>`<option>${c}</option>`).join('');
@@ -303,6 +308,13 @@ function openForm(id){
     if(s.docGuia){_docs.guia=s.docGuia;refreshSlot('guia')}
     if(s.docEmbalado){_docs.embalado=s.docEmbalado;refreshSlot('embalado')}
     if(s.docTicket){_docs.ticket=s.docTicket;refreshSlot('ticket')}
+    // Si tiene documentos, abrir el acordeón automáticamente
+    if(s.docGuia||s.docEmbalado||s.docTicket){
+      var body=document.getElementById('docsBody');
+      var arrow=document.getElementById('docsArrow');
+      if(body) body.classList.add('open');
+      if(arrow) arrow.classList.add('open');
+    }
     _links=s.links?JSON.parse(JSON.stringify(s.links)):[];renderLinks();
   }else{
     ['fName','fPhone','fAddr','fCost','fNotes'].forEach(i=>$(i).value='');

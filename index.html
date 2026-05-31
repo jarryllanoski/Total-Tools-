@@ -376,7 +376,15 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);max
 /* DOC SLOTS IN FORM */
 .docs-sec{background:var(--bg2);border:1px solid var(--bd);border-radius:10px;padding:12px;margin-bottom:11px}
 .docs-ttl{font-size:10px;font-weight:700;color:var(--text2);letter-spacing:.8px;text-transform:uppercase;margin-bottom:10px}
-.docs-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px}
+.docs-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:10px}
+.docs-accordion{border:1px solid var(--bd);border-radius:12px;overflow:hidden;margin-bottom:4px}
+.docs-accordion-hdr{display:flex;align-items:center;justify-content:space-between;padding:12px 14px;cursor:pointer;user-select:none;background:var(--bg2)}
+.docs-accordion-hdr:active{opacity:.8}
+.docs-accordion-ttl{font-size:11px;font-weight:700;color:var(--text2);letter-spacing:.5px;text-transform:uppercase}
+.docs-accordion-arrow{font-size:12px;color:var(--text2);transition:transform .2s}
+.docs-accordion-arrow.open{transform:rotate(180deg)}
+.docs-accordion-body{display:none;padding:12px;border-top:1px solid var(--bd)}
+.docs-accordion-body.open{display:block}
 .doc-slot{display:flex;flex-direction:column;gap:5px}
 .doc-tap{display:block;border:2px dashed var(--bd);border-radius:9px;aspect-ratio:3/4;overflow:hidden}
 .doc-tap.fg{border:2px solid var(--green)}
@@ -878,9 +886,13 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);max
         <div class="fg"><label class="fl">Código</label><input class="fi" id="fShalomCodigo" placeholder="TT9C" style="font-family:monospace;text-transform:uppercase" oninput="this.value=this.value.toUpperCase()" maxlength="8"></div>
       </div>
     </div>
-    <div class="docs-sec">
-      <div class="docs-ttl">📎 DOCUMENTOS DEL ENVÍO</div>
-      <div class="docs-grid">
+    <div class="docs-accordion">
+      <div class="docs-accordion-hdr" onclick="toggleDocsAccordion()">
+        <span class="docs-accordion-ttl">📎 Documentos del envío</span>
+        <span class="docs-accordion-arrow" id="docsArrow">▾</span>
+      </div>
+      <div class="docs-accordion-body" id="docsBody">
+      <div class="docs-grid" style="grid-template-columns:1fr 1fr 1fr">
         <div class="doc-slot">
           <div class="doc-sw">
             <div class="doc-tap" id="lblGuia"><div id="prevGuia"><div class="doc-empty"><div style="font-size:28px">🚚</div><div style="font-size:11px;font-weight:700">Guía courier</div></div></div></div>
@@ -938,7 +950,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);max
           </div>
         </div>
       </div>
-      <div style="border-top:1px solid var(--bd);padding-top:10px">
+      <div style="border-top:1px solid var(--bd);padding-top:10px;margin-top:4px">
         <div style="font-size:10px;color:var(--text2);margin-bottom:7px">🔗 Agregar link (Drive, Mega, etc.)</div>
         <div class="link-row">
           <input class="fi" id="fLink" placeholder="https://..." style="flex:1">
@@ -946,7 +958,8 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);max
         </div>
         <div class="link-list" id="linkListForm"></div>
       </div>
-    </div>
+      </div><!-- fin docs-accordion-body -->
+    </div><!-- fin docs-accordion -->
     <button class="btn-pri" onclick="saveShipment()">💾 Guardar envío</button>
     <button class="btn-sec" onclick="closeOverlay('formOverlay')">Cancelar</button>
   </div>
@@ -2242,6 +2255,19 @@ render();
 <script src="tracking.js"></script>
 <script>
 updateShareLink();
+
+function toggleDocsAccordion(){
+  var body = document.getElementById('docsBody');
+  var arrow = document.getElementById('docsArrow');
+  if(!body||!arrow) return;
+  var isOpen = body.classList.contains('open');
+  body.classList.toggle('open', !isOpen);
+  arrow.classList.toggle('open', !isOpen);
+}
+
+// Al abrir el form, cerrar el acordeón por defecto
+var _origOpenForm = typeof openForm === 'function' ? openForm : null;
+
 window.addEventListener('load', function(){
   // Asegurar window.S sincronizado
   if(typeof S !== 'undefined') window.S = S;
