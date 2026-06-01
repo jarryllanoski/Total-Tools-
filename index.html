@@ -57,6 +57,7 @@
   }
 
   async function fsPatch(path,obj){
+    if(window._authEnsureToken) await window._authEnsureToken();
     const fields={};Object.keys(obj).forEach(k=>{fields[k]=toFs(obj[k])});
     const r=await fetch(`${BASE}/${path}?key=${KEY}`,{
       method:'PATCH',
