@@ -127,6 +127,15 @@
     }catch(e){window._fbStatus&&window._fbStatus('err');}
   };
 
+  // Guardar un shipment individual inmediatamente (sin debounce)
+  window._fbSaveShipmentNow = async (ship) => {
+    try {
+      await fsPatch(shipPath(ship.id), slimShipment(ship));
+    } catch(e) {
+      console.warn('Error guardando shipment:', e);
+    }
+  };
+
   window._fbDeleteShipment = async (id) => {
     for(let i=0; i<3; i++){
       try{
