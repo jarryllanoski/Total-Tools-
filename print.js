@@ -506,4 +506,51 @@ function esc(s){
     .replace(/"/g,'&quot;');
 }
 
+  /* ── CAMPANA DE IMPRESIÓN EN HEADER ─────────────────────────────── */
+  function _injectPrintBell(){
+    var slot = document.getElementById('printBellSlot');
+    if(!slot || slot.querySelector('#printBellBtn')) return;
+    slot.innerHTML =
+      '<button id="printBellBtn" onclick="PrintModule.open()" title="Pedidos sin imprimir" style="'+
+        'position:relative;background:none;border:none;cursor:pointer;'+
+        'font-size:18px;padding:2px 4px;flex-shrink:0;line-height:1;'+
+        'display:flex;align-items:center;gap:2px;color:#e6edf3">'+
+        '<span style="font-size:15px">🖨️</span>'+
+        '<span style="font-size:16px">🔔</span>'+
+        '<span id="printBellBadge" style="'+
+          'display:none;position:absolute;top:-3px;right:-3px;'+
+          'background:#f78166;color:#fff;font-size:9px;font-weight:900;'+
+          'min-width:16px;height:16px;border-radius:8px;'+
+          'align-items:center;justify-content:center;'+
+          'padding:0 3px;line-height:1;font-family:inherit">0</span>'+
+      '</button>';
+  }
+
+  // Exponer updateBadge para que index.html lo llame desde updateStats
+  window.PrintModule.updateBadge = function(){
+    var S = window.S;
+    if(!S || !S.shipments) return;
+    _injectPrintBell();
+    var sinImprimir = S.shipments.filter(function(x){ return !x.printed && x.status !== 'FINALIZADO'; }).length;
+    var badge = document.getElementById('printBellBadge');
+    var bell  = document.getElementById('printBellBtn');
+    if(badge){
+      badge.textContent = sinImprimir;
+      badge.style.display = sinImprimir > 0 ? 'flex' : 'none';
+    }
+    if(bell){
+      bell.style.opacity = sinImprimir > 0 ? '1' : '0.45';
+      bell.title = sinImprimir > 0
+        ? sinImprimir + ' pedido' + (sinImprimir !== 1 ? 's' : '') + ' sin imprimir'
+        : 'Todo impreso';
+    }
+  };
+
+  // Inyectar al cargar
+  if(document.readyState === 'loading'){
+    document.addEventListener('DOMContentLoaded', _injectPrintBell);
+  } else {
+    setTimeout(_injectPrintBell, 200);
+  }
+
 })();

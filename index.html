@@ -677,20 +677,8 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);max
     </div>
     <div class="hdr-phone" id="hdrPhone">999000000</div>
   </div>
-  <div style="display:flex;flex-direction:column;align-items:flex-end;gap:3px;flex-shrink:0">
-    <div class="hdr-badge">PLAN PRO</div>
-  </div>
-  <button id="printBellBtn" onclick="doPrint()" title="Pedidos sin imprimir" style="
-    position:relative;background:none;border:none;cursor:pointer;
-    font-size:20px;padding:2px 4px;flex-shrink:0;line-height:1">
-    🔔
-    <span id="printBellBadge" style="
-      display:none;position:absolute;top:-2px;right:-2px;
-      background:#f78166;color:#fff;font-size:9px;font-weight:900;
-      min-width:16px;height:16px;border-radius:8px;
-      display:flex;align-items:center;justify-content:center;
-      padding:0 3px;line-height:1;font-family:inherit">0</span>
-  </button>
+  <div id="notifyBellSlot"></div>
+  <div id="printBellSlot"></div>
   <button class="hdr-out" onclick="if(window.AuthModule)AuthModule.logout()" title="Cerrar sesión">↪</button>
 </div>
 <style>
@@ -1516,18 +1504,8 @@ function updateStats(){
   $('sPend').textContent=S.shipments.filter(x=>x.status==='NUEVO PEDIDO'||x.status==='EN PROCESO').length;
   $('sEnv').textContent=S.shipments.filter(x=>x.status==='POR ALISTAR'||x.status==='ALISTADO'||x.status==='ENVIADO'||x.status==='LLEGÓ A DESTINO'||x.status==='PENDIENTE DE PAGO').length;
   $('sEnt').textContent=S.shipments.filter(x=>x.status==='FINALIZADO').length;
-  // Actualizar badge campana — pedidos sin imprimir
-  const sinImprimir = S.shipments.filter(x=>!x.printed&&x.status!=='FINALIZADO').length;
-  const badge = $('printBellBadge');
-  const bell  = $('printBellBtn');
-  if(badge){
-    badge.textContent = sinImprimir;
-    badge.style.display = sinImprimir > 0 ? 'flex' : 'none';
-  }
-  if(bell){
-    bell.style.opacity = sinImprimir > 0 ? '1' : '0.4';
-    bell.title = sinImprimir > 0 ? sinImprimir+' pedido'+(sinImprimir!==1?'s':'')+' sin imprimir' : 'Todo impreso';
-  }
+  // Badge de impresión actualizado desde print.js
+  if(window.PrintModule && window.PrintModule.updateBadge) window.PrintModule.updateBadge();
 }
 
 function renderStatsAsSuppliers(){
@@ -2304,6 +2282,7 @@ render();
 <!-- ★ SHALOM tracking — cargado al final -->
 <script src="config.js"></script>
 <script src="print.js"></script>
+<script src="notify.js"></script>
 <script src="tracking.js"></script>
 <script src="floatpanel.js"></script>
 <script>
