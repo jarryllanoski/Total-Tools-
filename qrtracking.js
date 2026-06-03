@@ -199,32 +199,39 @@ function _scanLoop(video){
 
 function _onScanResult(raw){
   _stopScan();
-  // raw puede ser "85257969/document/1/" o similar
-  // Mostrar el QR escaneado del ticket físico
+  // Mostrar mensaje de escaneado
   var scanResult = document.getElementById('qrTrkScanResult');
   if(scanResult){
     scanResult.textContent = '✅ Escaneado: ' + raw;
     scanResult.style.display = 'block';
   }
-  // Regenerar QR con el dato real del ticket
-  var canvas = document.getElementById('qrTrkCanvas');
-  if(canvas) canvas.innerHTML = '';
-  _loadQRLib(function(){
-    if(!global.QRCode) return;
-    var c = document.getElementById('qrTrkCanvas');
-    if(!c) return;
+  // Limpiar completamente el canvas antes de regenerar
+  var c = document.getElementById('qrTrkCanvas');
+  if(c){
+    // Destruir cualquier instancia anterior de QRCode
     c.innerHTML = '';
-    try {
-      new global.QRCode(c, {
-        text:         raw,
-        width:        200,
-        height:       200,
-        colorDark:    '#000000',
-        colorLight:   '#ffffff',
-        correctLevel: global.QRCode.CorrectLevel.M
-      });
-    } catch(e){}
-  });
+    // Forzar reflow para que el DOM se limpie
+    void c.offsetHeight;
+  }
+  // Pequeño delay para asegurar limpieza del DOM
+  setTimeout(function(){
+    _loadQRLib(function(){
+      if(!global.QRCode) return;
+      var canvas = document.getElementById('qrTrkCanvas');
+      if(!canvas) return;
+      canvas.innerHTML = '';
+      try {
+        new global.QRCode(canvas, {
+          text:         raw,
+          width:        200,
+          height:       200,
+          colorDark:    '#000000',
+          colorLight:   '#ffffff',
+          correctLevel: global.QRCode.CorrectLevel.M
+        });
+      } catch(e){ console.warn('[QRTracking] Error generando QR:', e); }
+    });
+  }, 100);
   if(typeof window.toast==='function') window.toast('✅ QR del ticket cargado');
 }
 
