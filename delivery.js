@@ -1,0 +1,487 @@
+/**
+ * delivery.js — Módulo de Rutas DELIVERY para Total Tools
+ * =========================================================
+ * - Triple tap en header del grupo DELIVERY → abre panel de rutas
+ * - Lista pedidos DELIVERY para entregar
+ * - Dirección toca → abre Google Maps (GPS o dirección)
+ * - Asignar motorizado
+ * - Confirmar entrega: nombre receptor + foto + firma → FINALIZADO
+ *
+ * NO modifica ningún archivo existente.
+ * Agregar <script src="delivery.js"></script> en index.html
+ */
+(function(global){
+'use strict';
+
+/* ══════════════════════════════════════════════
+   CSS
+══════════════════════════════════════════════ */
+function _injectCSS(){
+  if(document.getElementById('deliveryCSS')) return;
+  var s = document.createElement('style');
+  s.id = 'deliveryCSS';
+  s.textContent = [
+    /* Overlay principal */
+    '#dlvOv{display:none;position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:800;flex-direction:column}',
+    '#dlvOv.open{display:flex}',
+    '#dlvHeader{background:#161b22;padding:14px 16px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #30363d;flex-shrink:0}',
+    '#dlvBody{flex:1;overflow-y:auto;padding:12px 16px}',
+
+    /* Cards de ruta */
+    '.dlv-card{background:#161b22;border:1px solid #30363d;border-radius:12px;margin-bottom:10px;overflow:hidden}',
+    '.dlv-card-hdr{display:flex;align-items:center;gap:10px;padding:12px 14px;border-bottom:1px solid #30363d}',
+    '.dlv-num{width:28px;height:28px;border-radius:50%;background:var(--blue);color:#fff;font-size:13px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0}',
+    '.dlv-name{flex:1;font-size:14px;font-weight:700;color:#e6edf3}',
+    '.dlv-done .dlv-num{background:var(--green)}',
+    '.dlv-done .dlv-name{text-decoration:line-through;opacity:.5}',
+    '.dlv-card-body{padding:10px 14px}',
+    '.dlv-addr{font-size:12px;color:#8b949e;margin-bottom:8px;line-height:1.5;cursor:pointer}',
+    '.dlv-addr:active{opacity:.7}',
+    '.dlv-addr b{color:var(--blue)}',
+    '.dlv-meta{display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap}',
+    '.dlv-meta span{font-size:11px;color:var(--blue)}',
+    '.dlv-actions{display:flex;gap:8px}',
+    '.dlv-btn{flex:1;padding:10px;border-radius:9px;border:none;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit}',
+    '.dlv-btn-maps{background:rgba(56,139,253,.15);border:1px solid rgba(56,139,253,.3);color:var(--blue)}',
+    '.dlv-btn-driver{background:rgba(163,113,247,.15);border:1px solid rgba(163,113,247,.3);color:#a371f7}',
+    '.dlv-btn-deliver{background:linear-gradient(135deg,var(--green),#1a7f37);color:#fff}',
+    '.dlv-btn-done{background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.3);color:var(--green);cursor:default}',
+    '.dlv-driver-badge{font-size:10px;color:#a371f7;background:rgba(163,113,247,.1);border:1px solid rgba(163,113,247,.2);border-radius:10px;padding:2px 8px;margin-top:4px;display:inline-block}',
+
+    /* Overlay confirmar entrega */
+    '#dlvConfirmOv{display:none;position:fixed;inset:0;background:rgba(0,0,0,.9);z-index:900;align-items:flex-end;justify-content:center}',
+    '#dlvConfirmOv.open{display:flex}',
+    '#dlvConfirmSheet{background:#161b22;border-radius:16px 16px 0 0;padding:18px;width:100%;max-width:480px;border:1px solid #30363d;animation:dlvUp .2s ease;max-height:90vh;overflow-y:auto}',
+    '@keyframes dlvUp{from{transform:translateY(100%)}to{transform:translateY(0)}}',
+
+    /* Canvas firma */
+    '#dlvSignCanvas{width:100%;height:160px;background:#0d1117;border:1px solid #30363d;border-radius:10px;touch-action:none;cursor:crosshair;display:block}',
+
+    /* Driver overlay */
+    '#dlvDriverOv{display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:950;align-items:flex-end;justify-content:center}',
+    '#dlvDriverOv.open{display:flex}',
+    '#dlvDriverSheet{background:#161b22;border-radius:16px 16px 0 0;padding:18px;width:100%;max-width:480px;border:1px solid #30363d;animation:dlvUp .2s ease}',
+
+    /* Stats bar */
+    '#dlvStats{background:#1c2333;border-radius:10px;padding:10px 14px;margin-bottom:14px;display:flex;gap:16px;align-items:center}',
+    '.dlv-stat{text-align:center}',
+    '.dlv-stat-n{font-size:20px;font-weight:800;font-family:Syne,sans-serif}',
+    '.dlv-stat-l{font-size:10px;color:#8b949e}',
+
+    /* Foto preview */
+    '#dlvPhotoPreview{width:100%;max-height:180px;object-fit:contain;border-radius:10px;display:none;margin-top:8px;background:#0d1117}',
+  ].join('');
+  document.head.appendChild(s);
+}
+
+/* ══════════════════════════════════════════════
+   OVERLAYS HTML
+══════════════════════════════════════════════ */
+function _injectOverlays(){
+  if(document.getElementById('dlvOv')) return;
+
+  // Panel principal de rutas
+  var ov = document.createElement('div');
+  ov.id = 'dlvOv';
+  ov.innerHTML =
+    '<div id="dlvHeader">' +
+      '<div>' +
+        '<div style="font-family:Syne,sans-serif;font-weight:800;font-size:17px;color:#e6edf3">🛵 Ruta — DELIVERY</div>' +
+        '<div id="dlvSubtitle" style="font-size:11px;color:#8b949e;margin-top:2px"></div>' +
+      '</div>' +
+      '<button onclick="DeliveryModule.cerrar()" style="background:rgba(247,129,102,.15);border:1px solid rgba(247,129,102,.3);color:#f78166;border-radius:8px;width:34px;height:34px;font-size:16px;cursor:pointer">✕</button>' +
+    '</div>' +
+    '<div id="dlvBody"><div id="dlvStats"></div><div id="dlvList"></div></div>';
+  document.body.appendChild(ov);
+
+  // Overlay confirmar entrega
+  var ovC = document.createElement('div');
+  ovC.id = 'dlvConfirmOv';
+  ovC.innerHTML =
+    '<div id="dlvConfirmSheet">' +
+      '<div class="sheet-handle" style="width:36px;height:4px;background:#30363d;border-radius:2px;margin:0 auto 14px"></div>' +
+      '<div style="font-family:Syne,sans-serif;font-weight:800;font-size:17px;margin-bottom:4px">📦 Confirmar entrega</div>' +
+      '<div id="dlvConfirmName" style="font-size:13px;color:#8b949e;margin-bottom:14px"></div>' +
+
+      '<div style="font-size:10px;font-weight:700;color:#8b949e;letter-spacing:.8px;text-transform:uppercase;margin-bottom:6px">RECIBIDO POR *</div>' +
+      '<input id="dlvReceptor" class="fi" placeholder="Nombre de quien recibe" style="margin-bottom:12px">' +
+
+      '<div style="font-size:10px;font-weight:700;color:#8b949e;letter-spacing:.8px;text-transform:uppercase;margin-bottom:6px">FOTO DE LA ENTREGA</div>' +
+      '<button onclick="DeliveryModule._tomarFoto()" style="width:100%;padding:12px;background:rgba(56,139,253,.12);border:1px solid rgba(56,139,253,.25);border-radius:10px;color:var(--blue);font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">📷 Tomar foto</button>' +
+      '<input type="file" id="dlvFotoInput" accept="image/*" capture="environment" style="display:none" onchange="DeliveryModule._onFoto(this)">' +
+      '<img id="dlvPhotoPreview" alt="foto entrega">' +
+
+      '<div style="font-size:10px;font-weight:700;color:#8b949e;letter-spacing:.8px;text-transform:uppercase;margin:12px 0 6px;display:flex;justify-content:space-between;align-items:center">' +
+        '<span>FIRMA DEL CLIENTE</span>' +
+        '<button onclick="DeliveryModule._limpiarFirma()" style="background:none;border:none;color:#8b949e;font-size:11px;cursor:pointer;display:flex;align-items:center;gap:4px">🗑️ Limpiar</button>' +
+      '</div>' +
+      '<canvas id="dlvSignCanvas"></canvas>' +
+      '<div style="font-size:10px;color:#8b949e;text-align:center;margin-top:4px">Deslizá el dedo para firmar</div>' +
+
+      '<div style="display:flex;gap:9px;margin-top:16px">' +
+        '<button onclick="DeliveryModule._cerrarConfirm()" style="flex:1;padding:13px;background:#1c2333;border:1px solid #30363d;border-radius:10px;color:#8b949e;font-size:13px;cursor:pointer;font-family:inherit">Cancelar</button>' +
+        '<button onclick="DeliveryModule._confirmarEntrega()" style="flex:2;padding:13px;background:linear-gradient(135deg,var(--green),#1a7f37);border:none;border-radius:10px;color:#fff;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">✅ Confirmar entrega</button>' +
+      '</div>' +
+    '</div>';
+  ovC.addEventListener('click', function(e){ if(e.target===ovC) DeliveryModule._cerrarConfirm(); });
+  document.body.appendChild(ovC);
+
+  // Overlay asignar driver
+  var ovD = document.createElement('div');
+  ovD.id = 'dlvDriverOv';
+  ovD.innerHTML =
+    '<div id="dlvDriverSheet">' +
+      '<div class="sheet-handle" style="width:36px;height:4px;background:#30363d;border-radius:2px;margin:0 auto 14px"></div>' +
+      '<div style="font-family:Syne,sans-serif;font-weight:800;font-size:16px;margin-bottom:12px">🛵 Asignar motorizado</div>' +
+      '<div id="dlvDriverList" style="display:flex;flex-direction:column;gap:8px;margin-bottom:12px"></div>' +
+      '<div style="display:flex;gap:8px;margin-bottom:12px">' +
+        '<input id="dlvNewDriver" class="fi" placeholder="Nombre del motorizado..." style="flex:1">' +
+        '<button onclick="DeliveryModule._addDriver()" style="background:var(--blue);border:none;border-radius:8px;color:#fff;padding:0 14px;font-weight:700;cursor:pointer;font-size:18px">+</button>' +
+      '</div>' +
+      '<button onclick="DeliveryModule._cerrarDriver()" style="width:100%;padding:12px;background:#1c2333;border:1px solid #30363d;border-radius:10px;color:#8b949e;font-size:13px;cursor:pointer;font-family:inherit">Cerrar</button>' +
+    '</div>';
+  ovD.addEventListener('click', function(e){ if(e.target===ovD) DeliveryModule._cerrarDriver(); });
+  document.body.appendChild(ovD);
+}
+
+/* ══════════════════════════════════════════════
+   ESTADO
+══════════════════════════════════════════════ */
+var _currentShipId = null;
+var _fotoBase64    = null;
+var _signCtx       = null;
+var _signing       = false;
+var _drivers       = []; // lista de motorizados guardada en localStorage
+
+function _loadDrivers(){
+  try { _drivers = JSON.parse(localStorage.getItem('tt_drivers')||'[]'); } catch(e){ _drivers=[]; }
+}
+function _saveDrivers(){
+  try { localStorage.setItem('tt_drivers', JSON.stringify(_drivers)); } catch(e){}
+}
+
+/* ══════════════════════════════════════════════
+   HELPERS
+══════════════════════════════════════════════ */
+function _getDeliveryShipments(){
+  var ships = global.S && global.S.shipments ? global.S.shipments : [];
+  return ships.filter(function(s){
+    return s.courier && s.courier.toUpperCase().includes('DELIVERY') && s.status !== 'FINALIZADO';
+  });
+}
+
+function _mapsUrl(ship){
+  if(ship.gpsCoords){
+    return 'https://maps.google.com/?q=' + ship.gpsCoords;
+  }
+  var addr = [ship.address, ship.referencia].filter(Boolean).join(', ');
+  return 'https://maps.google.com/?q=' + encodeURIComponent(addr);
+}
+
+/* ══════════════════════════════════════════════
+   RENDER LISTA DE RUTA
+══════════════════════════════════════════════ */
+function _renderList(){
+  var ships = _getDeliveryShipments();
+  var total  = ships.length;
+  var done   = ships.filter(function(s){ return s._dlvDone; }).length;
+
+  // Stats
+  var stats = document.getElementById('dlvStats');
+  var subtitle = document.getElementById('dlvSubtitle');
+  if(stats){
+    stats.innerHTML =
+      '<div class="dlv-stat"><div class="dlv-stat-n" style="color:var(--blue)">' + total + '</div><div class="dlv-stat-l">Total</div></div>' +
+      '<div class="dlv-stat"><div class="dlv-stat-n" style="color:var(--green)">' + done + '</div><div class="dlv-stat-l">Entregados</div></div>' +
+      '<div class="dlv-stat"><div class="dlv-stat-n" style="color:#f59e0b">' + (total-done) + '</div><div class="dlv-stat-l">Pendientes</div></div>';
+  }
+  if(subtitle) subtitle.textContent = done + ' de ' + total + ' entregados';
+
+  var list = document.getElementById('dlvList');
+  if(!list) return;
+
+  if(!ships.length){
+    list.innerHTML = '<div style="text-align:center;padding:40px;color:#8b949e">📭 Sin pedidos DELIVERY pendientes</div>';
+    return;
+  }
+
+  list.innerHTML = ships.map(function(s, i){
+    var isDone  = !!s._dlvDone;
+    var driver  = s._dlvDriver || '';
+    var hasGps  = !!s.gpsCoords;
+    var addr    = s.address || '—';
+    var ref     = s.referencia ? ' · ' + s.referencia : '';
+
+    return '<div class="dlv-card ' + (isDone?'dlv-done':'') + '" id="dlvcard_' + s.id + '">' +
+      '<div class="dlv-card-hdr">' +
+        '<div class="dlv-num">' + (isDone ? '✓' : (i+1)) + '</div>' +
+        '<div style="flex:1">' +
+          '<div class="dlv-name">' + _esc(s.name) + '</div>' +
+          (driver ? '<div class="dlv-driver-badge">🛵 ' + _esc(driver) + '</div>' : '') +
+        '</div>' +
+        '<span style="font-size:11px;color:#8b949e">' + (s.cost ? 'S/ '+s.cost : '') + '</span>' +
+      '</div>' +
+      '<div class="dlv-card-body">' +
+        '<div class="dlv-addr" onclick="DeliveryModule._abrirMaps(\'' + s.id + '\')">' +
+          (hasGps ? '📍 ' : '🏠 ') + _esc(addr) + _esc(ref) +
+          (hasGps ? ' <b>· Ver en Maps</b>' : ' <b>· Abrir Maps</b>') +
+        '</div>' +
+        '<div class="dlv-meta">' +
+          '<span>📞 ' + _esc(s.phone) + '</span>' +
+          (s.date ? '<span>📅 ' + _esc(s.date) + '</span>' : '') +
+          '<span style="color:' + (isDone?'var(--green)':'#f59e0b') + '">' + _esc(s.status) + '</span>' +
+        '</div>' +
+        '<div class="dlv-actions">' +
+          '<button class="dlv-btn dlv-btn-maps" onclick="DeliveryModule._abrirMaps(\'' + s.id + '\')">🗺️ Maps</button>' +
+          (!isDone ? '<button class="dlv-btn dlv-btn-driver" onclick="DeliveryModule._abrirDriver(\'' + s.id + '\')">🛵 Driver</button>' : '') +
+          (!isDone
+            ? '<button class="dlv-btn dlv-btn-deliver" onclick="DeliveryModule._abrirConfirm(\'' + s.id + '\')">📦 Entregar</button>'
+            : '<button class="dlv-btn dlv-btn-done" disabled>✅ Entregado</button>'
+          ) +
+        '</div>' +
+      '</div>' +
+    '</div>';
+  }).join('');
+}
+
+/* ══════════════════════════════════════════════
+   ACCIONES
+══════════════════════════════════════════════ */
+function _esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+DeliveryModule._abrirMaps = function(shipId){
+  var ship = (global.S&&global.S.shipments||[]).find(function(x){ return x.id===shipId; });
+  if(!ship) return;
+  window.open(_mapsUrl(ship), '_blank');
+};
+
+DeliveryModule._abrirDriver = function(shipId){
+  _currentShipId = shipId;
+  _loadDrivers();
+  var list = document.getElementById('dlvDriverList');
+  if(list){
+    var ship = (global.S&&global.S.shipments||[]).find(function(x){ return x.id===shipId; });
+    var current = ship ? (ship._dlvDriver||'') : '';
+    list.innerHTML = _drivers.length
+      ? _drivers.map(function(d){
+          return '<div style="display:flex;align-items:center;gap:8px;padding:10px;background:' +
+            (current===d?'rgba(163,113,247,.15)':'var(--bg3)') +
+            ';border:1px solid ' + (current===d?'rgba(163,113,247,.4)':'#30363d') +
+            ';border-radius:9px;cursor:pointer" onclick="DeliveryModule._selDriver(\'' + d.replace(/'/g,"\\'") + '\')">' +
+            '<span style="font-size:18px">🛵</span>' +
+            '<span style="flex:1;font-size:13px;font-weight:600">' + _esc(d) + '</span>' +
+            (current===d ? '<span style="color:var(--green);font-size:12px">✓</span>' : '') +
+            '</div>';
+        }).join('')
+      : '<div style="text-align:center;padding:16px;color:#8b949e;font-size:12px">Sin motorizados registrados. Agrega uno abajo.</div>';
+  }
+  document.getElementById('dlvDriverOv').classList.add('open');
+};
+
+DeliveryModule._addDriver = function(){
+  var inp = document.getElementById('dlvNewDriver');
+  var name = (inp&&inp.value||'').trim();
+  if(!name){ if(typeof global.toast==='function') global.toast('⚠️ Escribe el nombre'); return; }
+  if(!_drivers.includes(name)){ _drivers.push(name); _saveDrivers(); }
+  if(inp) inp.value = '';
+  DeliveryModule._abrirDriver(_currentShipId);
+};
+
+DeliveryModule._selDriver = function(name){
+  var ship = (global.S&&global.S.shipments||[]).find(function(x){ return x.id===_currentShipId; });
+  if(ship){ ship._dlvDriver = name; if(typeof global.save==='function') global.save(); }
+  DeliveryModule._cerrarDriver();
+  _renderList();
+  if(typeof global.toast==='function') global.toast('🛵 ' + name + ' asignado');
+};
+
+DeliveryModule._cerrarDriver = function(){
+  document.getElementById('dlvDriverOv').classList.remove('open');
+};
+
+/* ── Confirmar entrega ───────────────────────────────────────────── */
+DeliveryModule._abrirConfirm = function(shipId){
+  _currentShipId = shipId;
+  _fotoBase64    = null;
+  var ship = (global.S&&global.S.shipments||[]).find(function(x){ return x.id===shipId; });
+  var nameEl = document.getElementById('dlvConfirmName');
+  if(nameEl) nameEl.textContent = ship ? ship.name + ' · ' + (ship.address||'') : '';
+  var inp = document.getElementById('dlvReceptor');
+  if(inp) inp.value = '';
+  var prev = document.getElementById('dlvPhotoPreview');
+  if(prev){ prev.src=''; prev.style.display='none'; }
+  document.getElementById('dlvConfirmOv').classList.add('open');
+  // Iniciar canvas de firma
+  setTimeout(_initSignCanvas, 100);
+};
+
+DeliveryModule._cerrarConfirm = function(){
+  document.getElementById('dlvConfirmOv').classList.remove('open');
+  _currentShipId = null;
+};
+
+DeliveryModule._tomarFoto = function(){
+  var inp = document.getElementById('dlvFotoInput');
+  if(inp) inp.click();
+};
+
+DeliveryModule._onFoto = function(input){
+  var file = input.files[0];
+  if(!file) return;
+  var r = new FileReader();
+  r.onload = function(e){
+    _fotoBase64 = e.target.result;
+    var prev = document.getElementById('dlvPhotoPreview');
+    if(prev){ prev.src = _fotoBase64; prev.style.display = 'block'; }
+  };
+  r.readAsDataURL(file);
+};
+
+DeliveryModule._limpiarFirma = function(){
+  if(_signCtx){
+    var c = document.getElementById('dlvSignCanvas');
+    if(c) _signCtx.clearRect(0, 0, c.width, c.height);
+  }
+};
+
+DeliveryModule._confirmarEntrega = function(){
+  var receptor = (document.getElementById('dlvReceptor')||{value:''}).value.trim();
+  if(!receptor){
+    if(typeof global.toast==='function') global.toast('⚠️ Escribe el nombre de quien recibe');
+    return;
+  }
+  var ship = (global.S&&global.S.shipments||[]).find(function(x){ return x.id===_currentShipId; });
+  if(!ship) return;
+
+  // Capturar firma
+  var firmaBase64 = null;
+  var canvas = document.getElementById('dlvSignCanvas');
+  if(canvas) firmaBase64 = canvas.toDataURL('image/png');
+
+  // Guardar datos de entrega en el shipment
+  ship.status        = 'FINALIZADO';
+  ship._dlvDone      = true;
+  ship._dlvReceptor  = receptor;
+  ship._dlvFecha     = new Date().toISOString();
+  if(_fotoBase64)  ship._dlvFoto  = _fotoBase64;
+  if(firmaBase64)  ship._dlvFirma = firmaBase64;
+
+  if(typeof global.save   === 'function') global.save();
+  if(typeof global.render === 'function') global.render();
+
+  DeliveryModule._cerrarConfirm();
+  _renderList();
+  if(typeof global.toast==='function') global.toast('✅ Entrega confirmada — ' + receptor);
+
+  // Alerta visual
+  var div = document.createElement('div');
+  div.style.cssText = 'position:fixed;top:70px;left:50%;transform:translateX(-50%);background:#1c2333;border:2px solid var(--green);border-radius:12px;padding:14px 18px;z-index:999;max-width:320px;width:calc(100% - 32px);text-align:center';
+  div.innerHTML = '<div style="font-size:24px;margin-bottom:6px">✅</div><div style="font-weight:800;color:var(--green);margin-bottom:4px">Entrega confirmada</div><div style="font-size:12px;color:#8b949e">Recibido por: ' + _esc(receptor) + '</div>';
+  document.body.appendChild(div);
+  setTimeout(function(){ if(div.parentNode) div.remove(); }, 3000);
+};
+
+/* ── Canvas firma ────────────────────────────────────────────────── */
+function _initSignCanvas(){
+  var canvas = document.getElementById('dlvSignCanvas');
+  if(!canvas || _signCtx) {
+    // Limpiar canvas existente
+    if(_signCtx && canvas) _signCtx.clearRect(0, 0, canvas.width, canvas.height);
+    return;
+  }
+  canvas.width  = canvas.offsetWidth  || 320;
+  canvas.height = canvas.offsetHeight || 160;
+  _signCtx = canvas.getContext('2d');
+  _signCtx.strokeStyle = '#e6edf3';
+  _signCtx.lineWidth   = 2.5;
+  _signCtx.lineCap     = 'round';
+  _signCtx.lineJoin    = 'round';
+
+  function getPos(e){
+    var rect = canvas.getBoundingClientRect();
+    var touch = e.touches ? e.touches[0] : e;
+    return { x: touch.clientX - rect.left, y: touch.clientY - rect.top };
+  }
+
+  canvas.addEventListener('mousedown',  function(e){ _signing=true; var p=getPos(e); _signCtx.beginPath(); _signCtx.moveTo(p.x,p.y); });
+  canvas.addEventListener('mousemove',  function(e){ if(!_signing) return; var p=getPos(e); _signCtx.lineTo(p.x,p.y); _signCtx.stroke(); });
+  canvas.addEventListener('mouseup',    function(){ _signing=false; });
+  canvas.addEventListener('touchstart', function(e){ e.preventDefault(); _signing=true; var p=getPos(e); _signCtx.beginPath(); _signCtx.moveTo(p.x,p.y); });
+  canvas.addEventListener('touchmove',  function(e){ e.preventDefault(); if(!_signing) return; var p=getPos(e); _signCtx.lineTo(p.x,p.y); _signCtx.stroke(); });
+  canvas.addEventListener('touchend',   function(){ _signing=false; });
+}
+
+/* ══════════════════════════════════════════════
+   TRIPLE TAP EN HEADER DEL GRUPO DELIVERY
+══════════════════════════════════════════════ */
+var _tapCount  = 0;
+var _tapTimer  = null;
+var _tapTarget = null;
+
+function _onGroupHeaderTap(e){
+  var hdr = e.currentTarget;
+  var name = hdr.querySelector('.cgroup-name');
+  if(!name) return;
+  var courierName = name.textContent.trim();
+  if(!courierName.toUpperCase().includes('DELIVERY')) return;
+
+  _tapCount++;
+  clearTimeout(_tapTimer);
+  _tapTimer = setTimeout(function(){
+    if(_tapCount >= 3) DeliveryModule.abrir();
+    _tapCount = 0;
+  }, 400);
+}
+
+function _attachTapListeners(){
+  // Observar cambios en el DOM para detectar cuando se renderizan los grupos
+  var observer = new MutationObserver(function(){
+    document.querySelectorAll('.cgroup-hdr').forEach(function(hdr){
+      if(hdr._dlvBound) return;
+      hdr._dlvBound = true;
+      hdr.addEventListener('click', _onGroupHeaderTap);
+    });
+  });
+  observer.observe(document.body, { childList: true, subtree: true });
+
+  // También para los ya existentes
+  document.querySelectorAll('.cgroup-hdr').forEach(function(hdr){
+    if(hdr._dlvBound) return;
+    hdr._dlvBound = true;
+    hdr.addEventListener('click', _onGroupHeaderTap);
+  });
+}
+
+/* ══════════════════════════════════════════════
+   API PÚBLICA
+══════════════════════════════════════════════ */
+var DeliveryModule = {};
+
+DeliveryModule.abrir = function(){
+  _loadDrivers();
+  document.getElementById('dlvOv').classList.add('open');
+  _renderList();
+};
+
+DeliveryModule.cerrar = function(){
+  document.getElementById('dlvOv').classList.remove('open');
+};
+
+DeliveryModule.init = function(){
+  _injectCSS();
+  _injectOverlays();
+  _loadDrivers();
+  _attachTapListeners();
+  console.log('[DeliveryModule] Listo — triple tap en DELIVERY para abrir rutas');
+};
+
+global.DeliveryModule = DeliveryModule;
+
+// Auto-init
+if(document.readyState === 'loading'){
+  document.addEventListener('DOMContentLoaded', DeliveryModule.init);
+} else {
+  DeliveryModule.init();
+}
+
+})(window);
