@@ -2279,40 +2279,19 @@ function openQR(){if(!('BarcodeDetector' in window)){if(window.jsQR){startQR();r
 async function startQR(){$('qrOverlay').classList.add('open');$('qrFound').style.display='none';try{_qrStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}});const v=$('qrVideo');v.srcObject=_qrStream;v.play();_qrCanvas=document.createElement('canvas');_qrCtx=_qrCanvas.getContext('2d');v.addEventListener('loadedmetadata',()=>{_qrCanvas.width=v.videoWidth;_qrCanvas.height=v.videoHeight;scanLoop()})}catch(e){closeQR();toast('⚠️ No se pudo acceder a la cámara')}}
 async function scanLoop(){const v=$('qrVideo');if(!v.srcObject)return;_qrCtx.drawImage(v,0,0,_qrCanvas.width,_qrCanvas.height);let res=null;if('BarcodeDetector' in window){try{const bd=new BarcodeDetector({formats:['qr_code']});const c=await bd.detect(_qrCanvas);if(c.length)res=c[0].rawValue}catch(e){}}if(!res&&window.jsQR){const img=_qrCtx.getImageData(0,0,_qrCanvas.width,_qrCanvas.height);const c=jsQR(img.data,img.width,img.height);if(c)res=c.data}if(res){handleQR(res);return}_qrAF=requestAnimationFrame(scanLoop)}
 function handleQR(raw){
-  // ★ Detectar QR de guía Shalom: formato XXXXXX/document/N/
-  if(raw && raw.includes('/document/')){
-    var parts = raw.split('/document/');
-    var qrId = parseInt(parts[0]);
+  if(raw&&raw.includes('/document/')){
+    const parts=raw.split('/document/');
+    const qrId=parseInt(parts[0]);
     if(!isNaN(qrId)){
-      var orderNumber = String(qrId - 3473503);
-      var m = S.shipments.find(function(s){
-        return (s.trackingOrderNumber === orderNumber) || (s.shalomGuia === orderNumber);
-      });
-      var f=$('qrFound');
-      f.textContent='✅ Guía: '+orderNumber;
-      f.style.display='block';
-      setTimeout(function(){
-        closeQR();
-        $('fSearch').value=orderNumber;
-        _filt='';renderChips();render();
-        if(m){
-          setTimeout(function(){
-            document.querySelectorAll('.card').forEach(function(c){
-              if(c.innerHTML.includes(orderNumber)||c.innerHTML.includes(m.name)){
-                c.style.background='rgba(56,139,253,.15)';
-                setTimeout(function(){c.style.background=''},1500);
-              }
-            });
-          },200);
-          toast('✅ '+m.name);
-        } else {
-          toast('⚠️ Guía no encontrada: '+orderNumber);
-        }
-      },800);
-      return;
+      const orderNumber=String(qrId-3473503);
+      const found=S.shipments.find(s=>(s.trackingOrderNumber===orderNumber)||(s.shalomGuia===orderNumber));
+      const fEl=$('qrFound');fEl.textContent='✅ Guía: '+orderNumber;fEl.style.display='block';
+      setTimeout(()=>{closeQR();$('fSearch').value=orderNumber;_filt='';renderChips();render();
+        if(found){setTimeout(()=>{document.querySelectorAll('.card').forEach(c=>{if(c.innerHTML.includes(orderNumber)){c.style.background='rgba(56,139,253,.15)';setTimeout(()=>c.style.background='',1500)}})},200);toast('✅ '+found.name);}
+        else{toast('⚠️ Guía no encontrada: '+orderNumber);}
+      },800);return;
     }
   }
-  // ★ Comportamiento original: buscar por teléfono
   let phone=raw.replace(/\D/g,'');if(phone.startsWith('51')&&phone.length===11)phone=phone.slice(2);if(phone.length!==9){toast('QR no reconocido');_qrAF=requestAnimationFrame(scanLoop);return}const f=$('qrFound');f.textContent=`✅ ${phone}`;f.style.display='block';const m=S.shipments.find(s=>s.phone===phone);setTimeout(()=>{closeQR();$('fSearch').value=phone;_filt='';renderChips();render();if(m){setTimeout(()=>{document.querySelectorAll('.card').forEach(c=>{if(c.innerHTML.includes(phone)){c.style.background='rgba(56,139,253,.15)';setTimeout(()=>c.style.background='',1500)}})},200);toast(`✅ ${m.name}`)}else{toast(`⚠️ No encontrado: ${phone}`)}},800)
 }
 function closeQR(){if(_qrAF)cancelAnimationFrame(_qrAF);if(_qrStream)_qrStream.getTracks().forEach(t=>t.stop());_qrStream=null;_qrAF=null;$('qrVideo').srcObject=null;$('qrOverlay').classList.remove('open')}
