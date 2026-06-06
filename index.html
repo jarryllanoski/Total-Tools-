@@ -1788,6 +1788,9 @@ function cardDocs(s,gChk,tChk){
       <div class="doc-lbl">GUÍA</div>
       <div class="doc-chk ${gChk?'on-g':''}" onclick="event.stopPropagation();togDoc('${s.id}','guia')">${gChk?'✓':''}</div>
     </div>`:''}
+    ${s.docEmbalado?`<div class="doc-thumb" style="border:2px solid var(--bd)">
+      <div onclick="openViewer&&openViewer(s.docEmbalado,'📦 Embalado')">${s.docEmbalado.t&&s.docEmbalado.t.startsWith('image/')?`<img src="${s.docEmbalado.d}" style="width:52px;height:66px;object-fit:cover;display:block">`:`<div class="doc-thumb-pdf"><span style="font-size:20px">📦</span></div>`}</div>
+      <div class="doc-thumb-lbl">EMBALADO</div></div>`:''}
     ${s.docTicket?`<div class="doc-thumb" style="border:2px solid ${tChk?'var(--purple)':'var(--bd)'}">
       <div onclick="qView('${s.id}','ticket')">${s.docTicket.t&&s.docTicket.t.startsWith('image/')?`<img src="${s.docTicket.d}" style="width:52px;height:66px;object-fit:cover;display:block">`:`<div class="doc-thumb-pdf"><span style="font-size:20px">🧾</span></div>`}</div>
       <div class="doc-lbl">TICKET</div>
