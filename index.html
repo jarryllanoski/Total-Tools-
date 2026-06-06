@@ -76,11 +76,18 @@
   }
   window._fsList = fsList; // ★ exponer globalmente para tokens
   // ── Strip images for cloud (too heavy) ───────────────────────────────
+  function _slimDoc(doc){
+    if(!doc) return null;
+    // Storage URL → guardar completa (no pesa nada)
+    if(doc.d && doc.d.startsWith('https://firebasestorage')) return doc;
+    // Base64 → placeholder [img]
+    return {t:doc.t, n:doc.n, d:'[img]'};
+  }
   function slimShipment(s){
     return{...s,
-      docGuia:s.docGuia?{t:s.docGuia.t,n:s.docGuia.n,d:'[img]'}:null,
-      docEmbalado:s.docEmbalado?{t:s.docEmbalado.t,n:s.docEmbalado.n,d:'[img]'}:null,
-      docTicket:s.docTicket?{t:s.docTicket.t,n:s.docTicket.n,d:'[img]'}:null
+      docGuia:    _slimDoc(s.docGuia),
+      docEmbalado:_slimDoc(s.docEmbalado),
+      docTicket:  _slimDoc(s.docTicket)
     };
   }
   function slimSupplier(sup){
