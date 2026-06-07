@@ -19,17 +19,24 @@
  * Orden de carga: DESPUÉS de delivery.js (openForm / refreshSlot / _docs / _editId)
  *                 y DESPUÉS de storage.js (window.StorageModule).
  *
- * ⚠️ La API key viaja en el navegador (modo prueba). Para producción, mover
- *    la llamada al proxy de Cloud Functions (igual que /api/track) para no exponerla.
+ * Por defecto USE_PROXY = true → llama a la Cloud Function "shalomTicket"
+ * (la API key NO viaja en el navegador). Pon USE_PROXY = false + API_KEY solo
+ * para pruebas locales antes de desplegar la función.
  */
 (function (global) {
   'use strict';
 
   /* ── CONFIG ──────────────────────────────────────────────────────── */
   var SHALOM = {
+    // true  = llama a tu Cloud Function (la API key vive en el servidor) ← PRODUCCIÓN
+    // false = llama directo a shalom-api.lat con la key en el cliente   ← solo pruebas
+    USE_PROXY:    true,
+    FUNCTION_URL: 'https://us-central1-total-tools-24ce8.cloudfunctions.net/shalomTicket',
+
+    // Solo se usan si USE_PROXY === false
     BASE_URL: 'https://shalom-api.lat',
     ENDPOINT: '/api/ticket-image',
-    API_KEY:  'sk_be883ea11609f97321db6e0ef243d8a83578a96841fb986506fd12b0e6924652'
+    API_KEY:  '' // déjala vacía en producción; con USE_PROXY la key va en el proxy
   };
 
   /* ── HELPERS ─────────────────────────────────────────────────────── */
@@ -56,13 +63,28 @@
     return { orderNumber: String(g).trim(), orderCode: String(c).trim() };
   }
 
-  /* Descargar el PNG del ticket desde la API de Shalom */
+  /* Descargar el PNG del ticket desde la API de Shalom (proxy o directo) */
   async function _fetchTicketPNG(orderNumber, orderCode) {
-    var r = await fetch(SHALOM.BASE_URL + SHALOM.ENDPOINT, {
-      method:  'POST',
-      headers: { 'x-api-key': SHALOM.API_KEY, 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ orderNumber: orderNumber, orderCode: orderCode })
-    });
+    var url, opts;
+    if (SHALOM.USE_PROXY) {
+      // Vía Cloud Function: la key NO viaja en el navegador
+      url  = SHALOM.FUNCTION_URL;
+      opts = {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ orderNumber: orderNumber, orderCode: orderCode })
+      };
+    } else {
+      // Directo a shalom-api.lat (solo pruebas; expone la key)
+      url  = SHALOM.BASE_URL + SHALOM.ENDPOINT;
+      opts = {
+        method:  'POST',
+        headers: { 'x-api-key': SHALOM.API_KEY, 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ orderNumber: orderNumber, orderCode: orderCode })
+      };
+    }
+
+    var r = await fetch(url, opts);
 
     if (!r.ok) {
       var txt = '';
