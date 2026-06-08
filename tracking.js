@@ -14,7 +14,8 @@
 ══════════════════════════════════════════════ */
 var TRK = {
   FIREBASE_URL: 'https://us-central1-total-tools-24ce8.cloudfunctions.net/shalomTracking',
-  AUTO_INTERVAL_MS: 6 * 60 * 60 * 1000, // 6 horas (base)
+  AUTO_INTERVAL_MS:         12 * 60 * 60 * 1000, // 12 horas — en tránsito (base)
+  AUTO_INTERVAL_DESTINO_MS: 24 * 60 * 60 * 1000, // 24 horas — llegó a destino / pendiente de pago
   KEYWORDS_ENTREGADO: ['entregado','entrega realizada','entrega completa','recogido','recojo completado','delivered'],
   KEYWORDS_DESTINO:   ['llegó a destino','llego a destino','en agencia destino','disponible para recojo',
                        'disponible para retiro','en agencia de destino','a disposicion',
@@ -262,8 +263,8 @@ async function autoTrackingCheck() {
     var ultima = s.trackingLastAutoCheck || 0;
     var diff = ahora - ultima;
     var intervalo = (s.status === 'LLEGÓ A DESTINO' || s.status === 'PENDIENTE DE PAGO')
-      ? 2 * 60 * 60 * 1000
-      : TRK.AUTO_INTERVAL_MS;
+      ? TRK.AUTO_INTERVAL_DESTINO_MS   // llegó a destino → cada 24h
+      : TRK.AUTO_INTERVAL_MS;          // en tránsito → cada 12h
     return diff >= intervalo;
   });
 
@@ -401,7 +402,7 @@ function _injectOverlays() {
     'Edita el pedido y coloca número de orden y código.',
     'Guarda tracking → el pedido pasa automáticamente a <b>ENVIADO</b>.',
     'Presiona <b>⟳ Consultar</b> en cualquier momento para actualizar al instante.',
-    'El sistema consulta Shalom automáticamente cada <b>6 horas</b>.',
+    'El sistema consulta Shalom automáticamente cada <b>12 horas</b> (en tránsito) y cada <b>24 horas</b> al llegar a destino. Al entregarse deja de consultar.',
     'Shalom dice "En tránsito" → etiqueta <b>ENVIADO</b> + cliente ve subtítulo informativo.',
     'Shalom dice "Demora" → etiqueta <b>ENVIADO</b> + cliente ve aviso de demora.',
     'Shalom dice "En destino" → cambia automáticamente a <b>LLEGÓ A DESTINO</b> (cada 2h revisa).',
