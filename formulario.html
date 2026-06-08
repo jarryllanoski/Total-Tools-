@@ -1771,20 +1771,23 @@ async function shalomBuscar(q){
     if(window._shalomData && window._shalomData.length){
       const _nrm = s => String(s==null?'':s).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
       const qu = _nrm(q);
-      const _ranked = [];
+      const _claveM = [];  // coincide por nombre/ubicación (prioritario)
+      const _dirM   = [];  // coincide solo por dirección (relleno)
       window._shalomData.forEach((ag,idx)=>{
         const clave = _nrm([ag.lugar_over||ag.nombre, ag.zona||ag.distrito, ag.provincia, ag.departamento].join(' '));
         const extra = _nrm(ag.direccion);
         let score;
         if(clave.indexOf(qu)===0)                 score=0; // empieza con lo buscado
         else if((' '+clave).indexOf(' '+qu)!==-1) score=1; // empieza una palabra
-        else if(clave.indexOf(qu)!==-1)            score=2; // contenido en campo clave
-        else if(extra.indexOf(qu)!==-1)            score=3; // solo en dirección
-        else return;                                        // no coincide
-        _ranked.push({ag,score,idx});
+        else if(clave.indexOf(qu)!==-1)            score=2; // contenido en nombre/ubicación
+        else { if(extra.indexOf(qu)!==-1) _dirM.push({ag,idx}); return; }
+        _claveM.push({ag,score,idx});
       });
-      _ranked.sort((a,b)=>a.score-b.score||a.idx-b.idx);
-      resultados = _ranked.slice(0,8).map(x=>x.ag);
+      _claveM.sort((a,b)=>a.score-b.score||a.idx-b.idx);
+      resultados = _claveM.map(x=>x.ag);
+      // La dirección solo rellena si faltan resultados (no mezcla otras provincias)
+      if(resultados.length < 8) resultados = resultados.concat(_dirM.map(x=>x.ag));
+      resultados = resultados.slice(0,8);
     }
     // 2. Si no hay resultados, consultar API
     if(!resultados.length){
