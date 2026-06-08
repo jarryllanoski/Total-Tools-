@@ -1769,14 +1769,22 @@ async function shalomBuscar(q){
     let resultados = [];
     // 1. Buscar en cache local
     if(window._shalomData && window._shalomData.length){
-      const qu = q.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
-      resultados = window._shalomData.filter(ag=>{
-        const hay = [ag.lugar_over||ag.nombre, ag.zona||ag.distrito,
-          ag.provincia, ag.departamento, ag.direccion]
-          .filter(Boolean).join(' ').toLowerCase()
-          .normalize('NFD').replace(/[\u0300-\u036f]/g,'');
-        return hay.includes(qu);
-      }).slice(0,8);
+      const _nrm = s => String(s==null?'':s).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+      const qu = _nrm(q);
+      const _ranked = [];
+      window._shalomData.forEach((ag,idx)=>{
+        const clave = _nrm([ag.lugar_over||ag.nombre, ag.zona||ag.distrito, ag.provincia, ag.departamento].join(' '));
+        const extra = _nrm(ag.direccion);
+        let score;
+        if(clave.indexOf(qu)===0)                 score=0; // empieza con lo buscado
+        else if((' '+clave).indexOf(' '+qu)!==-1) score=1; // empieza una palabra
+        else if(clave.indexOf(qu)!==-1)            score=2; // contenido en campo clave
+        else if(extra.indexOf(qu)!==-1)            score=3; // solo en dirección
+        else return;                                        // no coincide
+        _ranked.push({ag,score,idx});
+      });
+      _ranked.sort((a,b)=>a.score-b.score||a.idx-b.idx);
+      resultados = _ranked.slice(0,8).map(x=>x.ag);
     }
     // 2. Si no hay resultados, consultar API
     if(!resultados.length){
