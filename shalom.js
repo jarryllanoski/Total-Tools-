@@ -123,17 +123,36 @@
      BÚSQUEDA LOCAL — sobre el JSON cargado en memoria
      Busca por nombre, distrito, provincia, departamento, dirección.
   ══════════════════════════════════════════════════════════ */
-  function buscarEnLocal(texto, lista) {
-    var q = texto.trim().toLowerCase()
-      .normalize('NFD').replace(/[\u0300-\u036f]/g, ''); // ignora acentos
+  function _norm(s) {
+    return String(s == null ? '' : s).toLowerCase()
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, ''); // sin acentos / mayúsculas
+  }
 
-    return lista.filter(function (ag) {
-      var haystack = [
-        ag.nombre, ag.distrito, ag.provincia,
-        ag.departamento, ag.direccion, ag.referencia,
-      ].join(' ').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-      return haystack.includes(q);
-    }).slice(0, CFG.MAX_RESULTS);
+  function buscarEnLocal(texto, lista) {
+    var q = _norm(texto.trim());
+    if (!q) return [];
+
+    var matches = [];
+    for (var i = 0; i < lista.length; i++) {
+      var ag = lista[i];
+      // Campos clave (nombre/ubicación) → mejor relevancia que dirección/referencia
+      var clave = _norm([ag.nombre, ag.distrito, ag.provincia, ag.departamento].join(' '));
+      var extra = _norm([ag.direccion, ag.referencia].join(' '));
+
+      var score;
+      if (clave.indexOf(q) === 0)               score = 0; // empieza con lo buscado
+      else if ((' ' + clave).indexOf(' ' + q) !== -1) score = 1; // empieza una palabra
+      else if (clave.indexOf(q) !== -1)          score = 2; // contenido en campo clave
+      else if (extra.indexOf(q) !== -1)          score = 3; // solo en dirección/referencia
+      else continue;                                         // no coincide
+
+      matches.push({ ag: ag, score: score, idx: i });
+    }
+
+    // Ordenar por relevancia; empate → orden original del JSON
+    matches.sort(function (a, b) { return a.score - b.score || a.idx - b.idx; });
+
+    return matches.slice(0, CFG.MAX_RESULTS).map(function (m) { return m.ag; });
   }
 
   /* ══════════════════════════════════════════════════════════
