@@ -65,7 +65,7 @@
   }
   async function fsList(col){
     const r=await fetch(`${BASE}/${col}?key=${KEY}&pageSize=500`);
-    if(!r.ok) return[];
+    if(!r.ok) throw new Error('fsList HTTP '+r.status); // ★ error real, no fingir vacío
     const data=await r.json();
     return(data.documents||[]).map(doc=>{
       const o={};
@@ -183,6 +183,7 @@
         fsList(shipCol()),
         fsList(suppCol())
       ]);
+      // null SOLO cuando Firebase confirmó (con respuestas OK) que no hay nada
       if(!cfg && shipDocs.length===0) return null;
       const result = cfg||{};
       result.shipments = shipDocs.map(d=>{const{_id,...rest}=d;return rest;});
@@ -192,7 +193,7 @@
     } catch(e){
       console.warn('Firebase load error:',e);
       window._fbStatus&&window._fbStatus('err');
-      return null;
+      throw e; // ★ propagar: un error NO es "Firebase vacío" — evita pisar la nube con local
     }
   };
 
@@ -1450,24 +1451,34 @@ window._mergeRemote = (remote) => {
 };
 
 // On Firebase ready: load remote data if available
-const _initFirebase = async () => {
+const _initFirebase = async (intento) => {
+  intento = intento || 0;
   const indicator = document.getElementById('fbDot');
   if(indicator) indicator.style.display = 'block';
   try {
     const remote = await window._fbLoad();
     if(remote && Object.keys(remote).length > 0){
+      // Firebase tiene datos → Firebase manda
       window._mergeRemote(remote);
-      // Si había datos pendientes, subirlos ahora que estamos conectados
+      // Si había datos pendientes de subir, subirlos ahora que confirmamos conexión
       if(lsGet('dpanel_pending')==='1') _fbSaveWithRetry(S, 0);
     } else {
+      // remote === null SOLO cuando Firebase confirmó (respuestas OK) que está vacío.
+      // Solo en ese caso es seguro subir lo local (primer arranque real).
       const tieneLocal = S.shipments.length > 0 || S.suppliers.length > 0 ||
                          (S.config && S.config.name && S.config.name !== 'Mi Negocio');
       if(tieneLocal) _fbSaveWithRetry(S, 0);
     }
   } catch(e) {
-    console.warn('Firebase init error:', e);
-    // Sin conexión — trabajar con localStorage, subir cuando vuelva
-    toast('⚠️ Sin conexión a Firebase.');
+    // ★ La carga FALLÓ (no es "vacío"). NO tocar la nube: jamás subir local aquí.
+    console.warn('Firebase init error (intento '+intento+'):', e);
+    if(intento < 4){
+      // Reintentar la carga; no nos quedamos con local viejo en pantalla sin avisar
+      const delay = [2000, 5000, 10000, 20000][intento];
+      setTimeout(() => _initFirebase(intento+1), delay);
+      return; // no arrancar el listener todavía; lo hará el reintento exitoso
+    }
+    toast('⚠️ Sin conexión a Firebase. Reintentando en segundo plano.');
   }
   if(window._fbListen) window._fbListen();
 };
