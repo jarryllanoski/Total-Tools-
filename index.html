@@ -40,9 +40,27 @@
     return null;
   }
 
+  // ── Token de sesión (Firebase Auth) ───────────────────────────────────
+  // Devuelve la cabecera Authorization SOLO si hay un token válido.
+  // Si no hay sesión o el auth está desactivado, devuelve {} → se usa solo
+  // la API key (compatible mientras las reglas estén abiertas).
+  async function _authHeaders(){
+    try{
+      if(typeof window._authEnsureToken === 'function'){
+        const ok = await window._authEnsureToken(); // refresca si está por vencer
+        if(ok){
+          const tok = localStorage.getItem('tt_id_token') || '';
+          if(tok) return { 'Authorization': 'Bearer ' + tok };
+        }
+      }
+    }catch(e){ /* sin token → seguir con API key */ }
+    return {};
+  }
+
   // ── REST helpers ──────────────────────────────────────────────────────
   async function fsGet(path){
-    const r=await fetch(`${BASE}/${path}?key=${KEY}`);
+    const h=await _authHeaders();
+    const r=await fetch(`${BASE}/${path}?key=${KEY}`,{headers:h});
     if(r.status===404) return null;
     if(!r.ok) throw new Error(await r.text());
     const doc=await r.json();
@@ -53,18 +71,22 @@
 
   async function fsPatch(path,obj){
     const fields={};Object.keys(obj).forEach(k=>{fields[k]=toFs(obj[k])});
+    const h=await _authHeaders();
+    h['Content-Type']='application/json';
     const r=await fetch(`${BASE}/${path}?key=${KEY}`,{
       method:'PATCH',
-      headers:{'Content-Type':'application/json'},
+      headers:h,
       body:JSON.stringify({fields})
     });
     if(!r.ok) throw new Error(await r.text());
   }
   async function fsDel(path){
-    await fetch(`${BASE}/${path}?key=${KEY}`,{method:'DELETE'});
+    const h=await _authHeaders();
+    await fetch(`${BASE}/${path}?key=${KEY}`,{method:'DELETE',headers:h});
   }
   async function fsList(col){
-    const r=await fetch(`${BASE}/${col}?key=${KEY}&pageSize=500`);
+    const h=await _authHeaders();
+    const r=await fetch(`${BASE}/${col}?key=${KEY}&pageSize=500`,{headers:h});
     if(!r.ok) throw new Error('fsList HTTP '+r.status); // ★ error real, no fingir vacío
     const data=await r.json();
     return(data.documents||[]).map(doc=>{
