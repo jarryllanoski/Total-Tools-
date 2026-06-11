@@ -191,6 +191,16 @@ const FB_BASE = `https://firestore.googleapis.com/v1/projects/${FB_PRJ}/database
 const SHIP_BASE = 'panel/shipments/items';
 const CFG_PATH  = 'panel/config';
 
+/* ─── CLOUD FUNCTION (proxy seguro: el público ya no toca Firestore directo) ─── */
+const FORM_API = 'https://us-central1-total-tools-24ce8.cloudfunctions.net/formApi';
+async function _api(action, params, opts){
+  let url = FORM_API + '?action=' + encodeURIComponent(action);
+  if(params){ for(const k in params){ url += '&' + k + '=' + encodeURIComponent(params[k]); } }
+  const r = await fetch(url, opts || {});
+  if(!r.ok){ throw new Error('API ' + r.status); }
+  return r.json();
+}
+
 const wsId = 'panel'; // Tu app usa ruta fija
 
 /* ─── STATUS MAP ────────────────────────────────────────────────── */
@@ -540,50 +550,45 @@ function getAgencyData(courierName){
 
 /* ─── INIT ──────────────────────────────────────────────────────── */
 (function init(){
-  /* Check URL ?tracking=CODE first */
-  const tCode = new URLSearchParams(location.search).get('tracking');
-  if(tCode){ loadCfgThenTrack(tCode); return; }
+  /* Seguimiento por token único: ?seg=TOKEN */
+  const segTok = new URLSearchParams(location.search).get('seg');
+  if(segTok){ loadCfgThenTrack(segTok); return; }
 
-  /* Token-based link (?t=TOKEN) */
+  /* Link de registro con token de prefill (?t=TOKEN) */
   const tok = new URLSearchParams(location.search).get('t') || '';
   if(tok){ checkToken(tok); return; }
 
-  /* Fallback: localStorage one-shot (links sin token) */
+  /* Fallback: localStorage (último pedido en este dispositivo) */
   const saved = localStorage.getItem('dpanel_order_'+wsId);
   if(saved){
     try{
-      const {trackCode} = JSON.parse(saved);
-      if(trackCode){ loadCfgThenTrack(trackCode); return; }
+      const o = JSON.parse(saved);
+      if(o.trackToken){ loadCfgThenTrack(o.trackToken); return; }
     }catch(e){}
   }
 
   loadCfg();
 })();
 
-/* ─── TOKEN CHECK ────────────────────────────────────────────────── */
+/* ─── TOKEN CHECK (link de registro) ─────────────────────────────── */
 async function checkToken(tok){
-  // Mostrar mensaje mientras verifica
   setApp(`<div class="loading-screen"><div class="spin"></div><div class="spin-lbl">Verificando link...</div></div>`);
   try{
     const timeoutP = new Promise((_,rej)=>setTimeout(()=>rej(new Error('timeout')),8000));
-    const doc  = await Promise.race([fsGet(`panel/tokens/items/${tok}`), timeoutP]);
-    const data = fsDocToObj(doc);
-    /* Expired? */
-    if(data.expiresAt && new Date(data.expiresAt) < new Date()){
+    const data = await Promise.race([_api('token', {t: tok}), timeoutP]);
+    if(data.status === 'expired'){
       showTokenScreen('⏰','Link vencido','Este link ya venció. Solicitá uno nuevo.');
       return;
     }
-    /* Already used? */
-    if(data.used){
-      if(data.trackCode){
-        currentToken = tok;
-        loadCfgThenTrack(data.trackCode);
-      } else {
-        showTokenScreen('🔒','Link ya utilizado','Este link ya fue utilizado.\nPara registrar un nuevo pedido, solicitá un nuevo link.');
-      }
+    if(data.status === 'used'){
+      showTokenScreen('🔒','Link ya utilizado','Este link ya fue utilizado.\nPara registrar un nuevo pedido, solicitá un nuevo link.');
       return;
     }
-    /* Valid — show form */
+    if(data.status === 'invalid'){
+      showTokenScreen('❌','Link inválido','Este link no existe o fue eliminado.');
+      return;
+    }
+    /* Válido — mostrar form con prefill */
     currentToken = tok;
     if(data.prefillName)  _prefillName  = data.prefillName;
     if(data.prefillPhone) _prefillPhone = data.prefillPhone;
@@ -592,10 +597,8 @@ async function checkToken(tok){
   }catch(e){
     if(e.message==='timeout'){
       showTokenScreen('⚠️','Sin conexión','No se pudo verificar el link.\nRevisa tu conexión e intenta de nuevo.');
-    } else if(e.message&&e.message.includes('404')){
-      showTokenScreen('❌','Link inválido','Este link no existe o fue eliminado.');
     } else {
-      showTokenScreen('⚠️','Error de conexión',e.message+'\n\nReintentá más tarde.');
+      showTokenScreen('⚠️','Error de conexión','Reintentá más tarde.');
     }
   }
 }
@@ -608,30 +611,29 @@ function showTokenScreen(icon, title, msg){
   </div>`);
 }
 
-/* ─── LOAD CONFIG ───────────────────────────────────────────────── */
+/* ─── LOAD CONFIG (vía Cloud Function) ───────────────────────────── */
 async function loadCfg(){
-  // Renderizar form inmediatamente con defaults — nunca queda en Cargando
+  // Renderizar form de inmediato con defaults — nunca queda en Cargando
   CFG = null;
   renderForm();
-  // Cargar config de Firebase en background
   try{
-    const timeout = new Promise(res => setTimeout(() => res(null), 4000));
-    const doc = await Promise.race([fsGet(CFG_PATH), timeout]);
-    if(doc && doc.fields){
-      CFG = fsDocToObj(doc);
+    const timeout = new Promise(res => setTimeout(() => res(null), 5000));
+    const cfg = await Promise.race([_api('config'), timeout]);
+    if(cfg && !cfg.error){
+      CFG = cfg;
       renderForm(); // re-render con config real
     }
   }catch(e){
-    console.warn('Config Firebase no disponible:', e.message);
+    console.warn('Config no disponible:', e.message);
   }
 }
 
-async function loadCfgThenTrack(code){
+async function loadCfgThenTrack(token){
   try{
-    const doc = await fsGet(CFG_PATH);
-    if(doc && doc.fields) CFG = fsDocToObj(doc);
+    const cfg = await _api('config');
+    if(cfg && !cfg.error) CFG = cfg;
   }catch(e){ console.warn('Config no disponible'); }
-  renderTracking(code);
+  renderTracking(token);
 }
 
 /* ─── HEADER HTML ───────────────────────────────────────────────── */
@@ -786,14 +788,17 @@ function onPhoneInput(val){
     const b=$('knownBadge'); if(b) b.style.display='none';
     return;
   }
-  _phoneTimer=setTimeout(()=>{
-    const all=(CFG&&CFG.s)||[];
-    const matches=all.filter(x=>x.phone&&x.phone.replace(/\D/g,'')===phone);
-    if(matches.length){
-      matches.sort((a,b)=>((b.createdAt||'')>(a.createdAt||'')?1:-1));
-      _knownClient=matches[0];
-      _showKnownBadge();
-    } else {
+  _phoneTimer=setTimeout(async ()=>{
+    try{
+      const c = await _api('client', {phone: phone});
+      if(c && c.name){
+        _knownClient = c;
+        _showKnownBadge();
+      } else {
+        _knownClient=null;
+        const b=$('knownBadge'); if(b) b.style.display='none';
+      }
+    }catch(e){
       _knownClient=null;
       const b=$('knownBadge'); if(b) b.style.display='none';
     }
@@ -1378,34 +1383,31 @@ async function submitOrder(){
   showOverlay(true);
 
   try{
-    // Guardar en tu estructura Firebase (panel/shipments/items)
-    await fsPatch(`${SHIP_BASE}/${orderId}`, order);
-    // Actualizar timestamp de config para que el panel detecte el nuevo pedido
-    fetch(`${FB_BASE}/${CFG_PATH}?key=${FB_KEY}`, {
-      method: 'PATCH',
+    // Crear el pedido vía Cloud Function (el público ya no escribe Firestore directo)
+    const resp = await _api('create', null, {
+      method: 'POST',
       headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({fields:{ts:{integerValue:String(Date.now())}}})
-    }).catch(()=>{});
-    /* Mark token as used (if link was token-based) */
-    if(currentToken){
-      fsPatch(`panel/tokens/items/${currentToken}`, {
-        used: true, orderId: order.id, trackCode,
-        clientName: order.name, usedAt: new Date().toISOString()
-      }).catch(()=>{});
+      body: JSON.stringify({ order: order, token: currentToken || '' })
+    });
+    if(!resp || resp.status !== 'ok' || !resp.trackToken){
+      throw new Error((resp && resp.error) || 'No se pudo registrar');
     }
+    order.id = resp.orderId; // id real asignado por el servidor
     showOverlay(false);
-    localStorage.setItem('dpanel_order_'+wsId, JSON.stringify({trackCode, orderId:order.id, name:order.name}));
-    renderSuccessStep(order, trackCode);
+    localStorage.setItem('dpanel_order_'+wsId, JSON.stringify({
+      trackToken: resp.trackToken, orderId: resp.orderId, name: order.name
+    }));
+    renderSuccessStep(order, resp.trackCode, resp.trackToken);
   }catch(e){
     showOverlay(false);
     if(btn){ btn.disabled=false; btn.textContent='Confirmar pedido →'; }
     const eb=$('submitErrBox');
-    if(eb){ eb.style.display='block'; eb.textContent=`Error al guardar: ${e.message}`; }
+    if(eb){ eb.style.display='block'; eb.textContent=`Error al registrar: ${e.message}`; }
   }
 }
 
 /* ─── SUCCESS STEP 3 ────────────────────────────────────────────── */
-function renderSuccessStep(order, trackCode){
+function renderSuccessStep(order, trackCode, trackToken){
   const config   = (CFG&&CFG.config)||{};
   const bizName  = (CFG&&(CFG.config&&CFG.config.name||CFG.name))||'Mi Negocio';
   const bizPhone = (CFG&&(CFG.config&&CFG.config.phone||CFG.phone))||'';
@@ -1414,7 +1416,7 @@ function renderSuccessStep(order, trackCode){
     ? new Date(order.date+'T12:00:00').toLocaleDateString('es-PE',{weekday:'long',year:'numeric',month:'long',day:'numeric'})
     : selDateLbl||order.date;
 
-  const trackUrl = `${location.origin}${location.pathname}?tracking=${trackCode}`;
+  const trackUrl = `${location.origin}${location.pathname}?seg=${trackToken}`;
 
   const refLine  = order.referencia    ? `\n📌 Referencia: ${order.referencia}` : '';
   const dniLine  = order.dniRecoger    ? `\n🪪 DNI recoger: ${order.dniRecoger}` : '';
@@ -1453,7 +1455,7 @@ function renderSuccessStep(order, trackCode){
           ${extraRows}
         </div>
         ${waHref?`<a class="btn-wa" href="${esc(waHref)}" target="_blank" rel="noopener">💬 Enviar por WhatsApp</a>`:''}
-        <button class="btn-purple" onclick="goToTracking('${esc(trackCode)}')">📍 Ver mi seguimiento</button>
+        <button class="btn-purple" onclick="goToTracking('${esc(trackToken)}')">📍 Ver mi seguimiento</button>
       </div>
     </div>
     <div class="footer">Panel de Entregas · Formulario público</div>
@@ -1461,14 +1463,14 @@ function renderSuccessStep(order, trackCode){
 }
 
 /* ─── GO TO TRACKING ────────────────────────────────────────────── */
-function goToTracking(code){
+function goToTracking(token){
   clearTrackRefresh();
-  history.replaceState(null,'',`${location.pathname}?tracking=${code}`);
-  renderTracking(code);
+  history.replaceState(null,'',`${location.pathname}?seg=${token}`);
+  renderTracking(token);
 }
 
 /* ─── TRACKING PAGE ─────────────────────────────────────────────── */
-function renderTracking(code){
+function renderTracking(token){
   clearTrackRefresh();
   setApp(`
     ${headerHtml()}
@@ -1479,20 +1481,18 @@ function renderTracking(code){
     </div>
     <div class="footer">Panel de Entregas · Formulario público</div>
   `);
-  buscarPedido(code);
-
-  /* Auto-refresh every 30s */
-  trackRefreshId = setInterval(()=>{ buscarPedido(code, true); }, 30000);
+  buscarPedido(token);
+  // El auto-refresh se decide en buscarPedido: solo si el pedido NO está finalizado
 }
 
 function clearTrackRefresh(){
   if(trackRefreshId){ clearInterval(trackRefreshId); trackRefreshId=null; }
 }
 
-/* ─── SEARCH PEDIDO ─────────────────────────────────────────────── */
-async function buscarPedido(code, silent){
-  const c = (code||'').trim().toUpperCase();
-  if(!c) return;
+/* ─── SEARCH PEDIDO (por token único, lee 1 documento) ──────────── */
+async function buscarPedido(token, silent){
+  const t = (token||'').trim();
+  if(!t) return;
 
   if(!silent){
     const tc=$('trackContent');
@@ -1500,14 +1500,19 @@ async function buscarPedido(code, silent){
   }
 
   try{
-    /* Buscar directo en subcolección panel/shipments/items */
-    const docs = await fsListDocs(SHIP_BASE);
-    const m = docs.find(d=>{
-      const id=(d.name||'').split('/').pop();
-      return id.slice(-4).toUpperCase()===c.slice(-4);
-    });
-    if(m){ renderTrackResult(fsDocToObj(m), c); return; }
-    setTrackContent(`<div class="error-box">No se encontró ningún pedido con el código <strong>#${esc(c)}</strong>.</div><div style="text-align:center;margin-top:16px"><button onclick="nuevoRegistro()" style="background:var(--blue);border:none;border-radius:10px;color:#fff;font-weight:700;font-size:14px;padding:12px 24px;cursor:pointer;font-family:inherit">📝 Registrar nuevo pedido</button></div>${notMyOrderBtn()}`);
+    const resp = await _api('track', {token: t});
+    if(resp && resp.status === 'ok' && resp.order){
+      renderTrackResult(resp.order, resp.order.code);
+      // ★ Congelar finalizados: si está entregado, no auto-refrescar ni consultar Shalom
+      if(resp.order.frozen){
+        clearTrackRefresh();
+      } else if(!trackRefreshId){
+        trackRefreshId = setInterval(()=>{ buscarPedido(t, true); }, 30000);
+      }
+      return;
+    }
+    clearTrackRefresh();
+    setTrackContent(`<div class="error-box">No se encontró el pedido. Verifica tu link de seguimiento.</div><div style="text-align:center;margin-top:16px"><button onclick="nuevoRegistro()" style="background:var(--blue);border:none;border-radius:10px;color:#fff;font-weight:700;font-size:14px;padding:12px 24px;cursor:pointer;font-family:inherit">📝 Registrar nuevo pedido</button></div>${notMyOrderBtn()}`);
   }catch(e){
     setTrackContent(`<div class="error-box">Error al buscar: ${esc(e.message)}</div>${notMyOrderBtn()}`);
   }
