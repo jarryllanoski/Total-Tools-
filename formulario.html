@@ -201,25 +201,29 @@ const STATUS_META = {
   'NUEVO PEDIDO':    {color:'#f59e0b',emoji:'🆕',step:0},
   'EN PROCESO':      {color:'#f97316',emoji:'⚠️',step:1},
   'POR ALISTAR':     {color:'#3b82f6',emoji:'📦',step:2},
+  'ALISTADO':        {color:'#14b8a6',emoji:'✅',step:2},
   'ENVIADO':         {color:'#8b5cf6',emoji:'🚚',step:3},
-  'FINALIZADO':      {color:'#22c55e',emoji:'🏁',step:4},
+  'LLEGÓ A DESTINO': {color:'#06b6d4',emoji:'📍',step:4},
+  'PENDIENTE DE PAGO':{color:'#eab308',emoji:'💰',step:4},
+  'FINALIZADO':      {color:'#22c55e',emoji:'🏁',step:5},
   // aliases minúsculas para compatibilidad con pedidos viejos
   'Nuevo pedido':    {color:'#f59e0b',emoji:'🆕',step:0},
   'En proceso':      {color:'#f97316',emoji:'⚠️',step:1},
   'Por alistar':     {color:'#3b82f6',emoji:'📦',step:2},
   'Alistado':        {color:'#14b8a6',emoji:'✅',step:2},
   'Enviado':         {color:'#8b5cf6',emoji:'🚚',step:3},
-  'Llegó a destino': {color:'#06b6d4',emoji:'📍',step:3},
-  'Pendiente de pago':{color:'#eab308',emoji:'💰',step:3},
-  'Finalizado':      {color:'#22c55e',emoji:'🏁',step:4},
+  'Llegó a destino': {color:'#06b6d4',emoji:'📍',step:4},
+  'Pendiente de pago':{color:'#eab308',emoji:'💰',step:4},
+  'Finalizado':      {color:'#22c55e',emoji:'🏁',step:5},
 };
 
 function statusToStage(status){
   const s = (STATUS_META[status]||{}).step ?? -1;
-  if(s <= 1) return 0;
-  if(s <= 2) return 1;
-  if(s <= 3) return 2;
-  return 3;
+  if(s <= 1) return 0; // Recibido (NUEVO PEDIDO, EN PROCESO)
+  if(s <= 2) return 1; // Preparando (POR ALISTAR, ALISTADO)
+  if(s <= 3) return 2; // En camino (ENVIADO)
+  if(s <= 4) return 3; // En destino (LLEGÓ A DESTINO, PENDIENTE DE PAGO)
+  return 4;            // Entregado (FINALIZADO)
 }
 
 /* ─── COURIER EMOJI ─────────────────────────────────────────────── */
@@ -1518,7 +1522,7 @@ function _shalomTrackingBlock(ship){
 function renderTrackResult(ship, code){
   const meta   = STATUS_META[ship.status]||{color:'#6b7280',emoji:'🏷️',step:0};
   const stage  = statusToStage(ship.status);
-  const stages = ['Recibido','Preparando','En camino','Entregado'];
+  const stages = ['Recibido','Preparando','En camino','En destino','Entregado'];
   const tc     = (ship.id||'').slice(-4).toUpperCase();
 
   const dateLabel = ship.date
