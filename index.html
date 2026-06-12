@@ -1485,6 +1485,14 @@ window._mergeRemote = (remote) => {
     S.shipments=S.shipments.map(s=>({...s,status:_STATUS_MAP[s.status]||s.status}));
   }
 
+  // ★ FIX lecturas: sincronizar _S_TS con el ts de los datos recién cargados.
+  // Sin esto, el listener cree que SIEMPRE hay cambios nuevos y recarga los
+  // ~170 pedidos cada 5s en bucle (causaba millones de lecturas/mes).
+  if(remote && remote.ts){
+    window._S_TS = remote.ts;
+    _S_TS = remote.ts;
+  }
+
   lsSet('dpanel', JSON.stringify(window._slimStateForLocal ? window._slimStateForLocal(S) : S)); // ★ Mejora 3: local sin base64 pesadas
   render();
   renderChips();
