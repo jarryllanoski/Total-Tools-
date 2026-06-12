@@ -82,9 +82,7 @@
   }
   async function fsDel(path){
     const h=await _authHeaders();
-    const r=await fetch(`${BASE}/${path}?key=${KEY}`,{method:'DELETE',headers:h});
-    // 404 = el documento ya no existe → tratar como borrado exitoso
-    if(!r.ok && r.status!==404) throw new Error('fsDel HTTP '+r.status); // ★ Mejora 1: ahora el reintento sí funciona
+    await fetch(`${BASE}/${path}?key=${KEY}`,{method:'DELETE',headers:h});
   }
   async function fsList(col){
     const h=await _authHeaders();
@@ -120,6 +118,7 @@
 
   // ── SAVE ─────────────────────────────────────────────────────────────
   window._fbSave = async (data) => {
+    window._isSaving = true; // ★ Mejora 2: cerrar la ventana de carrera con _mergeRemote
     try {
       const saves=[];
       saves.push(fsPatch(cfgPath(),{
@@ -148,6 +147,8 @@
       console.warn('Firebase save error:',e);
       window._fbStatus&&window._fbStatus('err');
       throw e; // re-lanzar para que _fbSaveWithRetry lo capture
+    } finally {
+      window._isSaving = false; // ★ Mejora 2: liberar el candado pase lo que pase
     }
   };
 
