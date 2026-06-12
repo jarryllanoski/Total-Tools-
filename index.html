@@ -116,6 +116,22 @@
     return{...sup,cotiz:sup.cotiz?{t:sup.cotiz.t,n:sup.cotiz.n,d:'[img]'}:null};
   }
 
+  // ★ Mejora 3: copia del estado adelgazada SOLO para el respaldo localStorage.
+  // Conserva las URLs de Firebase Storage (pesan poco y se siguen viendo) y
+  // reemplaza las imágenes base64 pesadas por '[img]' para no llenar el local
+  // (~5MB). NO modifica el S real en memoria — solo la copia que se guarda.
+  window._slimStateForLocal = (state) => {
+    try{
+      const copy = {...state};
+      if(Array.isArray(state.shipments)) copy.shipments = state.shipments.map(slimShipment);
+      if(Array.isArray(state.suppliers)) copy.suppliers = state.suppliers.map(slimSupplier);
+      return copy;
+    }catch(e){
+      // Si algo falla, mejor guardar el estado completo que perder el respaldo
+      return state;
+    }
+  };
+
   // ── SAVE ─────────────────────────────────────────────────────────────
   window._fbSave = async (data) => {
     window._isSaving = true; // ★ Mejora 2: cerrar la ventana de carrera con _mergeRemote
@@ -1378,7 +1394,7 @@ const save = () => {
   _S_TS = Date.now();
   window._S_TS = _S_TS;
   window.S = S;
-  lsSet('dpanel', JSON.stringify(S)); // siempre local primero — instantáneo
+  lsSet('dpanel', JSON.stringify(window._slimStateForLocal ? window._slimStateForLocal(S) : S)); // ★ Mejora 3: local sin base64 pesadas
   clearTimeout(_fbSaveTimer);
   _fbSaveTimer = setTimeout(() => { _fbSaveWithRetry(S, 0); }, 800);
 };
@@ -1469,7 +1485,7 @@ window._mergeRemote = (remote) => {
     S.shipments=S.shipments.map(s=>({...s,status:_STATUS_MAP[s.status]||s.status}));
   }
 
-  lsSet('dpanel', JSON.stringify(S));
+  lsSet('dpanel', JSON.stringify(window._slimStateForLocal ? window._slimStateForLocal(S) : S)); // ★ Mejora 3: local sin base64 pesadas
   render();
   renderChips();
   toast('☁️ Datos sincronizados');
