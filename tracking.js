@@ -170,6 +170,19 @@ function aplicarResultado(ship, raw, source) {
   var autoEstado = detectarEstadoAuto(estadoTexto);
   var guiaOk = !!(ship.trackingOrderNumber || ship.shalomGuia);
 
+  // ★ Detectar si el estado Shalom es idéntico al de la última consulta.
+  // En auto-check, si nada cambió, NO tocamos campos ni historial: así no se
+  // genera un "cambio" que dispare save() y recargas en cadena entre dispositivos.
+  var nuevoTexto   = estadoTexto || '—';
+  var mismoEstado  = (ship.trackingStatus === nuevoTexto);
+  var esAuto       = (source === 'auto');
+
+  if (esAuto && mismoEstado) {
+    // Solo marcar la hora del último chequeo (interno, no afecta la tarjeta).
+    ship.trackingLastAutoCheck = Date.now();
+    return 'sin-cambio'; // ← el auto-check sabrá que este pedido no necesita guardado
+  }
+
   // Actualizar campos del shipment
   ship.trackingStatus        = estadoTexto || '—';
   ship.trackingMessage       = estadoTexto || '—';
@@ -273,6 +286,7 @@ async function autoTrackingCheck() {
 
   var okCount  = 0;
   var errCount = 0;
+  var changedCount = 0; // ★ cuántos pedidos cambiaron de verdad en este ciclo
 
   for (var i = 0; i < pendientes.length; i++) {
     var ship = pendientes[i];
@@ -285,6 +299,7 @@ async function autoTrackingCheck() {
         errCount++;
       } else {
         okCount++;
+        if (resultado !== 'sin-cambio') changedCount++; // ★ hubo cambio real
         if (resultado === 'EN_DESTINO') _mostrarAlertaDestino(ship);
       }
     } catch(e) {
@@ -309,10 +324,15 @@ async function autoTrackingCheck() {
     // Al menos 1 OK → resetear
     _autoFailCount = 0;
     _autoPaused    = false;
-    console.log('[Tracking] Auto-check OK (' + okCount + ' respuestas exitosas)');
+    console.log('[Tracking] Auto-check OK (' + okCount + ' respuestas, ' + changedCount + ' con cambios)');
   }
 
-  if (typeof window.save   === 'function') window.save();
+  // ★ Solo guardar (y subir ts → disparar recargas) si algún pedido cambió de verdad.
+  // Si ningún pedido cambió, NO guardamos: así no se genera el rebote de lecturas
+  // entre dispositivos que disparaba millones de lecturas/día.
+  if (changedCount > 0) {
+    if (typeof window.save === 'function') window.save();
+  }
   if (typeof window.render === 'function') window.render();
   _autoRunning = false;
 }
