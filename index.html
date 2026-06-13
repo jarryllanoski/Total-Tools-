@@ -82,7 +82,9 @@
   }
   async function fsDel(path){
     const h=await _authHeaders();
-    await fetch(`${BASE}/${path}?key=${KEY}`,{method:'DELETE',headers:h});
+    const r=await fetch(`${BASE}/${path}?key=${KEY}`,{method:'DELETE',headers:h});
+    // 404 = el documento ya no existe → tratar como borrado exitoso
+    if(!r.ok && r.status!==404) throw new Error('fsDel HTTP '+r.status); // ★ Mejora 1: ahora el reintento sí funciona
   }
   async function fsList(col){
     const h=await _authHeaders();
