@@ -41,7 +41,7 @@ body{background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,
 .fi::placeholder{color:var(--text2)}
 textarea.fi{resize:vertical;line-height:1.5}
 .fi.err{border-color:var(--red)}
-.fi.sel{background:var(--card);background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%236b7280' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 16px center;padding-right:40px;cursor:pointer}
+.fi.sel{background:var(--card);background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%236b7280' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 16px center;padding-right:40px;padding-top:16px;padding-bottom:16px;cursor:pointer;font-weight:600}
 .ferr{font-size:12px;color:var(--red);margin-top:5px;display:none}
 .ferr.show{display:block}
 
@@ -156,12 +156,14 @@ textarea.fi{resize:vertical;line-height:1.5}
 .section-ttl{font-size:11px;font-weight:700;color:var(--text2);letter-spacing:.7px;text-transform:uppercase;margin-bottom:10px}
 
 /* DELIVERY ADDRESS OPTIONS */
-.addr-opts{display:flex;gap:8px;margin-bottom:10px}
-.addr-opt{flex:1;background:var(--card);border:1.5px solid var(--bd);border-radius:12px;padding:12px 8px;text-align:center;cursor:pointer;transition:border-color .15s,background .15s;user-select:none}
+.addr-opts{display:flex;flex-direction:column;gap:8px;margin-bottom:10px}
+.addr-opt{display:flex;align-items:center;gap:12px;background:var(--card);border:1.5px solid var(--bd);border-radius:12px;padding:14px;text-align:left;cursor:pointer;transition:border-color .15s,background .15s;user-select:none}
 .addr-opt.active{border-color:var(--blue);background:#12203d}
-.addr-opt-icon{font-size:20px;margin-bottom:3px}
-.addr-opt-lbl{font-size:11px;font-weight:600;color:var(--text2)}
-.addr-opt.active .addr-opt-lbl{color:var(--text)}
+.addr-opt-icon{font-size:24px;flex-shrink:0}
+.addr-opt-body{flex:1}
+.addr-opt-lbl{font-size:14px;font-weight:700;color:var(--text);margin-bottom:2px}
+.addr-opt-desc{font-size:11px;color:var(--text2);line-height:1.4}
+.addr-opt.active .addr-opt-lbl{color:var(--blue)}
 .addr-result{background:var(--card2);border:1px solid var(--blue);border-radius:10px;padding:10px 12px;font-size:13px;color:var(--text);margin-bottom:8px;display:none;line-height:1.5}
 .addr-result.show{display:block}
 .addr-suggestions{background:var(--card2);border:1px solid var(--bd);border-radius:10px;overflow:hidden;margin-bottom:8px;display:none;max-height:200px;overflow-y:auto}
@@ -567,7 +569,7 @@ function headerHtml(){
   // Tu app guarda name y phone directo en CFG (no en CFG.config)
   const bizName = (CFG&&(CFG.name||CFG.config&&CFG.config.name)) || 'Mi Negocio';
   const bizCity = (CFG&&(CFG.city||CFG.config&&CFG.config.city)) || '';
-  return `<div class="biz-header" style="position:relative"><div class="biz-name">${esc(bizName)}</div>${bizCity?`<div class="biz-city">📍 ${esc(bizCity)}</div>`:''}<div onclick="abrirAyudaForm()" style="position:absolute;top:0;right:0;width:32px;height:32px;border-radius:50%;background:rgba(167,139,250,.12);border:1px solid rgba(167,139,250,.3);color:#a78bfa;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:15px;font-weight:700" title="¿Cómo llenar el formulario?">?</div></div>`;
+  return `<div class="biz-header" style="position:relative"><div class="biz-name">${esc(bizName)}</div>${bizCity?`<div class="biz-city">📍 ${esc(bizCity)}</div>`:''}<div onclick="abrirAyudaForm()" style="position:absolute;top:2px;right:0;display:flex;align-items:center;gap:4px;background:rgba(167,139,250,.12);border:1px solid rgba(167,139,250,.3);color:#a78bfa;border-radius:8px;padding:5px 10px;cursor:pointer;font-size:12px;font-weight:700" title="Ayuda">📖 Ayuda</div></div>`;
 }
 
 /* ─── Ayuda del formulario (autocontenida, pública) ──────────────── */
@@ -684,16 +686,22 @@ function renderForm(){
       </div>
 
       <div id="deliveryAddrBox" style="display:none;margin-top:4px">
-        <div class="section-ttl">📍 Dirección de entrega *</div>
+        <div class="section-ttl">📍 ¿A dónde enviamos tu pedido?</div>
         <div id="addrShortcut" style="display:none"></div>
         <div id="addrOpts" class="addr-opts">
           <div class="addr-opt" id="addrOptGps" onclick="setAddrMode('gps')">
             <div class="addr-opt-icon">📍</div>
-            <div class="addr-opt-lbl">Mi ubicación</div>
+            <div class="addr-opt-body">
+              <div class="addr-opt-lbl">Usar mi ubicación actual</div>
+              <div class="addr-opt-desc">Detectamos dónde estás ahora con el GPS de tu celular.</div>
+            </div>
           </div>
           <div class="addr-opt" id="addrOptManual" onclick="setAddrMode('manual')">
             <div class="addr-opt-icon">✏️</div>
-            <div class="addr-opt-lbl">Otra dirección</div>
+            <div class="addr-opt-body">
+              <div class="addr-opt-lbl">Escribir otra dirección</div>
+              <div class="addr-opt-desc">Escribe tú mismo la dirección de entrega.</div>
+            </div>
           </div>
         </div>
         <div id="addrGpsPanel" style="display:none">
@@ -1054,18 +1062,15 @@ function setAddrMode(mode){
     if(optManual) optManual.classList.remove('active');
     if(panelGps) panelGps.style.display='block';
     if(panelManual) panelManual.style.display='none';
-    // Ocultar botones mientras carga GPS
-    const addrOpts=$('addrOpts');
-    if(addrOpts) addrOpts.style.display='none';
   } else {
     if(optManual) optManual.classList.add('active');
     if(optGps) optGps.classList.remove('active');
     if(panelManual) panelManual.style.display='block';
     if(panelGps) panelGps.style.display='none';
-    // Mostrar botón GPS como alternativa
-    const addrOpts=$('addrOpts');
-    if(addrOpts) addrOpts.style.display='flex';
   }
+  // ★ Mantener SIEMPRE visibles ambas opciones para que el usuario pueda cambiar
+  const addrOpts=$('addrOpts');
+  if(addrOpts) addrOpts.style.display='flex';
 
   const result=$('addrGpsResult');
   if(result){ result.classList.remove('show'); result.innerHTML=''; }
@@ -1379,17 +1384,6 @@ async function submitOrder(){
   $('submitErrBox')&&($('submitErrBox').style.display='none');
   showOverlay(true);
 
-  // ★ Abrir una ventana YA, dentro del gesto del usuario (toque en "Confirmar").
-  // Si esperamos al await de Firebase, el navegador bloquea la apertura por no
-  // venir de un gesto. La ventana queda "en blanco" y le ponemos la URL de
-  // WhatsApp cuando llega la respuesta. Si el navegador la bloquea igual,
-  // _waWin será null y caemos al botón de respaldo en la pantalla de éxito.
-  let _waWin = null;
-  try { _waWin = window.open('', '_blank'); } catch(e){ _waWin = null; }
-  if(_waWin){
-    try { _waWin.document.write('<p style="font-family:sans-serif;padding:20px">Abriendo WhatsApp…</p>'); } catch(e){}
-  }
-
   try{
     // Crear el pedido vía Cloud Function (el público ya no escribe Firestore directo)
     const resp = await _api('create', null, {
@@ -1405,17 +1399,9 @@ async function submitOrder(){
     localStorage.setItem('dpanel_order_'+wsId, JSON.stringify({
       trackToken: resp.trackToken, orderId: resp.orderId, name: order.name
     }));
-    // ★ Redirigir la ventana ya abierta hacia WhatsApp con el mensaje completo
-    const waHref = _construirWaHref(order, resp.trackCode, resp.trackToken);
-    if(_waWin && waHref){
-      try { _waWin.location.href = waHref; } catch(e){ /* la pantalla tiene botón de respaldo */ }
-    } else if(_waWin){
-      try { _waWin.close(); } catch(e){}
-    }
     renderSuccessStep(order, resp.trackCode, resp.trackToken);
   }catch(e){
     showOverlay(false);
-    if(_waWin){ try { _waWin.close(); } catch(err){} } // cerrar la ventana en blanco si falló
     if(btn){ btn.disabled=false; btn.textContent='Confirmar pedido →'; }
     const eb=$('submitErrBox');
     if(eb){ eb.style.display='block'; eb.textContent=`Error al registrar: ${e.message}`; }
@@ -1432,7 +1418,6 @@ function renderSuccessStep(order, trackCode, trackToken){
     ? new Date(order.date+'T12:00:00').toLocaleDateString('es-PE',{weekday:'long',year:'numeric',month:'long',day:'numeric'})
     : selDateLbl||order.date;
 
-  const trackUrl = `${location.origin}${location.pathname}?seg=${trackToken}`;
   const waHref   = _construirWaHref(order, trackCode, trackToken);
 
   const extraRows = Object.entries(order.extra||{})
@@ -1462,14 +1447,8 @@ function renderSuccessStep(order, trackCode, trackToken){
           ${extraRows}
         </div>
         ${waHref?`
-          <div style="background:rgba(37,211,102,.1);border:1px solid rgba(37,211,102,.3);border-radius:12px;padding:12px;margin-top:14px;margin-bottom:4px;font-size:13px;color:#25d366;text-align:center;line-height:1.5">
-            👆 Si WhatsApp no se abrió solo, toca el botón verde para enviar tu pedido.
-          </div>
           <a class="btn-wa" href="${esc(waHref)}" target="_blank" rel="noopener" style="font-size:17px;padding:18px">💬 Enviar mi pedido por WhatsApp</a>
         `:'<div class="error-box">No se pudo generar el enlace de WhatsApp. Contáctanos directamente.</div>'}
-        <div style="text-align:center;margin-top:14px">
-          <a href="${esc(trackUrl)}" style="color:#8b949e;font-size:12px;text-decoration:underline">Ver el seguimiento de mi pedido</a>
-        </div>
       </div>
     </div>
     <div class="footer">Panel de Entregas · Formulario público</div>
