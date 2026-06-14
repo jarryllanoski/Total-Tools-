@@ -851,7 +851,7 @@ function saveConfig(){
   S.dispatch.anticipation=parseInt($('dispatchAnticip').value)||0;
   $('hdrName').textContent=S.config.name;
   $('hdrPhone').textContent=S.config.phone;
-  save(); renderChips(); toast('✅ Configuración guardada');
+  save('config'); renderChips(); toast('✅ Configuración guardada'); // ★ solo config
 }
 let _dragIdx=null;
 function dragStart(e,i){_dragIdx=i;e.currentTarget.classList.add('dragging');e.dataTransfer.effectAllowed='move'}
@@ -863,14 +863,14 @@ function dropLabel(e,toIdx){
   // Don't allow moving fixed labels
   if(FIXED_LABELS.includes(moved)){S.labels.splice(_dragIdx,0,moved);return}
   S.labels.splice(toIdx,0,moved);
-  save();renderChips();loadCfgUI();
+  save('config');renderChips();loadCfgUI(); // ★ solo config
 }
 function dragEnd(){document.querySelectorAll('.label-drag-row').forEach(r=>{r.classList.remove('dragging');r.classList.remove('drag-over')});_dragIdx=null}
 
 // Inline add functions
 function addLabelInline(){
   S.labels.push('NUEVA ETIQUETA');
-  save();renderChips();loadCfgUI();
+  save('config');renderChips();loadCfgUI(); // ★ solo config
   // Auto-open the last card
   const newIdx=S.labels.length-1;
   const bodyEl=document.getElementById(`body_lc_${newIdx}`);
@@ -883,12 +883,12 @@ function addLabelInline(){
 function addCourierInline(){
   const inp=$('newCourierInp');const v=inp.value.trim();
   if(!v){toast('Escribe el nombre del courier');return}
-  S.couriers.push(v);save();loadCfgUI();inp.value='';
+  S.couriers.push(v);save('config');loadCfgUI();inp.value=''; // ★ solo config
 }
 function addExtraInline(){
   const inp=$('newExtraInp');const v=inp.value.trim();
   if(!v){toast('Escribe el nombre del campo');return}
-  S.extraFields.push(v);save();loadCfgUI();inp.value='';
+  S.extraFields.push(v);save('config');loadCfgUI();inp.value=''; // ★ solo config
 }
 
 // Protected delete — requires hold confirmation
@@ -913,7 +913,7 @@ function toggleDispatchDay(v){
   const idx=S.dispatch.days.indexOf(v);
   if(idx>=0) S.dispatch.days.splice(idx,1);
   else S.dispatch.days.push(v);
-  save();
+  save('config'); // ★ solo config, no reescribe los 180 pedidos
   // Update buttons in place
   document.querySelectorAll('.day-btn').forEach(btn=>{
     const bv=parseInt(btn.getAttribute('onclick').match(/\d+/)[0]);
@@ -923,6 +923,6 @@ function toggleDispatchDay(v){
 
 function toggleCourierActive(name){
   S.courierActive[name] = S.courierActive[name]===false ? true : false;
-  save(); loadCfgUI();
+  save('config'); loadCfgUI(); // ★ solo config, no reescribe los 180 pedidos
   toast(S.courierActive[name]===false ? `🚚 ${name} oculto del formulario` : `🚚 ${name} visible en formulario`);
 }

@@ -138,8 +138,11 @@
   window._fbSave = async (data) => {
     window._isSaving = true; // ★ Mejora 2: cerrar la ventana de carrera con _mergeRemote
     // ★ Guardado incremental: decidir qué shipments subir
-    const subirTodos = _dirtyAll || _dirtyShips.size === 0;
-    const idsASubir = subirTodos ? null : new Set(_dirtyShips);
+    // Modo solo-config: si solo cambió config y no hay pedidos sucios pendientes,
+    // no se sube ningún pedido (idsASubir = set vacío).
+    const soloConfig = _dirtyConfigOnly && _dirtyShips.size === 0 && !_dirtyAll;
+    const subirTodos = !soloConfig && (_dirtyAll || _dirtyShips.size === 0);
+    const idsASubir = soloConfig ? new Set() : (subirTodos ? null : new Set(_dirtyShips));
     try {
       const saves=[];
       saves.push(fsPatch(cfgPath(),{
@@ -172,6 +175,7 @@
       // ★ Éxito: limpiar el registro de sucios
       _dirtyShips.clear();
       _dirtyAll = false;
+      _dirtyConfigOnly = false;
     } catch(e){
       console.warn('Firebase save error:',e);
       window._fbStatus&&window._fbStatus('err');
@@ -1407,14 +1411,25 @@ let _fbSaveTimer = null;
 // save(id) marca solo ese pedido para subir. save() sin id = subir todo (seguro).
 let _dirtyShips = new Set();
 let _dirtyAll = true; // true = subir todo (config/suppliers/masivo); arranque seguro
+let _dirtyConfigOnly = false; // true = subir SOLO config (toggles de Config)
 
 const save = (shipId) => {
   _S_TS = Date.now();
   window._S_TS = _S_TS;
   window.S = S;
   // Marcar qué cambió
-  if(shipId){ _dirtyShips.add(shipId); }
-  else { _dirtyAll = true; } // sin id → cambio de config/suppliers/masivo → subir todo
+  if(shipId === 'config'){
+    // ★ Solo config cambió (toggles de Config: días, couriers, etc.).
+    // No marca ningún pedido: si no hay otros pedidos sucios pendientes,
+    // _fbSave subirá únicamente el documento config (no los 180 pedidos).
+    _dirtyConfigOnly = true;
+  } else if(shipId){
+    _dirtyShips.add(shipId);
+    _dirtyConfigOnly = false; // hay un pedido real → no es solo-config
+  } else {
+    _dirtyAll = true; // sin id → cambio de config/suppliers/masivo → subir todo
+    _dirtyConfigOnly = false;
+  }
   lsSet('dpanel', JSON.stringify(window._slimStateForLocal ? window._slimStateForLocal(S) : S)); // ★ Mejora 3: local sin base64 pesadas
   clearTimeout(_fbSaveTimer);
   _fbSaveTimer = setTimeout(() => { _fbSaveWithRetry(S, 0); }, 800);
