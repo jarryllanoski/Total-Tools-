@@ -735,7 +735,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);max
 
 <!-- HEADER -->
 <div class="hdr">
-  <div class="hdr-logo" onclick="openOverlay('excelOverlay')" style="cursor:pointer" title="Importar / Exportar Excel">📦</div>
+  <div class="hdr-logo" onclick="openOverlay('excelOverlay');if(window.Respaldo)Respaldo.refrescarFecha()" style="cursor:pointer" title="Importar / Exportar Excel">📦</div>
   <div style="flex:1;min-width:0">
     <div style="display:flex;align-items:center;gap:6px">
       <div class="hdr-title" id="hdrName" style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Mi Negocio</div>
@@ -855,7 +855,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);max
 <!-- CONFIGURAR -->
 <div class="page" id="page-configurar">
   <div class="cfg-hdr">
-    <div class="cfg-ptl">⚙️ Configuración</div>
+    <div class="cfg-ptl">⚙️ Configuración <span onclick="if(window.Ayuda)Ayuda.abrir('config')" style="font-size:11px;color:#8b949e;cursor:pointer;font-weight:400;margin-left:8px" title="Ayuda">📖 Ayuda</span></div>
     <button class="cfg-save" onclick="saveConfig()">💾 Guardar</button>
   </div>
 
@@ -1272,7 +1272,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);max
 <div class="overlay" id="excelOverlay">
   <div class="sheet">
     <div class="sheet-handle"></div>
-    <div class="sheet-title">📊 Importar / Exportar Excel</div>
+    <div class="sheet-title">📊 Importar / Exportar Excel <span onclick="if(window.Ayuda)Ayuda.abrir('importExport')" style="float:right;font-size:11px;color:#8b949e;cursor:pointer;font-weight:400" title="Ayuda">📖 Ayuda</span></div>
 
     <!-- EXPORT -->
     <div style="background:var(--bg3);border-radius:11px;border:1px solid var(--bd);padding:14px;margin-bottom:12px">
@@ -1296,6 +1296,22 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);max
       <div style="font-size:11px;color:var(--text2);line-height:1.8">
         Nombre · Teléfono · Dirección · Courier · Fecha · Estado · Costo · Notas
       </div>
+    </div>
+
+    <!-- ═══ MÓDULO RESPALDO (respaldo.js) ═══ -->
+    <div style="border-top:1px solid var(--border);margin:4px 0 14px"></div>
+    <div style="background:rgba(46,160,67,.06);border:1px solid rgba(46,160,67,.25);border-radius:9px;padding:14px;margin-bottom:12px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+        <div style="font-size:13px;font-weight:800;color:var(--green);font-family:Syne,sans-serif">🛡️ Respaldo completo</div>
+        <button onclick="if(window.Ayuda)Ayuda.abrir('respaldo')" style="background:none;border:none;color:#8b949e;font-size:11px;cursor:pointer;padding:0" title="Ayuda">📖 Ayuda</button>
+      </div>
+      <div style="font-size:11px;color:var(--text2);line-height:1.5;margin-bottom:10px">
+        Guarda o recupera <b>todo</b> el sistema (pedidos, tracking, config, couriers) en un archivo .json. Más completo que Excel.
+      </div>
+      <button onclick="if(window.Respaldo)Respaldo.crearYDescargar()" class="btn-pri" style="margin-bottom:8px;background:linear-gradient(135deg,#2ea043,#1a7431)">🛡️ Crear y descargar respaldo</button>
+      <input type="file" id="restoreBackupFile" accept=".json" style="display:none" onchange="if(window.Respaldo)Respaldo.restaurarDesdeArchivo(this)">
+      <button onclick="$('restoreBackupFile').click()" class="btn-sec" style="border-color:rgba(46,160,67,.4);color:var(--green)">♻️ Restaurar desde respaldo</button>
+      <div id="respLastBackup" style="font-size:10px;color:var(--text2);margin-top:10px;text-align:center">Aún no has creado un respaldo</div>
     </div>
 
     <button class="btn-sec" onclick="closeOverlay('excelOverlay')">Cerrar</button>
@@ -2400,6 +2416,8 @@ render();
 <script src="qrtracking.js"></script>
 <script src="ticket.js"></script>
 <script src="agencias-extractor.js"></script>
+<script src="respaldo.js"></script>
+<script src="ayuda.js"></script>
 <script>
 updateShareLink();
 
