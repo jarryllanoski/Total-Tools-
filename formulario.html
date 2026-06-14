@@ -565,11 +565,13 @@ async function loadCfgThenTrack(token){
 }
 
 /* ─── HEADER HTML ───────────────────────────────────────────────── */
-function headerHtml(){
+function headerHtml(ayudaTipo){
   // Tu app guarda name y phone directo en CFG (no en CFG.config)
   const bizName = (CFG&&(CFG.name||CFG.config&&CFG.config.name)) || 'Mi Negocio';
   const bizCity = (CFG&&(CFG.city||CFG.config&&CFG.config.city)) || '';
-  return `<div class="biz-header" style="position:relative"><div class="biz-name">${esc(bizName)}</div>${bizCity?`<div class="biz-city">📍 ${esc(bizCity)}</div>`:''}<div onclick="abrirAyudaForm()" style="position:absolute;top:2px;right:0;display:flex;align-items:center;gap:4px;background:rgba(167,139,250,.12);border:1px solid rgba(167,139,250,.3);color:#a78bfa;border-radius:8px;padding:5px 10px;cursor:pointer;font-size:12px;font-weight:700" title="Ayuda">📖 Ayuda</div></div>`;
+  // ayudaTipo: 'track' = ayuda de seguimiento, cualquier otro = ayuda del formulario
+  const ayudaFn = ayudaTipo==='track' ? 'abrirAyudaTrack()' : 'abrirAyudaForm()';
+  return `<div class="biz-header" style="position:relative"><div class="biz-name">${esc(bizName)}</div>${bizCity?`<div class="biz-city">📍 ${esc(bizCity)}</div>`:''}<div onclick="${ayudaFn}" style="position:absolute;top:2px;right:0;display:flex;align-items:center;gap:4px;background:rgba(167,139,250,.12);border:1px solid rgba(167,139,250,.3);color:#a78bfa;border-radius:8px;padding:5px 10px;cursor:pointer;font-size:12px;font-weight:700" title="Ayuda">📖 Ayuda</div></div>`;
 }
 
 /* ─── Ayuda del formulario (autocontenida, pública) ──────────────── */
@@ -579,10 +581,9 @@ function abrirAyudaForm(){
     ov = document.createElement('div');
     ov.id = 'ayudaFormOv';
     ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:99999;display:flex;align-items:flex-end;justify-content:center';
-    ov.addEventListener('click', e=>{ if(e.target===ov) ov.classList.add('_hidden'); });
+    ov.addEventListener('click', e=>{ if(e.target===ov) ov.style.display='none'; });
     document.body.appendChild(ov);
   }
-  ov.classList.remove('_hidden');
   ov.style.display = 'flex';
   const pasos = [
     'Escribe tu <b>nombre completo</b> y tu <b>número de WhatsApp</b>.',
@@ -606,7 +607,38 @@ function abrirAyudaForm(){
   </div>`;
 }
 
-/* ─── FORM (single step) ─────────────────────────────────────────── */
+/* ─── Ayuda de la vista de SEGUIMIENTO (explica los estados) ──────── */
+function abrirAyudaTrack(){
+  let ov = document.getElementById('ayudaFormOv');
+  if(!ov){
+    ov = document.createElement('div');
+    ov.id = 'ayudaFormOv';
+    ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:99999;display:flex;align-items:flex-end;justify-content:center';
+    ov.addEventListener('click', e=>{ if(e.target===ov) ov.style.display='none'; });
+    document.body.appendChild(ov);
+  }
+  ov.style.display = 'flex';
+  const estados = [
+    {ico:'📦', t:'Recibido', d:'Tu pedido llegó a nuestro sistema y lo estamos revisando.'},
+    {ico:'⚙️', t:'Preparando', d:'Estamos alistando y empacando tu pedido.'},
+    {ico:'🚚', t:'En camino', d:'Tu pedido ya fue enviado por el courier y va en camino.'},
+    {ico:'🏢', t:'En destino', d:'Tu pedido llegó a la agencia de destino. ¡Ya puedes recogerlo!'},
+    {ico:'✅', t:'Entregado', d:'Tu pedido fue entregado. ¡Gracias por tu compra!'}
+  ];
+  const faq = [
+    {q:'¿Cada cuánto se actualiza?', a:'El estado se actualiza solo cada cierto tiempo. No necesitas hacer nada, solo abrir este enlace.'},
+    {q:'¿Necesito recoger mi pedido?', a:'Si elegiste retiro en agencia, cuando el estado diga "En destino" puedes ir a recogerlo con tu DNI.'},
+    {q:'Tengo una consulta', a:'Usa el botón verde "Consultar por WhatsApp" para escribirnos directamente.'}
+  ];
+  ov.innerHTML = `<div style="background:#0d1117;border:1px solid #30363d;border-radius:18px 18px 0 0;width:100%;max-width:520px;max-height:85vh;overflow-y:auto;padding:20px">
+    <div style="font-weight:800;font-size:18px;margin-bottom:4px;color:#e6edf3">📖 ¿Cómo sigo mi pedido?</div>
+    <div style="font-size:11px;color:#8b949e;margin-bottom:14px">Qué significa cada estado</div>
+    ${estados.map(e=>`<div style="display:flex;gap:12px;padding:10px 0;border-bottom:1px solid rgba(255,255,255,.05)"><div style="font-size:22px;flex-shrink:0">${e.ico}</div><div><div style="font-size:14px;color:#e6edf3;font-weight:700;margin-bottom:2px">${e.t}</div><div style="font-size:12px;color:#8b949e;line-height:1.5">${e.d}</div></div></div>`).join('')}
+    <div style="font-size:11px;font-weight:800;letter-spacing:.8px;color:#a78bfa;margin:16px 0 8px;text-transform:uppercase">Preguntas frecuentes</div>
+    ${faq.map(f=>`<div style="padding:8px 0;border-bottom:1px solid rgba(255,255,255,.05)"><div style="font-size:13px;color:#e6edf3;font-weight:700;margin-bottom:3px">${f.q}</div><div style="font-size:12px;color:#8b949e;line-height:1.5">${f.a}</div></div>`).join('')}
+    <button onclick="document.getElementById('ayudaFormOv').style.display='none'" style="width:100%;margin-top:18px;padding:12px;background:#1c2333;border:1px solid #30363d;border-radius:9px;color:#8b949e;font-size:13px;cursor:pointer;font-family:inherit">Cerrar</button>
+  </div>`;
+}
 function _courierLabel(name, type){
   const u=(name||'').toUpperCase();
   if(u.includes('RETIRO')) return 'Retiro en tienda';
@@ -1466,7 +1498,7 @@ function goToTracking(token){
 function renderTracking(token){
   clearTrackRefresh();
   setApp(`
-    ${headerHtml()}
+    ${headerHtml('track')}
     <div id="trackContent">
       <div style="display:flex;align-items:center;justify-content:center;padding:60px 0">
         <div class="spin"></div>
@@ -1616,8 +1648,7 @@ function renderTrackResult(ship, code){
 
   setTrackContent(`
     <div id="refreshRow" class="refresh-row">
-      <span class="refresh-lbl">Se actualiza automáticamente</span>
-      <button class="refresh-btn" onclick="buscarPedido('${esc(tc)}')">🔄 Actualizar</button>
+      <span class="refresh-lbl">🔄 Se actualiza automáticamente</span>
     </div>
     <div class="track-card">
       <div class="tk-section">
