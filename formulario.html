@@ -861,14 +861,37 @@ function _updateKnownAddrShortcut(){
   const opts=$('addrOpts');
   if(!shortcut) return;
   if(_knownClient&&_knownClient.address&&selCourierType==='delivery'){
+    // Dirección anterior resumida (no todo el texto largo)
+    const full = _knownClient.address;
+    const short = full.length>70 ? full.slice(0,70)+'…' : full;
     shortcut.style.display='block';
-    shortcut.innerHTML=`<button class="btn-sec" style="margin-top:0;margin-bottom:10px;text-align:left;padding:12px 14px;font-size:13px;line-height:1.5" onclick="useKnownAddress()">✅ Usar mi dirección anterior:<br><span style="color:var(--text2);font-weight:400">${esc(_knownClient.address)}</span></button>
-    <div style="font-size:11px;font-weight:700;color:var(--text2);letter-spacing:.5px;text-transform:uppercase;margin-bottom:8px">O elige otra</div>`;
-    if(opts) opts.style.display='';
+    shortcut.innerHTML=`
+      <div class="addr-opt active" onclick="useKnownAddress()" style="align-items:flex-start">
+        <div class="addr-opt-icon">✅</div>
+        <div class="addr-opt-body">
+          <div class="addr-opt-lbl">Usar mi dirección de siempre</div>
+          <div class="addr-opt-desc" style="color:var(--text2)">${esc(short)}</div>
+        </div>
+      </div>
+      <div onclick="mostrarOtrasOpciones()" id="otrasOpcLink" style="text-align:center;margin:10px 0 4px;color:var(--blue);font-size:13px;font-weight:600;cursor:pointer;text-decoration:underline">Usar otra dirección</div>`;
+    // Ocultar las opciones GPS/manual hasta que toque "Usar otra dirección"
+    if(opts) opts.style.display='none';
   } else {
     shortcut.style.display='none';
     if(opts) opts.style.display='';
   }
+}
+
+// Cuando el cliente con dirección anterior quiere usar otra: revela GPS/manual
+function mostrarOtrasOpciones(){
+  const opts=$('addrOpts');
+  if(opts) opts.style.display='flex';
+  const link=$('otrasOpcLink');
+  if(link) link.style.display='none';
+  // Quitar la marca "active" de la dirección anterior
+  const shortcut=$('addrShortcut');
+  const knownOpt=shortcut&&shortcut.querySelector('.addr-opt');
+  if(knownOpt) knownOpt.classList.remove('active');
 }
 
 function useKnownAddress(){
@@ -888,7 +911,7 @@ function useKnownAddress(){
     const addrBox=$('deliveryAddrBox');
     if(addrBox&&errDiv) addrBox.insertBefore(confirmed,errDiv);
   }
-  confirmed.innerHTML=`<div class="addr-result show" style="display:block">📍 ${esc(_deliveryAddr)}</div><button class="btn-sec" style="margin-top:6px;padding:10px;font-size:13px" onclick="changeAddress()">✏️ Cambiar dirección</button>`;
+  confirmed.innerHTML=`<div class="addr-result show" style="display:block">📍 ${esc(_deliveryAddr.length>90?_deliveryAddr.slice(0,90)+'…':_deliveryAddr)}</div><button class="btn-sec" style="margin-top:6px;padding:10px;font-size:13px" onclick="changeAddress()">✏️ Cambiar dirección</button>`;
   $('err_deliveryAddr')&&$('err_deliveryAddr').classList.remove('show');
 }
 
