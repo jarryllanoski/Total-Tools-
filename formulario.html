@@ -567,7 +567,41 @@ function headerHtml(){
   // Tu app guarda name y phone directo en CFG (no en CFG.config)
   const bizName = (CFG&&(CFG.name||CFG.config&&CFG.config.name)) || 'Mi Negocio';
   const bizCity = (CFG&&(CFG.city||CFG.config&&CFG.config.city)) || '';
-  return `<div class="biz-header"><div class="biz-name">${esc(bizName)}</div>${bizCity?`<div class="biz-city">📍 ${esc(bizCity)}</div>`:''}</div>`;
+  return `<div class="biz-header" style="position:relative"><div class="biz-name">${esc(bizName)}</div>${bizCity?`<div class="biz-city">📍 ${esc(bizCity)}</div>`:''}<div onclick="abrirAyudaForm()" style="position:absolute;top:0;right:0;width:32px;height:32px;border-radius:50%;background:rgba(167,139,250,.12);border:1px solid rgba(167,139,250,.3);color:#a78bfa;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:15px;font-weight:700" title="¿Cómo llenar el formulario?">?</div></div>`;
+}
+
+/* ─── Ayuda del formulario (autocontenida, pública) ──────────────── */
+function abrirAyudaForm(){
+  let ov = document.getElementById('ayudaFormOv');
+  if(!ov){
+    ov = document.createElement('div');
+    ov.id = 'ayudaFormOv';
+    ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:99999;display:flex;align-items:flex-end;justify-content:center';
+    ov.addEventListener('click', e=>{ if(e.target===ov) ov.classList.add('_hidden'); });
+    document.body.appendChild(ov);
+  }
+  ov.classList.remove('_hidden');
+  ov.style.display = 'flex';
+  const pasos = [
+    'Escribe tu <b>nombre completo</b> y tu <b>número de WhatsApp</b>.',
+    'Elige <b>cómo quieres recibir</b> tu pedido (delivery, retiro en agencia, etc.).',
+    'Indica tu <b>dirección</b>: usa "Mi ubicación" para enviar tu ubicación actual, o "Otra dirección" para escribirla.',
+    'Elige la <b>fecha de envío</b>.',
+    'Toca <b>Confirmar pedido</b>. Se abrirá WhatsApp con tu pedido listo — solo dale <b>enviar</b> para que lo recibamos.'
+  ];
+  const faq = [
+    {q:'¿Es obligatorio enviar el WhatsApp?', a:'Sí. Tu pedido se confirma cuando nos llega el mensaje por WhatsApp. Si no lo envías, no podremos procesarlo.'},
+    {q:'¿Cómo sigo mi pedido?', a:'Con el enlace de seguimiento que aparece en tu mensaje de WhatsApp. Ahí ves el estado en tiempo real.'},
+    {q:'¿Y si me equivoqué en un dato?', a:'Escríbenos por WhatsApp y lo corregimos.'}
+  ];
+  ov.innerHTML = `<div style="background:#0d1117;border:1px solid #30363d;border-radius:18px 18px 0 0;width:100%;max-width:520px;max-height:85vh;overflow-y:auto;padding:20px">
+    <div style="font-weight:800;font-size:18px;margin-bottom:4px;color:#e6edf3">❓ Cómo hacer tu pedido</div>
+    <div style="font-size:11px;color:#8b949e;margin-bottom:14px">Guía rápida</div>
+    ${pasos.map((p,i)=>`<div style="display:flex;gap:10px;padding:10px 0;border-bottom:1px solid rgba(255,255,255,.05)"><div style="width:22px;height:22px;border-radius:50%;background:rgba(167,139,250,.15);border:1px solid rgba(167,139,250,.3);color:#a78bfa;font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0">${i+1}</div><div style="font-size:13px;color:#e6edf3;line-height:1.5">${p}</div></div>`).join('')}
+    <div style="font-size:11px;font-weight:800;letter-spacing:.8px;color:#a78bfa;margin:16px 0 8px;text-transform:uppercase">Preguntas frecuentes</div>
+    ${faq.map(f=>`<div style="padding:8px 0;border-bottom:1px solid rgba(255,255,255,.05)"><div style="font-size:13px;color:#e6edf3;font-weight:700;margin-bottom:3px">${f.q}</div><div style="font-size:12px;color:#8b949e;line-height:1.5">${f.a}</div></div>`).join('')}
+    <button onclick="document.getElementById('ayudaFormOv').style.display='none'" style="width:100%;margin-top:18px;padding:12px;background:#1c2333;border:1px solid #30363d;border-radius:9px;color:#8b949e;font-size:13px;cursor:pointer;font-family:inherit">Cerrar</button>
+  </div>`;
 }
 
 /* ─── FORM (single step) ─────────────────────────────────────────── */
@@ -1198,6 +1232,43 @@ function selDate(iso, lbl){
 }
 
 /* ─── SUBMIT ────────────────────────────────────────────────────── */
+/* ─── Mensaje de WhatsApp (centralizado y mejorado) ──────────────── */
+// Construye el texto del pedido para WhatsApp con mejor formato.
+function _construirWaMsg(order, trackCode, trackToken){
+  const bizName  = (CFG&&(CFG.config&&CFG.config.name||CFG.name))||'Mi Negocio';
+  const dateLabel = order.date
+    ? new Date(order.date+'T12:00:00').toLocaleDateString('es-PE',{weekday:'long',year:'numeric',month:'long',day:'numeric'})
+    : selDateLbl||order.date;
+  const trackUrl = `${location.origin}${location.pathname}?seg=${trackToken}`;
+
+  const refLine  = order.referencia    ? `\n📌 *Referencia:* ${order.referencia}` : '';
+  const dniLine  = order.dniRecoger    ? `\n🪪 *DNI para recoger:* ${order.dniRecoger}` : '';
+  const encLine  = order.ciudadDestino ? `\n📦 *Ciudad destino:* ${order.ciudadDestino}\n🪪 *DNI destinatario:* ${order.dniDestinatario}` : '';
+  const notesLine= order.notes ? `\n📝 *Notas:* ${order.notes}` : '';
+  const dirLabel = selCourierType==='agencia'
+    ? `\n🏢 *Agencia:* ${order.address||'—'}`
+    : `\n🏠 *Dirección:* ${order.address||order.ciudadDestino||'—'}`;
+
+  // Mensaje con formato mejorado (negritas de WhatsApp con *, secciones claras)
+  return `🛒 *NUEVO PEDIDO* — ${bizName}\n`+
+    `━━━━━━━━━━━━━━━\n`+
+    `👤 *Cliente:* ${order.name}\n`+
+    `📞 *WhatsApp:* +51${order.phone}`+
+    `${dirLabel}${refLine}${dniLine}${encLine}\n`+
+    `🚚 *Courier:* ${order.courier}\n`+
+    `📅 *Fecha de envío:* ${dateLabel}${notesLine}\n`+
+    `━━━━━━━━━━━━━━━\n`+
+    `🔑 *Código de seguimiento:* #${trackCode}\n\n`+
+    `📍 *Para ver el estado de tu pedido en tiempo real, abre este enlace:*\n${trackUrl}`;
+}
+
+function _construirWaHref(order, trackCode, trackToken){
+  const bizPhone = (CFG&&(CFG.config&&CFG.config.phone||CFG.phone))||'';
+  if(!bizPhone) return null;
+  const msg = _construirWaMsg(order, trackCode, trackToken);
+  return `https://wa.me/51${bizPhone}?text=${encodeURIComponent(msg)}`;
+}
+
 async function submitOrder(){
   const name  = ($('f_name')||{value:''}).value.trim();
   const phone = ($('f_phone')||{value:''}).value.trim();
@@ -1308,6 +1379,17 @@ async function submitOrder(){
   $('submitErrBox')&&($('submitErrBox').style.display='none');
   showOverlay(true);
 
+  // ★ Abrir una ventana YA, dentro del gesto del usuario (toque en "Confirmar").
+  // Si esperamos al await de Firebase, el navegador bloquea la apertura por no
+  // venir de un gesto. La ventana queda "en blanco" y le ponemos la URL de
+  // WhatsApp cuando llega la respuesta. Si el navegador la bloquea igual,
+  // _waWin será null y caemos al botón de respaldo en la pantalla de éxito.
+  let _waWin = null;
+  try { _waWin = window.open('', '_blank'); } catch(e){ _waWin = null; }
+  if(_waWin){
+    try { _waWin.document.write('<p style="font-family:sans-serif;padding:20px">Abriendo WhatsApp…</p>'); } catch(e){}
+  }
+
   try{
     // Crear el pedido vía Cloud Function (el público ya no escribe Firestore directo)
     const resp = await _api('create', null, {
@@ -1323,9 +1405,17 @@ async function submitOrder(){
     localStorage.setItem('dpanel_order_'+wsId, JSON.stringify({
       trackToken: resp.trackToken, orderId: resp.orderId, name: order.name
     }));
+    // ★ Redirigir la ventana ya abierta hacia WhatsApp con el mensaje completo
+    const waHref = _construirWaHref(order, resp.trackCode, resp.trackToken);
+    if(_waWin && waHref){
+      try { _waWin.location.href = waHref; } catch(e){ /* la pantalla tiene botón de respaldo */ }
+    } else if(_waWin){
+      try { _waWin.close(); } catch(e){}
+    }
     renderSuccessStep(order, resp.trackCode, resp.trackToken);
   }catch(e){
     showOverlay(false);
+    if(_waWin){ try { _waWin.close(); } catch(err){} } // cerrar la ventana en blanco si falló
     if(btn){ btn.disabled=false; btn.textContent='Confirmar pedido →'; }
     const eb=$('submitErrBox');
     if(eb){ eb.style.display='block'; eb.textContent=`Error al registrar: ${e.message}`; }
@@ -1343,16 +1433,7 @@ function renderSuccessStep(order, trackCode, trackToken){
     : selDateLbl||order.date;
 
   const trackUrl = `${location.origin}${location.pathname}?seg=${trackToken}`;
-
-  const refLine  = order.referencia    ? `\n📌 Referencia: ${order.referencia}` : '';
-  const dniLine  = order.dniRecoger    ? `\n🪪 DNI recoger: ${order.dniRecoger}` : '';
-  const encLine  = order.ciudadDestino ? `\n📦 Ciudad destino: ${order.ciudadDestino}\n🪪 DNI destinatario: ${order.dniDestinatario}` : '';
-  const notesLine= order.notes ? `\n📝 Notas: ${order.notes}` : '';
-  const dirLabel = selCourierType==='agencia'
-    ? `\n🏢 Agencia: ${order.address||'—'}`
-    : `\n🏠 Dirección: ${order.address||order.ciudadDestino||'—'}`;
-  const waMsg    = `📦 NUEVO PEDIDO — ${bizName}\n\n👤 Cliente: ${order.name}\n📞 WhatsApp: +51${order.phone}${dirLabel}${refLine}${dniLine}${encLine}\n🚚 Courier: ${order.courier}\n📅 Fecha: ${dateLabel}${notesLine}\n\n🔑 Código: #${trackCode}\n🔗 Ver estado: ${trackUrl}`;
-  const waHref   = bizPhone ? `https://wa.me/51${bizPhone}?text=${encodeURIComponent(waMsg)}` : null;
+  const waHref   = _construirWaHref(order, trackCode, trackToken);
 
   const extraRows = Object.entries(order.extra||{})
     .filter(([,v])=>v)
@@ -1364,8 +1445,8 @@ function renderSuccessStep(order, trackCode, trackToken){
     <div style="padding:8px 0">
       <div class="success">
         <div class="success-icon">✅</div>
-        <div class="success-ttl">¡Pedido registrado!</div>
-        <div class="success-sub">Tu pedido fue recibido con éxito.<br>Guarda tu código de seguimiento:</div>
+        <div class="success-ttl">¡Casi listo!</div>
+        <div class="success-sub" style="color:#25d366;font-weight:600">Falta 1 paso: envíanos tu pedido por WhatsApp para confirmarlo.</div>
         <div class="track-code">#${esc(trackCode)}</div>
         <div class="summary-rows">
           <div class="sum-row"><span class="sum-lbl">Cliente</span><span class="sum-val">${esc(order.name)}</span></div>
@@ -1380,8 +1461,15 @@ function renderSuccessStep(order, trackCode, trackToken){
           ${order.notes?`<div class="sum-row"><span class="sum-lbl">Notas</span><span class="sum-val">${esc(order.notes)}</span></div>`:''}
           ${extraRows}
         </div>
-        ${waHref?`<a class="btn-wa" href="${esc(waHref)}" target="_blank" rel="noopener">💬 Enviar por WhatsApp</a>`:''}
-        <button class="btn-purple" onclick="goToTracking('${esc(trackToken)}')">📍 Ver mi seguimiento</button>
+        ${waHref?`
+          <div style="background:rgba(37,211,102,.1);border:1px solid rgba(37,211,102,.3);border-radius:12px;padding:12px;margin-top:14px;margin-bottom:4px;font-size:13px;color:#25d366;text-align:center;line-height:1.5">
+            👆 Si WhatsApp no se abrió solo, toca el botón verde para enviar tu pedido.
+          </div>
+          <a class="btn-wa" href="${esc(waHref)}" target="_blank" rel="noopener" style="font-size:17px;padding:18px">💬 Enviar mi pedido por WhatsApp</a>
+        `:'<div class="error-box">No se pudo generar el enlace de WhatsApp. Contáctanos directamente.</div>'}
+        <div style="text-align:center;margin-top:14px">
+          <a href="${esc(trackUrl)}" style="color:#8b949e;font-size:12px;text-decoration:underline">Ver el seguimiento de mi pedido</a>
+        </div>
       </div>
     </div>
     <div class="footer">Panel de Entregas · Formulario público</div>

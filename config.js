@@ -111,7 +111,7 @@ function openWA(id){
 
   // Sin docs marcados y sin mensajes → WhatsApp directo
   if(!gChk&&!tChk&&!hasMsg){
-    window.open(`https://wa.me/51${s.phone}`,'_blank');
+    window.waOpen(s.phone);
     return;
   }
 
@@ -524,7 +524,7 @@ async function genToken(action){
       });
     } else {
       const msg='📦 Hola '+name+', aquí tu link para registrar tu pedido:\n\n'+url+(link?'\n\n📎 '+link:'');
-      if(phone){ window.open('https://wa.me/51'+phone+'?text='+encodeURIComponent(msg),'_blank'); }
+      if(phone){ window.waOpen(phone, msg); }
       else if(navigator.share){ navigator.share({title:'Pedido - '+name,text:msg}).catch(()=>window.open('https://wa.me/?text='+encodeURIComponent(msg),'_blank')); }
       else { window.open('https://wa.me/?text='+encodeURIComponent(msg),'_blank'); }
       toast('🔑 Link generado');
@@ -655,7 +655,7 @@ function _tokAction(idx, action){
       window.open('https://wa.me/?text='+encodeURIComponent(msg),'_blank');
     }
   } else if(action==='wa'){
-    window.open('https://wa.me/51'+tok.phone+'?text='+encodeURIComponent(msg),'_blank');
+    window.waOpen(tok.phone, msg);
   } else if(action==='open'){
     window.open(url,'_blank');
   } else if(action==='delete'){

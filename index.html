@@ -1390,6 +1390,22 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);max
 const cap=s=>s.charAt(0).toUpperCase()+s.slice(1);
 const $=id=>document.getElementById(id);
 
+// ★ WhatsApp centralizado: el prefijo de país vive en UN solo lugar.
+// waLink(phone,msg) → devuelve la URL. waOpen(phone,msg) → la abre.
+const WA_PREFIX = '51'; // código de país (Perú). Cambiar aquí si se necesita.
+window.waLink = function(phone, msg){
+  var p = String(phone||'').replace(/[^0-9]/g,''); // limpiar espacios, guiones, etc.
+  if(!p) return null;
+  var url = 'https://wa.me/' + WA_PREFIX + p;
+  if(msg) url += '?text=' + encodeURIComponent(msg);
+  return url;
+};
+window.waOpen = function(phone, msg){
+  var url = window.waLink(phone, msg);
+  if(url) window.open(url, '_blank');
+  return url;
+};
+
 /* STATE */
 let _mem={};
 function lsGet(k){try{return localStorage.getItem(k)}catch(e){return _mem[k]||null}}
@@ -1924,7 +1940,7 @@ function quickMsg(id,idx){
   const s=S.shipments.find(x=>x.id===id);if(!s)return;
   const msgs=S.msgTemplates[s.status]||['',''];
   const tpl=msgs[idx];if(!tpl||!tpl.trim())return;
-  window.open(`https://wa.me/51${s.phone}?text=${encodeURIComponent(fillVars(tpl,s))}`,'_blank');
+  window.waOpen(s.phone, fillVars(tpl,s));
 }
 
 /* SUPPLIERS */
@@ -2147,7 +2163,7 @@ function sendSuppList(suppId){
   let msg=`Hola! 👋 Te paso la lista de lo que necesito:\n\n`;
   pending.forEach((it,i)=>{ msg+=`${i+1}. ${it.text}\n`; });
   msg+=`\nGracias 🙏`;
-  window.open(`https://wa.me/51${sup.phone}?text=${encodeURIComponent(msg)}`,'_blank');
+  window.waOpen(sup.phone, msg);
 }
 
 function saveNewSupplier(){
