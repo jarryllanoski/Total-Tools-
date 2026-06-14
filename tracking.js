@@ -49,6 +49,10 @@ function _esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;'
 ══════════════════════════════════════════════ */
 async function consultarShalom(orderNumber, orderCode) {
   console.log('[Tracking] CONSULTANDO SHALOM', orderNumber, orderCode);
+  // ★ Timeout: si Shalom no responde en 12s, abortar y seguir con el siguiente.
+  // Evita que una consulta colgada trabe todo el ciclo de auto-tracking.
+  var _ctrl = new AbortController();
+  var _timer = setTimeout(function(){ _ctrl.abort(); }, 12000);
   try {
     var r = await fetch(TRK.FIREBASE_URL, {
       method: 'POST',
@@ -56,14 +60,21 @@ async function consultarShalom(orderNumber, orderCode) {
       body: JSON.stringify({
         orderNumber: String(orderNumber).trim(),
         orderCode:   String(orderCode || '').trim()
-      })
+      }),
+      signal: _ctrl.signal
     });
     var raw = await r.json();
     console.log('[Tracking] RESPUESTA SHALOM', raw);
     return raw;
   } catch(e) {
-    console.warn('[Tracking] Error fetch:', e.message);
+    if(e.name === 'AbortError'){
+      console.warn('[Tracking] Timeout 12s — Shalom no respondió:', orderNumber);
+    } else {
+      console.warn('[Tracking] Error fetch:', e.message);
+    }
     return null;
+  } finally {
+    clearTimeout(_timer); // ★ limpiar el temporizador pase lo que pase
   }
 }
 
