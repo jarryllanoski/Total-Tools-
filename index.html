@@ -137,6 +137,9 @@
   // ── SAVE ─────────────────────────────────────────────────────────────
   window._fbSave = async (data) => {
     window._isSaving = true; // ★ Mejora 2: cerrar la ventana de carrera con _mergeRemote
+    // ★ Guardado incremental: decidir qué shipments subir
+    const subirTodos = _dirtyAll || _dirtyShips.size === 0;
+    const idsASubir = subirTodos ? null : new Set(_dirtyShips);
     try {
       const saves=[];
       saves.push(fsPatch(cfgPath(),{
@@ -152,15 +155,23 @@
         ts:Date.now()
       }));
       for(const s of(data.shipments||[])){
+        // Incremental: subir solo los pedidos marcados como sucios (o todos)
+        if(idsASubir && !idsASubir.has(s.id)) continue;
         saves.push(fsPatch(shipPath(s.id),slimShipment(s)));
       }
-      for(const sup of(data.suppliers||[])){
-        saves.push(fsPatch(suppPath(sup.id),slimSupplier(sup)));
+      // Suppliers: solo cuando es guardado completo (cambian poco y son pocos)
+      if(subirTodos){
+        for(const sup of(data.suppliers||[])){
+          saves.push(fsPatch(suppPath(sup.id),slimSupplier(sup)));
+        }
       }
       await Promise.all(saves);
       window._fbStatus&&window._fbStatus('ok');
       // Backup en localStorage con timestamp de último sync exitoso
       lsSet('dpanel_last_sync', String(Date.now()));
+      // ★ Éxito: limpiar el registro de sucios
+      _dirtyShips.clear();
+      _dirtyAll = false;
     } catch(e){
       console.warn('Firebase save error:',e);
       window._fbStatus&&window._fbStatus('err');
@@ -1392,10 +1403,18 @@ let _S_TS = Date.now();
 window._S_TS = _S_TS;
 let _fbSaveTimer = null;
 
-const save = () => {
+// ★ Guardado incremental: registro de pedidos modificados ("sucios").
+// save(id) marca solo ese pedido para subir. save() sin id = subir todo (seguro).
+let _dirtyShips = new Set();
+let _dirtyAll = true; // true = subir todo (config/suppliers/masivo); arranque seguro
+
+const save = (shipId) => {
   _S_TS = Date.now();
   window._S_TS = _S_TS;
   window.S = S;
+  // Marcar qué cambió
+  if(shipId){ _dirtyShips.add(shipId); }
+  else { _dirtyAll = true; } // sin id → cambio de config/suppliers/masivo → subir todo
   lsSet('dpanel', JSON.stringify(window._slimStateForLocal ? window._slimStateForLocal(S) : S)); // ★ Mejora 3: local sin base64 pesadas
   clearTimeout(_fbSaveTimer);
   _fbSaveTimer = setTimeout(() => { _fbSaveWithRetry(S, 0); }, 800);
@@ -1867,7 +1886,7 @@ function toggleSel(id){const s=S.shipments.find(x=>x.id===id);if(!s)return;s.sel
 function selAll(){const all=S.shipments.every(x=>x.sel);S.shipments.forEach(x=>x.sel=!all);save();render()}
 
 /* DOC TOGGLE */
-function togDoc(id,slot){const s=S.shipments.find(x=>x.id===id);if(!s)return;if(slot==='guia')s.chkGuia=!s.chkGuia;else s.chkTicket=!s.chkTicket;save();render()}
+function togDoc(id,slot){const s=S.shipments.find(x=>x.id===id);if(!s)return;if(slot==='guia')s.chkGuia=!s.chkGuia;else s.chkTicket=!s.chkTicket;save(id);render()}
 
 /* QUICK MSG */
 function quickMsg(id,idx){
@@ -2237,13 +2256,13 @@ function openPrivateNote(id){
 function savePvtNote(){
   const s=S.shipments.find(x=>x.id===_pvtNoteId); if(!s) return;
   s.privateNote=$('pvtNoteInput').value.trim();
-  save(); render(); closeOverlay('pvtNoteOverlay');
+  save(s.id); render(); closeOverlay('pvtNoteOverlay'); // ★ incremental
   toast('🔒 Nota privada guardada');
 }
 function deletePvtNote(){
   const s=S.shipments.find(x=>x.id===_pvtNoteId); if(!s) return;
   s.privateNote='';
-  save(); render(); closeOverlay('pvtNoteOverlay');
+  save(s.id); render(); closeOverlay('pvtNoteOverlay'); // ★ incremental
   toast('🗑️ Nota eliminada');
 }
 
@@ -2300,7 +2319,7 @@ function applyStatus(st){
     toast(`${stIcon(st)} ${st} → ${sel.length} clientes`);
   } else {
     s.status=st; s.sel=false;
-    save(); render(); closeOverlay('statusOverlay');
+    save(s.id); render(); closeOverlay('statusOverlay'); // ★ incremental: solo este pedido
     toast(`${stIcon(st)} ${st}`);
   }
 }

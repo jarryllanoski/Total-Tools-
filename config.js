@@ -369,14 +369,15 @@ function saveShipment(){
     S.shipments[idx]={...prev,...data, _localTs: Date.now()};
     // Guardar inmediatamente en Firebase (sin esperar debounce)
     if(window._fbSaveShipmentNow) window._fbSaveShipmentNow(S.shipments[idx]);
+    save(_editId);closeOverlay('formOverlay');render(); // ★ incremental: solo este pedido
     toast('✅ Actualizado');}
   else{
     data.id='id_'+Date.now();data.createdAt=new Date().toISOString();data._localTs=Date.now();S.shipments.push(data);
     // Guardar inmediatamente en Firebase
     if(window._fbSaveShipmentNow) window._fbSaveShipmentNow(data);
+    save(data.id);closeOverlay('formOverlay');render(); // ★ incremental: solo este pedido
     toast('✅ Envío registrado');
   }
-  save();closeOverlay('formOverlay');render();
 }
 
 /* EXCEL EXPORT / IMPORT */
