@@ -121,6 +121,12 @@ function _html(){
     '<div class="dlv-sheet">'+
       '<div style="width:36px;height:4px;background:#30363d;border-radius:2px;margin:0 auto 14px"></div>'+
       '<div style="font-family:Syne,sans-serif;font-weight:800;font-size:16px;margin-bottom:12px">🛵 Asignar motorizado</div>'+
+      '<div style="font-size:10px;font-weight:700;color:#8b949e;letter-spacing:.8px;text-transform:uppercase;margin-bottom:6px">🗺️ Link de ruta (opcional)</div>'+
+      '<div style="display:flex;gap:8px;margin-bottom:6px">'+
+        '<input id="dlvRutaLink" class="fi" placeholder="https://… o ubicación en vivo" inputmode="url" style="flex:1">'+
+        '<button onclick="DeliveryModule._genRuta()" title="Generar ruta en Maps" style="background:rgba(56,139,253,.12);border:1px solid rgba(56,139,253,.25);border-radius:8px;color:var(--blue);padding:0 12px;font-size:13px;cursor:pointer;font-family:inherit;white-space:nowrap">🗺️ Maps</button>'+
+      '</div>'+
+      '<button onclick="DeliveryModule._saveRuta()" style="width:100%;padding:9px;background:rgba(163,113,247,.1);border:1px solid rgba(163,113,247,.3);border-radius:8px;color:#a371f7;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;margin-bottom:14px">💾 Guardar link de ruta</button>'+
       '<div id="dlvDrvList" style="display:flex;flex-direction:column;gap:7px;margin-bottom:12px;max-height:200px;overflow-y:auto"></div>'+
       '<div style="font-size:10px;font-weight:700;color:#8b949e;letter-spacing:.8px;text-transform:uppercase;margin-bottom:8px">NUEVO MOTORIZADO</div>'+
       '<input id="dlvDrvName" class="fi" placeholder="Nombre..." style="margin-bottom:8px">'+
@@ -160,6 +166,7 @@ function _render(){
   list.innerHTML=ships.map(function(s,i){
     var drv=s._dlvDriver||'';
     var drvPhone=s._dlvDriverPhone||'';
+    var rutaLink=s._dlvRutaLink||'';
     var isDone=!!s._dlvDone;
     var addr=[s.address,s.referencia].filter(Boolean).join(' · ')||'—';
     var hasGps=!!s.gpsCoords;
@@ -172,6 +179,7 @@ function _render(){
             (drvPhone?'<div class="dlvc-drv-phone">📞 '+_esc(drvPhone)+'</div>':'')+
           '</div>'+
           '<div class="dlvc-drv-btns">'+
+            (rutaLink?'<button class="dlvc-drv-btn" style="background:rgba(163,113,247,.15);color:#a371f7" onclick="event.stopPropagation();DeliveryModule._verRuta(\''+s.id+'\')" title="Ver ruta">🗺️</button>':'')+
             (drvPhone
               ?'<button class="dlvc-drv-btn" style="background:rgba(37,211,102,.15);color:#25d366" onclick="event.stopPropagation();window.open(\'https://wa.me/51'+drvPhone+'\',\'_blank\')" title="WhatsApp">💬</button>'+
                '<button class="dlvc-drv-btn" style="background:rgba(56,139,253,.15);color:var(--blue)" onclick="event.stopPropagation();window.open(\'tel:'+drvPhone+'\')" title="Llamar">📞</button>'
@@ -224,6 +232,7 @@ DeliveryModule._openDrv=function(id){
         '</div>';
       }).join('')
     :'<div style="text-align:center;padding:16px;color:#8b949e;font-size:12px">Sin motorizados. Agrega uno abajo.</div>';
+  var _rl=document.getElementById('dlvRutaLink'); if(_rl) _rl.value=(ship&&ship._dlvRutaLink)||'';
   document.getElementById('dlvDrvOv').classList.add('open');
 };
 DeliveryModule._addDrv=function(){
@@ -241,11 +250,50 @@ DeliveryModule._delDrv=function(name){
 };
 DeliveryModule._selDrv=function(name,phone){
   var ship=((global.S&&global.S.shipments)||[]).find(function(x){return x.id===_currentShipId;});
-  if(ship){ship._dlvDriver=name;ship._dlvDriverPhone=phone||'';if(typeof global.save==='function')global.save();}
+  if(ship){
+    ship._dlvDriver=name;ship._dlvDriverPhone=phone||'';
+    var raw=(document.getElementById('dlvRutaLink')||{value:''}).value.trim();
+    if(raw){var n=_normLink(raw);if(n)ship._dlvRutaLink=n;}
+    else if(ship._dlvRutaLink){delete ship._dlvRutaLink;}
+    if(typeof global.save==='function')global.save();
+  }
   DeliveryModule._closeDrv();_render();
   if(typeof global.toast==='function')global.toast('🛵 '+name+' asignado');
 };
 DeliveryModule._closeDrv=function(){document.getElementById('dlvDrvOv').classList.remove('open');};
+
+/* ── Link de ruta del motorizado (por pedido) ────────────────────── */
+function _normLink(u){
+  u=String(u||'').trim();
+  if(!u) return '';
+  if(/^javascript:/i.test(u)) return '';
+  if(/^https?:\/\//i.test(u)) return u;
+  if(/^[a-z][a-z0-9+.-]*:/i.test(u)) return ''; // otros esquemas rechazados
+  return 'https://'+u;
+}
+DeliveryModule._genRuta=function(){
+  var ship=((global.S&&global.S.shipments)||[]).find(function(x){return x.id===_currentShipId;});
+  if(!ship)return;
+  var dest=ship.gpsCoords||[ship.address,ship.referencia].filter(Boolean).join(', ');
+  var inp=document.getElementById('dlvRutaLink');
+  if(inp)inp.value='https://www.google.com/maps/dir/?api=1&destination='+encodeURIComponent(dest);
+};
+DeliveryModule._saveRuta=function(){
+  var ship=((global.S&&global.S.shipments)||[]).find(function(x){return x.id===_currentShipId;});
+  if(!ship)return;
+  var raw=(document.getElementById('dlvRutaLink')||{value:''}).value.trim();
+  if(!raw){ delete ship._dlvRutaLink; }
+  else{ var n=_normLink(raw); if(!n){if(typeof global.toast==='function')global.toast('⚠️ Link de ruta inválido');return;} ship._dlvRutaLink=n; }
+  if(typeof global.save==='function')global.save();
+  DeliveryModule._closeDrv();_render();
+  if(typeof global.toast==='function')global.toast(ship._dlvRutaLink?'🗺️ Ruta guardada':'Ruta quitada');
+};
+DeliveryModule._verRuta=function(id){
+  var ship=((global.S&&global.S.shipments)||[]).find(function(x){return x.id===id;});
+  var url=ship&&ship._dlvRutaLink?String(ship._dlvRutaLink):'';
+  if(!/^https?:\/\//i.test(url)){if(typeof global.toast==='function')global.toast('⚠️ Link de ruta inválido');return;}
+  window.open(url,'_blank');
+};
 
 /* ── Confirmar entrega ───────────────────────────────────────────── */
 DeliveryModule._openConf=function(id){
