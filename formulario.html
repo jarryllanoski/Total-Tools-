@@ -642,10 +642,21 @@ function abrirAyudaTrack(){
 function _courierLabel(name, type){
   const u=(name||'').toUpperCase();
   if(u.includes('RETIRO')) return 'Retiro en tienda';
-  if(u.includes('ENCOMIENDA')) return `Encomienda – ${name}`;
-  const isKnownAgency=['SHALOM','OLVA','MARVISUR','DINSIDES'].some(n=>u.includes(n));
-  if(type==='agencia'||isKnownAgency) return `Retiro en agencia ${name}`;
+  if(u.includes('ENCOMIENDA')) return 'Encomienda';
   return name;
+}
+
+// Emoji representativo según el courier (íconos sin imágenes externas)
+function _courierIcon(name, type){
+  const u=(name||'').toUpperCase();
+  if(u.includes('RETIRO')) return '🏪';
+  if(u.includes('ENCOMIENDA')) return '📦';
+  if(u.includes('DELIVERY')) return '🏍️';
+  if(u.includes('SHALOM')) return '🚚';
+  if(u.includes('OLVA')) return '🚚';
+  if(u.includes('MARVISUR')) return '🚚';
+  if(u.includes('DINSIDES')) return '🚚';
+  return (type==='agencia') ? '🏢' : '🚚';
 }
 
 function renderForm(){
@@ -701,6 +712,7 @@ function renderForm(){
           ${courierOpts}
         </select>
         <div class="ferr" id="err_courier">Selecciona cómo recibir tu pedido</div>
+        <div id="courierBadge" style="display:none"></div>
       </div>
 
       <div id="agencyBox" style="display:none"></div>
@@ -854,6 +866,24 @@ function onCourierChange(name){
     if(encBox) encBox.style.display='none';
     _updateKnownAddrShortcut();
   }
+  // Tarjeta visual con el ícono del courier elegido
+  const badge=$('courierBadge');
+  if(badge){
+    if(name){
+      const ico=_courierIcon(name, selCourierType);
+      const tipoTxt = selCourierType==='agencia'?'Retiro en agencia'
+                    : selCourierType==='retiro'?'Retiro en tienda'
+                    : selCourierType==='encomienda'?'Encomienda'
+                    : 'Envío a domicilio';
+      badge.style.display='block';
+      badge.innerHTML=`<div style="display:flex;align-items:center;gap:12px;background:var(--card);border:1.5px solid var(--blue);border-radius:12px;padding:12px 14px;margin-top:8px">
+        <div style="font-size:28px;flex-shrink:0">${ico}</div>
+        <div><div style="font-size:14px;font-weight:700;color:var(--text)">${esc(name)}</div><div style="font-size:11px;color:var(--text2)">${tipoTxt}</div></div>
+      </div>`;
+    } else {
+      badge.style.display='none';
+    }
+  }
 }
 
 function _updateKnownAddrShortcut(){
@@ -866,15 +896,14 @@ function _updateKnownAddrShortcut(){
     const short = full.length>70 ? full.slice(0,70)+'…' : full;
     shortcut.style.display='block';
     shortcut.innerHTML=`
-      <div class="addr-opt active" onclick="useKnownAddress()" style="align-items:flex-start">
-        <div class="addr-opt-icon">✅</div>
+      <div class="addr-opt" id="knownAddrOpt" onclick="useKnownAddress()" style="align-items:flex-start">
+        <div class="addr-opt-icon">📍</div>
         <div class="addr-opt-body">
           <div class="addr-opt-lbl">Usar mi dirección de siempre</div>
           <div class="addr-opt-desc" style="color:var(--text2)">${esc(short)}</div>
         </div>
       </div>
       <div onclick="mostrarOtrasOpciones()" id="otrasOpcLink" style="text-align:center;margin:10px 0 4px;color:var(--blue);font-size:13px;font-weight:600;cursor:pointer;text-decoration:underline">Usar otra dirección</div>`;
-    // Ocultar las opciones GPS/manual hasta que toque "Usar otra dirección"
     if(opts) opts.style.display='none';
   } else {
     shortcut.style.display='none';
@@ -888,10 +917,12 @@ function mostrarOtrasOpciones(){
   if(opts) opts.style.display='flex';
   const link=$('otrasOpcLink');
   if(link) link.style.display='none';
-  // Quitar la marca "active" de la dirección anterior
-  const shortcut=$('addrShortcut');
-  const knownOpt=shortcut&&shortcut.querySelector('.addr-opt');
+  const knownOpt=$('knownAddrOpt');
   if(knownOpt) knownOpt.classList.remove('active');
+  // Si tenía la dirección anterior elegida, limpiarla para que tome la nueva
+  if(_addrMode==='known'){ _deliveryAddr=''; _addrMode=''; }
+  const confirmed=$('addrConfirmed');
+  if(confirmed) confirmed.remove();
 }
 
 function useKnownAddress(){
