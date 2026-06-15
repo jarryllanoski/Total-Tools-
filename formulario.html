@@ -913,22 +913,22 @@ function _updateKnownAddrShortcut(){
 
 // Cuando el cliente con dirección anterior quiere usar otra: revela GPS/manual
 function mostrarOtrasOpciones(){
-  const opts=$('addrOpts');
-  if(opts) opts.style.display='flex';
-  const link=$('otrasOpcLink');
-  if(link) link.style.display='none';
-  const knownOpt=$('knownAddrOpt');
-  if(knownOpt) knownOpt.classList.remove('active');
-  // Si tenía la dirección anterior elegida, limpiarla para que tome la nueva
-  if(_addrMode==='known'){ _deliveryAddr=''; _addrMode=''; }
+  // Limpiar cualquier selección previa de la dirección de siempre
+  _deliveryAddr=''; _addrMode='';
   const confirmed=$('addrConfirmed');
   if(confirmed) confirmed.remove();
+  // Ocultar el bloque de "dirección de siempre" y mostrar GPS/manual
+  const shortcut=$('addrShortcut');
+  if(shortcut) shortcut.style.display='none';
+  const opts=$('addrOpts');
+  if(opts) opts.style.display='flex';
 }
 
 function useKnownAddress(){
   if(!_knownClient||!_knownClient.address) return;
   _deliveryAddr=_knownClient.address;
   _addrMode='known';
+  // Ocultar TODO lo demás y mostrar solo la confirmación
   const shortcut=$('addrShortcut');
   if(shortcut) shortcut.style.display='none';
   const opts=$('addrOpts');
@@ -949,9 +949,8 @@ function useKnownAddress(){
 function changeAddress(){
   _deliveryAddr=''; _addrMode='';
   const confirmed=$('addrConfirmed');
-  if(confirmed) confirmed.innerHTML='';
-  const opts=$('addrOpts');
-  if(opts) opts.style.display='';
+  if(confirmed) confirmed.remove();
+  // Volver a mostrar el estado inicial (dirección de siempre + opciones)
   _updateKnownAddrShortcut();
 }
 
@@ -1016,7 +1015,7 @@ function renderAgencyBox(courierName){
           oninput="onAgencyManual(this.value)"
           style="resize:vertical;min-height:70px;font-family:inherit"></textarea>
       </div>
-      <div class="ferr" id="err_agency" style="margin-top:2px">Escribe la agencia de destino</div>
+      <div class="ferr" id="err_agency_manual" style="margin-top:2px">Escribe la agencia de destino</div>
       <div class="fg" style="margin-top:14px;margin-bottom:0">
         <input class="fi" id="f_dni_recoger" type="text" inputmode="numeric"
           placeholder="🪪 DNI para recoger *" maxlength="8" pattern="[0-9]*">
@@ -1403,8 +1402,22 @@ async function submitOrder(){
 
   if(!selCourierName){ $('err_courier')&&$('err_courier').classList.add('show'); ok=false; }
   else               { $('err_courier')&&$('err_courier').classList.remove('show'); }
-  if(selCourierType==='agencia'&&!agState.addr){ $('err_agency')&&$('err_agency').classList.add('show'); ok=false; }
-  else               { $('err_agency')&&$('err_agency').classList.remove('show'); }
+  // Validación de agencia: si es OLVA/manual, leer directo del campo (robusto)
+  const manualAgInput = $('agcManualInput');
+  if(manualAgInput){
+    // Modo manual (OLVA): tomar lo escrito directamente
+    const manualTxt = manualAgInput.value.trim();
+    agState.addr = manualTxt; // sincronizar por si acaso
+    if(selCourierType==='agencia' && !manualTxt){
+      $('err_agency_manual')&&$('err_agency_manual').classList.add('show'); ok=false;
+    } else {
+      $('err_agency_manual')&&$('err_agency_manual').classList.remove('show');
+    }
+  } else if(selCourierType==='agencia'&&!agState.addr){
+    $('err_agency')&&$('err_agency').classList.add('show'); ok=false;
+  } else {
+    $('err_agency')&&$('err_agency').classList.remove('show');
+  }
   if(!selDateIso)    { $('err_date')&&$('err_date').classList.add('show'); ok=false; }
   else               { $('err_date')&&$('err_date').classList.remove('show'); }
 
@@ -2033,6 +2046,12 @@ window.goToTracking         = goToTracking;
 window.clearOrderAndReset   = clearOrderAndReset;
 window.nuevoRegistro        = nuevoRegistro;
 window.checkToken           = checkToken;
+// ★ Funciones que faltaban exponer (por eso sus onclick no funcionaban)
+window.abrirAyudaForm       = abrirAyudaForm;
+window.abrirAyudaTrack      = abrirAyudaTrack;
+window.mostrarOtrasOpciones = mostrarOtrasOpciones;
+window.onAgencyManual       = onAgencyManual;
+window.toggleShalomHelp     = toggleShalomHelp;
 
 })();
 </script>
