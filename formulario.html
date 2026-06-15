@@ -970,9 +970,28 @@ function renderAgencyBox(courierName){
     shalomPrecargar();
     return;
   }
+  // ★ OLVA (y cualquier agencia sin base de datos): entrada manual
   const data  = getAgencyData(courierName);
-  if(!data){
-    agBox.innerHTML=`<div class="agc-box"><span class="agc-lbl">Agencia</span><div style="font-size:13px;color:var(--text2)">Sin datos de agencia para este courier.</div></div>`;
+  const esOlva = (courierName||'').toUpperCase().includes('OLVA');
+  if(esOlva || !data){
+    agBox.innerHTML=`<div class="agc-box">
+      <span class="agc-lbl">🏢 Escribe la agencia de ${esc(courierName)}</span>
+      <div style="font-size:12px;color:var(--text2);margin-bottom:10px;line-height:1.5">
+        Indica el departamento, provincia, distrito y dirección de la agencia donde quieres recoger tu pedido.
+      </div>
+      <div class="fg" style="margin-bottom:8px">
+        <textarea class="fi" id="agcManualInput" rows="3"
+          placeholder="Ej: Arequipa / Cerro Colorado — Av. Ejército 123, agencia Olva Zamácola"
+          oninput="onAgencyManual(this.value)"
+          style="resize:vertical;min-height:70px;font-family:inherit"></textarea>
+      </div>
+      <div class="ferr" id="err_agency" style="margin-top:2px">Escribe la agencia de destino</div>
+      <div class="fg" style="margin-top:14px;margin-bottom:0">
+        <input class="fi" id="f_dni_recoger" type="text" inputmode="numeric"
+          placeholder="🪪 DNI para recoger *" maxlength="8" pattern="[0-9]*">
+        <div class="ferr" id="err_dni_recoger">Ingresa el DNI (8 dígitos)</div>
+      </div>
+    </div>`;
     return;
   }
   const depts = Object.keys(data).sort();
@@ -1013,6 +1032,13 @@ function renderAgencyBox(courierName){
       <div class="ferr" id="err_dni_recoger">Ingresa el DNI (8 dígitos)</div>
     </div>
   </div>`;
+}
+
+// Entrada manual de agencia (OLVA y agencias sin base de datos)
+function onAgencyManual(val){
+  const txt=(val||'').trim();
+  agState = {dept:'', prov:'', dist:'', addr:txt};
+  if(txt){ $('err_agency')&&$('err_agency').classList.remove('show'); }
 }
 
 function onDept(courier){
