@@ -228,6 +228,35 @@
     try { rec.start(); } catch (e) { escuchando = false; setBtn(false); }
   }
 
+  // ── Auto-montaje del botón 🎤 (antes del punto verde #fbDot) ────────────
+  // No necesitas editar el header a mano: el botón se crea solo.
+  // Idempotente: si ya existe #voiceBtn no lo duplica.
+  function montarBoton() {
+    if (document.getElementById('voiceBtn')) return;
+    const dot = document.getElementById('fbDot');
+    const b = document.createElement('button');
+    b.id = 'voiceBtn';
+    b.type = 'button';
+    b.title = 'Jarvy — asistente de voz';
+    b.textContent = '🎤';
+    b.style.cssText = 'background:transparent;border:1px solid var(--bd);border-radius:8px;' +
+      'font-size:14px;line-height:1;padding:3px 6px;cursor:pointer;flex-shrink:0;color:inherit';
+    b.addEventListener('click', toggle);
+    if (dot && dot.parentNode) {
+      dot.parentNode.insertBefore(b, dot); // ← justo antes del punto verde
+    } else {
+      // Respaldo: si no encuentra el punto verde, botón flotante arriba a la derecha
+      b.style.cssText += ';position:fixed;top:12px;right:120px;z-index:99999';
+      document.body.appendChild(b);
+    }
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', montarBoton);
+  } else {
+    montarBoton();
+  }
+
   // API pública mínima
-  window.Voz = { toggle: toggle, decir: decir, interpretar: interpretar };
+  window.Voz = { toggle: toggle, decir: decir, interpretar: interpretar, montarBoton: montarBoton };
 })();
