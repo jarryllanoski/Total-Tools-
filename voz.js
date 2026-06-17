@@ -205,11 +205,19 @@
     return r;
   }
 
+  // ── Indicador de estado: grabando vs inactivo ──────────────────────────
+  // El botón cambia 🎤→🔴 con anillo pulsante, y aparece una píldora
+  // "🔴 Escuchando…" para que sea inequívoco cuándo está grabando.
   function setBtn(on) {
     const b = document.getElementById('voiceBtn');
-    if (!b) return;
-    b.textContent = on ? '🔴' : '🎤';
-    b.style.background = on ? 'rgba(247,129,102,.18)' : 'transparent';
+    if (b) {
+      b.textContent = on ? '🔴' : '🎤';
+      b.style.background = on ? 'rgba(247,129,102,.20)' : 'transparent';
+      b.style.animation = on ? 'vozPulse 1.1s infinite' : 'none';
+      b.title = on ? 'Escuchando… (toca para detener)' : 'Jarvy — asistente de voz';
+    }
+    const pill = document.getElementById('vozStatus');
+    if (pill) pill.style.display = on ? 'flex' : 'none';
   }
 
   function toggle() {
@@ -228,10 +236,90 @@
     try { rec.start(); } catch (e) { escuchando = false; setBtn(false); }
   }
 
+  // ── Triple toque sobre el 🎤 → abre la ayuda ────────────────────────────
+  let taps = 0, tapTimer = null;
+  function onTap() {
+    taps++;
+    clearTimeout(tapTimer);
+    if (taps >= 3) {                      // 3 toques seguidos → ayuda
+      taps = 0;
+      if (escuchando) { try { rec && rec.stop(); } catch (e) {} }
+      abrirAyuda();
+      return;
+    }
+    tapTimer = setTimeout(() => {          // 1 toque → grabar / detener
+      const n = taps; taps = 0;
+      if (n === 1) toggle();
+    }, 320);
+  }
+
+  // ── Panel de ayuda (se inyecta solo, no toca index.html) ────────────────
+  function ensureAyuda() {
+    if (document.getElementById('vozAyuda')) return;
+    const ov = document.createElement('div');
+    ov.id = 'vozAyuda';
+    ov.style.cssText = 'display:none;position:fixed;inset:0;z-index:100000;' +
+      'background:rgba(0,0,0,.6);align-items:center;justify-content:center;padding:18px';
+    ov.addEventListener('click', (e) => { if (e.target === ov) cerrarAyuda(); });
+    ov.innerHTML =
+      '<div style="background:var(--bg2,#161b22);border:1px solid var(--bd,#30363d);' +
+        'border-radius:14px;max-width:420px;width:100%;max-height:82vh;overflow:auto;' +
+        'padding:18px;color:var(--text,#e6edf3);font-family:inherit">' +
+        '<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">' +
+          '<div style="font-size:18px;font-weight:800;flex:1">🎤 Jarvy — Asistente de voz</div>' +
+          '<button onclick="window.Voz.cerrarAyuda()" style="background:none;border:1px solid var(--bd,#30363d);' +
+            'border-radius:8px;color:var(--text,#e6edf3);font-size:16px;cursor:pointer;padding:2px 9px">✕</button>' +
+        '</div>' +
+        '<div style="font-size:12px;color:var(--text2,#8b949e);line-height:1.6;margin-bottom:14px">' +
+          'Toca el 🎤, habla <b>una frase</b> y se apaga solo. Cuando grabe verás <b>🔴 Escuchando…</b>. ' +
+          'Triple toque sobre el 🎤 = abrir esta ayuda.</div>' +
+        cmd('🔍 Buscar', '“buscar Daniel”') +
+        cmd('🔢 Contar', '“cuántos nuevos”, “cuántos enviados”') +
+        cmd('📊 Ver estado', '“estado de Daniel”') +
+        cmd('🏷️ Cambiar etiqueta', '“marca a Daniel como enviado” — avanza o retrocede 1 paso') +
+        cmd('💬 WhatsApp', '“whatsapp a Daniel”') +
+        cmd('❓ Ayuda por voz', '“ayuda”') +
+      '</div>';
+    document.body.appendChild(ov);
+  }
+  function cmd(titulo, ejemplo) {
+    return '<div style="background:var(--bg3,#0d1117);border:1px solid var(--bd,#30363d);' +
+      'border-radius:10px;padding:10px 12px;margin-bottom:8px">' +
+      '<div style="font-size:13px;font-weight:700;margin-bottom:3px">' + titulo + '</div>' +
+      '<div style="font-size:12px;color:var(--text2,#8b949e)">' + ejemplo + '</div></div>';
+  }
+  function abrirAyuda() { ensureAyuda(); const o = document.getElementById('vozAyuda'); if (o) o.style.display = 'flex'; }
+  function cerrarAyuda() { const o = document.getElementById('vozAyuda'); if (o) o.style.display = 'none'; }
+
+  // ── Estilos inyectados (anillo pulsante + píldora de estado) ────────────
+  function ensureEstilos() {
+    if (document.getElementById('vozEstilos')) return;
+    const st = document.createElement('style');
+    st.id = 'vozEstilos';
+    st.textContent =
+      '@keyframes vozPulse{0%{box-shadow:0 0 0 0 rgba(247,129,102,.55)}' +
+      '70%{box-shadow:0 0 0 7px rgba(247,129,102,0)}100%{box-shadow:0 0 0 0 rgba(247,129,102,0)}}';
+    document.head.appendChild(st);
+  }
+  function ensurePill() {
+    if (document.getElementById('vozStatus')) return;
+    const p = document.createElement('div');
+    p.id = 'vozStatus';
+    p.style.cssText = 'display:none;position:fixed;top:10px;left:50%;transform:translateX(-50%);' +
+      'z-index:100001;align-items:center;gap:7px;background:rgba(247,129,102,.16);' +
+      'border:1px solid rgba(247,129,102,.5);color:#f78166;border-radius:20px;' +
+      'padding:6px 14px;font-size:13px;font-weight:700;font-family:inherit;' +
+      'animation:vozPulse 1.1s infinite';
+    p.textContent = '🔴 Escuchando…';
+    document.body.appendChild(p);
+  }
+
   // ── Auto-montaje del botón 🎤 (antes del punto verde #fbDot) ────────────
   // No necesitas editar el header a mano: el botón se crea solo.
   // Idempotente: si ya existe #voiceBtn no lo duplica.
   function montarBoton() {
+    ensureEstilos();
+    ensurePill();
     if (document.getElementById('voiceBtn')) return;
     const dot = document.getElementById('fbDot');
     const b = document.createElement('button');
@@ -241,7 +329,7 @@
     b.textContent = '🎤';
     b.style.cssText = 'background:transparent;border:1px solid var(--bd);border-radius:8px;' +
       'font-size:14px;line-height:1;padding:3px 6px;cursor:pointer;flex-shrink:0;color:inherit';
-    b.addEventListener('click', toggle);
+    b.addEventListener('click', onTap);
     if (dot && dot.parentNode) {
       dot.parentNode.insertBefore(b, dot); // ← justo antes del punto verde
     } else {
@@ -257,6 +345,9 @@
     montarBoton();
   }
 
-  // API pública mínima
-  window.Voz = { toggle: toggle, decir: decir, interpretar: interpretar, montarBoton: montarBoton };
+  // API pública
+  window.Voz = {
+    toggle: toggle, decir: decir, interpretar: interpretar,
+    montarBoton: montarBoton, abrirAyuda: abrirAyuda, cerrarAyuda: cerrarAyuda
+  };
 })();
