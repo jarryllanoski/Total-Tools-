@@ -159,10 +159,56 @@
           'Marca a nombre como enviado. WhatsApp a nombre.');
   }
 
+  // ── Frases personalizadas (se guardan en el dispositivo, cero Firebase) ─
+  const LS_KEY = 'vozFrasesPersonalizadas';
+  function cargarFrases() {
+    try { return JSON.parse(localStorage.getItem(LS_KEY) || '[]'); } catch (e) { return []; }
+  }
+  function guardarFrases(arr) {
+    try { localStorage.setItem(LS_KEY, JSON.stringify(arr)); } catch (e) {}
+  }
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c];
+    });
+  }
+
+  // Ejecuta una acción YA programada. capturado = lo que sigue a tu frase;
+  // argFijo = el dato fijo que configuraste (opcional).
+  function ejecutar(accion, capturado, argFijo) {
+    capturado = (capturado || '').trim();
+    argFijo = (argFijo || '').trim();
+    switch (accion) {
+      case 'buscar':   buscar(argFijo || capturado); return true;
+      case 'contar':   contar(argFijo || capturado); return true;
+      case 'estado':   estadoDe(argFijo || capturado); return true;
+      case 'whatsapp': whatsapp(argFijo || capturado); return true;
+      case 'etiqueta': cambiarEtiqueta(capturado, argFijo); return true; // argFijo = etiqueta destino
+      case 'ayuda':    ayudaVoz(); return true;
+      default: return false;
+    }
+  }
+
+  // ¿El texto hablado coincide con alguna frase personalizada?
+  function matchPersonalizada(t) {
+    const reglas = cargarFrases();
+    for (let i = 0; i < reglas.length; i++) {
+      const r = reglas[i];
+      const f = norm(r.frase);
+      if (!f) continue;
+      if (t === f) { ejecutar(r.accion, '', r.arg); return true; }
+      if (t.indexOf(f + ' ') === 0) { ejecutar(r.accion, t.slice(f.length).trim(), r.arg); return true; }
+    }
+    return false;
+  }
+
   // ── Interpretar el texto reconocido → comando ───────────────────────────
   function interpretar(texto) {
     const t = norm(texto);
     let mm;
+
+    // 1º) Frases personalizadas (tienen prioridad sobre los comandos base)
+    if (matchPersonalizada(t)) return;
 
     // Cambiar etiqueta: "marca a juan como enviado" / "cambia a juan a enviado" / "pon a juan en enviado"
     mm = t.match(/^(?:marca|cambia|pon|mueve|pasa)\s+(?:a\s+)?(.+?)\s+(?:como|a|en|al)\s+(.+)$/);
@@ -276,8 +322,85 @@
         cmd('🏷️ Cambiar etiqueta', '“marca a Daniel como enviado” — avanza o retrocede 1 paso') +
         cmd('💬 WhatsApp', '“whatsapp a Daniel”') +
         cmd('❓ Ayuda por voz', '“ayuda”') +
+
+        // ── Mis frases personalizadas ──────────────────────────────────
+        '<div style="border-top:1px solid var(--bd,#30363d);margin:14px 0 10px;padding-top:12px;' +
+          'font-size:15px;font-weight:800">⭐ Mis frases</div>' +
+        '<div style="font-size:12px;color:var(--text2,#8b949e);line-height:1.6;margin-bottom:10px">' +
+          'Define tu palabra y qué acción ya programada ejecuta. Si dejas el <b>dato fijo</b> vacío, ' +
+          'usa lo que digas después de tu palabra. Ej: “abre” + Buscar → dices “abre Daniel”. ' +
+          'O “resumen” + Contar + dato “nuevos” → dices “resumen”.</div>' +
+        '<div id="vozMisFrases"></div>' +
+        '<div style="display:flex;flex-direction:column;gap:8px;background:var(--bg3,#0d1117);' +
+          'border:1px solid var(--bd,#30363d);border-radius:10px;padding:10px 12px;margin-top:6px">' +
+          '<input id="vozFraseInp" placeholder="Lo que dices (ej: abre)" ' +
+            'style="' + inpCss() + '"/>' +
+          '<select id="vozAccionSel" style="' + inpCss() + '">' +
+            '<option value="buscar">Buscar</option>' +
+            '<option value="contar">Contar</option>' +
+            '<option value="estado">Ver estado</option>' +
+            '<option value="whatsapp">WhatsApp</option>' +
+            '<option value="etiqueta">Cambiar etiqueta a…</option>' +
+            '<option value="ayuda">Ayuda</option>' +
+          '</select>' +
+          '<input id="vozArgInp" placeholder="Dato fijo opcional (ej: nuevos / enviado)" ' +
+            'style="' + inpCss() + '"/>' +
+          '<button onclick="window.Voz.agregarFrase()" style="background:var(--ac,#388bfd);' +
+            'border:none;border-radius:8px;color:#fff;font-weight:700;font-size:13px;' +
+            'padding:9px;cursor:pointer">➕ Agregar frase</button>' +
+        '</div>' +
       '</div>';
     document.body.appendChild(ov);
+  }
+  function inpCss() {
+    return 'background:var(--bg2,#161b22);border:1px solid var(--bd,#30363d);border-radius:8px;' +
+      'color:var(--text,#e6edf3);font-size:13px;padding:9px 10px;width:100%;box-sizing:border-box;' +
+      'font-family:inherit';
+  }
+  function renderFrases() {
+    const cont = document.getElementById('vozMisFrases');
+    if (!cont) return;
+    const reglas = cargarFrases();
+    if (reglas.length === 0) {
+      cont.innerHTML = '<div style="font-size:12px;color:var(--text2,#8b949e);margin-bottom:8px">' +
+        'Aún no tienes frases personalizadas.</div>';
+      return;
+    }
+    cont.innerHTML = reglas.map(function (r, i) {
+      const det = r.arg
+        ? (' → ' + esc(r.accion) + ' “' + esc(r.arg) + '”')
+        : (' → ' + esc(r.accion) + ' (lo que sigas diciendo)');
+      return '<div style="display:flex;align-items:center;gap:8px;background:var(--bg3,#0d1117);' +
+        'border:1px solid var(--bd,#30363d);border-radius:10px;padding:8px 10px;margin-bottom:6px">' +
+        '<div style="flex:1;font-size:12px"><b>“' + esc(r.frase) + '”</b>' +
+        '<span style="color:var(--text2,#8b949e)">' + det + '</span></div>' +
+        '<button onclick="window.Voz.borrarFrase(' + i + ')" style="background:none;' +
+        'border:1px solid var(--bd,#30363d);border-radius:8px;color:#f78166;cursor:pointer;' +
+        'padding:2px 8px">✕</button></div>';
+    }).join('');
+  }
+  function agregarFrase() {
+    const fr = document.getElementById('vozFraseInp');
+    const ac = document.getElementById('vozAccionSel');
+    const ar = document.getElementById('vozArgInp');
+    if (!fr || !ac) return;
+    const frase = (fr.value || '').trim();
+    if (!frase) { _toast('Escribe la frase'); return; }
+    if (ac.value === 'etiqueta' && !(ar && ar.value.trim())) {
+      _toast('Para “Cambiar etiqueta”, pon la etiqueta destino en el dato fijo'); return;
+    }
+    const reglas = cargarFrases();
+    reglas.push({ frase: frase, accion: ac.value, arg: (ar && ar.value || '').trim() });
+    guardarFrases(reglas);
+    fr.value = ''; if (ar) ar.value = '';
+    renderFrases();
+    _toast('✅ Frase agregada');
+  }
+  function borrarFrase(i) {
+    const reglas = cargarFrases();
+    reglas.splice(i, 1);
+    guardarFrases(reglas);
+    renderFrases();
   }
   function cmd(titulo, ejemplo) {
     return '<div style="background:var(--bg3,#0d1117);border:1px solid var(--bd,#30363d);' +
@@ -285,7 +408,7 @@
       '<div style="font-size:13px;font-weight:700;margin-bottom:3px">' + titulo + '</div>' +
       '<div style="font-size:12px;color:var(--text2,#8b949e)">' + ejemplo + '</div></div>';
   }
-  function abrirAyuda() { ensureAyuda(); const o = document.getElementById('vozAyuda'); if (o) o.style.display = 'flex'; }
+  function abrirAyuda() { ensureAyuda(); renderFrases(); const o = document.getElementById('vozAyuda'); if (o) o.style.display = 'flex'; }
   function cerrarAyuda() { const o = document.getElementById('vozAyuda'); if (o) o.style.display = 'none'; }
 
   // ── Estilos inyectados (parpadeo del botón al grabar) ───────────────────
@@ -331,6 +454,7 @@
   // API pública
   window.Voz = {
     toggle: toggle, decir: decir, interpretar: interpretar,
-    montarBoton: montarBoton, abrirAyuda: abrirAyuda, cerrarAyuda: cerrarAyuda
+    montarBoton: montarBoton, abrirAyuda: abrirAyuda, cerrarAyuda: cerrarAyuda,
+    agregarFrase: agregarFrase, borrarFrase: borrarFrase, renderFrases: renderFrases
   };
 })();
