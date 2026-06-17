@@ -206,18 +206,15 @@
   }
 
   // ── Indicador de estado: grabando vs inactivo ──────────────────────────
-  // El botón cambia 🎤→🔴 con anillo pulsante, y aparece una píldora
-  // "🔴 Escuchando…" para que sea inequívoco cuándo está grabando.
+  // Al grabar, el botón pasa a 🔴 y parpadea. Al terminar vuelve a 🎤.
   function setBtn(on) {
     const b = document.getElementById('voiceBtn');
     if (b) {
       b.textContent = on ? '🔴' : '🎤';
       b.style.background = on ? 'rgba(247,129,102,.20)' : 'transparent';
-      b.style.animation = on ? 'vozPulse 1.1s infinite' : 'none';
+      b.style.animation = on ? 'vozBlink 0.8s steps(1) infinite' : 'none';
       b.title = on ? 'Escuchando… (toca para detener)' : 'Jarvy — asistente de voz';
     }
-    const pill = document.getElementById('vozStatus');
-    if (pill) pill.style.display = on ? 'flex' : 'none';
   }
 
   function toggle() {
@@ -271,7 +268,7 @@
             'border-radius:8px;color:var(--text,#e6edf3);font-size:16px;cursor:pointer;padding:2px 9px">✕</button>' +
         '</div>' +
         '<div style="font-size:12px;color:var(--text2,#8b949e);line-height:1.6;margin-bottom:14px">' +
-          'Toca el 🎤, habla <b>una frase</b> y se apaga solo. Cuando grabe verás <b>🔴 Escuchando…</b>. ' +
+          'Toca el 🎤, habla <b>una frase</b> y se apaga solo. Cuando grabe, el botón pasa a <b>🔴 y parpadea</b>. ' +
           'Triple toque sobre el 🎤 = abrir esta ayuda.</div>' +
         cmd('🔍 Buscar', '“buscar Daniel”') +
         cmd('🔢 Contar', '“cuántos nuevos”, “cuántos enviados”') +
@@ -291,27 +288,14 @@
   function abrirAyuda() { ensureAyuda(); const o = document.getElementById('vozAyuda'); if (o) o.style.display = 'flex'; }
   function cerrarAyuda() { const o = document.getElementById('vozAyuda'); if (o) o.style.display = 'none'; }
 
-  // ── Estilos inyectados (anillo pulsante + píldora de estado) ────────────
+  // ── Estilos inyectados (parpadeo del botón al grabar) ───────────────────
   function ensureEstilos() {
     if (document.getElementById('vozEstilos')) return;
     const st = document.createElement('style');
     st.id = 'vozEstilos';
     st.textContent =
-      '@keyframes vozPulse{0%{box-shadow:0 0 0 0 rgba(247,129,102,.55)}' +
-      '70%{box-shadow:0 0 0 7px rgba(247,129,102,0)}100%{box-shadow:0 0 0 0 rgba(247,129,102,0)}}';
+      '@keyframes vozBlink{0%,100%{opacity:1}50%{opacity:.25}}';
     document.head.appendChild(st);
-  }
-  function ensurePill() {
-    if (document.getElementById('vozStatus')) return;
-    const p = document.createElement('div');
-    p.id = 'vozStatus';
-    p.style.cssText = 'display:none;position:fixed;top:10px;left:50%;transform:translateX(-50%);' +
-      'z-index:100001;align-items:center;gap:7px;background:rgba(247,129,102,.16);' +
-      'border:1px solid rgba(247,129,102,.5);color:#f78166;border-radius:20px;' +
-      'padding:6px 14px;font-size:13px;font-weight:700;font-family:inherit;' +
-      'animation:vozPulse 1.1s infinite';
-    p.textContent = '🔴 Escuchando…';
-    document.body.appendChild(p);
   }
 
   // ── Auto-montaje del botón 🎤 (antes del punto verde #fbDot) ────────────
@@ -319,7 +303,6 @@
   // Idempotente: si ya existe #voiceBtn no lo duplica.
   function montarBoton() {
     ensureEstilos();
-    ensurePill();
     if (document.getElementById('voiceBtn')) return;
     const dot = document.getElementById('fbDot');
     const b = document.createElement('button');
