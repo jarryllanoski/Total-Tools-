@@ -153,6 +153,12 @@
     else decir('WhatsApp no disponible');
   }
 
+  // ── ACCIÓN: abrir el formulario de nuevo pedido (el botón +) ────────────
+  function nuevoPedido() {
+    if (typeof openForm === 'function') { openForm(null); decir('Nuevo pedido'); }
+    else decir('No pude abrir el formulario');
+  }
+
   // ── Ayuda hablada ───────────────────────────────────────────────────────
   function ayudaVoz() {
     decir('Puedes decir: buscar nombre. Cuántos nuevos. Estado de nombre. ' +
@@ -184,6 +190,7 @@
       case 'estado':   estadoDe(argFijo || capturado); return true;
       case 'whatsapp': whatsapp(argFijo || capturado); return true;
       case 'etiqueta': cambiarEtiqueta(capturado, argFijo); return true; // argFijo = etiqueta destino
+      case 'nuevo':    nuevoPedido(); return true;
       case 'ayuda':    ayudaVoz(); return true;
       default: return false;
     }
@@ -229,6 +236,11 @@
     // Buscar X
     mm = t.match(/^(?:buscar|busca|encuentra)\s+(?:a\s+)?(.+)$/);
     if (mm) { buscar(mm[1]); return; }
+
+    // Nuevo pedido (abre el formulario, igual que el botón +)
+    if (/^(nuevo pedido|nuevo envio|nuevo|crear pedido|crear envio|agregar pedido|crear nuevo)$/.test(t)) {
+      nuevoPedido(); return;
+    }
 
     // Ayuda
     if (/^(ayuda|que puedo decir|comandos)/.test(t)) { ayudaVoz(); return; }
@@ -321,6 +333,7 @@
         cmd('📊 Ver estado', '“estado de Daniel”') +
         cmd('🏷️ Cambiar etiqueta', '“marca a Daniel como enviado” — avanza o retrocede 1 paso') +
         cmd('💬 WhatsApp', '“whatsapp a Daniel”') +
+        cmd('🆕 Nuevo pedido', '“nuevo pedido” — abre el formulario (botón +)') +
         cmd('❓ Ayuda por voz', '“ayuda”') +
 
         // ── Mis frases personalizadas ──────────────────────────────────
@@ -341,6 +354,7 @@
             '<option value="estado">Ver estado</option>' +
             '<option value="whatsapp">WhatsApp</option>' +
             '<option value="etiqueta">Cambiar etiqueta a…</option>' +
+            '<option value="nuevo">Nuevo pedido</option>' +
             '<option value="ayuda">Ayuda</option>' +
           '</select>' +
           '<input id="vozArgInp" placeholder="Dato fijo opcional (ej: nuevos / enviado)" ' +
