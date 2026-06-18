@@ -966,19 +966,12 @@ function renderAgencyBox(courierName){
   // ★ SHALOM: usar buscador dinámico de la API
   if((courierName||'').toUpperCase().includes('SHALOM')){
     agBox.innerHTML = `<div class="agc-box">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-        <span class="agc-lbl" style="margin-bottom:0">🚌 Agencia Shalom — busca por ciudad o distrito</span>
-        <button onclick="toggleShalomHelp()" type="button" id="shalomHelpBtn" style="background:rgba(56,139,253,.15);border:1px solid rgba(56,139,253,.3);border-radius:50%;width:24px;height:24px;color:var(--blue);font-size:13px;cursor:pointer;font-weight:700;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-family:inherit">?</button>
-      </div>
-      <div id="shalomHelpBox" style="display:none;background:rgba(56,139,253,.08);border:1px solid rgba(56,139,253,.2);border-radius:10px;padding:10px 12px;margin-bottom:10px;font-size:12px;color:var(--text2);line-height:1.6">
-        💡 Puedes buscar por:<br>
-        • <b>Ciudad</b> — ej: Arequipa, Cusco, Trujillo<br>
-        • <b>Distrito</b> — ej: Miraflores, San Isidro<br>
-        • <b>Nombre de agencia</b> — ej: San Martín, El Agustino
-      </div>
+      <span class="agc-lbl">Busca tu agencia *</span>
       <div style="position:relative;margin-bottom:10px">
+        <span style="position:absolute;left:14px;top:50%;transform:translateY(-50%);font-size:15px;opacity:.65;pointer-events:none">🔍</span>
         <input class="fi" id="shalomAgInput" autocomplete="off"
-          placeholder="Ej: Lima, Miraflores, Chiclayo..."
+          style="padding-left:42px"
+          placeholder="Buscar sede Shalom…"
           oninput="shalomOnInput(this.value)">
         <div id="shalomSpin" style="display:none;position:absolute;right:14px;top:50%;
           transform:translateY(-50%);width:16px;height:16px;border:2px solid #1e1e30;
@@ -1643,72 +1636,118 @@ function setTrackContent(html){
 function notMyOrderBtn(){ return ''; }
 
 /* ── TRACKING SHALOM EN SEGUIMIENTO DEL CLIENTE ─────────────────── */
+function _copyTrack(txt, btn){
+  try{ navigator.clipboard.writeText(txt); }catch(e){
+    try{ var ta=document.createElement('textarea'); ta.value=txt; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta); }catch(_){}
+  }
+  if(btn){ var o=btn.textContent; btn.textContent='\u2713 Copiado'; setTimeout(function(){ btn.textContent=o; }, 1400); }
+}
+
+/* Deriva la fase del recorrido a partir del estado LITERAL de Shalom.
+   El estado se muestra tal cual (exacto); la fase solo define color, icono,
+   posicion en el stepper y si corresponde una pildora de indicacion. */
+function _shalomFase(estado){
+  var s = (estado||'').toString().toUpperCase();
+  if(/ENTREG|RECOGID|(RECEP|RECIB).+DESTINAT|CULMIN/.test(s)){
+    return {idx:3, color:'var(--green)', bg:'rgba(34,197,94,.10)', bd:'rgba(34,197,94,.28)',
+      ic:'\u2705', sub:'Tu paquete fue recogido. \u00a1Gracias por tu compra!', pill:null};
+  }
+  if(/TRANSIT|TR\u00c1NSIT|CAMINO|RUTA|TRASLAD|VIAJ|HACIA|REPARTO|DESPACH/.test(s)){
+    return {idx:1, color:'var(--blue)', bg:'rgba(79,142,247,.10)', bd:'rgba(79,142,247,.26)',
+      ic:'\ud83d\ude9a', sub:'Tu paquete ya sali\u00f3 y viaja hacia la agencia de destino.', pill:null};
+  }
+  if(/DESTINO|DISPONIBLE|RECOJO|LLEG/.test(s)){
+    return {idx:2, color:'var(--purple)', bg:'rgba(167,139,250,.12)', bd:'rgba(167,139,250,.32)',
+      ic:'\ud83d\udce6', sub:'Tu paquete ya est\u00e1 en la agencia Shalom de destino.', pill:'destino'};
+  }
+  if(/ORIGEN|REGISTR|RECEP|RECIB|ADMITID|EMITID/.test(s)){
+    return {idx:0, color:'var(--blue)', bg:'rgba(79,142,247,.08)', bd:'rgba(79,142,247,.22)',
+      ic:'\ud83d\udce6', sub:'Tu paquete fue recibido por Shalom y ser\u00e1 enviado pronto.', pill:null};
+  }
+  return {idx:-1, color:'var(--text2)', bg:'rgba(107,114,128,.08)', bd:'var(--bd)',
+    ic:'\ud83d\udce6', sub:'', pill:null};
+}
+
 function _shalomTrackingBlock(ship){
   var isShalom = ship.courier && ship.courier.toUpperCase().includes('SHALOM');
   if(!isShalom) return '';
-  var guia = ship.trackingOrderNumber || ship.shalomGuia || '';
-  var historial = ship.trackingHistorialShalom || [];
-  var estadoShalom = ship.trackingStatus || '';
-  var ultimaActualizacion = ship.trackingLastUpdate || '';
-  var subtitulo = ship.trackingSubtituloCliente || '';
-  if(!guia && !estadoShalom && !historial.length && !subtitulo) return '';
+  var guia   = ship.trackingOrderNumber || ship.shalomGuia   || '';
+  var codigo = ship.trackingOrderCode   || ship.shalomCodigo || '';
+  var estado = (ship.trackingStatus || '').trim();
+  var ultima = ship.trackingLastUpdate || '';
+  var dni    = ship.dniRecoger || ship.dniDestinatario || '';
+  if(!guia && !codigo && !estado) return '';
 
-  // Subtítulo informativo según estado
-  var subtituloHtml = '';
-  if(subtitulo === 'demora'){
-    subtituloHtml = '<div style="display:flex;align-items:center;gap:8px;background:rgba(247,129,102,.1);border:1px solid rgba(247,129,102,.25);border-radius:8px;padding:10px 12px;margin-bottom:8px">'
-      +'<span style="font-size:16px">⚠️</span>'
-      +'<div><div style="font-size:12px;font-weight:700;color:#f78166">Tu envío tiene una demora</div>'
-      +'<div style="font-size:11px;color:var(--text2)">Pronto llegará a tu destino</div></div></div>';
-  } else if(subtitulo === 'transito'){
-    subtituloHtml = '<div style="display:flex;align-items:center;gap:8px;background:rgba(56,139,253,.08);border:1px solid rgba(56,139,253,.2);border-radius:8px;padding:10px 12px;margin-bottom:8px">'
-      +'<span style="font-size:16px">🚚</span>'
-      +'<div><div style="font-size:12px;font-weight:700;color:var(--blue)">En tránsito hacia tu destino</div>'
-      +'<div style="font-size:11px;color:var(--text2)">Tu pedido está en camino</div></div></div>';
-  } else if(subtitulo === 'destino'){
-    subtituloHtml = '<div style="display:flex;align-items:center;gap:8px;background:rgba(163,113,247,.1);border:1px solid rgba(163,113,247,.25);border-radius:8px;padding:10px 12px;margin-bottom:8px">'
-      +'<span style="font-size:16px">📍</span>'
-      +'<div><div style="font-size:12px;font-weight:700;color:var(--purple)">Tu pedido está disponible para recojo</div>'
-      +'<div style="font-size:11px;color:var(--text2)">Preséntate con tu DNI en la agencia Shalom</div></div></div>';
-  } else if(subtitulo === 'entregado'){
-    subtituloHtml = '<div style="display:flex;align-items:center;gap:8px;background:rgba(46,160,67,.1);border:1px solid rgba(46,160,67,.25);border-radius:8px;padding:10px 12px;margin-bottom:8px">'
-      +'<span style="font-size:16px">✅</span>'
-      +'<div><div style="font-size:12px;font-weight:700;color:var(--green)">Pedido entregado</div>'
-      +'<div style="font-size:11px;color:var(--text2)">¡Gracias por tu compra!</div></div></div>';
+  // "actualizado hace X" en el header
+  var ago = '';
+  if(ultima){
+    var m = Math.floor((Date.now() - new Date(ultima).getTime())/60000);
+    if(isNaN(m)) ago='';
+    else if(m<1) ago='actualizado hace un momento';
+    else if(m<60) ago='actualizado hace '+m+' min';
+    else if(m<1440) ago='actualizado hace '+Math.floor(m/60)+' h';
+    else ago='actualizado el '+new Date(ultima).toLocaleDateString('es-PE',{day:'2-digit',month:'short'});
   }
-  var timeAgo = '';
-  if(ultimaActualizacion){
-    var diff = Date.now() - new Date(ultimaActualizacion).getTime();
-    var m = Math.floor(diff/60000);
-    if(m<1) timeAgo='hace un momento';
-    else if(m<60) timeAgo='hace '+m+' min';
-    else if(m<1440) timeAgo='hace '+Math.floor(m/60)+'h';
-    else timeAgo=new Date(ultimaActualizacion).toLocaleDateString('es-PE',{day:'2-digit',month:'short'});
+
+  var f = _shalomFase(estado);
+  var pasos = ['En origen','En camino','En destino','Entregado'];
+
+  // HERO: el titulo es EXACTAMENTE el estado de Shalom
+  var titulo = estado || 'Estado pendiente de actualizar';
+  var pillHtml = '';
+  if(f.pill === 'destino'){
+    pillHtml = '<span style="display:inline-block;margin-top:9px;font-size:12.5px;font-weight:800;'
+      +'padding:7px 12px;border-radius:9px;background:var(--purple);color:#0b0b13">'
+      +'\ud83d\udccd '+(dni?('Ac\u00e9rcate con tu DNI: '+esc(dni)):'Recoge en la agencia Shalom de destino')+'</span>';
   }
-  var histHtml='';
-  if(historial.length){
-    var recent=historial.slice(-4).reverse();
-    histHtml='<div style="margin-top:10px;border-top:1px solid rgba(163,113,247,.2);padding-top:10px">'
-      +'<div style="font-size:10px;font-weight:700;color:var(--text2);letter-spacing:1px;text-transform:uppercase;margin-bottom:8px">Historial</div>'
-      +recent.map(function(e,i){
-        return '<div style="display:flex;gap:10px;margin-bottom:8px;opacity:'+(i===0?1:0.55)+';">'
-          +'<div style="width:7px;height:7px;border-radius:50%;background:'+(i===0?'var(--purple)':'var(--bd)')+';flex-shrink:0;margin-top:5px"></div>'
-          +'<div><div style="font-size:12px;font-weight:'+(i===0?700:400)+';color:var(--text)">'+(e.estado||'—')+'</div>'
-          +(e.fecha?'<div style="font-size:10px;color:var(--text2)">'+esc(e.fecha)+(e.lugar?' · '+esc(e.lugar):'')+'</div>':'')
-          +'</div></div>';
-      }).join('')+'</div>';
+  var heroHtml = '<div style="display:flex;gap:12px;align-items:flex-start;background:'+f.bg
+    +';border:1px solid '+f.bd+';border-radius:12px;padding:13px 14px;margin-bottom:14px">'
+    +'<div style="font-size:26px;line-height:1;flex-shrink:0;margin-top:1px">'+f.ic+'</div>'
+    +'<div style="min-width:0"><div style="font-size:15px;font-weight:800;color:'+f.color
+    +';line-height:1.25'+(f.sub?';margin-bottom:3px':'')+'">'+esc(titulo)+'</div>'
+    +(f.sub?'<div style="font-size:12.5px;color:var(--text2);line-height:1.4">'+f.sub+'</div>':'')
+    +pillHtml
+    +'</div></div>';
+
+  // MINI-STEPPER del recorrido (solo si la fase es valida)
+  var stepHtml = '';
+  if(f.idx >= 0){
+    stepHtml = '<div style="display:flex;align-items:flex-start;margin:4px 2px 16px">'
+      + pasos.map(function(p,i){
+          var done = i < f.idx, now = i === f.idx;
+          var dotBg = (done||now) ? 'var(--purple)' : 'var(--bd)';
+          var line  = i===0 ? '' : '<div style="position:absolute;top:6px;left:-50%;width:100%;height:2px;background:'+((i<=f.idx)?'var(--purple)':'var(--bd)')+';z-index:1"></div>';
+          var ring  = now ? 'box-shadow:0 0 0 4px rgba(167,139,250,.22);' : '';
+          var mark  = done ? '\u2713' : '';
+          return '<div style="flex:1;text-align:center;position:relative">'
+            + line
+            + '<div style="width:13px;height:13px;border-radius:50%;background:'+dotBg+';border:2px solid '+dotBg+';margin:0 auto 6px;position:relative;z-index:2;'+ring+'display:flex;align-items:center;justify-content:center;font-size:8px;color:#fff">'+mark+'</div>'
+            + '<div style="font-size:9.5px;color:'+(now?'var(--text)':'var(--text2)')+';font-weight:'+(now?'800':'600')+';line-height:1.2">'+p+'</div>'
+            + '</div>';
+        }).join('')
+      + '</div>';
   }
-  return '<div class="tk-section" style="background:rgba(163,113,247,.06);border:1px solid rgba(163,113,247,.2);border-radius:12px;padding:12px 14px;margin-top:8px">'
-    +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">'
-    +'<div style="font-size:11px;font-weight:700;color:var(--purple);letter-spacing:.5px">🚚 SEGUIMIENTO SHALOM</div>'
-    +(timeAgo?'<div style="font-size:10px;color:var(--text2)">'+timeAgo+'</div>':'')
+
+  // GUIA + CODIGO
+  var guiaHtml = '';
+  if(guia || codigo){
+    guiaHtml = '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;'
+      +'background:var(--card2);border:1px solid var(--bd);border-radius:10px;padding:10px 13px">'
+      +'<div style="min-width:0"><div style="font-size:11px;color:var(--text2)">N.\u00ba de gu\u00eda Shalom</div>'
+      +(guia?'<div style="font-size:15px;font-weight:800;font-family:ui-monospace,monospace;letter-spacing:1px;color:var(--text)">'+esc(guia)+'</div>':'')
+      +(codigo?'<div style="font-size:11px;color:var(--text2);margin-top:1px">C\u00f3digo: <b style="color:var(--text);font-family:ui-monospace,monospace">'+esc(codigo)+'</b></div>':'')
+      +'</div>'
+      +(guia?'<button type="button" onclick="_copyTrack(\''+esc(guia)+'\',this)" style="font-size:11px;font-weight:700;color:var(--blue);background:none;border:none;cursor:pointer;font-family:inherit;flex-shrink:0">Copiar</button>':'')
+      +'</div>';
+  }
+
+  return '<div style="background:rgba(167,139,250,.06);border:1px solid rgba(167,139,250,.22);border-radius:14px;padding:14px;margin-bottom:18px">'
+    +'<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:12px">'
+    +'<div style="font-size:11px;font-weight:800;color:var(--purple);letter-spacing:.6px">\ud83d\ude9a SEGUIMIENTO SHALOM</div>'
+    +(ago?'<div style="font-size:10px;color:var(--text2);white-space:nowrap">'+ago+'</div>':'')
     +'</div>'
-    + subtituloHtml
-    +(guia?'<div style="font-size:11px;color:var(--text2);margin-bottom:6px">N° Guía: <span style="color:var(--text);font-family:monospace;font-weight:700">'+esc(guia)+'</span></div>':'')
-    +(estadoShalom
-      ?'<div style="background:rgba(163,113,247,.15);border:1px solid rgba(163,113,247,.3);border-radius:8px;padding:8px 12px;font-size:13px;font-weight:700;color:var(--purple)">📍 '+esc(estadoShalom)+'</div>'
-      :'<div style="font-size:12px;color:var(--text2);font-style:italic">Estado pendiente de actualizar...</div>')
-    +histHtml+'</div>';
+    + heroHtml + stepHtml + guiaHtml
+    +'</div>';
 }
 
 function renderTrackResult(ship, code){
@@ -1754,6 +1793,7 @@ function renderTrackResult(ship, code){
           ${meta.emoji} ${esc(ship.status||'Desconocido')}
         </div>
       </div>
+      ${_shalomTrackingBlock(ship)}
       <div class="tk-section">
         <div class="tk-lbl">Progreso</div>
         <div class="track-prog">${progHtml}</div>
@@ -1772,7 +1812,6 @@ function renderTrackResult(ship, code){
         ${extraRows}
       </div>
       ${(ship.links&&ship.links.length)?`<div class="tk-section"><div class="tk-lbl">📄 Documentos adjuntos</div>${ship.links.map(l=>`<a href="${l.u}" target="_blank" rel="noopener" style="display:flex;align-items:center;justify-content:space-between;padding:13px 16px;background:var(--bg2);border:1px solid var(--bd);border-radius:10px;text-decoration:none;margin-bottom:6px"><span style="color:var(--blue);font-weight:600;font-size:14px">📄 Presiona para ver tu documento</span><span style="color:var(--text2);font-size:18px">→</span></a>`).join('')}</div>`:''}
-      ${_shalomTrackingBlock(ship)}
     </div>
     ${waConsultUrl?`<div style="padding:4px 0 8px;text-align:center"><a href="${waConsultUrl}" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:8px;padding:13px 28px;background:#25D366;border-radius:14px;color:#fff;font-weight:700;font-size:15px;text-decoration:none">💬 Consultar por WhatsApp</a></div>`:''}
     <a href="https://www.totaltoolspe.com/" target="_blank" rel="noopener" style="display:flex;align-items:center;justify-content:space-between;margin-top:12px;padding:14px 18px;background:linear-gradient(135deg,rgba(56,139,253,.12),rgba(163,113,247,.12));border:1px solid rgba(56,139,253,.25);border-radius:14px;text-decoration:none;gap:12px">
