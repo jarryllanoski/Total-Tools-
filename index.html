@@ -195,22 +195,10 @@
   // Guardar un shipment individual inmediatamente (sin debounce)
   window._fbSaveShipmentNow = async (ship) => {
     window._isSaving = true;
-    console.log('[DIAG] 🔵 Subiendo pedido AHORA:', ship.id, '| status:', ship.status, '| trackingStatus:', ship.trackingStatus);
     try {
-      // ★ Reintentos: si falla la subida (internet intermitente), reintenta
-      // hasta 3 veces con espera creciente. Así el cambio de etiqueta no se
-      // pierde por un fallo momentáneo de red.
-      for(let i=0; i<3; i++){
-        try {
-          await fsPatch(shipPath(ship.id), slimShipment(ship));
-          console.log('[DIAG] ✅ SUBIDA OK:', ship.id, '| intento', i+1);
-          return; // éxito
-        } catch(e) {
-          console.warn('[DIAG] ⚠️ Falló intento', i+1, 'para', ship.id, '| Error:', e.message);
-          if(i < 2) await new Promise(r=>setTimeout(r, 2000*(i+1)));
-          else console.error('[DIAG] ❌ SUBIDA FALLÓ tras 3 intentos:', ship.id, '| Error:', e.message);
-        }
-      }
+      await fsPatch(shipPath(ship.id), slimShipment(ship));
+    } catch(e) {
+      console.warn('Error guardando shipment:', e);
     } finally {
       window._isSaving = false;
     }
@@ -1530,19 +1518,6 @@ window._mergeRemote = (remote) => {
     remote.shipments = remote.shipments.map(rs => {
       const local = S.shipments.find(ls => ls.id === rs.id);
       if(local) {
-        // ★ FIX sincronización: si este pedido tiene cambios locales aún NO subidos
-        // (está en _dirtyShips, o hay un guardado masivo pendiente con _dirtyAll),
-        // conservamos la versión LOCAL completa. Sin esto, el merge remoto pisaba
-        // el cambio de estado (ej: LLEGÓ A DESTINO) con el valor viejo de Firebase
-        // antes de que el guardado de 800ms se completara, y al recargar volvía atrás.
-        if(_dirtyAll || _dirtyShips.has(rs.id)){
-          console.log('[DIAG] 🛡️ MERGE protegió (cambio local pendiente):', rs.id, '| local status:', local.status, '| trackingStatus:', local.trackingStatus);
-          return local;
-        }
-        // Log: comparar lo que trae Firebase vs lo local (para ver si pisa)
-        if(local.trackingStatus !== rs.trackingStatus || local.status !== rs.status){
-          console.log('[DIAG] 🔄 MERGE pisa pedido:', rs.id, '| LOCAL status:', local.status, 'trk:', local.trackingStatus, '→ REMOTO status:', rs.status, 'trk:', rs.trackingStatus);
-        }
         // Preservar imágenes base64 que no se guardan en Firebase
         if(rs.docGuia && rs.docGuia.d === '[img]' && local.docGuia) rs.docGuia = local.docGuia;
         if(rs.docEmbalado && rs.docEmbalado.d === '[img]' && local.docEmbalado) rs.docEmbalado = local.docEmbalado;
@@ -2391,10 +2366,7 @@ function applyStatus(st){
     toast(`${stIcon(st)} ${st} → ${sel.length} clientes`);
   } else {
     s.status=st; s.sel=false;
-    save(s.id); // ★ incremental: solo este pedido
-    // ★ Subida inmediata: el cambio de etiqueta con clave se guarda al instante.
-    if(window._fbSaveShipmentNow) window._fbSaveShipmentNow(s);
-    render(); closeOverlay('statusOverlay');
+    save(s.id); render(); closeOverlay('statusOverlay'); // ★ incremental: solo este pedido
     toast(`${stIcon(st)} ${st}`);
   }
 }
