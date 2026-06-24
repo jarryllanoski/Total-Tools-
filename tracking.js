@@ -310,14 +310,7 @@ async function autoTrackingCheck() {
         errCount++;
       } else {
         okCount++;
-        if (resultado !== 'sin-cambio') {
-          changedCount++; // ★ hubo cambio real
-          // ★ Subida inmediata de ESE pedido (con su ID): el cambio de etiqueta
-          // del auto-tracking se guarda al instante, sin esperar el final del
-          // ciclo ni los 800ms. Así no se pierde aunque cierres el panel.
-          if (typeof window.save === 'function') window.save(ship.id);
-          if (typeof window._fbSaveShipmentNow === 'function') window._fbSaveShipmentNow(ship);
-        }
+        if (resultado !== 'sin-cambio') changedCount++; // ★ hubo cambio real
         if (resultado === 'EN_DESTINO') _mostrarAlertaDestino(ship);
       }
     } catch(e) {
@@ -345,10 +338,9 @@ async function autoTrackingCheck() {
     console.log('[Tracking] Auto-check OK (' + okCount + ' respuestas, ' + changedCount + ' con cambios)');
   }
 
-  // ★ Los pedidos que cambiaron YA se subieron inmediatamente dentro del loop.
-  // Este save() final solo refresca el ts global una vez, para que otros
-  // dispositivos detecten que hubo cambios y sincronicen. Si nada cambió,
-  // NO guarda: así no se genera el rebote de lecturas entre dispositivos.
+  // ★ Solo guardar (y subir ts → disparar recargas) si algún pedido cambió de verdad.
+  // Si ningún pedido cambió, NO guardamos: así no se genera el rebote de lecturas
+  // entre dispositivos que disparaba millones de lecturas/día.
   if (changedCount > 0) {
     if (typeof window.save === 'function') window.save();
   }
@@ -616,9 +608,7 @@ Tracking._guardarEdicion = function(shipId) {
     ship.status = 'ENVIADO';
   }
 
-  if (typeof window.save   === 'function') window.save(ship.id);
-  // ★ Subida inmediata: el cambio a ENVIADO se guarda al instante.
-  if (typeof window._fbSaveShipmentNow === 'function') window._fbSaveShipmentNow(ship);
+  if (typeof window.save   === 'function') window.save();
   if (typeof window.render === 'function') window.render();
   document.getElementById('delOverlay').classList.remove('open');
   if (typeof window.toast  === 'function') window.toast('✅ Tracking guardado');
@@ -662,10 +652,7 @@ Tracking.consultarAhora = async function(shipId) {
     if (typeof window.toast === 'function') window.toast('✅ Tracking auto reactivado');
   }
 
-  if (typeof window.save   === 'function') window.save(ship.id);
-  // ★ Subida inmediata a Firebase (sin esperar los 800ms): el cambio de
-  // etiqueta del tracking se guarda al instante, sin retorno posible.
-  if (typeof window._fbSaveShipmentNow === 'function') window._fbSaveShipmentNow(ship);
+  if (typeof window.save   === 'function') window.save();
   if (typeof window.render === 'function') window.render();
 
   if (resultado === 'error') {
