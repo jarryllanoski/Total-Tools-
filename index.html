@@ -196,9 +196,18 @@
   window._fbSaveShipmentNow = async (ship) => {
     window._isSaving = true;
     try {
-      await fsPatch(shipPath(ship.id), slimShipment(ship));
-    } catch(e) {
-      console.warn('Error guardando shipment:', e);
+      // ★ Reintentos: si falla la subida (internet intermitente), reintenta
+      // hasta 3 veces con espera creciente. Así el cambio de etiqueta no se
+      // pierde por un fallo momentáneo de red.
+      for(let i=0; i<3; i++){
+        try {
+          await fsPatch(shipPath(ship.id), slimShipment(ship));
+          return; // éxito
+        } catch(e) {
+          if(i < 2) await new Promise(r=>setTimeout(r, 2000*(i+1)));
+          else console.warn('Error guardando shipment tras 3 intentos:', e);
+        }
+      }
     } finally {
       window._isSaving = false;
     }
@@ -1518,6 +1527,14 @@ window._mergeRemote = (remote) => {
     remote.shipments = remote.shipments.map(rs => {
       const local = S.shipments.find(ls => ls.id === rs.id);
       if(local) {
+        // ★ FIX sincronización: si este pedido tiene cambios locales aún NO subidos
+        // (está en _dirtyShips, o hay un guardado masivo pendiente con _dirtyAll),
+        // conservamos la versión LOCAL completa. Sin esto, el merge remoto pisaba
+        // el cambio de estado (ej: LLEGÓ A DESTINO) con el valor viejo de Firebase
+        // antes de que el guardado de 800ms se completara, y al recargar volvía atrás.
+        if(_dirtyAll || _dirtyShips.has(rs.id)){
+          return local;
+        }
         // Preservar imágenes base64 que no se guardan en Firebase
         if(rs.docGuia && rs.docGuia.d === '[img]' && local.docGuia) rs.docGuia = local.docGuia;
         if(rs.docEmbalado && rs.docEmbalado.d === '[img]' && local.docEmbalado) rs.docEmbalado = local.docEmbalado;
@@ -2366,7 +2383,10 @@ function applyStatus(st){
     toast(`${stIcon(st)} ${st} → ${sel.length} clientes`);
   } else {
     s.status=st; s.sel=false;
-    save(s.id); render(); closeOverlay('statusOverlay'); // ★ incremental: solo este pedido
+    save(s.id); // ★ incremental: solo este pedido
+    // ★ Subida inmediata: el cambio de etiqueta con clave se guarda al instante.
+    if(window._fbSaveShipmentNow) window._fbSaveShipmentNow(s);
+    render(); closeOverlay('statusOverlay');
     toast(`${stIcon(st)} ${st}`);
   }
 }
