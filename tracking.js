@@ -609,6 +609,8 @@ Tracking._guardarEdicion = function(shipId) {
   }
 
   if (typeof window.save   === 'function') window.save(ship.id);
+  // ★ Subida INMEDIATA: al poner la guía y pasar a ENVIADO, sube al instante.
+  if (typeof window._fbSaveShipmentNow === 'function') window._fbSaveShipmentNow(ship);
   if (typeof window.render === 'function') window.render();
   document.getElementById('delOverlay').classList.remove('open');
   if (typeof window.toast  === 'function') window.toast('✅ Tracking guardado');
@@ -653,6 +655,11 @@ Tracking.consultarAhora = async function(shipId) {
   }
 
   if (typeof window.save   === 'function') window.save(ship.id);
+  // ★ Subida INMEDIATA a Firebase (no esperar los 800ms del debounce).
+  // Resuelve el caso: consultar y recargar rápido perdía el cambio porque
+  // el guardado de 800ms se cancelaba al recargar. Ahora sube al instante.
+  // El merge (corregido, solo _dirtyShips) ya evita que esto bloquee otros dispositivos.
+  if (typeof window._fbSaveShipmentNow === 'function') window._fbSaveShipmentNow(ship);
   if (typeof window.render === 'function') window.render();
 
   if (resultado === 'error') {

@@ -196,9 +196,16 @@
   window._fbSaveShipmentNow = async (ship) => {
     window._isSaving = true;
     try {
-      await fsPatch(shipPath(ship.id), slimShipment(ship));
-    } catch(e) {
-      console.warn('Error guardando shipment:', e);
+      // Reintentos: si falla la subida (red intermitente), reintenta hasta 3 veces.
+      for(let i=0; i<3; i++){
+        try {
+          await fsPatch(shipPath(ship.id), slimShipment(ship));
+          return; // éxito
+        } catch(e) {
+          if(i < 2) await new Promise(r=>setTimeout(r, 2000*(i+1)));
+          else console.warn('Error guardando shipment tras 3 intentos:', e);
+        }
+      }
     } finally {
       window._isSaving = false;
     }
