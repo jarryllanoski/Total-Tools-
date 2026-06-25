@@ -608,7 +608,7 @@ Tracking._guardarEdicion = function(shipId) {
     ship.status = 'ENVIADO';
   }
 
-  if (typeof window.save   === 'function') window.save();
+  if (typeof window.save   === 'function') window.save(ship.id);
   if (typeof window.render === 'function') window.render();
   document.getElementById('delOverlay').classList.remove('open');
   if (typeof window.toast  === 'function') window.toast('✅ Tracking guardado');
@@ -652,7 +652,7 @@ Tracking.consultarAhora = async function(shipId) {
     if (typeof window.toast === 'function') window.toast('✅ Tracking auto reactivado');
   }
 
-  if (typeof window.save   === 'function') window.save();
+  if (typeof window.save   === 'function') window.save(ship.id);
   if (typeof window.render === 'function') window.render();
 
   if (resultado === 'error') {
