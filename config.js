@@ -301,6 +301,7 @@ function openForm(id){
   ['inGuiaCam','inGuiaGal','inGuiaPdf','inTicketCam','inTicketGal','inTicketPdf'].forEach(i=>{const e=$(i);if(e)e.value=''});
   if(id){
     const s=S.shipments.find(x=>x.id===id);
+    if(!s){toast('⚠️ Recarga la página e intenta de nuevo');return;}
     $('fName').value=s.name;$('fPhone').value=s.phone;if($('fDni'))$('fDni').value=s.dni||'';$('fAddr').value=s.address;
     $('fCourier').value=s.courier;$('fDate').value=s.date;$('fStatus').value=s.status;
     $('fCost').value=s.cost||'';$('fNotes').value=s.notes||'';
