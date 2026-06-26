@@ -71,8 +71,8 @@ function openTrash(){
       const warn=remaining<=5;
       return`<div class="trash-item">
         <div class="trash-item-info">
-          <div class="trash-item-name">${item.shipment.name}</div>
-          <div class="trash-item-meta">📞 ${item.shipment.phone} · 🚚 ${item.shipment.courier}</div>
+          <div class="trash-item-name">${esc(item.shipment.name)}</div>
+          <div class="trash-item-meta">📞 ${esc(item.shipment.phone)} · 🚚 ${esc(item.shipment.courier)}</div>
           <div class="trash-item-meta">📅 Eliminado hace ${days===0?'hoy':days+' día'+(days>1?'s':'')}</div>
         </div>
         <span class="trash-item-days ${warn?'trash-days-warn':'trash-days-ok'}">${remaining}d</span>
@@ -117,7 +117,7 @@ function openWA(id){
 
   // Sin docs marcados pero con mensajes → abrir sheet solo con mensajes
   // Con docs marcados → abrir sheet completo
-  $('waInfo').innerHTML=`<div style="font-weight:700;font-size:14px;margin-bottom:4px">${s.name}</div><div style="color:var(--blue)">📞 +51 ${s.phone}</div><div style="color:var(--text2);font-size:12px;margin-top:2px">🏠 ${s.address}</div>`;
+  $('waInfo').innerHTML=`<div style="font-weight:700;font-size:14px;margin-bottom:4px">${esc(s.name)}</div><div style="color:var(--blue)">📞 +51 ${esc(s.phone)}</div><div style="color:var(--text2);font-size:12px;margin-top:2px">🏠 ${esc(s.address)}</div>`;
   let html='';
   if(s.docGuia||s.docTicket){
     html+=`<div style="font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;margin-bottom:8px">Documentos a enviar:</div><div class="wa-doc-grid">`;
@@ -281,7 +281,7 @@ $('viewer').addEventListener('click',e=>{if(e.target===$('viewer'))closeViewer()
 let _links=[];
 function addLink(){const v=$('fLink').value.trim();if(!v){toast('Ingresa un link');return}if(!v.startsWith('http')){toast('⚠️ Link inválido');return}const n=v.length>36?v.substring(0,36)+'…':v;_links.push({u:v,n});renderLinks();$('fLink').value='';toast('🔗 Agregado')}
 function removeLink(i){_links.splice(i,1);renderLinks()}
-function renderLinks(){$('linkListForm').innerHTML=_links.map((l,i)=>`<div class="link-item"><span>🔗</span><div class="link-name">${l.n}</div><a href="${l.u}" target="_blank" style="color:var(--blue);font-size:12px;text-decoration:none">↗</a><button class="link-del" type="button" onclick="removeLink(${i})">✕</button></div>`).join('')}
+function renderLinks(){$('linkListForm').innerHTML=_links.map((l,i)=>`<div class="link-item"><span>🔗</span><div class="link-name">${esc(l.n)}</div><a href="${esc(l.u)}" target="_blank" style="color:var(--blue);font-size:12px;text-decoration:none">↗</a><button class="link-del" type="button" onclick="removeLink(${i})">✕</button></div>`).join('')}
 
 /* FORM */
 let _editId=null;
@@ -580,7 +580,7 @@ async function loadTokenList(){
       return new Date(iso).toLocaleDateString('es-PE',{day:'2-digit',month:'short'});
     }
     
-    function renderItem(tok, idx){
+    function renderItem(tok){
       var exp = tok.expiresAt ? new Date(tok.expiresAt) : null;
       var expired = !!(exp && exp < now);
       var used = !!tok.used;
@@ -596,14 +596,15 @@ async function loadTokenList(){
       var ph = (tok.phone||'').replace(/</g,'&lt;').replace(/>/g,'&gt;');
       var lk = (tok.prefillLink||'').replace(/</g,'&lt;').replace(/>/g,'&gt;');
       var shortLk = lk.length>45 ? lk.substring(0,45)+'…' : lk;
+      var tid = (tok.id||'').replace(/"/g,'&quot;');
       var btns = '';
       if(pend){
-        btns += '<button class="tok-act-btn" data-idx="'+idx+'" data-act="share">📤 Compartir</button>';
-        if(ph) btns += '<button class="tok-act-btn" style="color:var(--green);border-color:rgba(46,160,67,.4)" data-idx="'+idx+'" data-act="wa">💬 WA</button>';
-        btns += '<button class="tok-act-btn" data-idx="'+idx+'" data-act="open">↗</button>';
+        btns += '<button class="tok-act-btn" data-id="'+tid+'" data-act="share">📤 Compartir</button>';
+        if(ph) btns += '<button class="tok-act-btn" style="color:var(--green);border-color:rgba(46,160,67,.4)" data-id="'+tid+'" data-act="wa">💬 WA</button>';
+        btns += '<button class="tok-act-btn" data-id="'+tid+'" data-act="open">↗</button>';
       }
-      btns += '<button class="tok-act-btn tok-act-del" data-idx="'+idx+'" data-act="delete">🗑️</button>';
-      
+      btns += '<button class="tok-act-btn tok-act-del" data-id="'+tid+'" data-act="delete">🗑️</button>';
+
       return '<div class="tok-list-item">'
         +'<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:3px">'
         +'<div class="tok-list-name">'+nm+'</div>'+badge
@@ -616,22 +617,22 @@ async function loadTokenList(){
         +'<div class="tok-list-actions" style="margin-top:8px">'+btns+'</div>'
         +'</div>';
     }
-    
-    activos.forEach(function(tok,i){ html += renderItem(tok, i); });
+
+    activos.forEach(function(tok){ html += renderItem(tok); });
     if(inactivos.length){
       html += '<div style="font-size:10px;font-weight:700;color:var(--text2);letter-spacing:1px;text-transform:uppercase;margin:12px 0 8px;padding-top:8px;border-top:1px solid var(--bd)">Usados / Vencidos</div>';
-      inactivos.forEach(function(tok,i){ html += renderItem(tok, activos.length+i); });
+      inactivos.forEach(function(tok){ html += renderItem(tok); });
     }
     if(!html) html = '<div class="tok-empty">📭 No hay links generados aún.</div>';
     list.innerHTML = html;
-    
-    // Event delegation para los botones
+
+    // Event delegation — usa el id real del documento, nunca la posición en el array
     list.onclick = function(e){
       var btn = e.target.closest('[data-act]');
       if(!btn) return;
-      var idx = parseInt(btn.dataset.idx);
+      var id  = btn.dataset.id;
       var act = btn.dataset.act;
-      _tokAction(idx, act);
+      _tokAction(id, act);
     };
     
   }catch(e){
@@ -640,9 +641,9 @@ async function loadTokenList(){
   }
 }
 
-function _tokAction(idx, action){
-  var tok = _tokCache[idx];
-  if(!tok){ console.error('Token no encontrado en índice', idx); return; }
+function _tokAction(id, action){
+  var tok = _tokCache.find(function(t){ return t.id === id; });
+  if(!tok){ console.error('Token no encontrado:', id); return; }
   var url = getFormLink()+'?t='+(tok.id||tok._id||'');
   var link = tok.prefillLink||'';
   var msg = '📦 Hola '+tok.name+', aquí tu link para registrar tu pedido:\n\n'+url+(link?'\n\n📎 '+link:'');

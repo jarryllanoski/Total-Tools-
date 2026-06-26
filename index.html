@@ -143,6 +143,7 @@
     const soloConfig = _dirtyConfigOnly && _dirtyShips.size === 0 && !_dirtyAll;
     const subirTodos = !soloConfig && (_dirtyAll || _dirtyShips.size === 0);
     const idsASubir = soloConfig ? new Set() : (subirTodos ? null : new Set(_dirtyShips));
+    const saveTs = Date.now(); // capturar antes de writes para que _S_TS coincida exactamente
     try {
       const saves=[];
       saves.push(fsPatch(cfgPath(),{
@@ -155,7 +156,7 @@
         dispatch:data.dispatch||{},
         config:data.config||{},
         trash:data.trash||[],
-        ts:Date.now()
+        ts:saveTs // usar saveTs fijo para que _S_TS y config.ts coincidan tras la escritura
       }));
       for(const s of(data.shipments||[])){
         // Incremental: subir solo los pedidos marcados como sucios (o todos)
@@ -169,9 +170,10 @@
         }
       }
       await Promise.all(saves);
+      window._S_TS = saveTs; // ★ actualizar al ts REAL escrito → evita que _poll recargue datos propios
       window._fbStatus&&window._fbStatus('ok');
       // Backup en localStorage con timestamp de último sync exitoso
-      lsSet('dpanel_last_sync', String(Date.now()));
+      lsSet('dpanel_last_sync', String(saveTs));
       // ★ Éxito: limpiar el registro de sucios
       _dirtyShips.clear();
       _dirtyAll = false;
@@ -275,9 +277,21 @@
           _listenFails = 0;
           _listenDelay = 5000; // reset delay en éxito
           const remoteTs = cfg.ts||0;
-          if(remoteTs > (window._S_TS||0)+3000){
+          const formTs   = cfg.formTs||0;
+          // formTs: escrito solo por Cloud Function o formulario — el panel nunca lo toca
+          const hasFormNew  = formTs > (window._lastFormTs||0);
+          const hasPanelNew = remoteTs > (window._S_TS||0)+500;
+          if(hasFormNew || hasPanelNew){
+            if(hasFormNew) window._lastFormTs = formTs;
             const remote = await window._fbLoad();
-            if(remote && window._mergeRemote) window._mergeRemote(remote);
+            if(remote && window._mergeRemote) {
+              window._mergeRemote(remote);
+              window._S_TS = remoteTs; // registrar hasta qué ts se cargó
+            }
+            // Refrescar lista de tokens si la pestaña Compartir está abierta
+            if(hasFormNew && document.getElementById('page-compartir')&&
+               document.getElementById('page-compartir').classList.contains('active')&&
+               typeof loadTokenList==='function') loadTokenList();
           }
         }
       }catch(e){
