@@ -260,8 +260,8 @@
       // null SOLO cuando Firebase confirmó (con respuestas OK) que no hay nada
       if(!cfg && shipDocs.length===0) return null;
       const result = cfg||{};
-      result.shipments = shipDocs.map(d=>{const{_id,...rest}=d;if(!rest.id)rest.id=_id;return rest;});
-      result.suppliers = suppDocs.map(d=>{const{_id,...rest}=d;if(!rest.id)rest.id=_id;return rest;});
+      result.shipments = shipDocs.map(d=>{const{_id,...rest}=d;if(!rest.id){rest.id=_id;fsPatch(shipPath(_id),{id:_id}).catch(()=>{});}return rest;});
+      result.suppliers = suppDocs.map(d=>{const{_id,...rest}=d;if(!rest.id){rest.id=_id;fsPatch(suppPath(_id),{id:_id}).catch(()=>{});}return rest;});
       window._fbStatus&&window._fbStatus('ok');
       return result;
     } catch(e){
