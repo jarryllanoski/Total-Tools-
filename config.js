@@ -258,7 +258,7 @@ function refreshSlot(slot){
   if(doc.t&&doc.t.startsWith('image/')){
     prev.innerHTML=`<div class="doc-full"><img src="${doc.d}" style="width:100%;height:100%;object-fit:cover;display:block"><div class="doc-ok">✓</div></div>`;
   } else {
-    const sn=doc.n.length>16?doc.n.substring(0,16)+'…':doc.n;
+    const _n=doc.n||'';const sn=_n.length>16?_n.substring(0,16)+'…':_n;
     prev.innerHTML=`<div class="doc-full"><div class="doc-full-pdf"><span style="font-size:32px">📄</span><span style="font-size:10px;color:var(--text2);text-align:center;padding:0 6px;word-break:break-all">${sn}</span></div><div class="doc-ok">✓ PDF</div></div>`;
   }
 }

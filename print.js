@@ -505,6 +505,7 @@ function esc(s){
     .replace(/>/g,'&gt;')
     .replace(/"/g,'&quot;');
 }
+window.esc = esc;
 
   /* ── CAMPANA DE IMPRESIÓN EN HEADER ─────────────────────────────── */
   function _injectPrintBell(){
