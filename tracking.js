@@ -742,6 +742,23 @@ Tracking.abrirManual = function() {
   if (ov) ov.classList.add('open');
 };
 
+/* ── copiarLink ──────────────────────────────────────────────────── */
+Tracking.copiarLink = function(id) {
+  var base = typeof getFormLink === 'function' ? getFormLink()
+    : window.location.origin + window.location.pathname.replace(/\/[^\/]*$/, '/formulario.html');
+  var url = base + '?seg=' + id;
+  var done = function() { if (typeof toast === 'function') toast('🔗 Link de seguimiento copiado'); };
+  try {
+    navigator.clipboard.writeText(url).then(done).catch(function() {
+      var t = document.createElement('textarea'); t.value = url;
+      document.body.appendChild(t); t.select(); document.execCommand('copy'); document.body.removeChild(t); done();
+    });
+  } catch(e) {
+    var t = document.createElement('textarea'); t.value = url;
+    document.body.appendChild(t); t.select(); document.execCommand('copy'); document.body.removeChild(t); done();
+  }
+};
+
 /* ── init ────────────────────────────────────────────────────────── */
 Tracking.init = function() {
   _injectCSS();
