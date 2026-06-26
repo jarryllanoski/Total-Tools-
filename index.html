@@ -1524,9 +1524,9 @@ function renderStatsAsSuppliers(){
         const pending=(sup.items||[]).filter(x=>!x.done).length;
         const total=(sup.items||[]).length;
         return`<div class="supp-card ${pending>0?'has-pending':''}" onclick="openSupplier('${sup.id}')">
-          <div class="supp-card-name">${sup.name}</div>
+          <div class="supp-card-name">${esc(sup.name)}</div>
           <div class="supp-card-phone">
-            <span style="font-size:11px;color:var(--blue)">📞 ${sup.phone}</span>
+            <span style="font-size:11px;color:var(--blue)">📞 ${esc(sup.phone)}</span>
             <button onclick="event.stopPropagation();sendSuppList('${sup.id}')"
               style="background:rgba(46,160,67,.15);border:1px solid rgba(46,160,67,.3);color:var(--green);border-radius:6px;padding:3px 8px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap">
               💬 Enviar
@@ -1535,7 +1535,7 @@ function renderStatsAsSuppliers(){
           ${total>0?`<div class="supp-card-items">
             ${(sup.items||[]).slice(0,4).map(it=>`<div class="supp-item-row">
               <div class="supp-item-dot ${it.done?'done':''}"></div>
-              <span class="supp-item-text ${it.done?'done':''}" style="font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${it.text}</span>
+              <span class="supp-item-text ${it.done?'done':''}" style="font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(it.text)}</span>
             </div>`).join('')}
             ${total>4?`<div style="font-size:10px;color:var(--text2)">+${total-4} más...</div>`:''}
           </div>`:`<div style="font-size:11px;color:var(--text2);font-style:italic;margin-top:4px">Lista vacía</div>`}
@@ -1724,23 +1724,23 @@ function cardHTML(s){
         onclick="togglePvtNote('${s.id}')" 
         ondblclick="event.stopPropagation();openPrivateNote('${s.id}')"
         style="cursor:pointer;flex:1;user-select:none">
-        ${s.name}${pvtNote?` <span style="font-size:11px;color:var(--purple);opacity:.7">🔒</span>`:''}
+        ${esc(s.name)}${pvtNote?` <span style="font-size:11px;color:var(--purple);opacity:.7">🔒</span>`:''}
       </div>
       <button class="wa-btn" onclick="openWA('${s.id}')">💬</button>
     </div>
-    ${pvtNote?`<div class="pvt-note" id="pvt_${s.id}" style="display:none" ondblclick="openPrivateNote('${s.id}')">🔒 ${pvtNote}</div>`:''}
+    ${pvtNote?`<div class="pvt-note" id="pvt_${s.id}" style="display:none" ondblclick="openPrivateNote('${s.id}')">🔒 ${esc(pvtNote)}</div>`:''}
     <div class="card-meta">
-      <span class="meta">📞 ${s.phone}</span>
+      <span class="meta">📞 ${esc(s.phone)}</span>
       <span class="meta">📅 ${s.date||'—'}</span>
       ${s.cost?`<span class="meta">💰 S/ ${s.cost}</span>`:''}
     </div>
-    <div class="card-addr">🏠 ${s.address}</div>
-    ${s.notes?`<div class="card-note">📝 ${s.notes}</div>`:''}
+    <div class="card-addr">🏠 ${esc(s.address)}</div>
+    ${s.notes?`<div class="card-note">📝 ${esc(s.notes)}</div>`:''}
     ${cardDocs(s,gChk,tChk)}
     ${(s.trackingOrderNumber||s.shalomGuia)&&typeof Tracking!=='undefined'?Tracking.renderCardBlock(s):''}
     ${(m1||m2)?`<div class="card-msgs">
-      ${m1?`<button class="card-msg card-msg-a" onclick="quickMsg('${s.id}',0)"><span class="card-msg-ltr">A</span><span class="card-msg-txt">${fillVars(m1,s).substring(0,70)}${fillVars(m1,s).length>70?'…':''}</span></button>`:''}
-      ${m2?`<button class="card-msg card-msg-b" onclick="quickMsg('${s.id}',1)"><span class="card-msg-ltr">B</span><span class="card-msg-txt">${fillVars(m2,s).substring(0,70)}${fillVars(m2,s).length>70?'…':''}</span></button>`:''}
+      ${m1?`<button class="card-msg card-msg-a" onclick="quickMsg('${s.id}',0)"><span class="card-msg-ltr">A</span><span class="card-msg-txt">${esc(fillVars(m1,s).substring(0,70))}${fillVars(m1,s).length>70?'…':''}</span></button>`:''}
+      ${m2?`<button class="card-msg card-msg-b" onclick="quickMsg('${s.id}',1)"><span class="card-msg-ltr">B</span><span class="card-msg-txt">${esc(fillVars(m2,s).substring(0,70))}${fillVars(m2,s).length>70?'…':''}</span></button>`:''}
     </div>`:''}
     <div class="card-actions">
       <button class="btn-st ${stClass(s.status)}" onclick="openStatus('${s.id}')" style="${!_filt?'opacity:.5;cursor:default':''}">
@@ -1846,15 +1846,15 @@ function renderSuppliersPanel(){
         const pending=sup.items?sup.items.filter(x=>!x.done).length:0;
         const total=sup.items?sup.items.length:0;
         return`<div class="supp-card ${pending>0?'has-pending':''}" onclick="openSupplier('${sup.id}')">
-          <div class="supp-card-name">${sup.name}</div>
+          <div class="supp-card-name">${esc(sup.name)}</div>
           <div class="supp-card-phone">
-            <span>📞 ${sup.phone}</span>
-            <button onclick="event.stopPropagation();window.open('https://wa.me/51${sup.phone}','_blank')" style="background:rgba(46,160,67,.15);border:1px solid rgba(46,160,67,.3);color:var(--green);border-radius:6px;width:24px;height:24px;font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0">💬</button>
+            <span>📞 ${esc(sup.phone)}</span>
+            <button onclick="event.stopPropagation();window.open('https://wa.me/51${esc(sup.phone)}','_blank')" style="background:rgba(46,160,67,.15);border:1px solid rgba(46,160,67,.3);color:var(--green);border-radius:6px;width:24px;height:24px;font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0">💬</button>
           </div>
           ${total>0?`<div class="supp-card-items">
             ${sup.items.slice(0,4).map(it=>`<div class="supp-item-row">
               <div class="supp-item-dot ${it.done?'done':''}"></div>
-              <span class="supp-item-text ${it.done?'done':''}">${it.text}</span>
+              <span class="supp-item-text ${it.done?'done':''}">${esc(it.text)}</span>
             </div>`).join('')}
             ${total>4?`<div style="font-size:10px;color:var(--text2);margin-top:2px">+${total-4} más...</div>`:''}
           </div>`:`<div style="font-size:11px;color:var(--text2);font-style:italic">Sin items aún</div>`}
@@ -1870,7 +1870,7 @@ function openSupplier(id){
   _suppId=id;
   const sup=S.suppliers.find(x=>x.id===id); if(!sup) return;
   $('suppName').textContent='🏭 '+sup.name;
-  $('suppPhone').innerHTML=`📞 ${sup.phone} <button onclick="window.open('https://wa.me/51${sup.phone}','_blank')" style="background:rgba(46,160,67,.15);border:1px solid rgba(46,160,67,.3);color:var(--green);border-radius:7px;padding:4px 10px;font-size:12px;font-weight:700;cursor:pointer">💬 WhatsApp</button>`;
+  $('suppPhone').innerHTML=`📞 ${esc(sup.phone)} <button onclick="window.open('https://wa.me/51${esc(sup.phone)}','_blank')" style="background:rgba(46,160,67,.15);border:1px solid rgba(46,160,67,.3);color:var(--green);border-radius:7px;padding:4px 10px;font-size:12px;font-weight:700;cursor:pointer">💬 WhatsApp</button>`;
   renderCotizArea(sup);
   renderSuppItems(sup);
   $('suppNewItem').value='';
@@ -1918,14 +1918,14 @@ function renderSuppItems(sup){
     return;
   }
   $('suppItemsList').innerHTML=sup.items.map((it,i)=>`
-    <div data-supp-text="${it.text.replace(/"/g,'&quot;')}" style="display:flex;align-items:center;gap:12px;padding:14px 0;border-bottom:1px solid var(--bd)">
+    <div data-supp-text="${esc(it.text)}" style="display:flex;align-items:center;gap:12px;padding:14px 0;border-bottom:1px solid var(--bd)">
       <div onclick="toggleSuppItem('${sup.id}',${i})" style="width:28px;height:28px;border-radius:8px;border:2px solid ${it.done?'var(--green)':'var(--bd)'};background:${it.done?'var(--green)':'transparent'};display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;color:#fff;font-size:14px;font-weight:700">${it.done?'✓':''}</div>
       <span style="flex:1;font-size:15px;font-weight:500;cursor:pointer;${it.done?'text-decoration:line-through;opacity:.45':''}"
         ontouchstart="suppTapStart('${sup.id}',${i},this,event)"
         ontouchmove="suppTapMove(event)"
         ontouchend="suppTapEnd(event)"
         onclick="toggleSuppItem('${sup.id}',${i})"
-      >${it.text}</span>
+      >${esc(it.text)}</span>
       <button onclick="delSuppItem('${sup.id}',${i})" style="background:none;border:none;color:var(--red);font-size:20px;cursor:pointer;opacity:.7;padding:0 4px;flex-shrink:0">✕</button>
     </div>`).join('');
 }

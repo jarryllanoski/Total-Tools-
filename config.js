@@ -71,8 +71,8 @@ function openTrash(){
       const warn=remaining<=5;
       return`<div class="trash-item">
         <div class="trash-item-info">
-          <div class="trash-item-name">${item.shipment.name}</div>
-          <div class="trash-item-meta">📞 ${item.shipment.phone} · 🚚 ${item.shipment.courier}</div>
+          <div class="trash-item-name">${esc(item.shipment.name)}</div>
+          <div class="trash-item-meta">📞 ${esc(item.shipment.phone)} · 🚚 ${esc(item.shipment.courier)}</div>
           <div class="trash-item-meta">📅 Eliminado hace ${days===0?'hoy':days+' día'+(days>1?'s':'')}</div>
         </div>
         <span class="trash-item-days ${warn?'trash-days-warn':'trash-days-ok'}">${remaining}d</span>
@@ -117,7 +117,7 @@ function openWA(id){
 
   // Sin docs marcados pero con mensajes → abrir sheet solo con mensajes
   // Con docs marcados → abrir sheet completo
-  $('waInfo').innerHTML=`<div style="font-weight:700;font-size:14px;margin-bottom:4px">${s.name}</div><div style="color:var(--blue)">📞 +51 ${s.phone}</div><div style="color:var(--text2);font-size:12px;margin-top:2px">🏠 ${s.address}</div>`;
+  $('waInfo').innerHTML=`<div style="font-weight:700;font-size:14px;margin-bottom:4px">${esc(s.name)}</div><div style="color:var(--blue)">📞 +51 ${esc(s.phone)}</div><div style="color:var(--text2);font-size:12px;margin-top:2px">🏠 ${esc(s.address)}</div>`;
   let html='';
   if(s.docGuia||s.docTicket){
     html+=`<div style="font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;margin-bottom:8px">Documentos a enviar:</div><div class="wa-doc-grid">`;
@@ -281,7 +281,7 @@ $('viewer').addEventListener('click',e=>{if(e.target===$('viewer'))closeViewer()
 let _links=[];
 function addLink(){const v=$('fLink').value.trim();if(!v){toast('Ingresa un link');return}if(!v.startsWith('http')){toast('⚠️ Link inválido');return}const n=v.length>36?v.substring(0,36)+'…':v;_links.push({u:v,n});renderLinks();$('fLink').value='';toast('🔗 Agregado')}
 function removeLink(i){_links.splice(i,1);renderLinks()}
-function renderLinks(){$('linkListForm').innerHTML=_links.map((l,i)=>`<div class="link-item"><span>🔗</span><div class="link-name">${l.n}</div><a href="${l.u}" target="_blank" style="color:var(--blue);font-size:12px;text-decoration:none">↗</a><button class="link-del" type="button" onclick="removeLink(${i})">✕</button></div>`).join('')}
+function renderLinks(){$('linkListForm').innerHTML=_links.map((l,i)=>`<div class="link-item"><span>🔗</span><div class="link-name">${esc(l.n)}</div><a href="${esc(l.u)}" target="_blank" style="color:var(--blue);font-size:12px;text-decoration:none">↗</a><button class="link-del" type="button" onclick="removeLink(${i})">✕</button></div>`).join('')}
 
 /* FORM */
 let _editId=null;
