@@ -1921,7 +1921,7 @@ function cardHTML(s){
     ${pvtNote?`<div class="pvt-note" id="pvt_${s.id}" style="display:none" ondblclick="openPrivateNote('${s.id}')">🔒 ${pvtNote}</div>`:''}
     <div class="card-meta">
       <span class="meta">📞 ${s.phone}</span>
-      <span class="meta">📅 ${s.date||'—'}${(s.links&&s.links.length)?` <button onclick="copyCardLink('${s.id}')" title="Copiar link" style="background:none;border:none;color:#8b949e;font-size:11px;cursor:pointer;padding:0 0 0 2px;vertical-align:middle">🔗</button>`:''}</span>
+      <span class="meta">📅 ${s.date||'—'} <button onclick="copyCardLink('${s.id}')" title="Copiar link" style="background:none;border:none;color:${(s.links&&s.links.length)?'#388bfd':'#8b949e'};font-size:11px;cursor:pointer;padding:0 0 0 2px;vertical-align:middle">🔗</button></span>
       ${s.cost?`<span class="meta">💰 S/ ${s.cost}</span>`:''}
     </div>
     <div class="card-addr">🏠 ${s.address}</div>
