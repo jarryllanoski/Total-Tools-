@@ -1,0 +1,32 @@
+rules_version = '2';
+
+// ============================================================================
+// Total Tools — Reglas de seguridad de Firestore
+// ----------------------------------------------------------------------------
+// PRINCIPIO:
+//   • El PANEL (index.html) ya envía el token de Firebase Auth en cada llamada
+//     (Authorization: Bearer ...). Por eso exigimos request.auth != null.
+//   • El PÚBLICO (formulario / seguimiento) ya NO toca Firestore directo:
+//     todo pasa por la Cloud Function "formApi", que usa el Admin SDK y
+//     IGNORA estas reglas (acceso de servidor). Por eso aquí el público
+//     queda completamente cerrado.
+// RESULTADO:
+//   • Solo quien inició sesión en el panel puede leer/escribir datos.
+//   • Nadie puede leer/editar/borrar con la API key suelta.
+//   • El formulario público sigue funcionando porque va por la función.
+// ============================================================================
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Solo usuarios autenticados (tu login del panel) acceden a TODO "panel/**"
+    match /panel/{document=**} {
+      allow read, write: if request.auth != null;
+    }
+
+    // Cualquier otra ruta: cerrada por defecto
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
