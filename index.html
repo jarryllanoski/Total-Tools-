@@ -1910,9 +1910,8 @@ function cardHTML(s){
   return `<div class="card">
     <div class="card-top">
       <div class="chk ${s.sel?'on':''}" onclick="toggleSel('${s.id}')">${s.sel?'✓':''}</div>
-      <div class="cname" 
-        onclick="togglePvtNote('${s.id}')" 
-        ondblclick="event.stopPropagation();openPrivateNote('${s.id}')"
+      <div class="cname"
+        onclick="nameClick('${s.id}')"
         style="cursor:pointer;flex:1;user-select:none">
         ${s.name}${pvtNote?` <span style="font-size:11px;color:var(--purple);opacity:.7">🔒</span>`:''}
       </div>
@@ -2449,6 +2448,31 @@ async function startQR(){$('qrOverlay').classList.add('open');$('qrFound').style
 async function scanLoop(){const v=$('qrVideo');if(!v.srcObject)return;_qrCtx.drawImage(v,0,0,_qrCanvas.width,_qrCanvas.height);let res=null;if('BarcodeDetector' in window){try{const bd=new BarcodeDetector({formats:['qr_code']});const c=await bd.detect(_qrCanvas);if(c.length)res=c[0].rawValue}catch(e){}}if(!res&&window.jsQR){const img=_qrCtx.getImageData(0,0,_qrCanvas.width,_qrCanvas.height);const c=jsQR(img.data,img.width,img.height);if(c)res=c.data}if(res){handleQR(res);return}_qrAF=requestAnimationFrame(scanLoop)}
 function handleQR(raw){if(raw&&raw.includes('/document/')){const _parts=raw.split('/document/');const _qrId=parseInt(_parts[0]);if(!isNaN(_qrId)){const _ord=String(_qrId-3473503);const _found=S.shipments.find(s=>(s.trackingOrderNumber===_ord)||(s.shalomGuia===_ord));const _fEl=$('qrFound');_fEl.textContent='✅ Guía: '+_ord;_fEl.style.display='block';setTimeout(()=>{closeQR();$('fSearch').value=_ord;_filt='';renderChips();render();if(_found){setTimeout(()=>{document.querySelectorAll('.card').forEach(c=>{if(c.innerHTML.includes(_ord)){c.style.background='rgba(56,139,253,.15)';setTimeout(()=>c.style.background='',1500)}})},200);toast('✅ '+_found.name);}else{toast('⚠️ Guía no encontrada: '+_ord);}},800);return;}}let phone=raw.replace(/\D/g,'');if(phone.startsWith('51')&&phone.length===11)phone=phone.slice(2);if(phone.length!==9){toast('QR no reconocido');_qrAF=requestAnimationFrame(scanLoop);return}const f=$('qrFound');f.textContent=`✅ ${phone}`;f.style.display='block';const m=S.shipments.find(s=>s.phone===phone);setTimeout(()=>{closeQR();$('fSearch').value=phone;_filt='';renderChips();render();if(m){setTimeout(()=>{document.querySelectorAll('.card').forEach(c=>{if(c.innerHTML.includes(phone)){c.style.background='rgba(56,139,253,.15)';setTimeout(()=>c.style.background='',1500)}})},200);toast(`✅ ${m.name}`)}else{toast(`⚠️ No encontrado: ${phone}`)}},800)}
 function closeQR(){if(_qrAF)cancelAnimationFrame(_qrAF);if(_qrStream)_qrStream.getTracks().forEach(t=>t.stop());_qrStream=null;_qrAF=null;$('qrVideo').srcObject=null;$('qrOverlay').classList.remove('open')}
+
+/* TRIPLE TAP EN NOMBRE → duplicar pedido */
+const _nTaps={},_nTmr={};
+function nameClick(id){
+  _nTaps[id]=(_nTaps[id]||0)+1;
+  clearTimeout(_nTmr[id]);
+  if(_nTaps[id]>=3){_nTaps[id]=0;duplicarPedido(id);return;}
+  _nTmr[id]=setTimeout(()=>{
+    const n=_nTaps[id];_nTaps[id]=0;
+    if(n===1)togglePvtNote(id);
+    else if(n===2)openPrivateNote(id);
+  },320);
+}
+function duplicarPedido(id){
+  const orig=S.shipments.find(x=>x.id===id);if(!orig)return;
+  const nuevo={...orig};
+  nuevo.id=Date.now().toString(36)+Math.random().toString(36).slice(2,5);
+  nuevo.date=new Date().toISOString().slice(0,10);
+  nuevo.status=(S.labels&&S.labels.length)?S.labels[0]:'Nuevo Pedido';
+  nuevo.sel=false;nuevo.docGuia=null;nuevo.docEmbalado=null;nuevo.docTicket=null;
+  nuevo.chkGuia=false;nuevo.chkTicket=false;nuevo.privateNote='';
+  nuevo.createdAt=new Date().toISOString();nuevo._localTs=Date.now();
+  S.shipments.unshift(nuevo);
+  save();render();toast('📋 Pedido duplicado — revisa y edita');
+}
 
 function copyCardLink(id){
   const s=S.shipments.find(x=>x.id===id);
