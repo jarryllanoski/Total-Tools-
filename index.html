@@ -88,15 +88,22 @@
   }
   async function fsList(col){
     const h=await _authHeaders();
-    const r=await fetch(`${BASE}/${col}?key=${KEY}&pageSize=500`,{headers:h});
-    if(!r.ok) throw new Error('fsList HTTP '+r.status); // ★ error real, no fingir vacío
-    const data=await r.json();
-    return(data.documents||[]).map(doc=>{
-      const o={};
-      Object.keys(doc.fields||{}).forEach(k=>{o[k]=fromFs(doc.fields[k])});
-      o._id=doc.name.split('/').pop();
-      return o;
-    });
+    let all=[];
+    let pageToken='';
+    do{
+      const url=`${BASE}/${col}?key=${KEY}&pageSize=300${pageToken?'&pageToken='+encodeURIComponent(pageToken):''}`;
+      const r=await fetch(url,{headers:h});
+      if(!r.ok) throw new Error('fsList HTTP '+r.status);
+      const data=await r.json();
+      (data.documents||[]).forEach(doc=>{
+        const o={};
+        Object.keys(doc.fields||{}).forEach(k=>{o[k]=fromFs(doc.fields[k])});
+        o._id=doc.name.split('/').pop();
+        all.push(o);
+      });
+      pageToken=data.nextPageToken||'';
+    }while(pageToken);
+    return all;
   }
   window._fsList = fsList; // ★ exponer globalmente para tokens
   // ── Strip images for cloud (too heavy) ───────────────────────────────
