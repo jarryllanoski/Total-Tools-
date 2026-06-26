@@ -196,9 +196,16 @@
   window._fbSaveShipmentNow = async (ship) => {
     window._isSaving = true;
     try {
-      await fsPatch(shipPath(ship.id), slimShipment(ship));
-    } catch(e) {
-      console.warn('Error guardando shipment:', e);
+      // Reintentos: si falla la subida (red intermitente), reintenta hasta 3 veces.
+      for(let i=0; i<3; i++){
+        try {
+          await fsPatch(shipPath(ship.id), slimShipment(ship));
+          return; // éxito
+        } catch(e) {
+          if(i < 2) await new Promise(r=>setTimeout(r, 2000*(i+1)));
+          else console.warn('Error guardando shipment tras 3 intentos:', e);
+        }
+      }
     } finally {
       window._isSaving = false;
     }
@@ -1518,6 +1525,13 @@ window._mergeRemote = (remote) => {
     remote.shipments = remote.shipments.map(rs => {
       const local = S.shipments.find(ls => ls.id === rs.id);
       if(local) {
+        // ★ FIX preciso: si ESTE pedido tiene un cambio local específico aún sin
+        // subir (está en _dirtyShips), conservamos la versión local para que el
+        // latido no lo pise antes de que suba. NO usamos _dirtyAll (sería muy
+        // amplio: bloquearía los cambios legítimos de otros dispositivos).
+        if(typeof _dirtyShips !== 'undefined' && _dirtyShips.has(rs.id)){
+          return local;
+        }
         // Preservar imágenes base64 que no se guardan en Firebase
         if(rs.docGuia && rs.docGuia.d === '[img]' && local.docGuia) rs.docGuia = local.docGuia;
         if(rs.docEmbalado && rs.docEmbalado.d === '[img]' && local.docEmbalado) rs.docEmbalado = local.docEmbalado;
