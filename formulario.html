@@ -1613,6 +1613,7 @@ async function buscarPedido(token, silent){
   try{
     const resp = await _api('track', {token: t});
     if(resp && resp.status === 'ok' && resp.order){
+      if(window.TTLoader) TTLoader.done();
       renderTrackResult(resp.order, resp.order.code);
       // ★ Congelar finalizados: si está entregado, no auto-refrescar ni consultar Shalom
       if(resp.order.frozen){
@@ -1622,9 +1623,11 @@ async function buscarPedido(token, silent){
       }
       return;
     }
+    if(window.TTLoader) TTLoader.done();
     clearTrackRefresh();
     setTrackContent(`<div class="error-box">No se encontró el pedido. Verifica tu link de seguimiento.</div><div style="text-align:center;margin-top:16px"><button onclick="nuevoRegistro()" style="background:var(--blue);border:none;border-radius:10px;color:#fff;font-weight:700;font-size:14px;padding:12px 24px;cursor:pointer;font-family:inherit">📝 Registrar nuevo pedido</button></div>${notMyOrderBtn()}`);
   }catch(e){
+    if(window.TTLoader) TTLoader.done();
     setTrackContent(`<div class="error-box">Error al buscar: ${esc(e.message)}</div>${notMyOrderBtn()}`);
   }
 }
@@ -2094,5 +2097,6 @@ window.toggleShalomHelp     = toggleShalomHelp;
 
 })();
 </script>
+<script src="loading-screen.js?v=1"></script>
 </body>
 </html>
