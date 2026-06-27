@@ -976,9 +976,9 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);max
     </div>
     <div class="frow">
       <div class="fg"><label class="fl">DNI</label><input class="fi" id="fDni" placeholder="12345678" maxlength="8" inputmode="numeric"></div>
-      <div class="fg"></div>
+      <div class="fg" id="fEncAgenciaGroup" style="display:none"><label class="fl">Agencia</label><input class="fi" id="fEncAgencia" placeholder="Nombre de la agencia"></div>
     </div>
-    <div class="fg"><label class="fl">Dirección *</label><input class="fi" id="fAddr" placeholder="Av., Mz., Lote..."></div>
+    <div class="fg"><label class="fl" id="fAddrLabel">Dirección *</label><input class="fi" id="fAddr" placeholder="Av., Mz., Lote..."></div>
     <div class="frow">
       <div class="fg"><label class="fl">Courier</label><select class="fs" id="fCourier"></select></div>
       <div class="fg"><label class="fl">Fecha</label><input class="fi" id="fDate" type="date"></div>
@@ -1924,7 +1924,7 @@ function cardHTML(s){
       <span class="meta">📅 ${s.date||'—'} <button onclick="copyCardLink('${s.id}')" title="Copiar link" style="background:none;border:none;color:#388bfd;font-size:11px;cursor:pointer;padding:0 0 0 2px;vertical-align:middle">🔗</button></span>
       ${s.cost?`<span class="meta">💰 S/ ${s.cost}</span>`:''}
     </div>
-    <div class="card-addr">🏠 ${s.address}</div>
+    ${(s.courier||'').toUpperCase().includes('ENCOMIENDA')?((s.ciudadDestino||s.address)?`<div class="card-addr">📦 ${s.ciudadDestino||s.address}${s.encAgencia?' · 🏪 '+s.encAgencia:''}</div>`:''): (s.address?`<div class="card-addr">🏠 ${s.address}</div>`:'' )}
     ${s.notes?`<div class="card-note">📝 ${s.notes}</div>`:''}
     ${cardDocs(s,gChk,tChk)}
     ${(s.trackingOrderNumber||s.shalomGuia)&&typeof Tracking!=='undefined'?Tracking.renderCardBlock(s):''}
@@ -2466,7 +2466,7 @@ render();
 </script>
 <!-- ★ SHALOM tracking — cargado al final -->
 <script src="storage.js?v=2"></script>
-<script src="config.js?v=3"></script>
+<script src="config.js?v=4"></script>
 <script src="print.js?v=3"></script>
 <script src="notify.js?v=2"></script>
 <script src="tracking.js?v=2"></script>

@@ -727,6 +727,9 @@ function renderForm(){
           <input class="fi" id="f_dni_dest" type="text" inputmode="numeric" placeholder="DNI del destinatario *" maxlength="8" pattern="[0-9]*">
           <div class="ferr" id="err_dni_dest">Ingresa el DNI (8 dígitos)</div>
         </div>
+        <div class="fg" style="margin-top:8px;margin-bottom:0">
+          <input class="fi" id="f_agencia" type="text" placeholder="Nombre de la agencia (opcional)" autocomplete="off">
+        </div>
       </div>
 
       <div id="deliveryAddrBox" style="display:none;margin-top:4px">
@@ -1457,6 +1460,7 @@ async function submitOrder(){
   const dniRecoger       = selCourierType==='agencia'    ? ($('f_dni_recoger')||{value:''}).value.trim() : '';
   const ciudadDestino    = selCourierType==='encomienda'  ? ($('f_ciudad')||{value:''}).value.trim()      : '';
   const dniDestinatario  = selCourierType==='encomienda'  ? ($('f_dni_dest')||{value:''}).value.trim()    : '';
+  const encAgencia       = selCourierType==='encomienda'  ? ($('f_agencia') ||{value:''}).value.trim()    : '';
 
   // Dirección final: para agencia usar la dirección de la agencia, para delivery usar la del cliente
   let finalAddress = deliveryAddress;
@@ -1478,6 +1482,7 @@ async function submitOrder(){
     dniRecoger,
     ciudadDestino,
     dniDestinatario,
+    encAgencia,
     courier:        selCourierName,
     date:           selDateIso,
     status:         'NUEVO PEDIDO',
@@ -1558,6 +1563,7 @@ function renderSuccessStep(order, trackCode, trackToken){
           ${order.referencia?`<div class="sum-row"><span class="sum-lbl">Referencia</span><span class="sum-val">${esc(order.referencia)}</span></div>`:''}
           ${order.ciudadDestino?`<div class="sum-row"><span class="sum-lbl">Ciudad destino</span><span class="sum-val">${esc(order.ciudadDestino)}</span></div>`:''}
           ${order.dniDestinatario?`<div class="sum-row"><span class="sum-lbl">DNI destinatario</span><span class="sum-val">${esc(order.dniDestinatario)}</span></div>`:''}
+          ${order.encAgencia?`<div class="sum-row"><span class="sum-lbl">Agencia</span><span class="sum-val">${esc(order.encAgencia)}</span></div>`:''}
           ${order.dniRecoger?`<div class="sum-row"><span class="sum-lbl">DNI para recoger</span><span class="sum-val">${esc(order.dniRecoger)}</span></div>`:''}
           <div class="sum-row"><span class="sum-lbl">Courier</span><span class="sum-val">${esc(order.courier)}</span></div>
           <div class="sum-row"><span class="sum-lbl">Fecha</span><span class="sum-val">${esc(dateLabel)}</span></div>
@@ -1810,6 +1816,7 @@ function renderTrackResult(ship, code){
         ${ship.referencia?`<div class="tk-row"><span class="tk-row-lbl">Referencia</span><span class="tk-row-val">${esc(ship.referencia)}</span></div>`:''}
         ${ship.ciudadDestino?`<div class="tk-row"><span class="tk-row-lbl">Ciudad destino</span><span class="tk-row-val">${esc(ship.ciudadDestino)}</span></div>`:''}
         ${ship.dniDestinatario?`<div class="tk-row"><span class="tk-row-lbl">DNI destinatario</span><span class="tk-row-val">${esc(ship.dniDestinatario)}</span></div>`:''}
+        ${ship.encAgencia?`<div class="tk-row"><span class="tk-row-lbl">Agencia</span><span class="tk-row-val">${esc(ship.encAgencia)}</span></div>`:''}
         ${ship.dniRecoger?`<div class="tk-row"><span class="tk-row-lbl">DNI para recoger</span><span class="tk-row-val">${esc(ship.dniRecoger)}</span></div>`:''}
         ${ship.notes?`<div class="tk-row"><span class="tk-row-lbl">Notas</span><span class="tk-row-val">${esc(ship.notes)}</span></div>`:''}
         ${extraRows}

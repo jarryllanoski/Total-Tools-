@@ -302,7 +302,10 @@ function openForm(id){
   if(id){
     const s=S.shipments.find(x=>x.id===id);
     if(!s){toast('⚠️ Recarga la página e intenta de nuevo');return;}
-    $('fName').value=s.name;$('fPhone').value=s.phone;if($('fDni'))$('fDni').value=s.dni||'';$('fAddr').value=s.address;
+    $('fName').value=s.name;$('fPhone').value=s.phone;if($('fDni'))$('fDni').value=s.dni||'';
+    const _isEncEdit=(s.courier||'').toUpperCase().includes('ENCOMIENDA');
+    $('fAddr').value=_isEncEdit?(s.ciudadDestino||s.address||''):s.address;
+    if($('fEncAgencia'))$('fEncAgencia').value=s.encAgencia||'';
     $('fCourier').value=s.courier;$('fDate').value=s.date;$('fStatus').value=s.status;
     $('fCost').value=s.cost||'';$('fNotes').value=s.notes||'';
     document.querySelectorAll('.xf').forEach(el=>{el.value=(s.extra&&s.extra[el.dataset.f])||''});
@@ -318,14 +321,19 @@ function openForm(id){
     }
     _links=s.links?JSON.parse(JSON.stringify(s.links)):[];renderLinks();
   }else{
-    ['fName','fPhone','fAddr','fCost','fNotes'].forEach(i=>$(i).value='');if($('fDni'))$('fDni').value='';
+    ['fName','fPhone','fAddr','fCost','fNotes'].forEach(i=>$(i).value='');if($('fDni'))$('fDni').value='';if($('fEncAgencia'))$('fEncAgencia').value='';
     $('fDate').valueAsDate=new Date();
   }
-  // ★ SHALOM: show/hide bloque guía según courier
+  // ★ SHALOM + ENCOMIENDA: show/hide bloques según courier
   const _showShalomBlock = () => {
     const c = ($('fCourier').value||'').toUpperCase();
     const b = $('shalomGuiaBlock');
     if(b) b.style.display = c.includes('SHALOM') ? 'block' : 'none';
+    const isEnc = c.includes('ENCOMIENDA');
+    const addrLbl = document.getElementById('fAddrLabel');
+    const encGrp  = document.getElementById('fEncAgenciaGroup');
+    if(addrLbl) addrLbl.textContent = isEnc ? 'Ciudad destino *' : 'Dirección *';
+    if(encGrp)  encGrp.style.display = isEnc ? '' : 'none';
   };
   $('fCourier').onchange = _showShalomBlock;
   if(id){
@@ -353,7 +361,11 @@ function saveShipment(){
   const name=$('fName').value.trim(),phone=$('fPhone').value.trim(),addr=$('fAddr').value.trim();
   if(!name||!phone||!addr){toast('⚠️ Nombre, teléfono y dirección requeridos');return}
   const extra={};document.querySelectorAll('.xf').forEach(el=>extra[el.dataset.f]=el.value);
-  const dni=($('fDni')||{value:''}).value.trim();const data={name,phone,dni,address:addr,courier:$('fCourier').value,date:$('fDate').value,status:$('fStatus').value,cost:$('fCost').value,notes:$('fNotes').value.trim(),extra,docGuia:_docs.guia,docEmbalado:_docs.embalado,docTicket:_docs.ticket,links:JSON.parse(JSON.stringify(_links)),sel:false,chkGuia:false,chkTicket:false};
+  const dni=($('fDni')||{value:''}).value.trim();
+  const _isEncSave=($('fCourier').value||'').toUpperCase().includes('ENCOMIENDA');
+  const _encAgencia=_isEncSave?($('fEncAgencia')||{value:''}).value.trim():'';
+  const data={name,phone,dni,address:_isEncSave?'':addr,courier:$('fCourier').value,date:$('fDate').value,status:$('fStatus').value,cost:$('fCost').value,notes:$('fNotes').value.trim(),extra,docGuia:_docs.guia,docEmbalado:_docs.embalado,docTicket:_docs.ticket,links:JSON.parse(JSON.stringify(_links)),sel:false,chkGuia:false,chkTicket:false};
+  if(_isEncSave){data.ciudadDestino=addr;data.encAgencia=_encAgencia;}
   // ★ SHALOM: leer campos guía
   const _sGuia   = ($('fShalomGuia')   ? $('fShalomGuia').value.trim()   : '')||'';
   const _sCodigo = ($('fShalomCodigo') ? $('fShalomCodigo').value.trim() : '')||'';
@@ -364,7 +376,8 @@ function saveShipment(){
     const prev=S.shipments[idx];
     ['trackingStatus','trackingMessage','trackingLastUpdate','trackingLastAutoCheck',
      'trackingHistory','trackingHistorialShalom','trackingOrigen','trackingDestino',
-     'trackingOrderNumber','trackingOrderCode','shalomGuia','shalomCodigo'].forEach(k=>{
+     'trackingOrderNumber','trackingOrderCode','shalomGuia','shalomCodigo',
+     'dniDestinatario'].forEach(k=>{
       if(prev[k]!==undefined&&!data[k]) data[k]=prev[k];
     });
     S.shipments[idx]={...prev,...data, _localTs: Date.now()};
