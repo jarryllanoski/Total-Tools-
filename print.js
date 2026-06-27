@@ -296,8 +296,8 @@ function _htmlEtiqueta(list, bultos, bizName, bizPhone, bizCity, fecha, qrUrl){
             <div class="remitente">
               <div class="rem-label">REMITENTE</div>
               <div class="rem-name">${esc(bizName)}</div>
-              ${bizPhone?`<div class="rem-sub">📞 ${esc(bizPhone)}</div>`:''}
-              ${bizCity?`<div class="rem-sub">📍 ${esc(bizCity)}</div>`:''}
+              ${bizPhone?`<div class="rem-sub">Tel: ${esc(bizPhone)}</div>`:''}
+              ${bizCity?`<div class="rem-sub">${esc(bizCity)}</div>`:''}
             </div>
             <div class="qr-box">
               <img src="${qrUrl(s.phone)}" alt="QR" width="90" height="90">
@@ -309,16 +309,15 @@ function _htmlEtiqueta(list, bultos, bizName, bizPhone, bizCity, fecha, qrUrl){
             <span class="dest-label">PARA:${bLabel}</span>
             <div class="dest-name">${esc(s.name)}</div>
             <div class="dest-phone">${esc(s.phone)}</div>
-            ${s.dni?`<div class="dest-ref"><b>DNI:</b> ${esc(s.dni)}</div>`:''}
+            ${(s.dniRecoger||s.dni)?`<div class="dest-dni"><b>DNI:</b> ${esc(s.dniRecoger||s.dni)}</div>`:''}
             <div style="font-size:clamp(7.5pt,1.4vw,9pt);font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#555;margin:2mm 0 1mm">DESTINO:</div>
             <div class="dest-addr">${esc(addr)}</div>
             ${s.referencia?`<div class="agencia"><b>Ref:</b> ${esc(s.referencia)}</div>`:''}
-            ${s.dniRecoger?`<div class="dest-ref"><b>DNI recoger:</b> ${esc(s.dniRecoger)}</div>`:''}
             ${notes}
           </div>
           <div class="card-footer">
-            <span class="courier">🚚 ${esc(s.courier||'—')}</span>
-            <span class="fecha">📅 ${esc(s.date||'—')}</span>
+            <span class="courier">${esc(s.courier||'—')}</span>
+            <span class="fecha">${esc(s.date||'—')}</span>
             <span class="codigo">#${esc(s.id?s.id.slice(-4).toUpperCase():'???')}</span>
           </div>
           <div class="card-thanks">
@@ -368,6 +367,7 @@ function _htmlEtiqueta(list, bultos, bizName, bizPhone, bizCity, fecha, qrUrl){
   .dest-phone { font-size:clamp(10pt,2.2vw,13pt); font-weight:700; color:#000; margin-bottom:1.5mm; }
   .dest-addr  { font-size:clamp(8pt,1.6vw,10pt); color:#000; margin-bottom:1.5mm; line-height:1.5; font-weight:400; }
   .dest-ref   { font-size:clamp(8pt,1.5vw,9.5pt); color:#000; margin-bottom:1mm; font-weight:700; display:block; }
+  .dest-dni   { font-size:clamp(12pt,2.4vw,15pt); color:#000; margin-bottom:2mm; font-weight:900; display:block; letter-spacing:1px; }
   .agencia    { font-size:clamp(8pt,1.5vw,9.5pt); color:#000; margin-bottom:1mm; font-weight:700; display:block; }
   .notes      { font-size:clamp(7.5pt,1.4vw,9pt); color:#333; font-style:italic; margin-top:1mm; display:block; }
 
@@ -409,12 +409,12 @@ function _htmlLista(list, bultos, bizName, bizPhone, bizCity, fecha, qrUrl){
       <td class="num">${i+1}</td>
       <td>
         <div class="row-name">${esc(s.name)}</div>
-        <div class="row-phone">📞 ${esc(s.phone)}</div>
+        <div class="row-phone">${esc(s.phone)}</div>
       </td>
       <td>
         <div class="row-addr">${esc(addr)}</div>
-        ${s.dniRecoger?`<div class="row-sub">🪪 ${esc(s.dniRecoger)}</div>`:''}
-        ${s.referencia?`<div class="row-sub">🔖 ${esc(s.referencia)}</div>`:''}
+        ${s.dniRecoger?`<div class="row-sub">DNI: ${esc(s.dniRecoger)}</div>`:''}
+        ${s.referencia?`<div class="row-sub">Ref: ${esc(s.referencia)}</div>`:''}
       </td>
       <td>
         <div>${esc(s.courier||'—')}</div>
@@ -463,11 +463,11 @@ function _htmlLista(list, bultos, bizName, bizPhone, bizCity, fecha, qrUrl){
 <div class="header">
   <h1>${esc(bizName)} — LISTA DE DESPACHO</h1>
   <div class="header-meta">
-    <span>📅 ${fecha}</span>
-    ${bizPhone?`<span>📞 ${esc(bizPhone)}</span>`:''}
-    ${bizCity?`<span>📍 ${esc(bizCity)}</span>`:''}
-    <span>📦 ${list.length} envío${list.length!==1?'s':''}</span>
-    ${bultos>1?`<span>🎁 ${bultos} bultos c/u</span>`:''}
+    <span>${fecha}</span>
+    ${bizPhone?`<span>Tel: ${esc(bizPhone)}</span>`:''}
+    ${bizCity?`<span>${esc(bizCity)}</span>`:''}
+    <span>${list.length} envío${list.length!==1?'s':''}</span>
+    ${bultos>1?`<span>${bultos} bultos c/u</span>`:''}
   </div>
 </div>
 <table>
