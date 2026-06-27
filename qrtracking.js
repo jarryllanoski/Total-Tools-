@@ -254,12 +254,11 @@ QRTracking.patchTrackingBlock = function(){
     if(!html) return html;
     var guia = s.trackingOrderNumber || s.shalomGuia || '';
     if(!guia) return html;
-    // Insertar botón 🔗 (link) y 📷 QR en el header junto a "Ayuda"
-    var linkBtn = '<button class="trk-btn-qr-hdr" onclick="Tracking.copiarLink(\''+s.id+'\')" title="Copiar link de seguimiento">🔗</button>';
+    // Insertar solo botón 📷 QR en el header junto a "Ayuda"
     var qrBtn = '<button class="trk-btn-qr-hdr" onclick="QRTracking.abrir(\''+guia+'\')" title="Ver QR de seguimiento">📷 QR</button>';
     html = html.replace(
       '<button onclick="Tracking.abrirManual()" style="background:none;border:none;color:#8b949e;font-size:10px;cursor:pointer;padding:0" title="Instrucciones">📖 Ayuda</button>',
-      '<button onclick="Tracking.abrirManual()" style="background:none;border:none;color:#8b949e;font-size:10px;cursor:pointer;padding:0" title="Instrucciones">📖 Ayuda</button>' + linkBtn + qrBtn
+      '<button onclick="Tracking.abrirManual()" style="background:none;border:none;color:#8b949e;font-size:10px;cursor:pointer;padding:0" title="Instrucciones">📖 Ayuda</button>' + qrBtn
     );
     return html;
   };
