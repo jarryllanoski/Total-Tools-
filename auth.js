@@ -7,7 +7,7 @@
 (function(){
 
   /* ── CONFIG ─────────────────────────────────────────────────────── */
-  var FB_API_KEY = 'AIzaSyBkbY-CFtNHfbaG864sXVnaAwBKZGW6SRI';
+  var FB_API_KEY = (window.FBConfig && window.FBConfig.KEY) || 'AIzaSyBkbY-CFtNHfbaG864sXVnaAwBKZGW6SRI';
   var AUTH_URL   = 'https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key='+FB_API_KEY;
   var REFRESH_URL= 'https://securetoken.googleapis.com/v1/token?key='+FB_API_KEY;
   var TOKEN_KEY  = 'tt_auth_token';

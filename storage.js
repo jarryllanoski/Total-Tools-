@@ -16,8 +16,8 @@
 'use strict';
 
 /* ── CONFIG ──────────────────────────────────────────────────────── */
-var STORAGE_BASE = 'https://firebasestorage.googleapis.com/v0/b/total-tools-24ce8.firebasestorage.app/o';
-var FB_KEY       = 'AIzaSyBkbY-CFtNHfbaG864sXVnaAwBKZGW6SRI';
+var STORAGE_BASE = (window.FBConfig && window.FBConfig.STORAGE_BASE) || 'https://firebasestorage.googleapis.com/v0/b/total-tools-24ce8.firebasestorage.app/o';
+var FB_KEY       = (window.FBConfig && window.FBConfig.KEY)          || 'AIzaSyBkbY-CFtNHfbaG864sXVnaAwBKZGW6SRI';
 
 /* ── HELPERS ─────────────────────────────────────────────────────── */
 
