@@ -1,9 +1,17 @@
 rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
+    // Documentos de envíos (guías, embalados, tickets)
+    // Lectura pública: las URLs se comparten por WhatsApp y el formulario público las muestra
+    // Escritura: solo el operador autenticado del panel (request.auth != null)
     match /shipments/{shipId}/{fileName} {
-      allow read: if true;
-      allow write: if true;
+      allow read:  if true;
+      allow write: if request.auth != null;
+    }
+
+    // Cualquier otro path: denegado por defecto
+    match /{allPaths=**} {
+      allow read, write: if false;
     }
   }
 }

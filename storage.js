@@ -79,9 +79,15 @@ async function uploadFile(file, shipId, slot) {
   var encoded = encodePath(path);
   var url     = STORAGE_BASE + '/' + encoded + '?uploadType=media&name=' + encoded + '&key=' + FB_KEY;
 
+  // Renovar idToken si está por vencer antes de subir
+  if (typeof window._authEnsureToken === 'function') await window._authEnsureToken();
+  var _idTok = localStorage.getItem('tt_id_token') || '';
+  var _uploadHdrs = { 'Content-Type': file.type };
+  if (_idTok) _uploadHdrs['Authorization'] = 'Bearer ' + _idTok;
+
   var response = await fetch(url, {
     method:  'POST',
-    headers: { 'Content-Type': file.type },
+    headers: _uploadHdrs,
     body:    file
   });
 
@@ -116,7 +122,10 @@ async function deleteFile(path) {
   var encoded = encodePath(path);
   var url = STORAGE_BASE + '/' + encoded + '?key=' + FB_KEY;
   try {
-    await fetch(url, { method: 'DELETE' });
+    if (typeof window._authEnsureToken === 'function') await window._authEnsureToken();
+    var _idTok = localStorage.getItem('tt_id_token') || '';
+    var _delHdrs = _idTok ? { 'Authorization': 'Bearer ' + _idTok } : {};
+    await fetch(url, { method: 'DELETE', headers: _delHdrs });
   } catch(e) {
     console.warn('[Storage] Error eliminando:', path, e.message);
   }
