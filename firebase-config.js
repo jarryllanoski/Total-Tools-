@@ -1,4 +1,4 @@
-// firebase.js — Configuración centralizada de Firebase para Total Tools
+// firebase-config.js — Configuración centralizada de Firebase para Total Tools
 window.FBConfig = {
   KEY:          'AIzaSyBkbY-CFtNHfbaG864sXVnaAwBKZGW6SRI',
   PRJ:          'total-tools-24ce8',
