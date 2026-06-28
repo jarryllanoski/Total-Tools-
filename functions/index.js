@@ -299,6 +299,7 @@ exports.shalomTracking = onRequest(
       try {
         const r = await fetch(`${SHALOM_BASE}/api/track`, {
           method: "POST",
+          signal: AbortSignal.timeout(15000),
           headers: {
             "x-api-key": SHALOM_KEY.value(),
             "Content-Type": "application/json",
