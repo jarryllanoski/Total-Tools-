@@ -2,6 +2,7 @@
 
 const {setGlobalOptions} = require("firebase-functions");
 const {onRequest} = require("firebase-functions/https");
+const {defineSecret} = require("firebase-functions/params");
 const {initializeApp} = require("firebase-admin/app");
 const {getFirestore} = require("firebase-admin/firestore");
 
@@ -9,20 +10,33 @@ setGlobalOptions({maxInstances: 10});
 initializeApp();
 const db = getFirestore();
 
+// ── Secret Manager ─────────────────────────────────────────────────────────
+const SHALOM_KEY = defineSecret("SHALOM_KEY");
+const SHALOM_BASE = "https://shalom-api.lat";
+
 // ── Rutas Firestore (deben coincidir exactamente con el panel) ─────────────
 const CFG_DOC = "panel/config";
 const SHIP_COL = "panel/shipments/items";
 const TOK_COL = "panel/tokens/items";
 
+// ── CORS ───────────────────────────────────────────────────────────────────
 const CORS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
   "Access-Control-Allow-Headers": "Content-Type",
 };
 
-// ── Punto de entrada único ─────────────────────────────────────────────────
-exports.formApi = onRequest(async (req, res) => {
+/**
+ * Aplica headers CORS a la respuesta.
+ * @param {Object} res response
+ */
+function setCORS(res) {
   Object.entries(CORS).forEach(([k, v]) => res.set(k, v));
+}
+
+// ── formApi ────────────────────────────────────────────────────────────────
+exports.formApi = onRequest(async (req, res) => {
+  setCORS(res);
   if (req.method === "OPTIONS") {
     res.status(204).send(""); return;
   }
@@ -187,3 +201,170 @@ async function handleTrack(req, res) {
   const frozen = ["ENTREGADO", "CANCELADO"].includes(order.status || "");
   res.json({status: "ok", order: Object.assign({}, order, {code, frozen})});
 }
+
+// ── FUNCIONES SHALOM ──────────────────────────────────────────────────────
+// Proxy seguro hacia shalom-api.lat
+// Key leída desde Secret Manager (SHALOM_KEY) — nunca expuesta al cliente
+// ──────────────────────────────────────────────────────────────────────────
+
+/**
+ * Hace un GET a la Shalom API y devuelve el JSON parseado.
+ * Lanza un Error enriquecido con .status y .detail si la respuesta no es ok.
+ * @param {string} url URL completa del endpoint Shalom
+ * @param {string} key valor de SHALOM_KEY desde Secret Manager
+ * @return {Promise<Object>} JSON de respuesta
+ */
+async function shalomGet(url, key) {
+  const r = await fetch(url, {headers: {"x-api-key": key}});
+  if (!r.ok) {
+    const txt = await r.text().catch(() => "");
+    const err = new Error(`Shalom ${r.status}`);
+    err.status = r.status;
+    err.detail = txt.slice(0, 200);
+    throw err;
+  }
+  return r.json();
+}
+
+// ── agenciasShalom ─────────────────────────────────────────────────────────
+// GET ?q=TEXTO → busca agencias     (shalom-api.lat/api/buscar?q=)
+// GET          → listado completo   (shalom-api.lat/api/listar)
+// Caller: formulario.html — buscador público de agencias
+exports.agenciasShalom = onRequest(
+    {secrets: [SHALOM_KEY]},
+    async (req, res) => {
+      setCORS(res);
+      if (req.method === "OPTIONS") {
+        res.status(204).send(""); return;
+      }
+      try {
+        const q = (req.query.q || "").trim();
+        const url = q ?
+          `${SHALOM_BASE}/api/buscar?q=${encodeURIComponent(q)}` :
+          `${SHALOM_BASE}/api/listar`;
+        const data = await shalomGet(url, SHALOM_KEY.value());
+        res.set("Cache-Control", "no-store");
+        res.json(data);
+      } catch (e) {
+        res.status(e.status || 500).json({
+          error: true, message: e.message, detail: e.detail || null,
+        });
+      }
+    },
+);
+
+// ── shalomListar ───────────────────────────────────────────────────────────
+// GET → listado completo de agencias (shalom-api.lat/api/listar)
+// URL separada de agenciasShalom — caller: agencias-extractor.js (panel admin)
+exports.shalomListar = onRequest(
+    {secrets: [SHALOM_KEY], region: "us-central1"},
+    async (req, res) => {
+      setCORS(res);
+      if (req.method === "OPTIONS") {
+        res.status(204).send(""); return;
+      }
+      try {
+        const data = await shalomGet(
+            `${SHALOM_BASE}/api/listar`,
+            SHALOM_KEY.value(),
+        );
+        res.set("Cache-Control", "no-store");
+        res.status(200).json(data);
+      } catch (e) {
+        res.status(e.status || 500).json({
+          error: e.message, detail: e.detail || null,
+        });
+      }
+    },
+);
+
+// ── shalomTracking ─────────────────────────────────────────────────────────
+// POST {orderNumber, orderCode} → tracking en tiempo real
+// Caller: tracking.js — auto-tracking cada 12/24 h por pedido en tránsito
+exports.shalomTracking = onRequest(
+    {secrets: [SHALOM_KEY]},
+    async (req, res) => {
+      setCORS(res);
+      if (req.method === "OPTIONS") {
+        res.status(204).send(""); return;
+      }
+      if (req.method !== "POST") {
+        res.status(405).json({error: true, message: "Usar POST"}); return;
+      }
+      const {orderNumber, orderCode} = req.body || {};
+      if (!orderNumber) {
+        res.status(400).json({error: true, message: "orderNumber requerido"});
+        return;
+      }
+      try {
+        const r = await fetch(`${SHALOM_BASE}/api/track`, {
+          method: "POST",
+          headers: {
+            "x-api-key": SHALOM_KEY.value(),
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            orderNumber: String(orderNumber).trim(),
+            orderCode: String(orderCode || "").trim(),
+          }),
+        });
+        if (!r.ok) {
+          const txt = await r.text().catch(() => "");
+          res.status(r.status).json({
+            error: `Shalom ${r.status}`, detail: txt.slice(0, 200),
+          });
+          return;
+        }
+        res.json(await r.json());
+      } catch (e) {
+        res.status(500).json({error: true, message: e.message});
+      }
+    },
+);
+
+// ── shalomTicket ───────────────────────────────────────────────────────────
+// POST {orderNumber, orderCode} → PNG binario del ticket de despacho
+// Caller: ticket.js — botón "Jalar ticket" en el panel
+exports.shalomTicket = onRequest(
+    {secrets: [SHALOM_KEY], region: "us-central1"},
+    async (req, res) => {
+      setCORS(res);
+      if (req.method === "OPTIONS") {
+        res.status(204).send(""); return;
+      }
+      if (req.method !== "POST") {
+        res.status(405).send("Method Not Allowed"); return;
+      }
+      const {orderNumber, orderCode} = req.body || {};
+      if (!orderNumber || !orderCode) {
+        res.status(400).json({error: "Falta orderNumber o orderCode"}); return;
+      }
+      try {
+        const r = await fetch(`${SHALOM_BASE}/api/ticket-image`, {
+          method: "POST",
+          headers: {
+            "x-api-key": SHALOM_KEY.value(),
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            orderNumber: String(orderNumber),
+            orderCode: String(orderCode),
+          }),
+        });
+        if (!r.ok) {
+          const txt = await r.text().catch(() => "");
+          res.status(r.status).json({
+            error: `Shalom ${r.status}`, detail: txt.slice(0, 200),
+          });
+          return;
+        }
+        const ct = r.headers.get("content-type") || "image/png";
+        const buf = Buffer.from(await r.arrayBuffer());
+        res.set("Content-Type", ct);
+        res.set("Cache-Control", "no-store");
+        res.status(200).send(buf);
+      } catch (e) {
+        res.status(500).json({error: e.message});
+      }
+    },
+);
