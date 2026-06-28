@@ -4,7 +4,7 @@ const {setGlobalOptions} = require("firebase-functions");
 const {onRequest} = require("firebase-functions/https");
 const {defineSecret} = require("firebase-functions/params");
 const {initializeApp} = require("firebase-admin/app");
-const {getFirestore} = require("firebase-admin/firestore");
+const {getFirestore, FieldValue} = require("firebase-admin/firestore");
 
 setGlobalOptions({maxInstances: 10});
 initializeApp();
@@ -18,6 +18,7 @@ const SHALOM_BASE = "https://shalom-api.lat";
 const CFG_DOC = "panel/config";
 const SHIP_COL = "panel/shipments/items";
 const TOK_COL = "panel/tokens/items";
+const TRACK_COL = "panel/tracking";
 
 // ── CORS ───────────────────────────────────────────────────────────────────
 const CORS = {
@@ -212,10 +213,13 @@ async function handleTrack(req, res) {
  * Lanza un Error enriquecido con .status y .detail si la respuesta no es ok.
  * @param {string} url URL completa del endpoint Shalom
  * @param {string} key valor de SHALOM_KEY desde Secret Manager
+ * @param {AbortSignal=} signal señal de cancelación opcional
  * @return {Promise<Object>} JSON de respuesta
  */
-async function shalomGet(url, key) {
-  const r = await fetch(url, {headers: {"x-api-key": key}});
+async function shalomGet(url, key, signal) {
+  const opts = {headers: {"x-api-key": key}};
+  if (signal) opts.signal = signal;
+  const r = await fetch(url, opts);
   if (!r.ok) {
     const txt = await r.text().catch(() => "");
     const err = new Error(`Shalom ${r.status}`);
@@ -242,7 +246,8 @@ exports.agenciasShalom = onRequest(
         const url = q ?
           `${SHALOM_BASE}/api/buscar?q=${encodeURIComponent(q)}` :
           `${SHALOM_BASE}/api/listar`;
-        const data = await shalomGet(url, SHALOM_KEY.value());
+        const data = await shalomGet(
+            url, SHALOM_KEY.value(), AbortSignal.timeout(10000));
         res.set("Cache-Control", "no-store");
         res.json(data);
       } catch (e) {
@@ -267,6 +272,7 @@ exports.shalomListar = onRequest(
         const data = await shalomGet(
             `${SHALOM_BASE}/api/listar`,
             SHALOM_KEY.value(),
+            AbortSignal.timeout(10000),
         );
         res.set("Cache-Control", "no-store");
         res.status(200).json(data);
@@ -280,7 +286,7 @@ exports.shalomListar = onRequest(
 
 // ── shalomTracking ─────────────────────────────────────────────────────────
 // POST {orderNumber, orderCode} → tracking en tiempo real
-// Caller: tracking.js — auto-tracking cada 12/24 h por pedido en tránsito
+// Si Shalom falla, sirve último tracking guardado en panel/tracking/{num}
 exports.shalomTracking = onRequest(
     {secrets: [SHALOM_KEY]},
     async (req, res) => {
@@ -296,6 +302,9 @@ exports.shalomTracking = onRequest(
         res.status(400).json({error: true, message: "orderNumber requerido"});
         return;
       }
+      const orderNum = String(orderNumber).trim();
+      const orderCod = String(orderCode || "").trim();
+      const cacheRef = db.doc(`${TRACK_COL}/${orderNum}`);
       try {
         const r = await fetch(`${SHALOM_BASE}/api/track`, {
           method: "POST",
@@ -305,20 +314,40 @@ exports.shalomTracking = onRequest(
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            orderNumber: String(orderNumber).trim(),
-            orderCode: String(orderCode || "").trim(),
+            orderNumber: orderNum,
+            orderCode: orderCod,
           }),
         });
         if (!r.ok) {
           const txt = await r.text().catch(() => "");
-          res.status(r.status).json({
-            error: `Shalom ${r.status}`, detail: txt.slice(0, 200),
-          });
+          throw Object.assign(
+              new Error(`Shalom ${r.status}`),
+              {status: r.status, detail: txt.slice(0, 200)},
+          );
+        }
+        const data = await r.json();
+        await cacheRef.set({
+          orderNumber: orderNum,
+          orderCode: orderCod,
+          data,
+          updatedAt: FieldValue.serverTimestamp(),
+          source: "shalom",
+        }).catch((e) => console.error("tracking cache write:", e));
+        res.json(data);
+      } catch (e) {
+        const snap = await cacheRef.get().catch(() => null);
+        if (snap && snap.exists) {
+          const c = snap.data();
+          const ts = c.updatedAt && c.updatedAt.toDate;
+          const cachedAt = ts ? c.updatedAt.toDate().toISOString() : null;
+          res.json({cached: true, cachedAt, data: c.data});
           return;
         }
-        res.json(await r.json());
-      } catch (e) {
-        res.status(500).json({error: true, message: e.message});
+        res.status(503).json({
+          error: true,
+          message: "Tracking temporalmente no disponible." +
+            " Intenta nuevamente en unos minutos.",
+        });
       }
     },
 );
@@ -343,6 +372,7 @@ exports.shalomTicket = onRequest(
       try {
         const r = await fetch(`${SHALOM_BASE}/api/ticket-image`, {
           method: "POST",
+          signal: AbortSignal.timeout(20000),
           headers: {
             "x-api-key": SHALOM_KEY.value(),
             "Content-Type": "application/json",
