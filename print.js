@@ -140,8 +140,30 @@ window.PrintModule = {
     this._renderScope(sel, newOnes);
     this._updateBultos();
     this.selectFmt(_fmt);
+    this._show();
+  },
 
-    // Mostrar
+  // Abre el modal directo con un solo pedido — ignora seleccionados del panel
+  openOne(id){
+    _injectModal();
+    const S = window.S;
+    if(!S) return;
+    const ship = S.shipments.find(x=>x.id===id);
+    if(!ship){ window.toast&&toast('Pedido no encontrado'); return; }
+    _scope  = 'one';
+    _list   = [ship];
+    _bultos = parseInt(localStorage.getItem('print_bultos')||'1') || 1;
+    _fmt    = localStorage.getItem('print_fmt') || 'etiqueta';
+    // Mostrar chip "1 pedido" sin opciones de scope
+    const row = document.getElementById('printScopeRow');
+    if(row) row.innerHTML = '<div style="font-size:12px;color:#8b949e;padding:4px 0">📦 1 pedido — <b style="color:#e6edf3">'+esc(ship.name)+'</b></div>';
+    this._updateBultos();
+    this.selectFmt(_fmt);
+    this._updateSubtitle();
+    this._show();
+  },
+
+  _show(){
     document.getElementById('printBackdrop').style.display = 'block';
     const sheet = document.getElementById('printSheet');
     sheet.style.display = 'block';
@@ -267,10 +289,17 @@ window.PrintModule = {
       html = _htmlLista(_list, _bultos, bizName, bizPhone, bizCity, fecha, qrUrl);
     }
 
-    const w = window.open('','_blank');
-    if(!w){ window.toast&&toast('⚠️ Permitir popups para imprimir'); return; }
-    w.document.write(html);
-    w.document.close();
+    // Blob URL evita document.write síncrono que congela el hilo principal
+    let blobUrl;
+    try {
+      const blob = new Blob([html], {type:'text/html;charset=utf-8'});
+      blobUrl = URL.createObjectURL(blob);
+    } catch(e){ blobUrl = null; }
+    const w = blobUrl ? window.open(blobUrl,'_blank') : window.open('','_blank');
+    if(!w){ window.toast&&toast('⚠️ Permitir popups para imprimir'); if(blobUrl) URL.revokeObjectURL(blobUrl); return; }
+    if(!blobUrl){ w.document.write(html); w.document.close(); }
+    // Limpiar URL del blob tras 2 minutos
+    if(blobUrl) setTimeout(()=>URL.revokeObjectURL(blobUrl), 120000);
 
     // Marcar como impresos
     _list.forEach(s=>{ s.printed = true; });

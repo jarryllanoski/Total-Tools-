@@ -216,31 +216,22 @@
     var ship = window.S && window.S.shipments && window.S.shipments.find(function(s){ return s.id===id; });
     if(!ship) return;
 
-    // Seleccionar el pedido y abrir PrintModule
-    ship.sel = true;
-    if(window.PrintModule && window.PrintModule.open){
-      window.PrintModule.open();
+    // openOne imprime solo este pedido sin tocar los seleccionados del panel
+    if(window.PrintModule && window.PrintModule.openOne){
+      window.PrintModule.openOne(id);
     }
 
-    // Marcar como impreso cuando se confirme la impresión
-    // Hookeamos el evento afterprint del navegador
+    // Marcar como impreso tras confirmación del navegador
     var _onAfterPrint = function(){
       window.removeEventListener('afterprint', _onAfterPrint);
-      ship.sel = false;
-      // Guardar flag _printed en el shipment
       ship._printed = true;
       if(typeof window.save === 'function') window.save();
-      // Actualizar notificación
       if(_notifs[notifIdx]) _notifs[notifIdx].printed = true;
       _render();
       if(typeof window.toast === 'function') window.toast('✅ Impreso — ' + ship.name);
     };
     window.addEventListener('afterprint', _onAfterPrint);
-
-    // Timeout de seguridad: si no dispara afterprint en 30s, igual marcar
-    setTimeout(function(){
-      window.removeEventListener('afterprint', _onAfterPrint);
-    }, 30000);
+    setTimeout(function(){ window.removeEventListener('afterprint', _onAfterPrint); }, 30000);
   }
 
   /* ── OBSERVAR NUEVOS PEDIDOS ─────────────────────────────────────── */
