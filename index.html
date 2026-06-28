@@ -766,7 +766,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);max
   <div class="hdr-logo" onclick="openOverlay('excelOverlay');if(window.Respaldo)Respaldo.refrescarFecha()" style="cursor:pointer" title="Importar / Exportar Excel">📦</div>
   <div style="flex:1;min-width:0">
     <div style="display:flex;align-items:center;gap:6px">
-      <div class="hdr-title" id="hdrName" style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Mi Negocio</div>
+      <div class="hdr-title" id="hdrName" style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer" title="Doble tap → Dashboard">Mi Negocio</div>
       <div id="fbDot" title="Conectando..." style="width:8px;height:8px;border-radius:50%;background:var(--text2);flex-shrink:0;transition:background .6s;animation:fbPulse 1.5s infinite" onclick="toast('☁️ Firebase: '+this.title)"></div>
     </div>
     <div class="hdr-phone" id="hdrPhone">999000000</div>
@@ -2463,6 +2463,15 @@ $('hdrName').textContent=S.config.name;
 $('hdrPhone').textContent=S.config.phone;
 renderChips();
 render();
+/* DASHBOARD — doble-tap en nombre del negocio */
+(function(){
+  var _t=0;
+  document.getElementById('hdrName').addEventListener('click',function(){
+    var now=Date.now();
+    if(now-_t<380 && window.DashBoard){ DashBoard.abrir(); _t=0; }
+    else _t=now;
+  });
+})();
 </script>
 <!-- ★ SHALOM tracking — cargado al final -->
 <script src="storage.js?v=2"></script>
@@ -2477,6 +2486,7 @@ render();
 <script src="agencias-extractor.js"></script>
 <script src="respaldo.js"></script>
 <script src="ayuda.js"></script>
+<script src="dashboard.js?v=1"></script>
 <script src="voz.js"></script>
 <script>
 updateShareLink();
