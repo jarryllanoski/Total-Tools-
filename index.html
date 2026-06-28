@@ -984,7 +984,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);max
       <div class="fg"><label class="fl">Fecha</label><input class="fi" id="fDate" type="date"></div>
     </div>
     <div class="frow">
-      <div class="fg"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px"><label class="fl" style="margin-bottom:0">Estado</label><span style="display:flex;gap:3px"><button type="button" onclick="statusStep(-1)" title="Estado anterior" style="background:none;border:1px solid var(--bd);border-radius:6px;color:var(--text2);font-size:11px;cursor:pointer;padding:1px 6px;line-height:1.6;font-family:inherit">‹ ant</button><button type="button" onclick="statusStep(1)" title="Estado siguiente" style="background:none;border:1px solid var(--bd);border-radius:6px;color:var(--text2);font-size:11px;cursor:pointer;padding:1px 6px;line-height:1.6;font-family:inherit">sig ›</button></span></div><select class="fs" id="fStatus"></select></div>
+      <div class="fg"><label class="fl">Estado</label><select class="fs" id="fStatus"></select></div>
       <div class="fg"><label class="fl">Costo S/</label><input class="fi" id="fCost" type="number" placeholder="0.00" min="0" step="0.5"></div>
     </div>
     <div class="fg"><label class="fl">Notas</label><input class="fi" id="fNotes" placeholder="Llamar antes..."></div>
@@ -1666,7 +1666,6 @@ function allStatuses(){ return S.labels; }
 function stIcon(st){ return FIXED_LABEL_ICONS[st]||(st==='PENDIENTE'?'🕐':st==='ENVIADO'?'🚚':st==='ENTREGADO'?'✅':'🏷️') }
 function stClass(st){ return st==='NUEVO PEDIDO'?'st-pend':st==='EN PROCESO'?'st-env':st==='POR ALISTAR'?'st-env':st==='FINALIZADO'?'st-ent':st==='ENVIADO'?'st-env':st==='ENTREGADO'?'st-ent':'st-cust' }
 function stSoptClass(st){ return st==='NUEVO PEDIDO'?'sopt-pend':st==='EN PROCESO'?'sopt-env':st==='POR ALISTAR'?'sopt-env':st==='FINALIZADO'?'sopt-ent':st==='ENVIADO'?'sopt-env':st==='ENTREGADO'?'sopt-ent':'sopt-cust' }
-function statusStep(d){const s=$('fStatus');if(!s||!s.options.length)return;s.selectedIndex=(s.selectedIndex+d+s.options.length)%s.options.length;}
 function fillVars(tpl,s){return tpl.replace(/\{nombre\}/gi,s.name).replace(/\{telefono\}/gi,s.phone).replace(/\{direccion\}/gi,s.address).replace(/\{courier\}/gi,s.courier).replace(/\{fecha\}/gi,s.date||'—').replace(/\{costo\}/gi,s.cost?'S/ '+s.cost:'—').replace(/\{estado\}/gi,s.status)}
 
 /* STATS */
