@@ -21,23 +21,32 @@ const TOK_COL = "panel/tokens/items";
 const TRACK_COL = "panel/tracking";
 
 // ── CORS ───────────────────────────────────────────────────────────────────
-const CORS = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type",
-};
+const ALLOWED_ORIGINS = [
+  "https://jarryllanoski.github.io",
+  "https://total-tools-24ce8.web.app",
+  "https://total-tools-24ce8.firebaseapp.com",
+];
+const LOCALHOST_ORIGIN_RE = /^http:\/\/localhost(:\d+)?$/;
 
 /**
- * Aplica headers CORS a la respuesta.
+ * Aplica headers CORS a la respuesta, reflejando el origen solo si está
+ * en la lista permitida (o es localhost en cualquier puerto).
+ * @param {Object} req request
  * @param {Object} res response
  */
-function setCORS(res) {
-  Object.entries(CORS).forEach(([k, v]) => res.set(k, v));
+function setCORS(req, res) {
+  const origin = req.get("Origin") || "";
+  if (ALLOWED_ORIGINS.includes(origin) || LOCALHOST_ORIGIN_RE.test(origin)) {
+    res.set("Access-Control-Allow-Origin", origin);
+    res.set("Vary", "Origin");
+  }
+  res.set("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+  res.set("Access-Control-Allow-Headers", "Content-Type");
 }
 
 // ── formApi ────────────────────────────────────────────────────────────────
 exports.formApi = onRequest(async (req, res) => {
-  setCORS(res);
+  setCORS(req, res);
   if (req.method === "OPTIONS") {
     res.status(204).send(""); return;
   }
@@ -51,7 +60,10 @@ exports.formApi = onRequest(async (req, res) => {
     else res.status(400).json({status: "error", error: "Acción desconocida"});
   } catch (e) {
     console.error("formApi error:", action, e);
-    res.status(500).json({status: "error", error: e.message});
+    res.status(500).json({
+      status: "error",
+      error: "Ocurrió un error temporal. Intenta nuevamente.",
+    });
   }
 });
 
@@ -230,6 +242,19 @@ async function shalomGet(url, key, signal) {
   return r.json();
 }
 
+const TRACK_FIELD_RE = /^[A-Za-z0-9\-_./ ]{1,40}$/;
+
+/**
+ * Valida un campo de tracking (orderNumber/orderCode): alfanumérico con
+ * separadores comunes, máximo 40 caracteres.
+ * @param {*} v valor crudo recibido del cliente
+ * @return {?string} valor saneado, o null si es inválido
+ */
+function safeTrackField(v) {
+  const s = String(v === undefined || v === null ? "" : v).trim();
+  return TRACK_FIELD_RE.test(s) ? s : null;
+}
+
 // ── agenciasShalom ─────────────────────────────────────────────────────────
 // GET ?q=TEXTO → busca agencias     (shalom-api.lat/api/buscar?q=)
 // GET          → listado completo   (shalom-api.lat/api/listar)
@@ -237,12 +262,12 @@ async function shalomGet(url, key, signal) {
 exports.agenciasShalom = onRequest(
     {secrets: [SHALOM_KEY]},
     async (req, res) => {
-      setCORS(res);
+      setCORS(req, res);
       if (req.method === "OPTIONS") {
         res.status(204).send(""); return;
       }
       try {
-        const q = (req.query.q || "").trim();
+        const q = (req.query.q || "").trim().slice(0, 100);
         const url = q ?
           `${SHALOM_BASE}/api/buscar?q=${encodeURIComponent(q)}` :
           `${SHALOM_BASE}/api/listar`;
@@ -251,8 +276,10 @@ exports.agenciasShalom = onRequest(
         res.set("Cache-Control", "no-store");
         res.json(data);
       } catch (e) {
+        console.error("agenciasShalom error:", e);
         res.status(e.status || 500).json({
-          error: true, message: e.message, detail: e.detail || null,
+          error: true,
+          message: "No se pudo cargar agencias. Intenta nuevamente.",
         });
       }
     },
@@ -264,7 +291,7 @@ exports.agenciasShalom = onRequest(
 exports.shalomListar = onRequest(
     {secrets: [SHALOM_KEY], region: "us-central1"},
     async (req, res) => {
-      setCORS(res);
+      setCORS(req, res);
       if (req.method === "OPTIONS") {
         res.status(204).send(""); return;
       }
@@ -277,8 +304,9 @@ exports.shalomListar = onRequest(
         res.set("Cache-Control", "no-store");
         res.status(200).json(data);
       } catch (e) {
+        console.error("shalomListar error:", e);
         res.status(e.status || 500).json({
-          error: e.message, detail: e.detail || null,
+          error: "No se pudo obtener el listado de agencias.",
         });
       }
     },
@@ -290,7 +318,7 @@ exports.shalomListar = onRequest(
 exports.shalomTracking = onRequest(
     {secrets: [SHALOM_KEY]},
     async (req, res) => {
-      setCORS(res);
+      setCORS(req, res);
       if (req.method === "OPTIONS") {
         res.status(204).send(""); return;
       }
@@ -298,12 +326,17 @@ exports.shalomTracking = onRequest(
         res.status(405).json({error: true, message: "Usar POST"}); return;
       }
       const {orderNumber, orderCode} = req.body || {};
-      if (!orderNumber) {
-        res.status(400).json({error: true, message: "orderNumber requerido"});
+      const orderNum = safeTrackField(orderNumber);
+      if (!orderNum) {
+        res.status(400).json({error: true, message: "orderNumber inválido"});
         return;
       }
-      const orderNum = String(orderNumber).trim();
-      const orderCod = String(orderCode || "").trim();
+      const orderCodeRaw = orderCode || "";
+      const orderCod = orderCodeRaw ? safeTrackField(orderCodeRaw) : "";
+      if (orderCod === null) {
+        res.status(400).json({error: true, message: "orderCode inválido"});
+        return;
+      }
       const cacheRef = db.doc(`${TRACK_COL}/${orderNum}`);
       try {
         const r = await fetch(`${SHALOM_BASE}/api/track`, {
@@ -358,7 +391,7 @@ exports.shalomTracking = onRequest(
 exports.shalomTicket = onRequest(
     {secrets: [SHALOM_KEY], region: "us-central1"},
     async (req, res) => {
-      setCORS(res);
+      setCORS(req, res);
       if (req.method === "OPTIONS") {
         res.status(204).send(""); return;
       }
@@ -366,8 +399,13 @@ exports.shalomTicket = onRequest(
         res.status(405).send("Method Not Allowed"); return;
       }
       const {orderNumber, orderCode} = req.body || {};
-      if (!orderNumber || !orderCode) {
-        res.status(400).json({error: "Falta orderNumber o orderCode"}); return;
+      const orderNum = safeTrackField(orderNumber);
+      const orderCod = safeTrackField(orderCode);
+      if (!orderNum || !orderCod) {
+        res.status(400).json({
+          error: "orderNumber/orderCode inválido o requerido",
+        });
+        return;
       }
       try {
         const r = await fetch(`${SHALOM_BASE}/api/ticket-image`, {
@@ -378,14 +416,16 @@ exports.shalomTicket = onRequest(
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            orderNumber: String(orderNumber),
-            orderCode: String(orderCode),
+            orderNumber: orderNum,
+            orderCode: orderCod,
           }),
         });
         if (!r.ok) {
           const txt = await r.text().catch(() => "");
+          console.error(
+              "shalomTicket upstream error:", r.status, txt.slice(0, 200));
           res.status(r.status).json({
-            error: `Shalom ${r.status}`, detail: txt.slice(0, 200),
+            error: "No se pudo generar el ticket. Intenta nuevamente.",
           });
           return;
         }
@@ -395,7 +435,10 @@ exports.shalomTicket = onRequest(
         res.set("Cache-Control", "no-store");
         res.status(200).send(buf);
       } catch (e) {
-        res.status(500).json({error: e.message});
+        console.error("shalomTicket error:", e);
+        res.status(500).json({
+          error: "No se pudo generar el ticket. Intenta nuevamente.",
+        });
       }
     },
 );
