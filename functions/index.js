@@ -18,7 +18,7 @@ const SHALOM_BASE = "https://shalom-api.lat";
 const CFG_DOC = "panel/config";
 const SHIP_COL = "panel/shipments/items";
 const TOK_COL = "panel/tokens/items";
-const TRACK_COL = "panel/tracking";
+const TRACK_COL = "panel/tracking/items";
 
 // ── CORS ───────────────────────────────────────────────────────────────────
 const ALLOWED_ORIGINS = [
@@ -337,8 +337,12 @@ exports.shalomTracking = onRequest(
         res.status(400).json({error: true, message: "orderCode inválido"});
         return;
       }
-      const cacheRef = db.doc(`${TRACK_COL}/${orderNum}`);
+      // cacheDocId nunca debe contener "/": evita romper el path de Firestore
+      // si en el futuro el formato de orderNum cambia.
+      const cacheDocId = orderNum.replace(/\//g, "_");
+      let cacheRef = null;
       try {
+        cacheRef = db.doc(`${TRACK_COL}/${cacheDocId}`);
         const r = await fetch(`${SHALOM_BASE}/api/track`, {
           method: "POST",
           signal: AbortSignal.timeout(15000),
@@ -368,7 +372,8 @@ exports.shalomTracking = onRequest(
         }).catch((e) => console.error("tracking cache write:", e));
         res.json(data);
       } catch (e) {
-        const snap = await cacheRef.get().catch(() => null);
+        console.error("shalomTracking error:", e);
+        const snap = cacheRef ? await cacheRef.get().catch(() => null) : null;
         if (snap && snap.exists) {
           const c = snap.data();
           const ts = c.updatedAt && c.updatedAt.toDate;
