@@ -259,9 +259,9 @@ function safeTrackField(v) {
 // Contador por IP en Firestore — ventana de 60 s, fail-open si Firestore falla.
 // Ruta: panel/rateLimits/items/{fn_ip_window} — cubierta por rules actuales
 const RATE_LIMITS = {
-  agenciasShalom: {windowMs: 60000, max: 30},
-  shalomTracking: {windowMs: 60000, max: 20},
-  shalomTicket: {windowMs: 60000, max: 10},
+  agenciasShalom: {windowMs: 60000, max: 100},
+  shalomTracking: {windowMs: 60000, max: 150},
+  shalomTicket: {windowMs: 60000, max: 50},
 };
 
 /**
