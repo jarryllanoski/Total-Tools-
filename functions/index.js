@@ -67,6 +67,32 @@ exports.formApi = onRequest(async (req, res) => {
   }
 });
 
+// ── Whitelist de campos permitidos en order (formulario público) ───────────
+// Refleja exactamente los campos que construye formulario.html.
+// Cualquier campo extra enviado por el cliente se descarta antes de escribir
+// en Firestore — los campos id/status/createdAt/fromForm los pone el backend.
+const ORDER_FIELDS = [
+  "id", "name", "phone", "address", "gpsCoords", "referencia",
+  "dniRecoger", "ciudadDestino", "dniDestinatario", "encAgencia",
+  "courier", "date", "status", "cost", "notes", "extra",
+  "docGuia", "docEmbalado", "docComprobante", "links",
+  "sel", "chkGuia", "chkEmbalado", "chkComprobante",
+  "createdAt", "fromForm", "dni",
+];
+
+/**
+ * Devuelve una copia de src con solo las claves de ORDER_FIELDS.
+ * @param {Object} src objeto order crudo del cliente
+ * @return {Object} objeto filtrado
+ */
+function pickOrderFields(src) {
+  const out = {};
+  ORDER_FIELDS.forEach((k) => {
+    if (Object.prototype.hasOwnProperty.call(src, k)) out[k] = src[k];
+  });
+  return out;
+}
+
 // ── action=create ──────────────────────────────────────────────────────────
 /**
  * @param {Object} req request
@@ -108,7 +134,7 @@ async function handleCreate(req, res) {
   // trackToken = orderId → ?seg=orderId → panel/shipments/items/{orderId}
   const trackToken = orderId;
 
-  const orderToSave = Object.assign({}, order, {
+  const orderToSave = Object.assign({}, pickOrderFields(order), {
     id: orderId,
     status: order.status || "NUEVO PEDIDO",
     createdAt: order.createdAt || new Date().toISOString(),
