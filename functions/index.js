@@ -255,6 +255,44 @@ function safeTrackField(v) {
   return TRACK_FIELD_RE.test(s) ? s : null;
 }
 
+// ── Rate limit básico ──────────────────────────────────────────────────────
+// Contador por IP en Firestore — ventana de 60 s, fail-open si Firestore falla.
+// Ruta: panel/rateLimits/items/{fn_ip_window} — cubierta por rules actuales
+const RATE_LIMITS = {
+  agenciasShalom: {windowMs: 60000, max: 30},
+  shalomTracking: {windowMs: 60000, max: 20},
+  shalomTicket: {windowMs: 60000, max: 10},
+};
+
+/**
+ * Devuelve false si la IP superó el límite en la ventana actual.
+ * Fail-open: permite la solicitud si Firestore no está disponible.
+ * @param {string} name clave de RATE_LIMITS
+ * @param {Object} req request de Express
+ * @return {Promise<boolean>} true = permitir, false = rechazar
+ */
+async function checkRateLimit(name, req) {
+  const cfg = RATE_LIMITS[name];
+  const forwarded = req.get("x-forwarded-for") || req.ip || "unknown";
+  const ip = forwarded.split(",")[0].trim();
+  const windowStart = Math.floor(Date.now() / cfg.windowMs) * cfg.windowMs;
+  const docId = (name + "_" + ip + "_" + windowStart)
+      .replace(/[^A-Za-z0-9_]/g, "_");
+  const ref = db.doc("panel/rateLimits/items/" + docId);
+  try {
+    return await db.runTransaction(async (tx) => {
+      const snap = await tx.get(ref);
+      const count = snap.exists ? (snap.data().count || 0) : 0;
+      if (count >= cfg.max) return false;
+      tx.set(ref, {count: count + 1, windowStart: windowStart}, {merge: true});
+      return true;
+    });
+  } catch (e) {
+    console.error("checkRateLimit error:", name, e);
+    return true; // fail-open: nunca bloquear por error de Firestore
+  }
+}
+
 // ── agenciasShalom ─────────────────────────────────────────────────────────
 // GET ?q=TEXTO → busca agencias     (shalom-api.lat/api/buscar?q=)
 // GET          → listado completo   (shalom-api.lat/api/listar)
@@ -265,6 +303,13 @@ exports.agenciasShalom = onRequest(
       setCORS(req, res);
       if (req.method === "OPTIONS") {
         res.status(204).send(""); return;
+      }
+      if (!(await checkRateLimit("agenciasShalom", req))) {
+        res.status(429).json({
+          error: true,
+          message: "Demasiadas solicitudes. Intenta nuevamente en un minuto.",
+        });
+        return;
       }
       try {
         const q = (req.query.q || "").trim().slice(0, 100);
@@ -324,6 +369,13 @@ exports.shalomTracking = onRequest(
       }
       if (req.method !== "POST") {
         res.status(405).json({error: true, message: "Usar POST"}); return;
+      }
+      if (!(await checkRateLimit("shalomTracking", req))) {
+        res.status(429).json({
+          error: true,
+          message: "Demasiadas solicitudes. Intenta nuevamente en un minuto.",
+        });
+        return;
       }
       const {orderNumber, orderCode} = req.body || {};
       const orderNum = safeTrackField(orderNumber);
@@ -402,6 +454,13 @@ exports.shalomTicket = onRequest(
       }
       if (req.method !== "POST") {
         res.status(405).send("Method Not Allowed"); return;
+      }
+      if (!(await checkRateLimit("shalomTicket", req))) {
+        res.status(429).json({
+          error: true,
+          message: "Demasiadas solicitudes. Intenta nuevamente en un minuto.",
+        });
+        return;
       }
       const {orderNumber, orderCode} = req.body || {};
       const orderNum = safeTrackField(orderNumber);
