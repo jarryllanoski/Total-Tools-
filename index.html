@@ -555,6 +555,11 @@
   <div class="sheet">
     <div class="sheet-handle"></div>
     <div class="sheet-title" id="formTitle">Nuevo Envío</div>
+    <div style="background:rgba(37,211,102,.08);border:1px solid rgba(37,211,102,.25);border-radius:10px;padding:11px;margin-bottom:13px">
+      <div style="font-size:10px;font-weight:700;color:#25D366;letter-spacing:.6px;text-transform:uppercase;margin-bottom:7px">📋 Pegar pedido de WhatsApp</div>
+      <textarea class="fi" id="fPaste" style="height:58px;resize:none;font-size:12px;line-height:1.4" placeholder="Pega aquí el mensaje que te llegó por WhatsApp y se llenarán los campos automáticamente…" onpaste="setTimeout(parseWAOrder,40)"></textarea>
+      <button type="button" class="btn-sec" style="margin-top:7px;font-size:12px;padding:9px" onclick="parseWAOrder()">✨ Rellenar campos</button>
+    </div>
     <div class="frow">
       <div class="fg"><label class="fl">Nombre *</label><input class="fi" id="fName" placeholder="Nombre completo"></div>
       <div class="fg"><label class="fl">Teléfono *</label><input class="fi" id="fPhone" placeholder="9XXXXXXXX" maxlength="9" inputmode="numeric" onpaste="setTimeout(()=>{var v=this.value.replace(/\D/g,'');if(v.startsWith('51')&&v.length>9)v=v.slice(2);this.value=v.slice(-9)},0)" oninput="this.value=this.value.replace(/\D/g,'').slice(0,9)"></div>

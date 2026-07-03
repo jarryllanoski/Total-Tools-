@@ -333,7 +333,54 @@ function openForm(id){
     if($('fShalomCodigo')) $('fShalomCodigo').value = '';
   }
   _showShalomBlock();
+  if($('fPaste')) $('fPaste').value='';
   openOverlay('formOverlay');
+}
+
+/* ── PEGAR PEDIDO DE WHATSAPP → autocompletar campos ──────────────── */
+function _spanishDateToIso(str){
+  const meses={enero:'01',febrero:'02',marzo:'03',abril:'04',mayo:'05',junio:'06',julio:'07',agosto:'08',septiembre:'09',setiembre:'09',octubre:'10',noviembre:'11',diciembre:'12'};
+  const m=(str||'').toLowerCase().match(/(\d{1,2})\s+de\s+([a-záéíóú]+)\s+de\s+(\d{4})/);
+  if(!m) return '';
+  const mes=meses[m[2]];
+  if(!mes) return '';
+  return `${m[3]}-${mes}-${m[1].padStart(2,'0')}`;
+}
+function parseWAOrder(){
+  const txt=($('fPaste')?$('fPaste').value:'')||'';
+  if(!txt.trim()){ toast('⚠️ Pega el mensaje de WhatsApp primero'); return; }
+  const clean=s=>(s||'').replace(/\*/g,'').trim();
+  const grab=re=>{ const m=txt.match(re); return m?clean(m[1]):''; };
+  const name   =grab(/Cliente:?\*?\s*(.+)/i);
+  const phoneR =grab(/WhatsApp:?\*?\s*([+\d\s]+)/i);
+  const addr   =grab(/(?:Agencia|Direcci[oó]n):?\*?\s*(.+)/i);
+  const ciudad =grab(/Ciudad destino:?\*?\s*(.+)/i);
+  const dni    =grab(/DNI(?:\s+para\s+recoger|\s+destinatario)?:?\*?\s*(\d{6,8})/i);
+  const courier=grab(/Courier:?\*?\s*(.+)/i);
+  const fechaR =grab(/Fecha de env[ií]o:?\*?\s*(.+)/i);
+  const notas  =grab(/Notas:?\*?\s*(.+)/i);
+  let filled=0;
+  if(name){ $('fName').value=name; filled++; }
+  if(phoneR){
+    let v=phoneR.replace(/\D/g,'');
+    if(v.startsWith('51')&&v.length>9) v=v.slice(2);
+    v=v.slice(-9);
+    if(v){ $('fPhone').value=v; filled++; }
+  }
+  const addrVal=addr||ciudad;
+  if(addrVal){ $('fAddr').value=addrVal; filled++; }
+  if(ciudad&&!addr&&$('fEncAgencia')){ /* encomienda: dejar dirección como ciudad */ }
+  if(dni&&$('fDni')){ $('fDni').value=dni; filled++; }
+  if(courier){
+    const sel=$('fCourier');
+    const opt=Array.from(sel.options).find(o=>o.value.toUpperCase().trim()===courier.toUpperCase().trim());
+    if(opt){ sel.value=opt.value; filled++; }
+    sel.dispatchEvent(new Event('change'));
+  }
+  if(fechaR){ const iso=_spanishDateToIso(fechaR); if(iso){ $('fDate').value=iso; filled++; } }
+  if(notas){ $('fNotes').value=notas; filled++; }
+  if(filled>0) toast('✅ '+filled+' campo'+(filled!==1?'s':'')+' rellenado'+(filled!==1?'s':''));
+  else toast('⚠️ No se reconoció el formato del mensaje');
 }
 function saveShipment(){
   // Auto-agregar link si hay texto en el campo pero no se presionó +Add
