@@ -153,6 +153,19 @@
     }
   };
 
+  // ── TRASH SUBCOLLECTION ────────────────────────────────────────────
+  window._fbWriteTrashItem = async (id, item) => {
+    await fsPatch('panel/trash/items/' + id, item);
+  };
+  window._fbDeleteTrashItem = async (id) => {
+    await fsDel('panel/trash/items/' + id);
+  };
+
+  // ── FORM CONFIG SNAPSHOTS ──────────────────────────────────────────
+  window._fbSaveFormConfig = async (id, snap) => {
+    await fsPatch('panel/forms/configs/' + id, snap);
+  };
+
   // ── TOKENS ────────────────────────────────────────────────────────
   const tokPath = (id) => `panel/tokens/items/${id}`;
   const tokCol  = () => `panel/tokens/items`;
@@ -2149,8 +2162,8 @@ function deletePvtNote(){
 /* STATUS */
 let _stId=null;
 function openStatus(id){
+  if(S.shipments.filter(x=>x.sel).length>1){ toast('⚠️ Selecciona un solo pedido para cambiar etiqueta'); return; }
   if(!_filt){ toast('⚠️ Filtra por una etiqueta primero'); return; }
-  // Require PIN
   openPin(()=>{ _doOpenStatus(id); });
 }
 
@@ -2210,12 +2223,21 @@ function openDel(id){
   $('delMsg').textContent=`¿Mover "${s.name}" a la papelera?`;
   $('delYes').style.background='var(--red)';
   $('delYes').textContent='Mover a papelera';
-  $('delYes').onclick=()=>{
-    S.trash.push({shipment:s, deletedAt:Date.now()});
-    S.shipments=S.shipments.filter(x=>x.id!==id);
-    // Borrar de Firestore inmediatamente
-    if(window._fbDeleteShipment) window._fbDeleteShipment(id);
-    save();render();closeOverlay('delOverlay');toast('🗑️ Movido a papelera');
+  $('delYes').onclick=async()=>{
+    $('delYes').disabled=true;
+    $('delYes').textContent='Moviendo...';
+    try{
+      if(window._fbWriteTrashItem)
+        await window._fbWriteTrashItem(id,{shipment:s,deletedAt:Date.now()});
+      S.trash.push({shipment:s,deletedAt:Date.now()});
+      S.shipments=S.shipments.filter(x=>x.id!==id);
+      if(window._fbDeleteShipment) window._fbDeleteShipment(id);
+      save();render();closeOverlay('delOverlay');toast('🗑️ Movido a papelera');
+    }catch(e){
+      $('delYes').disabled=false;
+      $('delYes').textContent='Mover a papelera';
+      toast('❌ No se pudo mover a papelera. El pedido no fue borrado.');
+    }
   };
   openOverlay('delOverlay');
 }

@@ -44,15 +44,11 @@ function checkPin(){
     setTimeout(()=>{ _pinEntry=''; updatePinDots(); $('pinMsg').textContent='Ingresa la clave'; $('pinMsg').style.color='var(--text2)'; },700);
   }
 }
-let _trashTapTimer=null, _trashTaps=0;
 function onTrashBtnTap(){
-  _trashTaps++;
-  clearTimeout(_trashTapTimer);
-  if(_trashTaps>=2){ _trashTaps=0; openTrash(); return; }
-  _trashTapTimer=setTimeout(()=>{ 
-    _trashTaps=0;
-    delSelected(); // single tap = delete selected
-  },350);
+  const sel=S.shipments.filter(x=>x.sel);
+  if(sel.length===1){ openDel(sel[0].id); return; }
+  if(sel.length>1){ toast('⚠️ Para borrar, selecciona solo un pedido a la vez'); return; }
+  openTrash();
 }
 
 function openTrash(){
@@ -96,7 +92,19 @@ function emptyTrash(){
   $('delMsg').textContent=`¿Eliminar definitivamente ${S.trash.length} envío(s)? Esto no se puede deshacer.`;
   $('delYes').style.background='var(--red)';
   $('delYes').textContent='Eliminar definitivamente';
-  $('delYes').onclick=()=>{S.trash=[];save();closeOverlay('delOverlay');openTrash();toast('🗑️ Papelera vaciada')};
+  $('delYes').onclick=async()=>{
+    $('delYes').disabled=true;
+    $('delYes').textContent='Eliminando...';
+    try{
+      if(window._fsList&&window._fbDeleteTrashItem){
+        const items=await window._fsList('panel/trash/items');
+        await Promise.all(items.map(x=>window._fbDeleteTrashItem(x._id)));
+      }
+    }catch(e){console.warn('emptyTrash subcol:',e.message);}
+    S.trash=[];save();closeOverlay('delOverlay');openTrash();toast('🗑️ Papelera vaciada');
+    $('delYes').disabled=false;
+    $('delYes').textContent='Eliminar definitivamente';
+  };
   openOverlay('delOverlay');
 }
 
@@ -211,30 +219,8 @@ function loadDoc(input,slot){
     // Mensajes y auto-cambio de estado
     if(slot==='guia'){
       toast('🚚 Guía subida ✓');
-      // Auto-cambio a ENVIADO si estaba en estados anteriores
-      const autoSts=['NUEVO PEDIDO','EN PROCESO','POR ALISTAR','ALISTADO'];
-      if(_editId){
-        const ship=window.S&&window.S.shipments&&window.S.shipments.find(x=>x.id===_editId);
-        if(ship&&autoSts.includes(ship.status)){
-          ship.status='ENVIADO';
-          // Actualizar el selector de status en el form
-          const fStatus=$('fStatus');
-          if(fStatus) fStatus.value='ENVIADO';
-          toast('🚚 Guía subida → Estado cambiado a ENVIADO');
-        }
-      }
     } else if(slot==='embalado'){
       toast('📦 Foto de embalado subida ✓');
-      // Auto-cambio a ALISTADO si estaba en POR ALISTAR
-      if(_editId){
-        const ship=window.S&&window.S.shipments&&window.S.shipments.find(x=>x.id===_editId);
-        if(ship&&(ship.status==='POR ALISTAR'||ship.status==='EN PROCESO')){
-          ship.status='ALISTADO';
-          const fStatus=$('fStatus');
-          if(fStatus) fStatus.value='ALISTADO';
-          toast('📦 Embalado → Estado cambiado a ALISTADO');
-        }
-      }
     } else {
       toast('🧾 Documento subido ✓');
     }
@@ -437,20 +423,40 @@ function updateShareLink(){
   const el = document.getElementById('shareUrl');
   if(el) el.textContent = link;
 }
-function copyLink(){ 
-  const link = getFormLink();
+async function _snapshotFormConfig(){
+  const uuid=Math.random().toString(36).slice(2,9)+Date.now().toString(36);
+  const snap={
+    name:(S.config&&S.config.name)||'',
+    city:(S.config&&S.config.city)||'',
+    phone:(S.config&&S.config.phone)||'',
+    couriers:S.couriers||[],
+    courierActive:S.courierActive||{},
+    courierTypes:S.courierTypes||{},
+    dispatch:S.dispatch||{},
+    extraFields:S.extraFields||[],
+    createdAt:new Date().toISOString()
+  };
+  if(window._fbSaveFormConfig) await window._fbSaveFormConfig(uuid,snap);
+  return uuid;
+}
+async function copyLink(){
+  let link=getFormLink();
+  try{const cfgId=await _snapshotFormConfig();link+=`?cfg=${cfgId}`;}catch(e){console.warn('cfg snapshot:',e);}
   navigator.clipboard.writeText(link).then(()=>toast('🔗 Link copiado')).catch(()=>{
-    // Fallback para navegadores sin clipboard API
-    const ta = document.createElement('textarea');
-    ta.value = link; document.body.appendChild(ta);
-    ta.select(); document.execCommand('copy');
-    document.body.removeChild(ta);
-    toast('🔗 Link copiado');
+    const ta=document.createElement('textarea');ta.value=link;document.body.appendChild(ta);ta.select();document.execCommand('copy');document.body.removeChild(ta);toast('🔗 Link copiado');
   });
 }
-function shareWA(){ window.open(`https://wa.me/?text=${encodeURIComponent('📦 Hola, aquí el link para registrar tu pedido:\n\n'+getFormLink())}`); }
+async function shareWA(){
+  let link=getFormLink();
+  try{const cfgId=await _snapshotFormConfig();link+=`?cfg=${cfgId}`;}catch(e){console.warn('cfg snapshot:',e);}
+  window.open(`https://wa.me/?text=${encodeURIComponent('📦 Hola, aquí el link para registrar tu pedido:\n\n'+link)}`);
+}
 function shareTG(){ window.open(`https://t.me/share/url?url=${encodeURIComponent(getFormLink())}`); }
-function openFormLink(){ window.open(getFormLink(),'_blank'); }
+async function openFormLink(){
+  let link=getFormLink();
+  try{const cfgId=await _snapshotFormConfig();link+=`?cfg=${cfgId}`;}catch(e){console.warn('cfg snapshot:',e);}
+  window.open(link,'_blank');
+}
 
 /* ── TOKENS: SISTEMA COMPLETO ─────────────────────────────────────── */
 let _tokCache = []; // cache local de tokens
@@ -484,7 +490,9 @@ async function genToken(action){
   };
   try {
     await window._fbSaveTok(tok);
-    const url = getFormLink()+'?t='+id;
+    let cfgParam='';
+    try{ const cfgId=await _snapshotFormConfig(); cfgParam=`&cfg=${cfgId}`; }catch(e){ console.warn('cfg snapshot:',e); }
+    const url = getFormLink()+'?t='+id+cfgParam;
     $('tokName').value=''; $('tokPhone').value=''; $('tokLink').value=''; $('tokExp').value='';
     // Pequeño delay para que Firebase indexe el documento
     await new Promise(r=>setTimeout(r,800));

@@ -611,25 +611,25 @@ function showTokenScreen(icon, title, msg){
 
 /* ─── LOAD CONFIG ───────────────────────────────────────────────── */
 async function loadCfg(){
-  // Renderizar form inmediatamente con defaults — nunca queda en Cargando
   CFG = null;
   renderForm();
-  // Cargar config de Firebase en background
   try{
-    const timeout = new Promise(res => setTimeout(() => res(null), 4000));
-    const doc = await Promise.race([fsGet(CFG_PATH), timeout]);
-    if(doc && doc.fields){
-      CFG = fsDocToObj(doc);
-      renderForm(); // re-render con config real
-    }
+    const cfgId = new URLSearchParams(location.search).get('cfg');
+    const timeout = new Promise(res => setTimeout(() => res(null), 5000));
+    const cfgReq = cfgId
+      ? fsGet('panel/forms/configs/' + cfgId).then(d => d && d.fields ? fsDocToObj(d) : null)
+      : fsGet(CFG_PATH).then(d => d && d.fields ? fsDocToObj(d) : null);
+    const cfg = await Promise.race([cfgReq, timeout]);
+    if(cfg){ CFG = cfg; renderForm(); }
   }catch(e){
-    console.warn('Config Firebase no disponible:', e.message);
+    console.warn('Config no disponible:', e.message);
   }
 }
 
 async function loadCfgThenTrack(code){
   try{
-    const doc = await fsGet(CFG_PATH);
+    const cfgId = new URLSearchParams(location.search).get('cfg');
+    const doc = cfgId ? await fsGet('panel/forms/configs/' + cfgId) : await fsGet(CFG_PATH);
     if(doc && doc.fields) CFG = fsDocToObj(doc);
   }catch(e){ console.warn('Config no disponible'); }
   renderTracking(code);
@@ -1470,7 +1470,12 @@ async function buscarPedido(code, silent){
       return id.slice(-4).toUpperCase()===c.slice(-4);
     });
     if(m){ renderTrackResult(fsDocToObj(m), c); return; }
-    setTrackContent(`<div class="error-box">No se encontró ningún pedido con el código <strong>#${esc(c)}</strong>.</div><div style="text-align:center;margin-top:16px"><button onclick="nuevoRegistro()" style="background:var(--blue);border:none;border-radius:10px;color:#fff;font-weight:700;font-size:14px;padding:12px 24px;cursor:pointer;font-family:inherit">📝 Registrar nuevo pedido</button></div>${notMyOrderBtn()}`);
+    const _bizPhone=((CFG&&(CFG.phone||CFG.config&&CFG.config.phone))||'').replace(/\D/g,'');
+    const _waHref=_bizPhone?`https://wa.me/51${_bizPhone}?text=${encodeURIComponent('Hola, tengo una consulta sobre mi pedido')}`:'';
+    setTrackContent(
+      `<div class="error-box" style="text-align:center">🔧 Link no disponible<br><small style="font-weight:400;opacity:.8">Para consultar el estado de tu pedido, escríbenos directamente.</small></div>`+
+      (_waHref?`<div style="text-align:center;margin-top:20px"><a href="${_waHref}" target="_blank" rel="noopener" style="display:inline-block;background:#25D366;color:#fff;padding:14px 24px;border-radius:12px;text-decoration:none;font-weight:700;font-size:15px">💬 Consultar por WhatsApp</a></div>`:'')
+    );
   }catch(e){
     setTrackContent(`<div class="error-box">Error al buscar: ${esc(e.message)}</div>${notMyOrderBtn()}`);
   }
