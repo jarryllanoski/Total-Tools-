@@ -2275,7 +2275,8 @@ $('hdrName').textContent=S.config.name;
 $('hdrPhone').textContent=S.config.phone;
 renderChips();
 render();
-updateShareLink();
+// updateShareLink se define en config.js que carga después — el link se actualiza al abrir la tab Compartir
+if(typeof updateShareLink==='function') updateShareLink();
 </script>
 <!-- ★ SHALOM tracking — cargado al final -->
 <script src="config.js"></script>
