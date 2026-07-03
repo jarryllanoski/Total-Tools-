@@ -385,18 +385,26 @@ function exportExcel(){
   if(!S.shipments.length){ toast('Sin envíos para exportar'); return; }
   if(typeof XLSX==='undefined'){ toast('⚠️ Cargando librería...'); return; }
   const rows=S.shipments.map(s=>({
-    'Nombre':s.name||'',
-    'Teléfono':s.phone||'',
-    'Dirección':s.address||'',
-    'Courier':s.courier||'',
-    'Fecha':s.date||'',
-    'Estado':s.status||'',
-    'Costo':s.cost||'',
-    'Notas':s.notes||'',
-    'Nota privada':s.privateNote||''
+    'N° Orden':          s.id||'',
+    'Nombre':            s.name||'',
+    'Teléfono':          s.phone||'',
+    'DNI':               s.dniDestinatario||s.dniRecoger||'',
+    'Dirección':         s.address||'',
+    'Ciudad destino':    s.ciudadDestino||'',
+    'Referencia':        s.referencia||'',
+    'Courier':           s.courier||'',
+    'Fecha':             s.date||'',
+    'Estado':            s.status||'',
+    'Costo':             s.cost||'',
+    'Notas':             s.notes||'',
+    'Nota privada':      s.privateNote||'',
+    'N° Guía Shalom':    s.trackingOrderNumber||s.shalomGuia||'',
+    'Código Shalom':     s.trackingOrderCode||s.shalomCodigo||'',
+    'Links':             (s.links||[]).map(l=>l.u||l.url||'').filter(Boolean).join(' | '),
+    'Creado':            s.createdAt ? s.createdAt.split('T')[0] : '',
   }));
   const ws=XLSX.utils.json_to_sheet(rows);
-  ws['!cols']=[{wch:25},{wch:13},{wch:35},{wch:15},{wch:12},{wch:18},{wch:8},{wch:30},{wch:30}];
+  ws['!cols']=[{wch:28},{wch:25},{wch:13},{wch:10},{wch:35},{wch:15},{wch:18},{wch:12},{wch:12},{wch:18},{wch:8},{wch:30},{wch:20},{wch:16},{wch:12},{wch:40},{wch:12}];
   const wb=XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb,ws,'Envíos');
   const date=new Date().toLocaleDateString('es-PE').replace(/\//g,'-');
@@ -421,19 +429,29 @@ function importExcel(input){
         const phone=(row['Teléfono']||row['Telefono']||row['telefono']||'').toString().trim();
         const address=(row['Dirección']||row['Direccion']||row['direccion']||'').toString().trim();
         if(!name||!phone){ skipped++; return; }
-        if(S.shipments.find(x=>x.name===name&&x.phone===phone)){ skipped++; return; }
+        const importedId=(row['N° Orden']||'').toString().trim();
+        if(importedId && S.shipments.find(x=>x.id===importedId)){ skipped++; return; }
+        if(!importedId && S.shipments.find(x=>x.name===name&&x.phone===phone)){ skipped++; return; }
+        const guia=(row['N° Guía Shalom']||'').toString().trim();
+        const cod=(row['Código Shalom']||'').toString().trim();
         S.shipments.push({
-          id:'xl_'+Date.now()+'_'+Math.random().toString(36).slice(2,6),
+          id: importedId || 'xl_'+Date.now()+'_'+Math.random().toString(36).slice(2,6),
           name, phone, address,
+          dniDestinatario: (row['DNI']||'').toString().trim(),
+          ciudadDestino:   (row['Ciudad destino']||'').toString().trim(),
+          referencia:      (row['Referencia']||'').toString().trim(),
           courier:(row['Courier']||row['courier']||S.couriers[0]||'').toString().trim(),
           date:(row['Fecha']||row['fecha']||new Date().toISOString().split('T')[0]).toString().trim(),
           status:(row['Estado']||row['estado']||'NUEVO PEDIDO').toString().trim(),
           cost:(row['Costo']||row['costo']||'').toString().trim(),
           notes:(row['Notas']||row['notas']||'').toString().trim(),
           privateNote:(row['Nota privada']||'').toString().trim(),
-          extra:{},docGuia:null,docTicket:null,links:[],
+          trackingOrderNumber: guia, shalomGuia: guia,
+          trackingOrderCode: cod, shalomCodigo: cod,
+          links: ((row['Links']||row['Links adicionales']||'').toString().split(' | ').map(u=>u.trim()).filter(Boolean)).map(u=>({u, n:u.length>36?u.slice(0,36)+'…':u})),
+          extra:{},docGuia:null,docEmbalado:null,docTicket:null,
           sel:false,chkGuia:false,chkTicket:false,
-          createdAt:new Date().toISOString()
+          createdAt: row['Creado'] ? row['Creado']+'T00:00:00.000Z' : new Date().toISOString(),
         });
         added++;
       });
