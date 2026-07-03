@@ -541,16 +541,14 @@ function showTokenScreen(icon, title, msg){
 
 /* ─── LOAD CONFIG (vía Cloud Function) ───────────────────────────── */
 async function loadCfg(){
-  // Renderizar form de inmediato con defaults — nunca queda en Cargando
   CFG = null;
   renderForm();
   try{
+    const cfgId = new URLSearchParams(location.search).get('cfg');
     const timeout = new Promise(res => setTimeout(() => res(null), 5000));
-    const cfg = await Promise.race([_api('config'), timeout]);
-    if(cfg && !cfg.error){
-      CFG = cfg;
-      renderForm(); // re-render con config real
-    }
+    const cfgReq = cfgId ? _api('formcfg', {id: cfgId}) : _api('config');
+    const cfg = await Promise.race([cfgReq, timeout]);
+    if(cfg && !cfg.error){ CFG = cfg; renderForm(); }
   }catch(e){
     console.warn('Config no disponible:', e.message);
   }
@@ -558,7 +556,8 @@ async function loadCfg(){
 
 async function loadCfgThenTrack(token){
   try{
-    const cfg = await _api('config');
+    const cfgId = new URLSearchParams(location.search).get('cfg');
+    const cfg = cfgId ? await _api('formcfg', {id: cfgId}) : await _api('config');
     if(cfg && !cfg.error) CFG = cfg;
   }catch(e){ console.warn('Config no disponible'); }
   renderTracking(token);
@@ -1631,7 +1630,12 @@ async function buscarPedido(token, silent){
     }
     if(window.TTLoader) TTLoader.done();
     clearTrackRefresh();
-    setTrackContent(`<div class="error-box">No se encontró el pedido. Verifica tu link de seguimiento.</div><div style="text-align:center;margin-top:16px"><button onclick="nuevoRegistro()" style="background:var(--blue);border:none;border-radius:10px;color:#fff;font-weight:700;font-size:14px;padding:12px 24px;cursor:pointer;font-family:inherit">📝 Registrar nuevo pedido</button></div>${notMyOrderBtn()}`);
+    const _bizPhone=((CFG&&(CFG.config&&CFG.config.phone||CFG.phone))||'').replace(/\D/g,'');
+    const _waHref=_bizPhone?`https://wa.me/51${_bizPhone}?text=${encodeURIComponent('Hola, tengo una consulta sobre mi pedido')}`:'';
+    setTrackContent(
+      `<div class="error-box" style="text-align:center">🔧 Link no disponible<br><small style="font-weight:400;opacity:.8">Para consultar el estado de tu pedido, escríbenos directamente.</small></div>`+
+      (_waHref?`<div style="text-align:center;margin-top:20px"><a href="${_waHref}" target="_blank" rel="noopener" style="display:inline-block;background:#25D366;color:#fff;padding:14px 24px;border-radius:12px;text-decoration:none;font-weight:700;font-size:15px">💬 Consultar por WhatsApp</a></div>`:'')
+    );
   }catch(e){
     if(window.TTLoader) TTLoader.done();
     setTrackContent(`<div class="error-box">Error al buscar: ${esc(e.message)}</div>${notMyOrderBtn()}`);

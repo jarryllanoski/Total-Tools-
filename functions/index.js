@@ -19,6 +19,7 @@ const CFG_DOC = "panel/config";
 const SHIP_COL = "panel/shipments/items";
 const TOK_COL = "panel/tokens/items";
 const TRACK_COL = "panel/tracking/items";
+const FORMCFG_COL = "panel/forms/configs";
 
 // ── CORS ───────────────────────────────────────────────────────────────────
 const ALLOWED_ORIGINS = [
@@ -54,9 +55,10 @@ exports.formApi = onRequest(async (req, res) => {
   const action = (req.query.action || "").trim();
   try {
     if (action === "create") await handleCreate(req, res);
-    else if (action === "token" ) await handleToken(req, res);
-    else if (action === "config") await handleConfig(req, res);
-    else if (action === "track" ) await handleTrack(req, res);
+    else if (action === "token"  ) await handleToken(req, res);
+    else if (action === "config" ) await handleConfig(req, res);
+    else if (action === "track"  ) await handleTrack(req, res);
+    else if (action === "formcfg") await handleFormCfg(req, res);
     else res.status(400).json({status: "error", error: "Acción desconocida"});
   } catch (e) {
     console.error("formApi error:", action, e);
@@ -214,6 +216,15 @@ async function handleToken(req, res) {
 async function handleConfig(req, res) {
   const snap = await db.doc(CFG_DOC).get();
   res.json(snap.exists ? snap.data() : {});
+}
+
+// ── action=formcfg ─────────────────────────────────────────────────────────
+async function handleFormCfg(req, res) {
+  const id = (req.query.id || "").trim();
+  if (!id) return res.status(400).json({error: "missing id"});
+  const snap = await db.doc(`${FORMCFG_COL}/${id}`).get();
+  if (!snap.exists) return res.status(404).json({error: "not found"});
+  res.json(snap.data());
 }
 
 // ── action=track ───────────────────────────────────────────────────────────
