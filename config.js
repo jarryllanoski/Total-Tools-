@@ -339,8 +339,9 @@ function openForm(id){
   }
   _showShalomBlock();
   if($('fPaste')) $('fPaste').value='';
+  window._waPasteUsed = false;  // reiniciar: buscador de agencias disponible de nuevo
   // Caja "Pegar pedido de WhatsApp": solo en pedido NUEVO (no al editar)
-  if($('fPasteBox')) $('fPasteBox').style.display = id ? 'none' : 'flex';
+  if($('fPasteBox')) $('fPasteBox').style.display = id ? 'none' : 'block';
   openOverlay('formOverlay');
 }
 
@@ -386,7 +387,13 @@ function parseWAOrder(){
   }
   if(fechaR){ const iso=_spanishDateToIso(fechaR); if(iso){ $('fDate').value=iso; filled++; } }
   if(notas){ $('fNotes').value=notas; filled++; }
-  if(filled>0) toast('✅ '+filled+' campo'+(filled!==1?'s':'')+' rellenado'+(filled!==1?'s':''));
+  if(filled>0){
+    // Pegado de WhatsApp reconocido: la dirección ya viene completa, así que
+    // NO activar el buscador de agencias Shalom (solo aplica en llenado manual).
+    window._waPasteUsed = true;
+    const _d=$('shDrop'); if(_d) _d.style.display='none';
+    toast('✅ '+filled+' campo'+(filled!==1?'s':'')+' rellenado'+(filled!==1?'s':''));
+  }
   else toast('⚠️ No se reconoció el formato del mensaje');
 }
 
@@ -438,6 +445,8 @@ function _panelShalomSearch(q){
 }
 function onAddrInput(val){
   const drop=$('shDrop'); if(!drop) return;
+  // Si se pegó un pedido de WhatsApp, la dirección ya está completa: no buscar agencias
+  if(window._waPasteUsed){ drop.style.display='none'; return; }
   const isShalom=(($('fCourier')||{value:''}).value||'').toUpperCase().includes('SHALOM');
   if(!isShalom){ drop.style.display='none'; return; }
   clearTimeout(_shTimer);

@@ -555,9 +555,12 @@
   <div class="sheet">
     <div class="sheet-handle"></div>
     <div class="sheet-title" id="formTitle">Nuevo Envío</div>
-    <div id="fPasteBox" style="background:rgba(37,211,102,.08);border:1px solid rgba(37,211,102,.25);border-radius:9px;padding:8px 9px;margin-bottom:11px;display:flex;gap:7px;align-items:flex-start">
-      <textarea class="fi" id="fPaste" rows="1" style="flex:1;height:36px;min-height:36px;resize:none;font-size:12px;line-height:1.4;padding:8px 10px" placeholder="📋 Pega el pedido de WhatsApp…" onpaste="setTimeout(parseWAOrder,40)"></textarea>
-      <button type="button" class="btn-sec" style="font-size:12px;padding:8px 12px;white-space:nowrap;flex-shrink:0" onclick="parseWAOrder()">✨ Rellenar</button>
+    <div id="fPasteBox" style="background:rgba(37,211,102,.08);border:1px solid rgba(37,211,102,.28);border-radius:9px;padding:9px 10px;margin-bottom:11px">
+      <div style="font-size:10.5px;color:#25D366;font-weight:600;line-height:1.45;margin-bottom:7px">📲 <b>Opcional</b> — Pega el mensaje que te llegó por WhatsApp y se rellenan Nombre, Teléfono, DNI, Dirección, Courier, Fecha y Notas automáticamente.</div>
+      <div style="display:flex;gap:7px;align-items:flex-start">
+        <textarea class="fi" id="fPaste" rows="1" style="flex:1;height:36px;min-height:36px;resize:none;font-size:12px;line-height:1.4;padding:8px 10px" placeholder="Pega aquí el mensaje del cliente…" onpaste="setTimeout(parseWAOrder,40)"></textarea>
+        <button type="button" style="font-size:12px;font-weight:700;padding:8px 13px;white-space:nowrap;flex-shrink:0;background:#25D366;color:#fff;border:none;border-radius:8px;cursor:pointer;font-family:inherit" onclick="parseWAOrder()">📲 Rellenar</button>
+      </div>
     </div>
     <div class="frow">
       <div class="fg"><label class="fl">Nombre *</label><input class="fi" id="fName" placeholder="Nombre completo"></div>
