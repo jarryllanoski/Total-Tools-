@@ -278,8 +278,9 @@ function openForm(id){
   if(body) body.classList.remove('open');
   if(arrow) arrow.classList.remove('open');
   _editId=id;$('formTitle').textContent=id?'Editar Envío':'Nuevo Envío';
-  const activeCouriers = S.couriers.filter(c => S.courierActive[c] !== false);
-  $('fCourier').innerHTML = (activeCouriers.length ? activeCouriers : S.couriers).map(c=>`<option>${c}</option>`).join('');
+  // Panel de gestión: SIEMPRE todos los couriers disponibles (independiente
+  // de qué esté activo en el formulario público del cliente).
+  $('fCourier').innerHTML = (S.couriers||[]).map(c=>`<option>${c}</option>`).join('');
   $('fStatus').innerHTML=allStatuses().map(s=>`<option>${s}</option>`).join('');
   $('extraForm').innerHTML=S.extraFields.map(f=>`<div class="fg"><label class="fl">${f}</label><input class="fi xf" data-f="${f}" placeholder="${f}..."></div>`).join('');
   _docs={guia:null,embalado:null,ticket:null};_links=[];
@@ -314,12 +315,16 @@ function openForm(id){
   const _showShalomBlock = () => {
     const c = ($('fCourier').value||'').toUpperCase();
     const b = $('shalomGuiaBlock');
-    if(b) b.style.display = c.includes('SHALOM') ? 'block' : 'none';
+    const isShalom = c.includes('SHALOM');
+    if(b) b.style.display = isShalom ? 'block' : 'none';
     const isEnc = c.includes('ENCOMIENDA');
     const addrLbl = document.getElementById('fAddrLabel');
     const encGrp  = document.getElementById('fEncAgenciaGroup');
     if(addrLbl) addrLbl.textContent = isEnc ? 'Ciudad destino *' : 'Dirección *';
     if(encGrp)  encGrp.style.display = isEnc ? '' : 'none';
+    // SHALOM: precargar agencias para búsqueda instantánea; si no, ocultar dropdown
+    if(isShalom){ if(typeof _panelShalomLoad==='function') _panelShalomLoad(); }
+    else { const d=$('shDrop'); if(d) d.style.display='none'; }
   };
   $('fCourier').onchange = _showShalomBlock;
   if(id){
@@ -384,6 +389,96 @@ function parseWAOrder(){
   if(filled>0) toast('✅ '+filled+' campo'+(filled!==1?'s':'')+' rellenado'+(filled!==1?'s':''));
   else toast('⚠️ No se reconoció el formato del mensaje');
 }
+
+/* ── BÚSQUEDA DE AGENCIAS SHALOM en el campo Dirección (courier SHALOM) ──
+   Mismo JSON y misma calidad de búsqueda que el formulario público.       */
+let _shTimer=null;
+async function _panelShalomLoad(){
+  if(window._shalomData && window._shalomData.length) return window._shalomData;
+  // 1) cache localStorage (misma clave que usa el formulario)
+  try{
+    const c=localStorage.getItem('shalom_agencias_cache');
+    const t=parseInt(localStorage.getItem('shalom_agencias_time')||'0');
+    if(c && (Date.now()-t)<86400000){ window._shalomData=JSON.parse(c); return window._shalomData; }
+  }catch(e){}
+  // 2) JSON local
+  try{
+    const r=await fetch('data/agencias-shalom.json');
+    if(r.ok){
+      const j=await r.json();
+      const lista=j.agencias||j.data||j||[];
+      if(Array.isArray(lista)&&lista.length){
+        window._shalomData=lista;
+        try{ localStorage.setItem('shalom_agencias_cache',JSON.stringify(lista)); localStorage.setItem('shalom_agencias_time',String(Date.now())); }catch(e){}
+        return lista;
+      }
+    }
+  }catch(e){ console.warn('[Shalom panel] JSON no disponible:',e.message); }
+  return [];
+}
+function _panelShalomSearch(q){
+  const data=window._shalomData||[];
+  const nrm=s=>String(s==null?'':s).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
+  const qu=nrm(q);
+  const claveM=[], dirM=[];
+  data.forEach((ag,idx)=>{
+    const clave=nrm([ag.lugar_over||ag.nombre, ag.zona||ag.distrito, ag.provincia, ag.departamento].join(' '));
+    const extra=nrm(ag.direccion);
+    let score;
+    if(clave.indexOf(qu)===0) score=0;
+    else if((' '+clave).indexOf(' '+qu)!==-1) score=1;
+    else if(clave.indexOf(qu)!==-1) score=2;
+    else { if(extra.indexOf(qu)!==-1) dirM.push({ag,idx}); return; }
+    claveM.push({ag,score,idx});
+  });
+  claveM.sort((a,b)=>a.score-b.score||a.idx-b.idx);
+  let res=claveM.map(x=>x.ag);
+  if(res.length<8) res=res.concat(dirM.map(x=>x.ag));
+  return res.slice(0,8);
+}
+function onAddrInput(val){
+  const drop=$('shDrop'); if(!drop) return;
+  const isShalom=(($('fCourier')||{value:''}).value||'').toUpperCase().includes('SHALOM');
+  if(!isShalom){ drop.style.display='none'; return; }
+  clearTimeout(_shTimer);
+  const q=(val||'').trim();
+  if(q.length<2){ drop.style.display='none'; return; }
+  _shTimer=setTimeout(async()=>{
+    await _panelShalomLoad();
+    const res=_panelShalomSearch(q);
+    if(!res.length){
+      drop.innerHTML='<div style="padding:12px 14px;text-align:center;font-size:12px;color:var(--text2)">🔍 Sin resultados — busca por ciudad, distrito o nombre de agencia</div>';
+      drop.style.display='block'; return;
+    }
+    window._panelShCache=res;
+    drop.innerHTML=res.map((ag,i)=>{
+      const nombre=ag.lugar_over||ag.nombre||'—';
+      const geo=[ag.zona||ag.distrito,ag.provincia,ag.departamento].filter(Boolean).join(' · ');
+      const dir=ag.direccion||'';
+      return `<div onclick="pickShalomAgency(${i})" style="padding:9px 12px;border-bottom:1px solid var(--bd);cursor:pointer" onmouseover="this.style.background='var(--bg3)'" onmouseout="this.style.background=''">
+        <div style="font-weight:700;font-size:12px;color:var(--text)">${esc(nombre)}</div>
+        ${geo?`<div style="font-size:11px;color:var(--blue);margin-top:2px">${esc(geo)}</div>`:''}
+        ${dir?`<div style="font-size:11px;color:var(--text2);margin-top:2px;line-height:1.4">${esc(dir)}</div>`:''}
+      </div>`;
+    }).join('');
+    drop.style.display='block';
+  },300);
+}
+function pickShalomAgency(i){
+  const ag=(window._panelShCache||[])[i]; if(!ag) return;
+  const nombre=ag.lugar_over||ag.nombre||'';
+  const dir=ag.direccion||'';
+  $('fAddr').value = dir ? (nombre+' – '+dir) : nombre;
+  const drop=$('shDrop'); if(drop) drop.style.display='none';
+  toast('🏢 Agencia seleccionada');
+}
+// Cerrar dropdown al hacer click fuera
+document.addEventListener('click',function(e){
+  const drop=$('shDrop'); if(!drop) return;
+  if(e.target && (e.target.id==='fAddr' || (e.target.closest && e.target.closest('#shDrop')))) return;
+  drop.style.display='none';
+});
+
 function saveShipment(){
   // Auto-agregar link si hay texto en el campo pero no se presionó +Add
   const pendingLink = ($('fLink')||{value:''}).value.trim();

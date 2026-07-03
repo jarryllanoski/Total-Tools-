@@ -567,7 +567,7 @@
       <div class="fg"><label class="fl">DNI</label><input class="fi" id="fDni" placeholder="12345678" maxlength="8" inputmode="numeric"></div>
       <div class="fg" id="fEncAgenciaGroup" style="display:none"><label class="fl">Agencia</label><input class="fi" id="fEncAgencia" placeholder="Nombre de la agencia"></div>
     </div>
-    <div class="fg"><label class="fl" id="fAddrLabel">Dirección *</label><input class="fi" id="fAddr" placeholder="Av., Mz., Lote..."></div>
+    <div class="fg" style="position:relative"><label class="fl" id="fAddrLabel">Dirección *</label><input class="fi" id="fAddr" placeholder="Av., Mz., Lote..." autocomplete="off" oninput="onAddrInput(this.value)" onfocus="onAddrInput(this.value)"><div id="shDrop" style="display:none;position:absolute;left:0;right:0;top:100%;z-index:50;background:var(--bg2);border:1px solid var(--bd);border-radius:9px;margin-top:4px;max-height:230px;overflow-y:auto;box-shadow:0 8px 24px rgba(0,0,0,.4)"></div></div>
     <div class="frow">
       <div class="fg"><label class="fl">Courier</label><select class="fs" id="fCourier"></select></div>
       <div class="fg"><label class="fl">Fecha</label><input class="fi" id="fDate" type="date"></div>
