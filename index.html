@@ -395,7 +395,7 @@
       <div class="chips-wrap" id="filterChips" style="flex:1;margin:0"></div>
     </div>
     <div class="tb-btns">
-      <button class="tb-btn" onclick="selAll()">☑️</button>
+      <button class="tb-btn" id="selAllBtn" onclick="selAll()" title="Seleccionar / deseleccionar todo">☑️</button>
       <button class="tb-btn" onclick="doPrint()">🖨️</button>
       <button class="tb-btn" onclick="doCSV()">📊</button>
       <button class="tb-btn" onclick="render()">🔄</button>
@@ -1447,6 +1447,8 @@ function setChipSort(v){
 function render(){
   updateStats(); updateAdvBar();
   const sel=S.shipments.filter(x=>x.sel);
+  // Resaltar en azul el botón "seleccionar todo" si hay algún pedido seleccionado
+  const _selBtn=$('selAllBtn'); if(_selBtn) _selBtn.classList.toggle('sel-on', sel.length>0);
   const srch=$('fSearch').value.toLowerCase();
   let data=S.shipments;
   if(_filt) data=data.filter(x=>x.status===_filt);

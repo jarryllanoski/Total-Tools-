@@ -134,7 +134,7 @@ window.PrintModule = {
     // Decidir scope inicial
     _scope = sel.length ? 'sel' : 'new';
     _list  = _scope==='sel' ? sel : newOnes;
-    _bultos = parseInt(localStorage.getItem('print_bultos')||'1') || 1;
+    _bultos = 1;  // siempre empieza en 1 por impresión (no persistir valor viejo)
     _fmt    = localStorage.getItem('print_fmt') || 'etiqueta';
 
     this._renderScope(sel, newOnes);
@@ -152,7 +152,7 @@ window.PrintModule = {
     if(!ship){ window.toast&&toast('Pedido no encontrado'); return; }
     _scope  = 'one';
     _list   = [ship];
-    _bultos = parseInt(localStorage.getItem('print_bultos')||'1') || 1;
+    _bultos = 1;  // siempre empieza en 1 por impresión (no persistir valor viejo)
     _fmt    = localStorage.getItem('print_fmt') || 'etiqueta';
     // Mostrar chip "1 pedido" sin opciones de scope
     const row = document.getElementById('printScopeRow');

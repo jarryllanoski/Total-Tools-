@@ -37,6 +37,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);max
 .tb-btn{background:var(--bg2);border:1px solid var(--bd);border-radius:7px;width:36px;height:36px;cursor:pointer;color:var(--text2);font-size:14px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
 .tb-btn.pri{background:var(--blue);border-color:var(--blue);color:#fff}
 .tb-btn.danger{background:#2d1b1b;border-color:var(--red);color:var(--red)}
+.tb-btn.sel-on{border-color:var(--blue);box-shadow:0 0 0 2px rgba(56,139,253,.45);color:var(--blue)}
 .qr-scan-btn{background:var(--bg2);border:1px solid var(--blue);border-radius:7px;width:36px;height:36px;cursor:pointer;color:var(--blue);font-size:17px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
 
 /* CHIPS */
