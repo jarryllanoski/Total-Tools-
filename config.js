@@ -334,6 +334,8 @@ function openForm(id){
   }
   _showShalomBlock();
   if($('fPaste')) $('fPaste').value='';
+  // Caja "Pegar pedido de WhatsApp": solo en pedido NUEVO (no al editar)
+  if($('fPasteBox')) $('fPasteBox').style.display = id ? 'none' : 'flex';
   openOverlay('formOverlay');
 }
 
