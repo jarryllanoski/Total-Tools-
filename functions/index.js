@@ -55,9 +55,9 @@ exports.formApi = onRequest(async (req, res) => {
   const action = (req.query.action || "").trim();
   try {
     if (action === "create") await handleCreate(req, res);
-    else if (action === "token"  ) await handleToken(req, res);
-    else if (action === "config" ) await handleConfig(req, res);
-    else if (action === "track"  ) await handleTrack(req, res);
+    else if (action === "token") await handleToken(req, res);
+    else if (action === "config") await handleConfig(req, res);
+    else if (action === "track") await handleTrack(req, res);
     else if (action === "formcfg") await handleFormCfg(req, res);
     else res.status(400).json({status: "error", error: "Acción desconocida"});
   } catch (e) {
@@ -215,10 +215,24 @@ async function handleToken(req, res) {
  */
 async function handleConfig(req, res) {
   const snap = await db.doc(CFG_DOC).get();
-  res.json(snap.exists ? snap.data() : {});
+  const d = snap.exists ? snap.data() : {};
+  // Solo campos públicos que el formulario necesita.
+  // NUNCA exponer statusPin, trash, msgTemplates ni labels al público.
+  res.json({
+    config: d.config || {},
+    couriers: d.couriers || [],
+    courierActive: d.courierActive || {},
+    courierTypes: d.courierTypes || {},
+    dispatch: d.dispatch || {},
+    extraFields: d.extraFields || [],
+  });
 }
 
 // ── action=formcfg ─────────────────────────────────────────────────────────
+/**
+ * @param {Object} req request
+ * @param {Object} res response
+ */
 async function handleFormCfg(req, res) {
   const id = (req.query.id || "").trim();
   if (!id) return res.status(400).json({error: "missing id"});
