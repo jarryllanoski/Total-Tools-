@@ -101,6 +101,15 @@ function pickOrderFields(src) {
  * @param {Object} res response
  */
 async function handleCreate(req, res) {
+  // Rate limit: máx 10 pedidos/min por IP — evita spam de pedidos falsos.
+  if (!(await checkRateLimit("formApi_create", req))) {
+    res.status(429).json({
+      status: "error",
+      error: "Demasiadas solicitudes. Intenta de nuevo en un minuto.",
+    });
+    return;
+  }
+
   const body = req.body || {};
   const order = body.order || {};
   const tokenId = (body.token || "").trim();
@@ -313,6 +322,7 @@ const RATE_LIMITS = {
   agenciasShalom: {windowMs: 60000, max: 100},
   shalomTracking: {windowMs: 60000, max: 150},
   shalomTicket: {windowMs: 60000, max: 50},
+  formApi_create: {windowMs: 60000, max: 10},
 };
 
 /**
