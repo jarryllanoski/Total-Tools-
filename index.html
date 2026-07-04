@@ -1496,6 +1496,9 @@ function render(){
     </div>`).join('');
 }
 
+/* Sanitización XSS: datos de pedidos vienen del formulario público */
+function escH(s){ return s==null?'':String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
+function escU(u){ u=String(u==null?'':u).trim(); return (/^https?:\/\//i.test(u)||/^data:image\//i.test(u))?escH(u):'#'; }
 function cardHTML(s){
   const gChk=s.chkGuia||false, tChk=s.chkTicket||false;
   const msgs=S.msgTemplates[s.status]||['',''];
@@ -1508,27 +1511,27 @@ function cardHTML(s){
         onclick="togglePvtNote('${s.id}')" 
         ondblclick="event.stopPropagation();openPrivateNote('${s.id}')"
         style="cursor:pointer;flex:1;user-select:none">
-        ${s.name}${pvtNote?` <span style="font-size:11px;color:var(--purple);opacity:.7">🔒</span>`:''}
+        ${escH(s.name)}${pvtNote?` <span style="font-size:11px;color:var(--purple);opacity:.7">🔒</span>`:''}
       </div>
       <button class="wa-btn" onclick="openWA('${s.id}')">💬</button>
     </div>
-    ${pvtNote?`<div class="pvt-note" id="pvt_${s.id}" style="display:none" ondblclick="openPrivateNote('${s.id}')">🔒 ${pvtNote}</div>`:''}
+    ${pvtNote?`<div class="pvt-note" id="pvt_${s.id}" style="display:none" ondblclick="openPrivateNote('${s.id}')">🔒 ${escH(pvtNote)}</div>`:''}
     <div class="card-meta">
-      <span class="meta">📞 ${s.phone}</span>
-      <span class="meta">📅 ${s.date||'—'} <button onclick="copyCardLink('${s.id}')" title="Copiar link" style="background:none;border:none;color:#388bfd;font-size:11px;cursor:pointer;padding:0 0 0 2px;vertical-align:middle">🔗</button></span>
-      ${s.cost?`<span class="meta">💰 S/ ${s.cost}</span>`:''}
+      <span class="meta">📞 ${escH(s.phone)}</span>
+      <span class="meta">📅 ${escH(s.date||'—')} <button onclick="copyCardLink('${s.id}')" title="Copiar link" style="background:none;border:none;color:#388bfd;font-size:11px;cursor:pointer;padding:0 0 0 2px;vertical-align:middle">🔗</button></span>
+      ${s.cost?`<span class="meta">💰 S/ ${escH(s.cost)}</span>`:''}
     </div>
-    ${(s.courier||'').toUpperCase().includes('ENCOMIENDA')?((s.ciudadDestino||s.address)?`<div class="card-addr">📦 ${s.ciudadDestino||s.address}${s.encAgencia?' · 🏪 '+s.encAgencia:''}</div>`:''): (s.address?`<div class="card-addr">🏠 ${s.address}</div>`:'' )}
-    ${s.notes?`<div class="card-note">📝 ${s.notes}</div>`:''}
+    ${(s.courier||'').toUpperCase().includes('ENCOMIENDA')?((s.ciudadDestino||s.address)?`<div class="card-addr">📦 ${escH(s.ciudadDestino||s.address)}${s.encAgencia?' · 🏪 '+escH(s.encAgencia):''}</div>`:''): (s.address?`<div class="card-addr">🏠 ${escH(s.address)}</div>`:'' )}
+    ${s.notes?`<div class="card-note">📝 ${escH(s.notes)}</div>`:''}
     ${cardDocs(s,gChk,tChk)}
     ${(s.trackingOrderNumber||s.shalomGuia)&&typeof Tracking!=='undefined'?Tracking.renderCardBlock(s):''}
     ${(m1||m2)?`<div class="card-msgs">
-      ${m1?`<button class="card-msg card-msg-a" onclick="quickMsg('${s.id}',0)"><span class="card-msg-ltr">A</span><span class="card-msg-txt">${fillVars(m1,s).substring(0,70)}${fillVars(m1,s).length>70?'…':''}</span></button>`:''}
-      ${m2?`<button class="card-msg card-msg-b" onclick="quickMsg('${s.id}',1)"><span class="card-msg-ltr">B</span><span class="card-msg-txt">${fillVars(m2,s).substring(0,70)}${fillVars(m2,s).length>70?'…':''}</span></button>`:''}
+      ${m1?`<button class="card-msg card-msg-a" onclick="quickMsg('${s.id}',0)"><span class="card-msg-ltr">A</span><span class="card-msg-txt">${escH(fillVars(m1,s).substring(0,70))}${fillVars(m1,s).length>70?'…':''}</span></button>`:''}
+      ${m2?`<button class="card-msg card-msg-b" onclick="quickMsg('${s.id}',1)"><span class="card-msg-ltr">B</span><span class="card-msg-txt">${escH(fillVars(m2,s).substring(0,70))}${fillVars(m2,s).length>70?'…':''}</span></button>`:''}
     </div>`:''}
     <div class="card-actions">
       <button class="btn-st ${stClass(s.status)}" onclick="openStatus('${s.id}')" style="${!_filt?'opacity:.5;cursor:default':''}">
-        ${stIcon(s.status)} ${s.status}${!_filt?' 🔒':''}
+        ${stIcon(s.status)} ${escH(s.status)}${!_filt?' 🔒':''}
       </button>
       <button class="btn-edit" onclick="openForm('${s.id}')">✏️</button>
       <button class="btn-del" onclick="openDel('${s.id}')">🗑️</button>
@@ -1541,19 +1544,19 @@ function cardDocs(s,gChk,tChk){
   if(!has)return'';
   return`<div class="card-docs">
     ${s.docGuia?`<div class="doc-thumb" style="border:2px solid ${gChk?'var(--green)':'var(--bd)'}">
-      <div onclick="qView('${s.id}','guia')">${s.docGuia.t&&s.docGuia.t.startsWith('image/')?`<img src="${s.docGuia.d}" style="width:52px;height:66px;object-fit:cover;display:block">`:`<div class="doc-thumb-pdf"><span style="font-size:20px">📄</span></div>`}</div>
+      <div onclick="qView('${s.id}','guia')">${s.docGuia.t&&s.docGuia.t.startsWith('image/')?`<img src="${escU(s.docGuia.d)}" style="width:52px;height:66px;object-fit:cover;display:block">`:`<div class="doc-thumb-pdf"><span style="font-size:20px">📄</span></div>`}</div>
       <div class="doc-lbl">GUÍA</div>
       <div class="doc-chk ${gChk?'on-g':''}" onclick="event.stopPropagation();togDoc('${s.id}','guia')">${gChk?'✓':''}</div>
     </div>`:''}
     ${s.docEmbalado?`<div class="doc-thumb" style="border:2px solid var(--bd)">
-      <div onclick="openViewer&&openViewer(s.docEmbalado,'📦 Embalado')">${s.docEmbalado.t&&s.docEmbalado.t.startsWith('image/')?`<img src="${s.docEmbalado.d}" style="width:52px;height:66px;object-fit:cover;display:block">`:`<div class="doc-thumb-pdf"><span style="font-size:20px">📦</span></div>`}</div>
+      <div onclick="openViewer&&openViewer(s.docEmbalado,'📦 Embalado')">${s.docEmbalado.t&&s.docEmbalado.t.startsWith('image/')?`<img src="${escU(s.docEmbalado.d)}" style="width:52px;height:66px;object-fit:cover;display:block">`:`<div class="doc-thumb-pdf"><span style="font-size:20px">📦</span></div>`}</div>
       <div class="doc-lbl">EMBALADO</div></div>`:''}
     ${s.docTicket?`<div class="doc-thumb" style="border:2px solid ${tChk?'var(--purple)':'var(--bd)'}">
-      <div onclick="qView('${s.id}','ticket')">${s.docTicket.t&&s.docTicket.t.startsWith('image/')?`<img src="${s.docTicket.d}" style="width:52px;height:66px;object-fit:cover;display:block">`:`<div class="doc-thumb-pdf"><span style="font-size:20px">🧾</span></div>`}</div>
+      <div onclick="qView('${s.id}','ticket')">${s.docTicket.t&&s.docTicket.t.startsWith('image/')?`<img src="${escU(s.docTicket.d)}" style="width:52px;height:66px;object-fit:cover;display:block">`:`<div class="doc-thumb-pdf"><span style="font-size:20px">🧾</span></div>`}</div>
       <div class="doc-lbl">TICKET</div>
       <div class="doc-chk ${tChk?'on-t':''}" onclick="event.stopPropagation();togDoc('${s.id}','ticket')">${tChk?'✓':''}</div>
     </div>`:''}
-    ${(s.links||[]).map(l=>`<a href="${l.u}" target="_blank" rel="noopener" class="link-chip" style="text-decoration:none;cursor:pointer">🔗 ${l.n}</a>`).join('')}
+    ${(s.links||[]).map(l=>`<a href="${escU(l.u)}" target="_blank" rel="noopener" class="link-chip" style="text-decoration:none;cursor:pointer">🔗 ${escH(l.n)}</a>`).join('')}
   </div>`;
 }
 
