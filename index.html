@@ -1398,8 +1398,9 @@ function bulkChangeStatus(){
 
 function applyBulkStatus(st){
   const sel=S.shipments.filter(x=>x.sel);
-  sel.forEach(s=>{ s.status=st; s.sel=false; });
-  save(); render();
+  // Marcar como sucio solo cada pedido cambiado (no reescribir los ~170).
+  sel.forEach(s=>{ s.status=st; s.sel=false; save(s.id); });
+  render();
   closeOverlay('bulkStatusOverlay');
   toast(`✅ ${sel.length} cliente${sel.length>1?'s':''} → ${stIcon(st)} ${st}`);
 }
@@ -1561,8 +1562,12 @@ function cardDocs(s,gChk,tChk){
 }
 
 /* SELECT */
-function toggleSel(id){const s=S.shipments.find(x=>x.id===id);if(!s)return;s.sel=!s.sel;save();render()}
-function selAll(){const all=S.shipments.every(x=>x.sel);S.shipments.forEach(x=>x.sel=!all);save();render()}
+// La selección es estado EFÍMERO de UI: se guarda solo en local, nunca en
+// Firestore. Antes, save() sin id reescribía los ~170 pedidos por cada click
+// de checkbox (causa del pico de escrituras). saveLocal() no toca Firestore.
+function saveLocal(){ try{ lsSet('dpanel', JSON.stringify(window._slimStateForLocal ? window._slimStateForLocal(S) : S)); }catch(e){} }
+function toggleSel(id){const s=S.shipments.find(x=>x.id===id);if(!s)return;s.sel=!s.sel;saveLocal();render()}
+function selAll(){const all=S.shipments.every(x=>x.sel);S.shipments.forEach(x=>x.sel=!all);saveLocal();render()}
 
 /* DOC TOGGLE */
 function togDoc(id,slot){const s=S.shipments.find(x=>x.id===id);if(!s)return;if(slot==='guia')s.chkGuia=!s.chkGuia;else s.chkTicket=!s.chkTicket;save(id);render()}
