@@ -1,0 +1,44 @@
+name: CI
+
+# Verificación automática en cada push/PR a main.
+# NO despliega nada — solo valida que el código no tenga errores.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  lint-functions:
+    name: Lint Cloud Functions
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Instalar dependencias de functions
+        working-directory: functions
+        run: npm ci || npm install
+      - name: Ejecutar ESLint
+        working-directory: functions
+        run: npm run lint
+
+  validate-frontend:
+    name: Validar sintaxis del frontend
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Validar sintaxis de los .js del panel
+        run: |
+          for f in config.js print.js tracking.js delivery.js notify.js \
+                   floatpanel.js storage.js auth.js dashboard.js qrtracking.js \
+                   ticket.js respaldo.js ayuda.js voz.js loading-screen.js \
+                   agencias-extractor.js firebase-config.js; do
+            if [ -f "$f" ]; then
+              node --check "$f" && echo "  ok: $f" || { echo "  FALLA: $f"; exit 1; }
+            fi
+          done
