@@ -540,14 +540,32 @@ function showTokenScreen(icon, title, msg){
 }
 
 /* ─── LOAD CONFIG (vía Cloud Function) ───────────────────────────── */
+function _cfgHasPhone(c){ return !!(c && (c.phone || (c.config && c.config.phone))); }
+
 async function loadCfg(){
   CFG = null;
   renderForm();
   try{
     const cfgId = new URLSearchParams(location.search).get('cfg');
-    const timeout = new Promise(res => setTimeout(() => res(null), 5000));
-    const cfgReq = cfgId ? _api('formcfg', {id: cfgId}) : _api('config');
-    const cfg = await Promise.race([cfgReq, timeout]);
+    const withTO = (pr,ms)=>Promise.race([pr, new Promise(r=>setTimeout(()=>r(null),ms))]);
+    let cfg = null;
+    if(cfgId){
+      const snap = await withTO(_api('formcfg', {id: cfgId}), 5000);
+      if(snap && !snap.error) cfg = snap;
+    }
+    // Sin snapshot, snapshot fallido, o snapshot sin teléfono del negocio →
+    // completar con la config en vivo. Garantiza el botón de WhatsApp.
+    if(!cfg || !_cfgHasPhone(cfg)){
+      const live = await withTO(_api('config'), 5000);
+      if(live && !live.error){
+        if(!cfg){ cfg = live; }
+        else{
+          const lp = live.phone || (live.config && live.config.phone) || '';
+          if(lp) cfg.phone = lp;
+          if(!(cfg.name||(cfg.config&&cfg.config.name))) cfg.name = live.name || (live.config&&live.config.name) || '';
+        }
+      }
+    }
     if(cfg && !cfg.error){ CFG = cfg; renderForm(); }
   }catch(e){
     console.warn('Config no disponible:', e.message);
@@ -557,7 +575,15 @@ async function loadCfg(){
 async function loadCfgThenTrack(token){
   try{
     const cfgId = new URLSearchParams(location.search).get('cfg');
-    const cfg = cfgId ? await _api('formcfg', {id: cfgId}) : await _api('config');
+    let cfg = cfgId ? await _api('formcfg', {id: cfgId}) : await _api('config');
+    if(cfg && cfg.error) cfg = null;
+    if(!cfg || !_cfgHasPhone(cfg)){
+      const live = await _api('config');
+      if(live && !live.error){
+        if(!cfg){ cfg = live; }
+        else{ const lp = live.phone||(live.config&&live.config.phone)||''; if(lp) cfg.phone = lp; }
+      }
+    }
     if(cfg && !cfg.error) CFG = cfg;
   }catch(e){ console.warn('Config no disponible'); }
   renderTracking(token);
@@ -1374,10 +1400,15 @@ function _construirWaMsg(order, trackCode, trackToken){
 }
 
 function _construirWaHref(order, trackCode, trackToken){
-  const bizPhone = (CFG&&(CFG.config&&CFG.config.phone||CFG.phone))||'';
-  if(!bizPhone) return null;
+  let bizPhone = (CFG&&(CFG.config&&CFG.config.phone||CFG.phone))||'';
+  bizPhone = String(bizPhone).replace(/\D/g,'');
+  if(bizPhone.startsWith('51') && bizPhone.length>9) bizPhone = bizPhone.slice(2);
   const msg = _construirWaMsg(order, trackCode, trackToken);
-  return `https://wa.me/51${bizPhone}?text=${encodeURIComponent(msg)}`;
+  // Con número del negocio → mensaje directo al negocio.
+  // Sin número (caso extremo) → abre WhatsApp con el mensaje listo para enviar.
+  return bizPhone
+    ? `https://wa.me/51${bizPhone}?text=${encodeURIComponent(msg)}`
+    : `https://wa.me/?text=${encodeURIComponent(msg)}`;
 }
 
 async function submitOrder(){
