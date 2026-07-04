@@ -27,7 +27,13 @@
     "ignore": [
       "firebase.json",
       "**/.*",
-      "**/node_modules/**"
+      "**/node_modules/**",
+      "functions/**",
+      ".github/**",
+      "*.md",
+      "firestore.rules",
+      "storage.rules",
+      "firestore.indexes.json"
     ]
   },
   "storage": {
