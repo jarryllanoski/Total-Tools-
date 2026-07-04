@@ -82,15 +82,31 @@ const ORDER_FIELDS = [
   "createdAt", "fromForm", "dni",
 ];
 
+// Tamaño máximo por campo de texto — evita payloads gigantes (M-3).
+const FIELD_MAX = {
+  name: 120, phone: 20, dni: 12, dniRecoger: 12, dniDestinatario: 12,
+  cost: 20, courier: 60, date: 30, status: 60, encAgencia: 200,
+  ciudadDestino: 120, address: 600, referencia: 300, notes: 600,
+  gpsCoords: 60, id: 60, createdAt: 40,
+};
+const DEFAULT_MAX = 600;
+
 /**
  * Devuelve una copia de src con solo las claves de ORDER_FIELDS.
+ * Trunca strings que excedan su tamaño máximo permitido.
  * @param {Object} src objeto order crudo del cliente
  * @return {Object} objeto filtrado
  */
 function pickOrderFields(src) {
   const out = {};
   ORDER_FIELDS.forEach((k) => {
-    if (Object.prototype.hasOwnProperty.call(src, k)) out[k] = src[k];
+    if (!Object.prototype.hasOwnProperty.call(src, k)) return;
+    let v = src[k];
+    if (typeof v === "string") {
+      const max = FIELD_MAX[k] || DEFAULT_MAX;
+      if (v.length > max) v = v.slice(0, max);
+    }
+    out[k] = v;
   });
   return out;
 }
@@ -272,7 +288,14 @@ async function handleTrack(req, res) {
   const order = snap.data();
   const code = (order.id || "").slice(-4).toUpperCase();
   const frozen = ["ENTREGADO", "CANCELADO"].includes(order.status || "");
-  res.json({status: "ok", order: Object.assign({}, order, {code, frozen})});
+  // A-2: no exponer datos que la vista de seguimiento no necesita
+  // (teléfono, costo, notas privadas, GPS, documentos internos).
+  const safe = Object.assign({}, order, {code, frozen});
+  ["phone", "cost", "privateNote", "gpsCoords",
+    "docGuia", "docEmbalado", "docComprobante", "docTicket",
+    "sel", "chkGuia", "chkEmbalado", "chkComprobante", "fromForm"]
+      .forEach((k) => delete safe[k]);
+  res.json({status: "ok", order: safe});
 }
 
 // ── FUNCIONES SHALOM ──────────────────────────────────────────────────────
