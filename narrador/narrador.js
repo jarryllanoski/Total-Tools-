@@ -192,10 +192,13 @@
     }
   }
 
-  // ── 7. Éxito → Delfi ───────────────────────────────────────────────
-  function isSuccess(){ return /casi listo|pedido recibido|c[óo]digo de seguimiento/i.test(app.textContent||'') && has('a[href*="wa.me"]'); }
+  // ── 7. Detección de pantallas ──────────────────────────────────────
+  // Tracking tiene .track-card/.status-badge; éxito tiene "¡Casi listo!".
+  // (El texto "código de seguimiento" aparece en AMBAS, por eso no sirve
+  //  para distinguir: el éxito se identifica solo por "casi listo".)
   function isTracking(){ return has('.track-card')||has('.status-badge'); }
   function isNotFound(){ return /link no disponible|no encuentro tu pedido/i.test(app.textContent||''); }
+  function isSuccess(){ return /casi listo/i.test(app.textContent||''); }
 
   // ── 8. Lógica del SEGUIMIENTO (Delfi) ──────────────────────────────
   var lastDelfiKey='';
@@ -228,8 +231,9 @@
     clearTimeout(scanT);
     scanT=setTimeout(function(){
       try{
-        if(isSuccess()){ if(!heavySeen.bye){ heavySeen.bye=1; say('heavy',HEAVY.bye); } return; }
+        // Tracking PRIMERO: si el pedido ya está en seguimiento, manda Delfi.
         if(isTracking()||isNotFound()){ delfiScan(); return; }
+        if(isSuccess()){ if(!heavySeen.bye){ heavySeen.bye=1; say('heavy',HEAVY.bye); } return; }
         if(has('#f_name')){ heavyScanForm(); return; }
       }catch(err){ /* nunca romper el formulario */ }
     },180);
