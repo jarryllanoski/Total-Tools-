@@ -32,15 +32,19 @@
    +'@media(prefers-reduced-motion:reduce){#ttf-logo,#ttf-bar{animation:none}}';
   (document.head||document.documentElement).appendChild(st);
 
+  // Elegir una de las 4 mascotas al azar en cada carga
+  var LOGOS=['load-heavy.webp','load-super.webp','load-nauti.webp','load-toby.webp'];
+  var pick=LOGOS[Math.floor(Math.random()*LOGOS.length)];
+
   ov=document.createElement('div'); ov.id='ttf-ov';
-  ov.innerHTML='<img id="ttf-logo" alt="Heavy" src="'+BASE+'heavy-logo.webp">'
+  ov.innerHTML='<img id="ttf-logo" alt="Total" src="'+BASE+pick+'">'
     +'<div id="ttf-bar-w"><div id="ttf-bar"></div></div>'
     +'<div id="ttf-msg">Iniciando fábrica…</div>';
   (document.body||document.documentElement).appendChild(ov);
 
   // Fallback de texto si la imagen no carga (conexión lenta / falla)
   var img=ov.querySelector('#ttf-logo');
-  img.onerror=function(){ var d=document.createElement('div'); d.id='ttf-logo'; d.className='txt'; d.innerHTML='🦈 HEAVY<br>DUTY · TOTAL'; img.replaceWith(d); };
+  img.onerror=function(){ var d=document.createElement('div'); d.id='ttf-logo'; d.className='txt'; d.innerHTML='TOTAL<br>TOOLS'; img.replaceWith(d); };
 
   // Barra de progreso animada (falsa, hasta que el form esté listo)
   var bar=ov.querySelector('#ttf-bar'), pct=0, raf;
