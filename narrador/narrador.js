@@ -140,6 +140,17 @@
   function agenciaSel(){
     return txt('#shalomSelTxt') || txt('.sel-badge span') || rowVal('Agencia') || rowVal('Direcci[oó]n') || '';
   }
+  // Courier del FORMULARIO: el select #f_courier está vacío hasta que el cliente
+  // elige. Los campos existen ocultos, así que el tipo se deduce por sección
+  // VISIBLE. Antes de elegir devuelve '' para no tapar la bienvenida.
+  function vis(el){ return !!(el && el.offsetParent!==null); }
+  function formCourier(){
+    var sel=document.getElementById('f_courier');
+    if(!sel || !sel.value) return '';   // aún no elige → la bienvenida se queda
+    if(vis(document.getElementById('f_ciudad'))||vis(document.getElementById('f_dni_dest'))) return 'encomienda';
+    if(vis(document.getElementById('f_dni_recoger'))||has('#shalomSelTxt')) return 'agencia';
+    return 'delivery';
+  }
 
   // Etapa de tracking a partir del texto de estado
   function estadoATexto(){
@@ -183,7 +194,7 @@
   function heavyScanForm(){
     if(!has('#f_name')) return;
     heavyWelcomeOnce();
-    var t=tipoEnvio();
+    var t=formCourier();
     if(t && heavySeen.courier!==t){ heavySeen.courier=t; if(HEAVY.courier[t]) say('heavy',HEAVY.courier[t]); }
     var ag=agenciaSel();
     if(ag && heavySeen.ag!==ag){
