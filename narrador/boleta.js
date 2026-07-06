@@ -56,13 +56,20 @@
     {k:'WHATSAPP',get:function(){ var v=val('f_phone').replace(/\D/g,''); return v?'+51 '+v:''; }},
     {k:'ENTREGA', get:function(){ var s=document.getElementById('f_courier'); if(!s||!s.value) return ''; var o=s.options[s.selectedIndex]; return o?(o.textContent||s.value).trim():s.value; }},
     {k:'DESTINO', get:function(){
-        // Agencia (Shalom u otra): badge seleccionado
+        // El formulario publica el tipo de courier (funciona aunque el paso
+        // esté oculto en el asistente). Si no está, se usa la heurística vieja.
+        var t=window._selCourierType;
+        if(t){
+          if(t==='agencia')    return txt('#shalomSelTxt')||txt('.sel-badge span')||'';
+          if(t==='encomienda'){ var c=val('f_ciudad'), a=val('f_agencia'); return c?(c+(a?' — '+a:'')):''; }
+          if(t==='delivery'){ var d=val('addrManualInput')||txt('#addrGpsResult'); var r=val('f_ref'); return d?(d+(r?' ('+r+')':'')):''; }
+          return ''; // retiro en tienda: sin destino
+        }
+        // Fallback (sin asistente): deducir por lo que está visible.
         var ag=txt('#shalomSelTxt')||txt('.sel-badge span'); if(ag) return ag;
-        // Otras agencias: ciudad (+ agencia opcional)
-        if(visible('f_ciudad')){ var c=val('f_ciudad'), a=val('f_agencia'); return c?(c+(a?' — '+a:'')):''; }
-        // Delivery: dirección manual / GPS + referencia
-        var d=val('addrManualInput')||txt('#addrGpsResult'); var r=val('f_ref');
-        if(d) return d+(r?' ('+r+')':'');
+        if(visible('f_ciudad')){ var c2=val('f_ciudad'), a2=val('f_agencia'); return c2?(c2+(a2?' — '+a2:'')):''; }
+        var d2=val('addrManualInput')||txt('#addrGpsResult'); var r2=val('f_ref');
+        if(d2) return d2+(r2?' ('+r2+')':'');
         return '';
     }},
     {k:'DNI',     get:function(){ return val('f_dni_recoger')||val('f_dni_dest')||''; }},

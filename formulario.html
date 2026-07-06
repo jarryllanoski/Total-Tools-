@@ -728,6 +728,8 @@ function renderForm(){
   setApp(`
     ${headerHtml()}
     <div style="padding-bottom:12px">
+      <div id="wzProgress" class="wz-progress"></div>
+      <div class="wz-step" data-step="1">
       <div class="fg">
         <input class="fi" id="f_name" type="text" placeholder="Nombre completo *" autocomplete="name">
         <div class="ferr" id="err_name">Ingresa tu nombre completo</div>
@@ -740,7 +742,10 @@ function renderForm(){
         <div id="knownBadge" style="display:none;margin-top:8px"></div>
       </div>
       ${extraHtml}
+      <button class="btn-main" onclick="wzNext()" style="margin-top:8px">Continuar →</button>
+      </div>
 
+      <div class="wz-step" data-step="2" hidden>
       <div class="section-ttl" style="margin-top:4px">¿Cómo quieres recibir tu pedido? *</div>
       <div class="fg">
         <select class="fi sel" id="f_courier" onchange="onCourierChange(this.value)">
@@ -749,7 +754,13 @@ function renderForm(){
         <div class="ferr" id="err_courier">Selecciona cómo recibir tu pedido</div>
         <div id="courierBadge" style="display:none"></div>
       </div>
+      <div class="wz-nav">
+        <button class="wz-back" onclick="wzBack()">← Atrás</button>
+        <button class="btn-main" onclick="wzNext()">Continuar →</button>
+      </div>
+      </div>
 
+      <div class="wz-step" data-step="3" hidden>
       <div id="agencyBox" style="display:none"></div>
 
       <div id="encomiendaBox" style="display:none;margin-top:4px">
@@ -799,7 +810,13 @@ function renderForm(){
             placeholder="Referencia (ej: frente al mercado, casa azul...)">
         </div>
       </div>
+      <div class="wz-nav">
+        <button class="wz-back" onclick="wzBack()">← Atrás</button>
+        <button class="btn-main" onclick="wzNext()">Continuar →</button>
+      </div>
+      </div>
 
+      <div class="wz-step" data-step="4" hidden>
       <div style="margin-top:18px">
         <div class="section-ttl">Fecha de envío *</div>
         <div class="dates-scroll" id="datesGrid">${datesChips}</div>
@@ -810,8 +827,12 @@ function renderForm(){
         <textarea class="fi" id="f_notes" rows="2" placeholder="Notas u observaciones (opcional)"></textarea>
       </div>
 
+      <div class="wz-nav">
+        <button class="wz-back" onclick="wzBack()">← Atrás</button>
+      </div>
       <div id="submitErrBox" class="error-box" style="display:none;margin-top:4px"></div>
       <button class="btn-main" id="confirmBtn" onclick="submitOrder()" style="margin-top:8px">Confirmar pedido →</button>
+      </div>
     </div>
     <div class="footer">Panel de Entregas · Formulario público</div>
   `);
@@ -827,6 +848,9 @@ function renderForm(){
   /* Pre-fill from token */
   if(_prefillName){ const el=$('f_name'); if(el) el.value=_prefillName; }
   if(_prefillPhone){ const el=$('f_phone'); if(el){ el.value=_prefillPhone; onPhoneInput(_prefillPhone); } }
+
+  /* Asistente paso a paso (solo presentación; no cambia la lógica) */
+  wzInit();
 }
 
 /* ─── PHONE DETECTION ────────────────────────────────────────────── */
@@ -881,6 +905,9 @@ function onCourierChange(name){
                  : isRetiro     ? 'retiro'
                  :                'delivery';
   selCourierName=name;
+  // El formulario "publica" el tipo de courier para las capas de presentación
+  // (boleta / narrador), que así no dependen de la visibilidad de los campos.
+  window._selCourierType = name ? selCourierType : '';
   $('err_courier')&&$('err_courier').classList.remove('show');
   _deliveryAddr=''; _addrMode='';
   const agBox=$('agencyBox');
@@ -2115,9 +2142,123 @@ window.shalomReset   = shalomReset;
 // ★ Alias para compatibilidad con botón Reintentar
 window.shalomBuscar  = shalomBuscar;
 
+/* ─── ASISTENTE PASO A PASO (solo presentación) ──────────────────────
+   El formulario se muestra por pasos para que sea más rápido de llenar y
+   nada tape a nada. NO cambia la validación ni el envío: submitOrder()
+   sigue siendo el guardián final. Cada "Continuar" reusa las MISMAS reglas
+   para no dejar avanzar con errores. Todo va en try/catch: si algo fallara,
+   el formulario sigue funcionando. */
+var _wzStep=1;
+function _wzInjectCss(){
+  if(document.getElementById('wzCss')) return;
+  var s=document.createElement('style'); s.id='wzCss';
+  s.textContent=''
+   +'.wz-progress{margin:2px 0 16px}'
+   +'.wz-ptxt{font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:#8b949e;margin-bottom:6px;font-weight:700}'
+   +'.wz-pbar{height:6px;background:#1c2333;border-radius:99px;overflow:hidden}'
+   +'.wz-pbar i{display:block;height:100%;background:linear-gradient(90deg,#12a5b4,#5b9bff);border-radius:99px;transition:width .35s ease}'
+   +'.wz-step[hidden]{display:none!important}'
+   +'.wz-step{animation:wzIn .28s ease}'
+   +'@keyframes wzIn{from{opacity:0;transform:translateX(10px)}to{opacity:1;transform:none}}'
+   +'.wz-nav{display:flex;gap:10px;margin-top:14px}'
+   +'.wz-nav .wz-back{flex:0 0 auto;background:#1c2333;border:1px solid #30363d;color:#8b949e;border-radius:12px;padding:0 16px;min-height:44px;font-size:14px;cursor:pointer;font-family:inherit}'
+   +'.wz-nav .btn-main{flex:1;margin-top:0!important}';
+  document.head.appendChild(s);
+}
+function _wzNeedDest(){ return selCourierType!=='retiro'; }
+function wzSeq(){ return _wzNeedDest()?[1,2,3,4]:[1,2,4]; }
+function _wzErr(fid,eid,bad){
+  var fe=$(fid),ee=$(eid);
+  if(bad){ fe&&fe.classList.add('err'); ee&&ee.classList.add('show'); }
+  else   { fe&&fe.classList.remove('err'); ee&&ee.classList.remove('show'); }
+  return bad;
+}
+// Valida SOLO los campos del paso, con las mismas reglas que submitOrder.
+function wzValidate(step){
+  var ok=true;
+  if(step===1){
+    var name=($('f_name')||{value:''}).value.trim();
+    var phone=($('f_phone')||{value:''}).value.trim();
+    if(_wzErr('f_name','err_name',!name)) ok=false;
+    if(_wzErr('f_phone','err_phone',!/^\d{9}$/.test(phone))) ok=false;
+    var extraF=((CFG&&CFG.extraFields)||[]).filter(function(f){return f&&f.visible!==false;});
+    extraF.forEach(function(f){
+      var fname=typeof f==='string'?f:(f.name||''); var isReq=typeof f==='object'&&!!f.required;
+      if(!isReq) return;
+      var el=$('ex_'+fname.replace(/\W/g,'_')), er=$('exerr_'+fname.replace(/\W/g,'_'));
+      if(el&&!el.value.trim()){ el.classList.add('err'); er&&er.classList.add('show'); ok=false; }
+      else if(el){ el.classList.remove('err'); er&&er.classList.remove('show'); }
+    });
+  } else if(step===2){
+    if(!selCourierName){ $('err_courier')&&$('err_courier').classList.add('show'); ok=false; }
+    else { $('err_courier')&&$('err_courier').classList.remove('show'); }
+  } else if(step===3){
+    if(selCourierType==='agencia'){
+      var man=$('agcManualInput');
+      if(man){ if(!man.value.trim()){ $('err_agency_manual')&&$('err_agency_manual').classList.add('show'); ok=false; } else { $('err_agency_manual')&&$('err_agency_manual').classList.remove('show'); } }
+      else if(!agState.addr){ $('err_agency')&&$('err_agency').classList.add('show'); ok=false; }
+      else { $('err_agency')&&$('err_agency').classList.remove('show'); }
+      var dni=($('f_dni_recoger')||{value:''}).value.trim();
+      if(_wzErr('f_dni_recoger','err_dni_recoger',!/^\d{8}$/.test(dni))) ok=false;
+    } else if(selCourierType==='encomienda'){
+      var ci=($('f_ciudad')||{value:''}).value.trim(), dd=($('f_dni_dest')||{value:''}).value.trim();
+      if(_wzErr('f_ciudad','err_ciudad',!ci)) ok=false;
+      if(_wzErr('f_dni_dest','err_dni_dest',!/^\d{8}$/.test(dd))) ok=false;
+    } else if(selCourierType==='delivery'){
+      var addr=_addrMode==='manual'?($('addrManualInput')||{value:''}).value.trim():_deliveryAddr;
+      if(!addr){ $('err_deliveryAddr')&&$('err_deliveryAddr').classList.add('show'); ok=false; }
+      else { $('err_deliveryAddr')&&$('err_deliveryAddr').classList.remove('show'); }
+    }
+  }
+  return ok;
+}
+function wzProgress(){
+  var box=$('wzProgress'); if(!box) return;
+  var seq=wzSeq(); var idx=seq.indexOf(_wzStep); if(idx<0) idx=0;
+  var pct=Math.round(((idx+1)/seq.length)*100);
+  box.innerHTML='<div class="wz-ptxt">Paso '+(idx+1)+' de '+seq.length+'</div>'
+    +'<div class="wz-pbar"><i style="width:'+pct+'%"></i></div>';
+}
+function wzShow(step){
+  _wzStep=step;
+  var steps=document.querySelectorAll('.wz-step');
+  for(var i=0;i<steps.length;i++){ steps[i].hidden=(+steps[i].getAttribute('data-step')!==step); }
+  wzProgress();
+  try{ window.scrollTo({top:0,behavior:'smooth'}); }catch(e){ try{ window.scrollTo(0,0); }catch(_){} }
+}
+function wzNext(){
+  if(!wzValidate(_wzStep)) return;   // muestra los errores y no avanza
+  var seq=wzSeq(); var idx=seq.indexOf(_wzStep);
+  if(idx>=0&&idx<seq.length-1) wzShow(seq[idx+1]);
+}
+function wzBack(){
+  var seq=wzSeq(); var idx=seq.indexOf(_wzStep);
+  if(idx>0) wzShow(seq[idx-1]);
+}
+function wzInit(){
+  try{
+    if(!$('wzProgress')) return;         // el form no está en modo asistente
+    _wzInjectCss();
+    _wzStep=1; window._selCourierType='';
+    // Enter avanza en los campos de texto del paso 1 (avance "mixto")
+    ['f_name','f_phone'].forEach(function(id){
+      var el=$(id); if(el) el.addEventListener('keydown',function(ev){ if(ev.key==='Enter'){ ev.preventDefault(); wzNext(); } });
+    });
+    // Auto-avance al elegir courier (elección clara → siguiente paso)
+    var cs=$('f_courier');
+    if(cs) cs.addEventListener('change',function(){
+      if(_wzStep!==2||!this.value) return;
+      setTimeout(function(){ if(_wzStep===2&&selCourierName) wzNext(); },550);
+    });
+    wzShow(1);
+  }catch(e){ /* nunca romper el formulario */ }
+}
+
 /* ─── EXPOSE GLOBALS ────────────────────────────────────────────── */
 window.loadCfg              = loadCfg;
 window.renderForm           = renderForm;
+window.wzNext               = wzNext;
+window.wzBack               = wzBack;
 window.onPhoneInput         = onPhoneInput;
 window.onCourierChange      = onCourierChange;
 window.useKnownAddress      = useKnownAddress;

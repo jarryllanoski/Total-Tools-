@@ -153,6 +153,9 @@
   function formCourier(){
     var sel=document.getElementById('f_courier');
     if(!sel || !sel.value) return '';   // aún no elige → la bienvenida se queda
+    // El formulario publica el tipo autoritativo (robusto aunque el paso esté
+    // oculto en el asistente). Si no está, se deduce por lo visible.
+    if(window._selCourierType) return window._selCourierType;
     if(/RETIRO|TIENDA/i.test(sel.value)) return 'retiro';
     if(vis(document.getElementById('f_ciudad'))||vis(document.getElementById('f_dni_dest'))) return 'encomienda';
     if(vis(document.getElementById('f_dni_recoger'))||has('#shalomSelTxt')) return 'agencia';
