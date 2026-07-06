@@ -1,11 +1,15 @@
 /* ═══════════════════════════════════════════════════════════════════
    BOLETA EN VIVO — vista previa tipo ticket térmico que se "imprime"
-   mientras el cliente llena el formulario.
+   línea por línea mientras el cliente llena el formulario.
    Capa de presentación OPCIONAL y DESACOPLADA (igual patrón que los
    personajes): observa el DOM del formulario, no toca la lógica.
    · 0 llamadas a la nube · 0 cambios a formApi · solo lectura del DOM
    · Solo en el formulario (si hay ?seg=, no aplica)
    · Fuentes del sistema (sin CDN) — funciona en cualquier internet
+   · Actualización INCREMENTAL: cada línea se crea una sola vez (se
+     "imprime" uno por uno) y luego se edita en su sitio (sin parpadear).
+     No reescribe el HTML en cada tecla → no dispara bucles ni molesta a
+     otros módulos (el narrador) que también observan #app.
    ═══════════════════════════════════════════════════════════════════ */
 (function(){
   'use strict';
@@ -35,11 +39,15 @@
    +'@keyframes ttbpar{50%{opacity:.25}}'
    +'#tt-bol .brow{display:flex;justify-content:space-between;gap:10px;padding:2px 0}'
    +'#tt-bol .brow .k{color:#8a8170;flex:none}'
-   +'#tt-bol .brow .v{text-align:right;font-weight:600;word-break:break-word;white-space:pre-wrap;animation:ttbin .25s ease}'
-   +'@keyframes ttbin{from{opacity:0;transform:translateY(-3px)}to{opacity:1}}'
+   +'#tt-bol .brow .v{text-align:right;font-weight:600;word-break:break-word;white-space:pre-wrap}'
+   // La animación de "impresión" vive SOLO en la fila nueva (clase .print),
+   // no en el valor. Así, al editar un campo (p. ej. la NOTA) el texto se
+   // actualiza en su sitio y NO vuelve a animarse (no parpadea).
+   +'#tt-bol .brow.print{animation:ttbprint .3s ease both}'
+   +'@keyframes ttbprint{from{opacity:0;transform:translateY(-4px);clip-path:inset(0 0 100% 0)}to{opacity:1;transform:none;clip-path:inset(0 0 0 0)}}'
    +'#tt-bol .ghost{color:#c3baa4;letter-spacing:1px}'
    +'#tt-bol .bfoot{border-top:1.4px dashed #9a917f;margin-top:7px;padding-top:7px;text-align:center;color:#8a8170;font-size:9.5px;letter-spacing:1px}'
-   +'@media(prefers-reduced-motion:reduce){#tt-bol *{animation:none!important}}';
+   +'@media(prefers-reduced-motion:reduce){#tt-bol *{animation:none!important;clip-path:none!important}}';
   document.head.appendChild(st);
 
   // ── Definición de líneas (clave, etiqueta, cómo leer el valor) ──────
@@ -50,7 +58,7 @@
     {k:'DESTINO', get:function(){
         // Agencia (Shalom u otra): badge seleccionado
         var ag=txt('#shalomSelTxt')||txt('.sel-badge span'); if(ag) return ag;
-        // Otras agencias / encomienda: ciudad (+ agencia opcional)
+        // Otras agencias: ciudad (+ agencia opcional)
         if(visible('f_ciudad')){ var c=val('f_ciudad'), a=val('f_agencia'); return c?(c+(a?' — '+a:'')):''; }
         // Delivery: dirección manual / GPS + referencia
         var d=val('addrManualInput')||txt('#addrGpsResult'); var r=val('f_ref');
@@ -63,9 +71,10 @@
   ];
 
   // ── Construcción / actualización ───────────────────────────────────
-  var box, rowsEl, statEl, mounted=false;
+  var box, rowsEl, statEl, mounted=false, ghostShown=false;
+  var rows={};   // clave → {el, vEl, val}
   function build(){
-    if(document.getElementById('tt-bol')) { box=document.getElementById('tt-bol'); return; }
+    if(document.getElementById('tt-bol')) { box=document.getElementById('tt-bol'); rowsEl=box.querySelector('.brows'); statEl=box.querySelector('.bst'); return; }
     var biz=txt('.biz-name')||'TOTAL TOOLS';
     var city=txt('.biz-city')||'';
     // Logo: nombre del negocio en mayúsculas, con la última palabra en rojo
@@ -81,20 +90,55 @@
       +'<div class="bfoot">SEGUIMIENTO · SE GENERA AL CONFIRMAR</div>'
       +'</div>';
     rowsEl=box.querySelector('.brows'); statEl=box.querySelector('.bst');
+    rows={}; ghostShown=false;
     mounted=true;
   }
 
-  function ghost(){
-    return '<div class="ghost">CLIENTE ·················<br>WHATSAPP ···············<br>ENTREGA ················<br>FECHA ··················</div>';
+  function showGhost(){
+    if(ghostShown) return;
+    rowsEl.innerHTML='<div class="ghost">CLIENTE ·················<br>WHATSAPP ···············<br>ENTREGA ················<br>FECHA ··················</div>';
+    ghostShown=true;
   }
+  function clearGhost(){
+    if(!ghostShown) return;
+    var g=rowsEl.querySelector('.ghost'); if(g&&g.parentNode) g.parentNode.removeChild(g);
+    ghostShown=false;
+  }
+  // Inserta la fila nueva respetando el orden del ticket (aunque el cliente
+  // llene los campos en otro orden).
+  function insertOrdered(i, el){
+    for(var j=i+1;j<LINES.length;j++){ var r=rows[LINES[j].k]; if(r){ rowsEl.insertBefore(el, r.el); return; } }
+    rowsEl.appendChild(el);
+  }
+
   function update(){
     if(!box) return;
-    var any=false, html='';
+    var anyVisible=false, printed=0;
     for(var i=0;i<LINES.length;i++){
-      var v=LINES[i].get();
-      if(v){ any=true; html+='<div class="brow"><span class="k">'+LINES[i].k+'</span><span class="v">'+esc(v)+'</span></div>'; }
+      var key=LINES[i].k, v=LINES[i].get(), rec=rows[key];
+      if(v){
+        anyVisible=true;
+        if(!rec){
+          clearGhost();
+          // Línea nueva → se "imprime" (uno por uno). Si aparecen varias en
+          // el mismo instante (p. ej. al elegir courier), se escalonan.
+          var row=document.createElement('div'); row.className='brow print';
+          row.style.animationDelay=(printed*0.08)+'s'; printed++;
+          row.innerHTML='<span class="k">'+esc(key)+'</span><span class="v"></span>';
+          var vEl=row.querySelector('.v'); vEl.textContent=v;
+          insertOrdered(i, row);
+          rows[key]={el:row, vEl:vEl, val:v};
+        } else if(rec.val!==v){
+          // Actualización en vivo → solo cambia el texto, sin re-animar.
+          rec.vEl.textContent=v; rec.val=v;
+        }
+      } else if(rec){
+        // Se borró el campo → quitar la línea.
+        if(rec.el.parentNode) rec.el.parentNode.removeChild(rec.el);
+        delete rows[key];
+      }
     }
-    rowsEl.innerHTML=any?html:ghost();
+    if(!anyVisible) showGhost();
   }
 
   // Insertar la boleta al inicio del formulario (después de la cabecera)
@@ -109,7 +153,7 @@
     update();
     return true;
   }
-  function removeBox(){ if(box&&box.parentNode) box.parentNode.removeChild(box); }
+  function removeBox(){ if(box&&box.parentNode){ box.parentNode.removeChild(box); rows={}; ghostShown=false; } }
 
   // ── Observadores: reacciona a lo que el cliente llena ──────────────
   var deb;
@@ -129,7 +173,17 @@
       }catch(e){ /* nunca romper el formulario */ }
     },140);
   }
-  try{ new MutationObserver(scan).observe(app,{childList:true,subtree:true}); }catch(e){}
+  // El observador IGNORA las mutaciones originadas dentro de la propia boleta
+  // (evita el bucle de auto-disparo y no perturba a otros módulos —como el
+  //  narrador— que también observan #app).
+  try{
+    new MutationObserver(function(recs){
+      for(var i=0;i<recs.length;i++){
+        var t=recs[i].target;
+        if(!(box && (t===box || box.contains(t)))){ scan(); return; }
+      }
+    }).observe(app,{childList:true,subtree:true});
+  }catch(e){}
   if(document.readyState!=='loading') scan(); else document.addEventListener('DOMContentLoaded',scan);
   window.addEventListener('load',scan);
 })();
