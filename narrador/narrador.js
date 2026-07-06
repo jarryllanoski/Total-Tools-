@@ -39,7 +39,7 @@
     courier:{
       delivery:'Envío a domicilio. Estoy preparando la mejor ruta hasta tu puerta. 🛵',
       agencia:'Retiro en agencia. Preparo el envío al punto que elijas. 🏢',
-      encomienda:'Encomienda a otra ciudad. Preparo tu herramienta para un viaje seguro. 📦',
+      encomienda:'Envío por otra agencia a otra ciudad. Preparo tu herramienta para un viaje seguro. 📦',
       retiro:'Retiro en tienda confirmado. Te avisamos cuando esté listo para recoger. 🏪'
     },
     place:{
@@ -61,7 +61,7 @@
     s2_retiro:'Tu pedido está casi listo. Te avisaremos apenas puedas pasar a recogerlo. ⏳',
     s3_agencia:function(a,dir){ return '¡Tu pedido llegó a la agencia'+(a?' '+a:'')+'! Acércate con tu DNI'+(dir?' a '+dir:'')+' para recogerlo. 🏢'; },
     s3_delivery:'¡Tu pedido llegó a tu dirección! Sal a recibirlo y revisa tu herramienta al momento de la entrega. 🛵',
-    s3_encomienda:function(ci){ return 'Tu encomienda llegó'+(ci?' a '+ci:'')+'. Acércate con tu DNI a la agencia de destino para recogerla. 📦'; },
+    s3_encomienda:function(ci){ return 'Tu envío llegó'+(ci?' a '+ci:'')+'. Acércate con tu DNI a la agencia de destino para recogerlo. 📦'; },
     s3_retiro:'¡Tu pedido está listo para recoger en nuestra tienda! Acércate con tu DNI y te lo entregamos. 🏪',
     pago:'Tu pedido está en destino. Coordina el pago para completar la entrega. 💳',
     s4:'🎉 ¡Entrega completada! Gracias por confiar en Total. Espero acompañarte en tu próxima compra.',

@@ -239,8 +239,17 @@ function courierEmoji(name, type){
   if(u.includes('DINSIDES'))                       return '📦';
   if(u.includes('DELIVERY')||u.includes('MOTORIZADO')) return '🛵';
   if(u.includes('RETIRO'))                         return '🏪';
-  if(u.includes('ENCOMIENDA'))                     return '📦';
+  if(_isOtrasAg(u))                                return '📦';
   return '🏢';
+}
+
+/* "Encomienda" se renombró a "Otras Agencias" en la interfaz.
+   La clave interna y los campos siguen siendo 'encomienda' (sin migración
+   de datos ni cambios en formApi). Detectamos ambos nombres para ser
+   compatibles con configuraciones (panel) que aún digan "Encomienda". */
+function _isOtrasAg(name){
+  const u=(name||'').toUpperCase();
+  return u.includes('ENCOMIENDA')||u.includes('OTRAS AGENCIA')||u.includes('OTRA AGENCIA');
 }
 
 /* ─── AGENCY DATA ───────────────────────────────────────────────── */
@@ -668,7 +677,7 @@ function abrirAyudaTrack(){
 function _courierLabel(name, type){
   const u=(name||'').toUpperCase();
   if(u.includes('RETIRO')) return 'Retiro en tienda';
-  if(u.includes('ENCOMIENDA')) return 'Encomienda';
+  if(_isOtrasAg(u)) return 'Otras Agencias';
   return name;
 }
 
@@ -676,7 +685,7 @@ function _courierLabel(name, type){
 function _courierIcon(name, type){
   const u=(name||'').toUpperCase();
   if(u.includes('RETIRO')) return '🏪';
-  if(u.includes('ENCOMIENDA')) return '📦';
+  if(_isOtrasAg(u)) return '📦';
   if(u.includes('DELIVERY')) return '🏍️';
   if(u.includes('SHALOM')) return '🚚';
   if(u.includes('OLVA')) return '🚚';
@@ -690,7 +699,7 @@ function renderForm(){
   _knownClient=null; _deliveryAddr=''; _addrMode=''; _gpsLat=null; _gpsLon=null;
   const extraF   = ((CFG&&CFG.extraFields)||[]).filter(f=>f&&f.visible!==false);
   // Couriers: usar config de Firebase o defaults de tu app
-  const couriers = (CFG&&CFG.couriers)||['SHALOM','OLVA COURIER','MARVISUR','DELIVERY','RETIRO EN TIENDA','ENCOMIENDA'];
+  const couriers = (CFG&&CFG.couriers)||['SHALOM','OLVA COURIER','MARVISUR','DELIVERY','RETIRO EN TIENDA','OTRAS AGENCIAS'];
   const cAct     = (CFG&&CFG.courierActive)||{};
   const cTypes   = (CFG&&CFG.courierTypes)||{};
   const dispatch = (CFG&&CFG.dispatch)||{};
@@ -862,9 +871,9 @@ function onCourierChange(name){
   const cTypes=(CFG&&CFG.courierTypes)||{};
   const configType=name?(cTypes[name]||''):'';
   const u=(name||'').toUpperCase();
-  const isEncomienda=u.includes('ENCOMIENDA');
+  const isEncomienda=_isOtrasAg(u);
   const isRetiro=!isEncomienda&&u.includes('RETIRO');
-  // Name-based RETIRO/ENCOMIENDA takes priority over stored configType
+  // Name-based RETIRO/OTRAS AGENCIAS takes priority over stored configType
   const isKnownAgency=['SHALOM','OLVA','MARVISUR','DINSIDES'].some(n=>u.includes(n));
   const isAgencia=!isRetiro&&!isEncomienda&&(configType==='agencia'||isKnownAgency);
   selCourierType = isAgencia    ? 'agencia'
@@ -902,7 +911,7 @@ function onCourierChange(name){
       const ico=_courierIcon(name, selCourierType);
       const tipoTxt = selCourierType==='agencia'?'Retiro en agencia'
                     : selCourierType==='retiro'?'Retiro en tienda'
-                    : selCourierType==='encomienda'?'Encomienda'
+                    : selCourierType==='encomienda'?'Otras Agencias'
                     : 'Envío a domicilio';
       badge.style.display='block';
       badge.innerHTML=`<div style="display:flex;align-items:center;gap:12px;background:var(--card);border:1.5px solid var(--blue);border-radius:12px;padding:12px 14px;margin-top:8px">
