@@ -39,7 +39,8 @@
     courier:{
       delivery:'Envío a domicilio. Estoy preparando la mejor ruta hasta tu puerta. 🛵',
       agencia:'Retiro en agencia. Preparo el envío al punto que elijas. 🏢',
-      encomienda:'Encomienda a otra ciudad. Preparo tu herramienta para un viaje seguro. 📦'
+      encomienda:'Encomienda a otra ciudad. Preparo tu herramienta para un viaje seguro. 📦',
+      retiro:'Retiro en tienda confirmado. Te avisamos cuando esté listo para recoger. 🏪'
     },
     place:{
       agencia:function(a){ return 'Ubicación confirmada'+(a?': '+a:'')+'. Nuestros operadores ya conocen el destino.'; },
@@ -57,9 +58,11 @@
     s0:'Tu pedido llegó bien y ya está registrado. 📋 Comenzamos a trabajarlo.',
     s1:'Los especialistas están alistando y protegiendo tu herramienta para que llegue en excelentes condiciones. 📦',
     s2:'¡Ya salió de nuestra tienda! 🚚 Tu pedido está en viaje y sigo el recorrido en tiempo real.',
+    s2_retiro:'Tu pedido está casi listo. Te avisaremos apenas puedas pasar a recogerlo. ⏳',
     s3_agencia:function(a,dir){ return '¡Tu pedido llegó a la agencia'+(a?' '+a:'')+'! Acércate con tu DNI'+(dir?' a '+dir:'')+' para recogerlo. 🏢'; },
     s3_delivery:'¡Tu pedido llegó a tu dirección! Sal a recibirlo y revisa tu herramienta al momento de la entrega. 🛵',
     s3_encomienda:function(ci){ return 'Tu encomienda llegó'+(ci?' a '+ci:'')+'. Acércate con tu DNI a la agencia de destino para recogerla. 📦'; },
+    s3_retiro:'¡Tu pedido está listo para recoger en nuestra tienda! Acércate con tu DNI y te lo entregamos. 🏪',
     pago:'Tu pedido está en destino. Coordina el pago para completar la entrega. 💳',
     s4:'🎉 ¡Entrega completada! Gracias por confiar en Total. Espero acompañarte en tu próxima compra.',
     notfound:'No encuentro tu pedido con ese código. Escríbenos y lo revisamos enseguida. 💬'
@@ -133,6 +136,7 @@
     if(has('#f_ciudad')||has('#f_dni_dest')) return 'encomienda';
     if(has('#shalomSelTxt')||has('#f_dni_recoger')) return 'agencia';
     // Tracking (filas del resultado)
+    if(/RETIRO|TIENDA/i.test(rowVal('Courier'))) return 'retiro';
     if(rowVal('Ciudad destino')||rowVal('DNI destinatario')) return 'encomienda';
     if(rowVal('DNI para recoger')||rowVal('Agencia')) return 'agencia';
     return 'delivery';
@@ -147,6 +151,7 @@
   function formCourier(){
     var sel=document.getElementById('f_courier');
     if(!sel || !sel.value) return '';   // aún no elige → la bienvenida se queda
+    if(/RETIRO|TIENDA/i.test(sel.value)) return 'retiro';
     if(vis(document.getElementById('f_ciudad'))||vis(document.getElementById('f_dni_dest'))) return 'encomienda';
     if(vis(document.getElementById('f_dni_recoger'))||has('#shalomSelTxt')) return 'agencia';
     return 'delivery';
@@ -219,18 +224,16 @@
     var e=estadoATexto(); if(!e) return;
     var key=JSON.stringify(e)+tipoEnvio();
     if(key===lastDelfiKey) return; lastDelfiKey=key;
-    var m;
+    var m, t=tipoEnvio();
     if(e.st===0) m=DELFI.welcome+' '+DELFI.s0;
     else if(e.st===1) m=DELFI.s1;
-    else if(e.st===2) m=DELFI.s2;
+    else if(e.st===2) m=(t==='retiro')?DELFI.s2_retiro:DELFI.s2;
     else if(e.st===3){
       if(e.pago) m=DELFI.pago;
-      else{
-        var t=tipoEnvio();
-        if(t==='encomienda') m=DELFI.s3_encomienda(rowVal('Ciudad destino'));
-        else if(t==='agencia'){ m=DELFI.s3_agencia(agenciaSel(),''); }
-        else m=DELFI.s3_delivery;
-      }
+      else if(t==='retiro') m=DELFI.s3_retiro;
+      else if(t==='encomienda') m=DELFI.s3_encomienda(rowVal('Ciudad destino'));
+      else if(t==='agencia') m=DELFI.s3_agencia(agenciaSel(),'');
+      else m=DELFI.s3_delivery;
     }
     else if(e.st===4) m=DELFI.s4;
     say('delfi', m);
