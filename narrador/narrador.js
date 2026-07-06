@@ -70,6 +70,8 @@
 
   // ── 3. Estilos (inyectados una vez) ────────────────────────────────
   var css = ''
+  // Reserva espacio abajo para que el narrador NO tape botones (WhatsApp, enviar)
+  + '#app{padding-bottom:120px}'
   + '#tt-narr{position:fixed;left:10px;right:10px;bottom:10px;z-index:9000;display:flex;align-items:flex-end;gap:10px;pointer-events:none;max-width:560px;margin:0 auto;font-family:inherit;opacity:0;transform:translateY(16px);transition:opacity .4s ease,transform .4s ease}'
   + '#tt-narr.on{opacity:1;transform:none}'
   + '@media(prefers-reduced-motion:reduce){#tt-narr{transition:none}}'
