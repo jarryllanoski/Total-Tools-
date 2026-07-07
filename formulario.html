@@ -42,6 +42,17 @@ body{background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,
 textarea.fi{resize:vertical;line-height:1.5}
 .fi.err{border-color:var(--red)}
 .fi.sel{background:var(--card);background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%236b7280' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 16px center;padding-right:40px;padding-top:16px;padding-bottom:16px;cursor:pointer;font-weight:600}
+#courierCards{display:flex;flex-direction:column;gap:10px}
+.cour-card{display:flex;align-items:center;gap:12px;width:100%;text-align:left;background:var(--card2);border:1.5px solid var(--bd);border-radius:14px;padding:13px 14px;min-height:56px;cursor:pointer;font-family:inherit;color:var(--text);transition:border-color .15s,background .15s,transform .05s}
+.cour-card:active{transform:scale(.99)}
+.cour-card.sel{border-color:#12a5b4;background:rgba(18,165,180,.10)}
+.cour-card .cc-ic{font-size:24px;flex:none;width:34px;text-align:center;line-height:1}
+.cour-card .cc-body{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.cour-card .cc-name{font-size:15px;font-weight:700;line-height:1.2}
+.cour-card .cc-sub{font-size:12px;color:var(--text2)}
+.cour-card .cc-radio{flex:none;width:20px;height:20px;border-radius:50%;border:2px solid var(--bd);position:relative;transition:border-color .15s}
+.cour-card.sel .cc-radio{border-color:#12a5b4}
+.cour-card.sel .cc-radio:after{content:"";position:absolute;inset:3px;border-radius:50%;background:#12a5b4}
 .ferr{font-size:12px;color:var(--red);margin-top:5px;display:none}
 .ferr.show{display:block}
 
@@ -753,6 +764,28 @@ function renderForm(){
       }).join('')
     : '<option value="">Sin couriers configurados</option>';
 
+  // Tarjetas de courier VISIBLES (el cliente elige de un vistazo). El <select>
+  // #f_courier queda oculto como fuente de la verdad: las tarjetas solo lo
+  // escriben y disparan 'change' → misma lógica de siempre.
+  const _courierTypeOf=(c)=>{
+    const u=(c||'').toUpperCase();
+    if(_isOtrasAg(u)) return 'encomienda';
+    if(u.includes('RETIRO')) return 'retiro';
+    if(cTypes[c]==='agencia'||['SHALOM','OLVA','MARVISUR','DINSIDES'].some(n=>u.includes(n))) return 'agencia';
+    return 'delivery';
+  };
+  const _courierSub=(t)=> t==='agencia'?'Recoge en agencia' : t==='retiro'?'Recoge en la tienda' : t==='encomienda'?'Envío a otra ciudad' : 'Envío a tu dirección';
+  const courierCards = active.length
+    ? active.map(c=>{
+        const t=_courierTypeOf(c);
+        return `<button type="button" class="cour-card" role="radio" aria-checked="false" data-courier="${esc(c)}" onclick="pickCourier(this.dataset.courier)">
+          <span class="cc-ic">${_courierIcon(c,t)}</span>
+          <span class="cc-body"><span class="cc-name">${esc(_courierLabel(c,t))}</span><span class="cc-sub">${esc(_courierSub(t))}</span></span>
+          <span class="cc-radio"></span>
+        </button>`;
+      }).join('')
+    : `<div class="ferr show" style="position:static">Sin couriers configurados</div>`;
+
   const datesChips=buildDatesChips(dispatch);
 
   setApp(`
@@ -778,11 +811,11 @@ function renderForm(){
       <div class="wz-step" data-step="2" hidden>
       <div class="section-ttl" style="margin-top:4px">¿Cómo quieres recibir tu pedido? *</div>
       <div class="fg">
-        <select class="fi sel" id="f_courier" onchange="onCourierChange(this.value)">
+        <div id="courierCards" role="radiogroup" aria-label="¿Cómo quieres recibir tu pedido?">${courierCards}</div>
+        <select class="fi sel" id="f_courier" onchange="onCourierChange(this.value)" style="display:none" tabindex="-1" aria-hidden="true">
           ${courierOpts}
         </select>
         <div class="ferr" id="err_courier">Selecciona cómo recibir tu pedido</div>
-        <div id="courierBadge" style="display:none"></div>
       </div>
       <div class="wz-nav">
         <button class="wz-back" onclick="wzBack()">← Atrás</button>
@@ -921,6 +954,20 @@ function _showKnownBadge(){
 }
 
 /* ─── COURIER SELECTION ─────────────────────────────────────────── */
+// Tocar una tarjeta: escribe en el <select> oculto y dispara 'change'
+// (misma lógica de siempre + auto-avance del asistente). Solo diseño.
+function pickCourier(name){
+  const sel=$('f_courier'); if(!sel) return;
+  sel.value=name;
+  sel.dispatchEvent(new Event('change',{bubbles:true}));
+  const cards=document.querySelectorAll('#courierCards .cour-card');
+  cards.forEach(c=>{
+    const on=c.getAttribute('data-courier')===name;
+    c.classList.toggle('sel',on);
+    c.setAttribute('aria-checked',on?'true':'false');
+  });
+}
+
 function onCourierChange(name){
   const cTypes=(CFG&&CFG.courierTypes)||{};
   const configType=name?(cTypes[name]||''):'';
@@ -2292,6 +2339,7 @@ window.wzBack               = wzBack;
 window.wzShow               = wzShow;
 window.onPhoneInput         = onPhoneInput;
 window.onCourierChange      = onCourierChange;
+window.pickCourier          = pickCourier;
 window.useKnownAddress      = useKnownAddress;
 window.changeAddress        = changeAddress;
 window.resetAgencySelection = resetAgencySelection;
