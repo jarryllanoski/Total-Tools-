@@ -214,12 +214,11 @@
   }
 
   // ── 7. Detección de pantallas ──────────────────────────────────────
-  // Tracking tiene .track-card/.status-badge; éxito tiene "¡Casi listo!".
-  // (El texto "código de seguimiento" aparece en AMBAS, por eso no sirve
-  //  para distinguir: el éxito se identifica solo por "casi listo".)
+  // Tracking tiene .track-card/.status-badge; la pantalla de éxito tiene
+  // el contenedor .success (marcador robusto, independiente del texto).
   function isTracking(){ return has('.track-card')||has('.status-badge'); }
   function isNotFound(){ return /link no disponible|no encuentro tu pedido/i.test(app.textContent||''); }
-  function isSuccess(){ return /casi listo/i.test(app.textContent||''); }
+  function isSuccess(){ return has('.success'); }
 
   // ── 8. Lógica del SEGUIMIENTO (Delfi) ──────────────────────────────
   var lastDelfiKey='';

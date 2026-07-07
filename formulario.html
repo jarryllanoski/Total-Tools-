@@ -1677,45 +1677,19 @@ async function submitOrder(){
 
 /* ─── SUCCESS STEP 3 ────────────────────────────────────────────── */
 function renderSuccessStep(order, trackCode, trackToken){
-  const config   = (CFG&&CFG.config)||{};
-  const bizName  = (CFG&&(CFG.config&&CFG.config.name||CFG.name))||'Mi Negocio';
-  const bizPhone = (CFG&&(CFG.config&&CFG.config.phone||CFG.phone))||'';
-
-  const dateLabel = order.date
-    ? new Date(order.date+'T12:00:00').toLocaleDateString('es-PE',{weekday:'long',year:'numeric',month:'long',day:'numeric'})
-    : selDateLbl||order.date;
-
-  const waHref   = _construirWaHref(order, trackCode, trackToken);
-
-  const extraRows = Object.entries(order.extra||{})
-    .filter(([,v])=>v)
-    .map(([k,v])=>`<div class="sum-row"><span class="sum-lbl">${esc(k)}</span><span class="sum-val">${esc(v)}</span></div>`)
-    .join('');
-
+  const waHref = _construirWaHref(order, trackCode, trackToken);
+  // Pantalla mínima: los datos ya se vieron en la boleta. Aquí solo el
+  // botón de WhatsApp (por ahí llega el link de seguimiento) + confirmación.
   setApp(`
     ${headerHtml()}
     <div style="padding:8px 0">
       <div class="success">
         <div class="success-icon">✅</div>
-        <div class="success-ttl">¡Casi listo!</div>
-        <div class="success-sub" style="color:#25d366;font-weight:600">Falta 1 paso: envíanos tu pedido por WhatsApp para confirmarlo.</div>
+        <div class="success-ttl">¡Pedido registrado!</div>
+        <div class="success-sub">Envíalo por WhatsApp y recibe tu <b style="color:var(--text)">link de seguimiento</b>.</div>
         <div class="track-code">#${esc(trackCode)}</div>
-        <div class="summary-rows">
-          <div class="sum-row"><span class="sum-lbl">Cliente</span><span class="sum-val">${esc(order.name)}</span></div>
-          <div class="sum-row"><span class="sum-lbl">Teléfono</span><span class="sum-val">+51 ${esc(order.phone)}</span></div>
-          ${order.address?`<div class="sum-row"><span class="sum-lbl">Dirección</span><span class="sum-val">${esc(order.address)}</span></div>`:''}
-          ${order.referencia?`<div class="sum-row"><span class="sum-lbl">Referencia</span><span class="sum-val">${esc(order.referencia)}</span></div>`:''}
-          ${order.ciudadDestino?`<div class="sum-row"><span class="sum-lbl">Ciudad destino</span><span class="sum-val">${esc(order.ciudadDestino)}</span></div>`:''}
-          ${order.dniDestinatario?`<div class="sum-row"><span class="sum-lbl">DNI destinatario</span><span class="sum-val">${esc(order.dniDestinatario)}</span></div>`:''}
-          ${order.encAgencia?`<div class="sum-row"><span class="sum-lbl">Agencia</span><span class="sum-val">${esc(order.encAgencia)}</span></div>`:''}
-          ${order.dniRecoger?`<div class="sum-row"><span class="sum-lbl">DNI para recoger</span><span class="sum-val">${esc(order.dniRecoger)}</span></div>`:''}
-          <div class="sum-row"><span class="sum-lbl">Courier</span><span class="sum-val">${esc(order.courier)}</span></div>
-          <div class="sum-row"><span class="sum-lbl">Fecha</span><span class="sum-val">${esc(dateLabel)}</span></div>
-          ${order.notes?`<div class="sum-row"><span class="sum-lbl">Notas</span><span class="sum-val">${esc(order.notes)}</span></div>`:''}
-          ${extraRows}
-        </div>
         ${waHref?`
-          <a class="btn-wa" href="${esc(waHref)}" target="_blank" rel="noopener" style="font-size:17px;padding:18px">💬 Enviar mi pedido por WhatsApp</a>
+          <a class="btn-wa" href="${esc(waHref)}" target="_blank" rel="noopener" style="font-size:17px;padding:18px">💬 Enviar por WhatsApp y obtener mi seguimiento</a>
         `:'<div class="error-box">No se pudo generar el enlace de WhatsApp. Contáctanos directamente.</div>'}
       </div>
     </div>
