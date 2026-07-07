@@ -37,7 +37,7 @@
   var pick=LOGOS[Math.floor(Math.random()*LOGOS.length)];
 
   ov=document.createElement('div'); ov.id='ttf-ov';
-  ov.innerHTML='<img id="ttf-logo" alt="Total" src="'+BASE+pick+'">'
+  ov.innerHTML='<img id="ttf-logo" alt="Total" src="'+BASE+pick+'?v=2">'
     +'<div id="ttf-bar-w"><div id="ttf-bar"></div></div>'
     +'<div id="ttf-msg">Iniciando fábrica…</div>';
   (document.body||document.documentElement).appendChild(ov);
