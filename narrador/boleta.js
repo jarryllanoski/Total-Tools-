@@ -47,6 +47,16 @@
    +'@keyframes ttbprint{from{opacity:0;transform:translateY(-4px);clip-path:inset(0 0 100% 0)}to{opacity:1;transform:none;clip-path:inset(0 0 0 0)}}'
    +'#tt-bol .ghost{color:#c3baa4;letter-spacing:1px}'
    +'#tt-bol .bfoot{border-top:1.4px dashed #9a917f;margin-top:7px;padding-top:7px;text-align:center;color:#8a8170;font-size:9.5px;letter-spacing:1px}'
+   // Tap-para-editar: cada línea es tocable y salta al paso a editar.
+   +'#tt-bol .brow.editable{cursor:pointer;border-radius:5px;margin:0 -6px;padding-left:6px;padding-right:6px;transition:background .15s}'
+   +'#tt-bol .brow.editable:hover,#tt-bol .brow.editable:active{background:rgba(18,165,180,.14)}'
+   +'#tt-bol .bedit{display:none;text-align:center;color:#12a5b4;font-size:9px;letter-spacing:.5px;margin-top:7px}'
+   +'#tt-bol.has-rows.editable-on .bedit{display:block}'
+   // Sello "CONFIRMADO" al registrar el pedido (marca TOTAL, rojo).
+   // Translúcido (tinta) para que los datos se lean por debajo: nada tapa a nada.
+   +'#tt-bol .stamp{position:absolute;top:44%;left:50%;transform:translate(-50%,-50%) rotate(-13deg);border:2.5px solid #d5281f;color:#d5281f;font-weight:800;font-size:18px;letter-spacing:2px;padding:4px 12px;border-radius:8px;text-transform:uppercase;pointer-events:none;opacity:.6;mix-blend-mode:multiply;box-shadow:0 0 0 2px rgba(213,40,31,.1) inset}'
+   +'#tt-bol .stamp.in{animation:ttstamp .5s cubic-bezier(.2,1.5,.4,1) both}'
+   +'@keyframes ttstamp{0%{opacity:0;transform:translate(-50%,-50%) rotate(-13deg) scale(2.6)}55%{opacity:.75}100%{opacity:.6;transform:translate(-50%,-50%) rotate(-13deg) scale(1)}}'
    +'@media(prefers-reduced-motion:reduce){#tt-bol *{animation:none!important;clip-path:none!important}}';
   document.head.appendChild(st);
 
@@ -77,9 +87,34 @@
     {k:'NOTA',    get:function(){ return val('f_notes'); }}
   ];
 
+  // ── Tap-para-editar: a qué paso/campo lleva cada línea ─────────────
+  var EDIT={
+    CLIENTE:{step:1,id:'f_name'},  WHATSAPP:{step:1,id:'f_phone'},
+    ENTREGA:{step:2,id:'f_courier'}, DESTINO:{step:3,id:null},
+    DNI:{step:3,id:null},          FECHA:{step:4,id:null},
+    NOTA:{step:4,id:'f_notes'}
+  };
+  function wizOn(){ return typeof window.wzShow==='function'; }
+  function goEdit(key){
+    var e=EDIT[key]; if(!e) return;
+    if(wizOn()){ try{ window.wzShow(e.step); }catch(_){} }
+    setTimeout(function(){
+      var target=e.id?document.getElementById(e.id):null;
+      if(!target){
+        var step=document.querySelector('.wz-step[data-step="'+e.step+'"]');
+        if(step) target=step.querySelector('input:not([type=hidden]),select,textarea');
+      }
+      if(target){
+        try{ target.focus(); }catch(_){}
+        try{ target.scrollIntoView({block:'center',behavior:'smooth'}); }catch(_){}
+      }
+    },130);
+  }
+
   // ── Construcción / actualización ───────────────────────────────────
-  var box, rowsEl, statEl, mounted=false, ghostShown=false;
+  var box, rowsEl, statEl, mounted=false, ghostShown=false, stamped=false;
   var rows={};   // clave → {el, vEl, val}
+  var snap={};   // último valor conocido de cada línea (para el sello final)
   function build(){
     if(document.getElementById('tt-bol')) { box=document.getElementById('tt-bol'); rowsEl=box.querySelector('.brows'); statEl=box.querySelector('.bst'); return; }
     var biz=txt('.biz-name')||'TOTAL TOOLS';
@@ -94,6 +129,7 @@
       +(city?'<span class="bsub">'+esc(city.replace(/^📍\s*/,''))+'</span>':'')+'</div>'
       +'<div class="bstat"><span><i class="dot"></i><b class="bst">Imprimiendo pedido…</b></span></div>'
       +'<div class="brows"></div>'
+      +'<div class="bedit">✎ Toca un dato para corregirlo</div>'
       +'<div class="bfoot">SEGUIMIENTO · SE GENERA AL CONFIRMAR</div>'
       +'</div>';
     rowsEl=box.querySelector('.brows'); statEl=box.querySelector('.bst');
@@ -124,7 +160,7 @@
     for(var i=0;i<LINES.length;i++){
       var key=LINES[i].k, v=LINES[i].get(), rec=rows[key];
       if(v){
-        anyVisible=true;
+        anyVisible=true; snap[key]=v;
         if(!rec){
           clearGhost();
           // Línea nueva → se "imprime" (uno por uno). Si aparecen varias en
@@ -133,6 +169,8 @@
           row.style.animationDelay=(printed*0.08)+'s'; printed++;
           row.innerHTML='<span class="k">'+esc(key)+'</span><span class="v"></span>';
           var vEl=row.querySelector('.v'); vEl.textContent=v;
+          if(wizOn()){ row.classList.add('editable'); row.title='Tocar para editar';
+            (function(k){ row.addEventListener('click',function(){ goEdit(k); }); })(key); }
           insertOrdered(i, row);
           rows[key]={el:row, vEl:vEl, val:v};
         } else if(rec.val!==v){
@@ -142,16 +180,19 @@
       } else if(rec){
         // Se borró el campo → quitar la línea.
         if(rec.el.parentNode) rec.el.parentNode.removeChild(rec.el);
-        delete rows[key];
+        delete rows[key]; delete snap[key];
       }
     }
     if(!anyVisible) showGhost();
+    box.classList.toggle('has-rows', anyVisible);
   }
 
   // Insertar la boleta al inicio del formulario (después de la cabecera)
   function place(){
     if(!document.getElementById('f_name')) return false; // solo cuando el form está
     build();
+    if(wizOn()) box.classList.add('editable-on');
+    stamped=false; // volvimos al formulario en blanco
     if(!box.parentNode){
       var header=app.querySelector('.biz-header');
       if(header && header.nextSibling) app.insertBefore(box, header.nextSibling);
@@ -161,6 +202,60 @@
     return true;
   }
   function removeBox(){ if(box&&box.parentNode){ box.parentNode.removeChild(box); rows={}; ghostShown=false; } }
+
+  // ── Sello "CONFIRMADO" + sonido de impresora al registrar el pedido ─
+  // Sintetiza un "ka-chunk" corto con WebAudio (sin archivos, sin CDN).
+  function playStamp(){
+    try{
+      var AC=window.AudioContext||window.webkitAudioContext; if(!AC) return;
+      var c=navigator.connection||{}; if(c.saveData) return;
+      var ctx=new AC();
+      function hit(t,g){
+        var dur=0.09, buf=ctx.createBuffer(1, Math.floor(ctx.sampleRate*dur), ctx.sampleRate), d=buf.getChannelData(0);
+        for(var i=0;i<d.length;i++){ d[i]=(Math.random()*2-1)*(1-i/d.length); }
+        var src=ctx.createBufferSource(); src.buffer=buf;
+        var bp=ctx.createBiquadFilter(); bp.type='bandpass'; bp.frequency.value=1200; bp.Q.value=0.8;
+        var gain=ctx.createGain(); gain.gain.value=g;
+        src.connect(bp); bp.connect(gain); gain.connect(ctx.destination); src.start(t);
+      }
+      var t0=ctx.currentTime; hit(t0,0.16); hit(t0+0.11,0.11);
+      setTimeout(function(){ try{ ctx.close(); }catch(_){} },700);
+    }catch(_){}
+  }
+  function stampedRowsHtml(){
+    var html='';
+    for(var i=0;i<LINES.length;i++){ var k=LINES[i].k, v=snap[k]; if(v) html+='<div class="brow"><span class="k">'+esc(k)+'</span><span class="v">'+esc(v)+'</span></div>'; }
+    return html||'<div class="ghost">PEDIDO REGISTRADO</div>';
+  }
+  // En la pantalla de éxito: reaparece la boleta ya SELLADA (con el resumen
+  // que quedó) reemplazando el resumen plano. No toca el botón de WhatsApp.
+  function showStamped(){
+    try{
+      if(stamped) return;
+      var success=app.querySelector('.success'); if(!success) return;
+      if(document.getElementById('tt-bol')){ stamped=true; return; }
+      var biz=txt('.biz-name')||'TOTAL TOOLS';
+      var parts=biz.trim().split(/\s+/); var last=parts.length>1?parts.pop():'';
+      var logoHtml=esc(parts.join(' ').toUpperCase())+(last?' <span>'+esc(last.toUpperCase())+'</span>':'');
+      var code=(txt('.track-code')||'').replace(/^#/,'');
+      var d=document.createElement('div'); d.id='tt-bol'; d.className='done has-rows';
+      d.innerHTML='<div class="paper">'
+        +'<div class="bhead"><div class="blogo">'+logoHtml+'</div></div>'
+        +'<div class="bstat"><span><i class="dot"></i><b class="bst">Pedido registrado</b></span></div>'
+        +'<div class="brows">'+stampedRowsHtml()+'</div>'
+        +'<div class="bfoot">'+(code?('SEGUIMIENTO · #'+esc(code)):'SEGUIMIENTO GENERADO')+'</div>'
+        +'<div class="stamp">Confirmado</div>'
+        +'</div>';
+      var sum=success.querySelector('.summary-rows');
+      if(sum){ success.insertBefore(d, sum); sum.style.display='none'; }
+      else success.insertBefore(d, success.firstChild);
+      var stampEl=d.querySelector('.stamp');
+      requestAnimationFrame(function(){ if(stampEl) stampEl.classList.add('in'); });
+      playStamp();
+      stamped=true;
+      box=null; rows={}; // la boleta viva fue reemplazada por la sellada
+    }catch(_){ /* nunca romper la pantalla de éxito */ }
+  }
 
   // ── Observadores: reacciona a lo que el cliente llena ──────────────
   var deb;
@@ -175,7 +270,8 @@
       try{
         var isTrack=app.querySelector('.track-card')||app.querySelector('.status-badge');
         var isSuccess=/casi listo/i.test(app.textContent||'');
-        if(isTrack||isSuccess){ removeBox(); return; }  // no en éxito ni seguimiento
+        if(isTrack){ removeBox(); return; }        // en seguimiento: sin boleta
+        if(isSuccess){ showStamped(); return; }     // en éxito: boleta sellada
         place();
       }catch(e){ /* nunca romper el formulario */ }
     },140);
