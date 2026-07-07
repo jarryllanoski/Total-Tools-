@@ -28,10 +28,6 @@
    +'#tt-bol .paper{position:relative;background:#f6f1e3;color:#2a251d;border-radius:4px;padding:13px 15px 15px;font-size:12px;line-height:1.5}'
    +'#tt-bol .paper:before,#tt-bol .paper:after{content:"";position:absolute;left:0;right:0;height:9px;background:radial-gradient(circle,rgba(0,0,0,.28) 0 3.5px,transparent 4px);background-size:14px 9px}'
    +'#tt-bol .paper:before{top:-4px}#tt-bol .paper:after{bottom:-4px;transform:scaleY(-1)}'
-   +'#tt-bol .bhead{text-align:center;border-bottom:1.4px dashed #9a917f;padding-bottom:7px;margin-bottom:7px}'
-   +'#tt-bol .blogo{font-weight:800;font-size:14px;letter-spacing:2px}'
-   +'#tt-bol .blogo span{color:#d5281f}'
-   +'#tt-bol .bsub{display:block;color:#8a8170;font-size:9.5px;letter-spacing:.5px;margin-top:1px}'
    +'#tt-bol .bstat{display:flex;justify-content:space-between;font-size:9px;color:#8a8170;letter-spacing:1px;text-transform:uppercase;margin-bottom:5px}'
    +'#tt-bol .bstat b{color:#2a251d}'
    +'#tt-bol .bstat .dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:#e0a41a;margin-right:5px;animation:ttbpar 1s infinite}'
@@ -116,16 +112,11 @@
   var rows={};   // clave → {el, vEl, val}
   function build(){
     if(document.getElementById('tt-bol')) { box=document.getElementById('tt-bol'); rowsEl=box.querySelector('.brows'); return; }
-    var biz=txt('.biz-name')||'TOTAL TOOLS';
-    var city=txt('.biz-city')||'';
-    // Logo: nombre del negocio en mayúsculas, con la última palabra en rojo
-    var parts=biz.trim().split(/\s+/);
-    var last=parts.length>1?parts.pop():'';
-    var logoHtml=esc(parts.join(' ').toUpperCase())+(last?' <span>'+esc(last.toUpperCase())+'</span>':'');
+    // Sin cabecera propia: el nombre del negocio y la dirección ya están en
+    // el encabezado de la página. Así la boleta ocupa menos y los datos se
+    // ven mejor (sobre todo con destinos largos).
     box=document.createElement('div'); box.id='tt-bol';
     box.innerHTML='<div class="paper">'
-      +'<div class="bhead"><div class="blogo">'+logoHtml+'</div>'
-      +(city?'<span class="bsub">'+esc(city.replace(/^📍\s*/,''))+'</span>':'')+'</div>'
       +'<div class="brows"></div>'
       +'<div class="bfoot">REVISA QUE TUS DATOS ESTÉN CORRECTOS</div>'
       +'</div>';
