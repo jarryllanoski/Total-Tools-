@@ -1692,7 +1692,7 @@ async function submitOrder(){
     localStorage.setItem('dpanel_order_'+wsId, JSON.stringify({
       trackToken: resp.trackToken, orderId: resp.orderId, name: order.name
     }));
-    renderSuccessStep(order, resp.trackCode, resp.trackToken);
+    showInlineConfirmed(order, resp.trackCode, resp.trackToken);
   }catch(e){
     showOverlay(false);
     if(btn){ btn.disabled=false; btn.textContent='Confirmar pedido →'; }
@@ -1701,26 +1701,33 @@ async function submitOrder(){
   }
 }
 
-/* ─── SUCCESS STEP 3 ────────────────────────────────────────────── */
-function renderSuccessStep(order, trackCode, trackToken){
+/* ─── CONFIRMACIÓN INLINE ───────────────────────────────────────────
+   Al registrar el pedido NO se cambia de pantalla: se ocultan los pasos
+   del formulario, la boleta (con los datos) se queda arriba y CONGELADA,
+   y aparece el botón de WhatsApp. Sin recargar, sin salto. La lógica de
+   guardado no cambia. */
+function showInlineConfirmed(order, trackCode, trackToken){
   const waHref = _construirWaHref(order, trackCode, trackToken);
-  // Pantalla mínima: los datos ya se vieron en la boleta. Aquí solo el
-  // botón de WhatsApp (por ahí llega el link de seguimiento) + confirmación.
-  setApp(`
-    ${headerHtml()}
-    <div style="padding:8px 0">
-      <div class="success">
-        <div class="success-icon">✅</div>
-        <div class="success-ttl">¡Pedido registrado!</div>
-        <div class="success-sub">Envíalo por WhatsApp y recibe tu <b style="color:var(--text)">link de seguimiento</b>.</div>
-        <div class="track-code">#${esc(trackCode)}</div>
-        ${waHref?`
-          <a class="btn-wa" href="${esc(waHref)}" target="_blank" rel="noopener" style="font-size:17px;padding:18px">💬 Enviar por WhatsApp y obtener mi seguimiento</a>
-        `:'<div class="error-box">No se pudo generar el enlace de WhatsApp. Contáctanos directamente.</div>'}
-      </div>
-    </div>
-    ${brandFooterHtml()}
-  `);
+  window._ttFrozen = true;                 // congela la boleta (sin ✎ / sin tap-editar)
+  // Ocultar los inputs del formulario (todos los pasos + la barra de progreso)
+  document.querySelectorAll('.wz-step').forEach(s=>{ s.hidden=true; });
+  const prog=$('wzProgress'); if(prog) prog.style.display='none';
+  const bol=document.getElementById('tt-bol'); if(bol) bol.classList.add('frozen');
+  // Insertar el bloque confirmado en el contenedor del formulario (queda
+  // debajo de la boleta). Usa clase .tt-confirmed (NO .success) para que la
+  // boleta permanezca visible.
+  const anyStep=document.querySelector('.wz-step');
+  const cont=(anyStep&&anyStep.parentNode)||document.getElementById('app');
+  let box=$('ttConfirmed');
+  if(!box){ box=document.createElement('div'); box.id='ttConfirmed'; box.className='tt-confirmed'; cont.appendChild(box); }
+  box.innerHTML=`
+    <div style="text-align:center;padding:10px 0 4px">
+      <div style="font-size:16px;font-weight:800;color:var(--green);letter-spacing:.3px">✅ ¡Pedido registrado!</div>
+      <div style="font-size:13px;color:var(--text2);margin-top:5px">Tu código de seguimiento: <b style="color:var(--text)">#${esc(trackCode)}</b></div>
+      ${waHref?`<a class="btn-wa" href="${esc(waHref)}" target="_blank" rel="noopener" style="font-size:17px;padding:18px;margin-top:14px">💬 Enviar por WhatsApp y recibir mi link de seguimiento</a>`
+              :'<div class="error-box" style="margin-top:12px">No se pudo generar el enlace de WhatsApp. Contáctanos directamente.</div>'}
+    </div>`;
+  try{ box.scrollIntoView({behavior:'smooth',block:'center'}); }catch(_){}
 }
 
 /* ─── GO TO TRACKING ────────────────────────────────────────────── */
@@ -2316,7 +2323,7 @@ function wzInit(){
   try{
     if(!$('wzProgress')) return;         // el form no está en modo asistente
     _wzInjectCss();
-    _wzStep=1; window._selCourierType='';
+    _wzStep=1; window._selCourierType=''; window._ttFrozen=false;
     // Enter avanza en los campos de texto del paso 1 (avance "mixto")
     ['f_name','f_phone'].forEach(function(id){
       var el=$(id); if(el) el.addEventListener('keydown',function(ev){ if(ev.key==='Enter'){ ev.preventDefault(); wzNext(); } });

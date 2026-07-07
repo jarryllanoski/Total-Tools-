@@ -53,6 +53,9 @@
    +'#tt-bol .brow.editable{cursor:pointer;border-radius:5px;margin:0 -6px;padding-left:6px;padding-right:6px;transition:background .15s}'
    +'#tt-bol .brow.editable:hover,#tt-bol .brow.editable:active{background:rgba(18,165,180,.14)}'
    +'#tt-bol .brow.editable .v:after{content:" ✎";color:#12a5b4;font-size:10px;font-weight:400;opacity:.55}'
+   // Pedido ya registrado: boleta congelada (sin lápiz, sin cursor de edición).
+   +'#tt-bol.frozen .brow.editable{cursor:default}'
+   +'#tt-bol.frozen .brow.editable .v:after{content:none}'
    +'@media(prefers-reduced-motion:reduce){#tt-bol *{animation:none!important;clip-path:none!important}}';
   document.head.appendChild(st);
 
@@ -92,6 +95,7 @@
   };
   function wizOn(){ return typeof window.wzShow==='function'; }
   function goEdit(key){
+    if(window._ttFrozen) return;   // pedido ya registrado: no editar
     var e=EDIT[key]; if(!e) return;
     if(wizOn()){ try{ window.wzShow(e.step); }catch(_){} }
     setTimeout(function(){
@@ -162,7 +166,7 @@
           row.style.animationDelay=(printed*0.08)+'s'; printed++;
           row.innerHTML='<span class="k">'+esc(key)+'</span><span class="v"></span>';
           var vEl=row.querySelector('.v'); vEl.textContent=v;
-          if(wizOn()){ row.classList.add('editable'); row.title='Tocar para editar';
+          if(wizOn() && !window._ttFrozen){ row.classList.add('editable'); row.title='Tocar para editar';
             (function(k){ row.addEventListener('click',function(){ goEdit(k); }); })(key); }
           insertOrdered(i, row);
           rows[key]={el:row, vEl:vEl, val:v};

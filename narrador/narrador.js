@@ -218,7 +218,7 @@
   // el contenedor .success (marcador robusto, independiente del texto).
   function isTracking(){ return has('.track-card')||has('.status-badge'); }
   function isNotFound(){ return /link no disponible|no encuentro tu pedido/i.test(app.textContent||''); }
-  function isSuccess(){ return has('.success'); }
+  function isSuccess(){ return has('.success')||has('.tt-confirmed'); }
 
   // ── 8. Lógica del SEGUIMIENTO (Delfi) ──────────────────────────────
   var lastDelfiKey='';
