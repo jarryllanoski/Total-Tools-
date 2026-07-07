@@ -127,7 +127,7 @@
       +'<div class="bhead"><div class="blogo">'+logoHtml+'</div>'
       +(city?'<span class="bsub">'+esc(city.replace(/^📍\s*/,''))+'</span>':'')+'</div>'
       +'<div class="brows"></div>'
-      +'<div class="bfoot">AL CONFIRMAR RECIBES TU CÓDIGO DE SEGUIMIENTO</div>'
+      +'<div class="bfoot">REVISA QUE TUS DATOS ESTÉN CORRECTOS</div>'
       +'</div>';
     rowsEl=box.querySelector('.brows');
     rows={}; ghostShown=false;
