@@ -47,11 +47,12 @@
    +'@keyframes ttbprint{from{opacity:0;transform:translateY(-4px);clip-path:inset(0 0 100% 0)}to{opacity:1;transform:none;clip-path:inset(0 0 0 0)}}'
    +'#tt-bol .ghost{color:#c3baa4;letter-spacing:1px}'
    +'#tt-bol .bfoot{border-top:1.4px dashed #9a917f;margin-top:7px;padding-top:7px;text-align:center;color:#8a8170;font-size:9.5px;letter-spacing:1px}'
-   // Tap-para-editar: cada línea es tocable y salta al paso a editar.
+   // Tap-para-editar: cada línea tocable lleva un lápiz ✎ sutil al final
+   // (afordancia clara, sin frase confusa). El ✎ es pseudo-elemento, así
+   // que no interfiere con la actualización del valor.
    +'#tt-bol .brow.editable{cursor:pointer;border-radius:5px;margin:0 -6px;padding-left:6px;padding-right:6px;transition:background .15s}'
    +'#tt-bol .brow.editable:hover,#tt-bol .brow.editable:active{background:rgba(18,165,180,.14)}'
-   +'#tt-bol .bedit{display:none;text-align:center;color:#12a5b4;font-size:9px;letter-spacing:.5px;margin-top:7px}'
-   +'#tt-bol.has-rows.editable-on .bedit{display:block}'
+   +'#tt-bol .brow.editable .v:after{content:" ✎";color:#12a5b4;font-size:10px;font-weight:400;opacity:.55}'
    // Sello "CONFIRMADO" al registrar el pedido (marca TOTAL, rojo).
    // Translúcido (tinta) para que los datos se lean por debajo: nada tapa a nada.
    +'#tt-bol .stamp{position:absolute;top:44%;left:50%;transform:translate(-50%,-50%) rotate(-13deg);border:2.5px solid #d5281f;color:#d5281f;font-weight:800;font-size:18px;letter-spacing:2px;padding:4px 12px;border-radius:8px;text-transform:uppercase;pointer-events:none;opacity:.6;mix-blend-mode:multiply;box-shadow:0 0 0 2px rgba(213,40,31,.1) inset}'
@@ -112,11 +113,11 @@
   }
 
   // ── Construcción / actualización ───────────────────────────────────
-  var box, rowsEl, statEl, mounted=false, ghostShown=false, stamped=false;
+  var box, rowsEl, mounted=false, ghostShown=false, stamped=false;
   var rows={};   // clave → {el, vEl, val}
   var snap={};   // último valor conocido de cada línea (para el sello final)
   function build(){
-    if(document.getElementById('tt-bol')) { box=document.getElementById('tt-bol'); rowsEl=box.querySelector('.brows'); statEl=box.querySelector('.bst'); return; }
+    if(document.getElementById('tt-bol')) { box=document.getElementById('tt-bol'); rowsEl=box.querySelector('.brows'); return; }
     var biz=txt('.biz-name')||'TOTAL TOOLS';
     var city=txt('.biz-city')||'';
     // Logo: nombre del negocio en mayúsculas, con la última palabra en rojo
@@ -127,12 +128,10 @@
     box.innerHTML='<div class="paper">'
       +'<div class="bhead"><div class="blogo">'+logoHtml+'</div>'
       +(city?'<span class="bsub">'+esc(city.replace(/^📍\s*/,''))+'</span>':'')+'</div>'
-      +'<div class="bstat"><span><i class="dot"></i><b class="bst">Imprimiendo pedido…</b></span></div>'
       +'<div class="brows"></div>'
-      +'<div class="bedit">✎ Toca un dato para corregirlo</div>'
-      +'<div class="bfoot">SEGUIMIENTO · SE GENERA AL CONFIRMAR</div>'
+      +'<div class="bfoot">AL CONFIRMAR RECIBES TU CÓDIGO DE SEGUIMIENTO</div>'
       +'</div>';
-    rowsEl=box.querySelector('.brows'); statEl=box.querySelector('.bst');
+    rowsEl=box.querySelector('.brows');
     rows={}; ghostShown=false;
     mounted=true;
   }
@@ -184,14 +183,12 @@
       }
     }
     if(!anyVisible) showGhost();
-    box.classList.toggle('has-rows', anyVisible);
   }
 
   // Insertar la boleta al inicio del formulario (después de la cabecera)
   function place(){
     if(!document.getElementById('f_name')) return false; // solo cuando el form está
     build();
-    if(wizOn()) box.classList.add('editable-on');
     stamped=false; // volvimos al formulario en blanco
     if(!box.parentNode){
       var header=app.querySelector('.biz-header');
@@ -238,7 +235,7 @@
       var parts=biz.trim().split(/\s+/); var last=parts.length>1?parts.pop():'';
       var logoHtml=esc(parts.join(' ').toUpperCase())+(last?' <span>'+esc(last.toUpperCase())+'</span>':'');
       var code=(txt('.track-code')||'').replace(/^#/,'');
-      var d=document.createElement('div'); d.id='tt-bol'; d.className='done has-rows';
+      var d=document.createElement('div'); d.id='tt-bol'; d.className='done';
       d.innerHTML='<div class="paper">'
         +'<div class="bhead"><div class="blogo">'+logoHtml+'</div></div>'
         +'<div class="bstat"><span><i class="dot"></i><b class="bst">Pedido registrado</b></span></div>'
