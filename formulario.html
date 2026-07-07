@@ -150,6 +150,15 @@ textarea.fi{resize:vertical;line-height:1.5}
 .small-link:hover{opacity:1}
 
 .footer{text-align:center;font-size:11px;color:var(--text2);padding:24px 0 8px;opacity:.35}
+.brand-foot{margin-top:22px;padding:16px 8px 12px;border-top:1px solid var(--bd);text-align:center}
+.brand-foot .bf-row{display:flex;flex-wrap:wrap;justify-content:center;align-items:center;gap:5px 12px}
+.brand-foot .bf-row+.bf-row{margin-top:7px}
+.brand-foot .bf-item{font-size:12px;color:var(--text2);white-space:nowrap;display:inline-flex;align-items:center;gap:4px}
+.brand-foot .bf-item b{color:#d5281f;font-weight:800}
+.brand-foot .bf-web{color:#12a5b4;text-decoration:none;font-weight:600}
+.brand-foot .bf-web:active{text-decoration:underline}
+.brand-foot .bf-dot{color:var(--text2);opacity:.4}
+.brand-foot .bf-soc .bf-item{font-size:11px;opacity:.85}
 .used-note{text-align:center;font-size:12px;color:var(--text2);margin-top:14px;padding:10px 14px;background:rgba(107,114,128,.06);border:1px solid var(--bd);border-radius:10px;line-height:1.5}
 
 /* Section divider */
@@ -694,6 +703,23 @@ function _courierIcon(name, type){
   return (type==='agencia') ? '🏢' : '🚚';
 }
 
+/* Pie de marca (mismo en formulario, éxito y seguimiento). Solo diseño. */
+function brandFooterHtml(){
+  return `
+    <div class="brand-foot">
+      <div class="bf-row">
+        <span class="bf-item">🛡️ Garantía <b>1 año</b></span>
+        <span class="bf-dot">·</span>
+        <a class="bf-item bf-web" href="https://totaltoolspe.com" target="_blank" rel="noopener">🌐 totaltoolspe.com</a>
+      </div>
+      <div class="bf-row bf-soc">
+        <span class="bf-item">📘 Total One-Stop Tools Station</span>
+        <span class="bf-item">🎵 Total Tools Lima</span>
+        <span class="bf-item">📷 totaltoolsperu</span>
+      </div>
+    </div>`;
+}
+
 function renderForm(){
   clearTrackRefresh();
   _knownClient=null; _deliveryAddr=''; _addrMode=''; _gpsLat=null; _gpsLon=null;
@@ -834,7 +860,7 @@ function renderForm(){
       <button class="btn-main" id="confirmBtn" onclick="submitOrder()" style="margin-top:8px">Confirmar pedido →</button>
       </div>
     </div>
-    <div class="footer">Panel de Entregas · Formulario público</div>
+    ${brandFooterHtml()}
   `);
 
   if(!selDateIso){
@@ -1642,7 +1668,7 @@ function renderSuccessStep(order, trackCode, trackToken){
         `:'<div class="error-box">No se pudo generar el enlace de WhatsApp. Contáctanos directamente.</div>'}
       </div>
     </div>
-    <div class="footer">Panel de Entregas · Formulario público</div>
+    ${brandFooterHtml()}
   `);
 }
 
@@ -1663,7 +1689,7 @@ function renderTracking(token){
         <div class="spin"></div>
       </div>
     </div>
-    <div class="footer">Panel de Entregas · Formulario público</div>
+    ${brandFooterHtml()}
   `);
   buscarPedido(token);
   // El auto-refresh se decide en buscarPedido: solo si el pedido NO está finalizado
