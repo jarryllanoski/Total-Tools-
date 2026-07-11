@@ -789,6 +789,7 @@ async function loadTokenList(){
       var ph = (tok.phone||'').replace(/</g,'&lt;').replace(/>/g,'&gt;');
       var lk = (tok.prefillLink||'').replace(/</g,'&lt;').replace(/>/g,'&gt;');
       var shortLk = lk.length>45 ? lk.substring(0,45)+'…' : lk;
+      var lkHref = (tok.prefillLink||'').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
       var tid = (tok.id||'').replace(/"/g,'&quot;');
       var btns = '';
       if(pend){
@@ -805,7 +806,7 @@ async function loadTokenList(){
         +'<div class="tok-list-meta">'
         +(ph?'📞 '+ph+'  · ':'')+tiempo
         +(expTxt?'<br>⏱ '+expTxt:'')
-        +(lk?'<br><span style="color:var(--blue);font-size:10px">🔗 '+shortLk+'</span>':'')
+        +(lk?'<br><a href="'+lkHref+'" target="_blank" rel="noopener" class="link-chip" onclick="event.stopPropagation()" style="margin-top:4px">🔗 '+shortLk+'</a>':'')
         +'</div>'
         +'<div class="tok-list-actions" style="margin-top:8px">'+btns+'</div>'
         +'</div>';

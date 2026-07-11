@@ -140,6 +140,11 @@
         ? '<button class="notify-btn notify-btn-printed" disabled>✅ Impreso</button>'
         : '<button class="notify-btn notify-btn-print" onclick="NotifyModule.imprimir('+i+')">🖨️ Imprimir</button>';
 
+      // Link del pedido (mismo estilo de pastilla .link-chip del panel), clickeable
+      var linkHtml = n.link
+        ? '<a href="' + n.link.replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;') + '" target="_blank" rel="noopener" class="link-chip" onclick="event.stopPropagation()">🔗 Link</a>'
+        : '';
+
       return '<div class="notify-item">' +
         '<div class="notify-icon">' + n.icon + '</div>' +
         '<div class="notify-content">' +
@@ -148,6 +153,7 @@
           '<div class="notify-actions">' +
             '<button class="notify-btn notify-btn-ver" onclick="NotifyModule.ver('+i+')">👁 Ver</button>' +
             printedHtml +
+            linkHtml +
           '</div>' +
         '</div>' +
         '<div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">' +
@@ -263,7 +269,8 @@
           sub:     s.courier + ' · ' + (s.address||s.ciudadDestino||'—').substring(0,45),
           shipId:  s.id,
           printed: !!s._printed,
-          ts:      ts
+          ts:      ts,
+          link:    (s.links && s.links[0] && s.links[0].u) || ''
         });
       }
     });
@@ -281,6 +288,7 @@
         sub:     opts.sub     || '',
         shipId:  opts.shipId  || '',
         printed: opts.printed || false,
+        link:    opts.link    || '',
         time:    _timeAgo(opts.ts || Date.now()),
         ts:      opts.ts || Date.now(),
         read:    false
