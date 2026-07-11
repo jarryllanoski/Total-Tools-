@@ -2014,6 +2014,7 @@ function openDel(id){
   $('delMsg').textContent=`¿Mover "${s.name}" a la papelera?`;
   $('delYes').style.background='var(--red)';
   $('delYes').textContent='Mover a papelera';
+  $('delYes').disabled=false;   // botón siempre habilitado al abrir (evita que quede trabado)
   $('delYes').onclick=async()=>{
     $('delYes').disabled=true;
     $('delYes').textContent='Moviendo...';
@@ -2037,6 +2038,7 @@ function delSelected(){
   $('delMsg').textContent=`¿Mover ${sel.length} envío(s) a la papelera?`;
   $('delYes').style.background='var(--red)';
   $('delYes').textContent='Mover a papelera';
+  $('delYes').disabled=false;   // botón siempre habilitado al abrir (evita que quede trabado)
   $('delYes').onclick=()=>{
     sel.forEach(s=>{
       S.trash.push({shipment:s, deletedAt:Date.now()});
