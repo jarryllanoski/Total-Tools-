@@ -111,6 +111,14 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);max
 .doc-chk.on-t{background:var(--purple);border-color:var(--purple)}
 .link-chip{display:inline-block;vertical-align:middle;background:var(--bg2);border:1px solid var(--bd);border-radius:6px;padding:3px 7px;font-size:10px;color:var(--text2);align-self:center;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-decoration:none;cursor:pointer}
 .link-chip:active{background:var(--bg3)}
+/* Compartir: selección de tokens usados + agrupado por día */
+.tok-check{flex:none;width:19px;height:19px;border-radius:5px;border:2px solid var(--bd);background:var(--bg2);cursor:pointer;position:relative;display:inline-block;vertical-align:middle}
+.tok-check.on{background:var(--blue);border-color:var(--blue)}
+.tok-check.on:after{content:"✓";position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#fff;font-size:12px;font-weight:800;line-height:1}
+.tok-day-hdr{font-size:11px;font-weight:700;color:var(--text2);letter-spacing:.5px;margin:12px 0 6px;padding-left:2px}
+.tok-bar{display:flex;gap:8px;margin:6px 0 8px}
+.tok-bar .tok-act-btn{flex:1;justify-content:center}
+.tok-bar .tok-act-btn[disabled]{opacity:.45;cursor:default}
 
 /* MSG BUTTONS A/B */
 .card-msgs{display:flex;flex-direction:column;gap:6px;margin-top:8px}

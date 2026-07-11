@@ -675,6 +675,60 @@ async function openFormLink(){
 
 /* ── TOKENS: SISTEMA COMPLETO ─────────────────────────────────────── */
 let _tokCache = []; // cache local de tokens
+let _tokSel = {};   // selección local de tokens usados (id → true), para imprimir
+
+// ¿el token es de HOY? (por fecha de creación, igual que el "hace Xh")
+function _isTokToday(iso){
+  if(!iso) return false;
+  var d=new Date(iso), n=new Date();
+  return d.getFullYear()===n.getFullYear()&&d.getMonth()===n.getMonth()&&d.getDate()===n.getDate();
+}
+function _tokDayLabel(iso, isToday){
+  if(isToday) return 'Hoy';
+  if(!iso) return 'Sin fecha';
+  return new Date(iso).toLocaleDateString('es-PE',{weekday:'short',day:'2-digit',month:'short'});
+}
+function _tokSelCount(){ return Object.keys(_tokSel).filter(function(k){return _tokSel[k];}).length; }
+function _updateTokBar(){
+  var b=document.getElementById('tokPrintBtn'); if(!b) return;
+  var n=_tokSelCount();
+  b.textContent='🖨️ Imprimir'+(n?' ('+n+')':'');
+  b.disabled=!n;
+}
+// Tocar el checkbox de un token usado
+function tokToggleSel(id){
+  if(_tokSel[id]) delete _tokSel[id]; else _tokSel[id]=true;
+  var cb=document.querySelector('.tok-check[data-id="'+id.replace(/"/g,'&quot;')+'"]');
+  if(cb) cb.classList.toggle('on', !!_tokSel[id]);
+  _updateTokBar();
+}
+// Seleccionar todo = solo los de HOY que ya fueron USADOS (toggle)
+function tokSelAllToday(){
+  var ids=_tokCache.filter(function(t){return t.used && _isTokToday(t.createdAt);}).map(function(t){return t.id;});
+  if(!ids.length){ toast('No hay usados de hoy'); return; }
+  var yaTodos=ids.every(function(id){return _tokSel[id];});
+  ids.forEach(function(id){
+    if(yaTodos) delete _tokSel[id]; else _tokSel[id]=true;
+    var cb=document.querySelector('.tok-check[data-id="'+id.replace(/"/g,'&quot;')+'"]');
+    if(cb) cb.classList.toggle('on', !yaTodos);
+  });
+  _updateTokBar();
+}
+// Imprimir los seleccionados → etiqueta real del envío vinculado (orderId)
+function tokPrintSel(){
+  var sel=Object.keys(_tokSel).filter(function(k){return _tokSel[k];});
+  if(!sel.length){ toast('Selecciona links usados'); return; }
+  var toks=sel.map(function(id){return _tokCache.find(function(t){return t.id===id;});}).filter(Boolean);
+  var orderIds=toks.map(function(t){return t.orderId;}).filter(Boolean);
+  var S=window.S;
+  var existing=orderIds.filter(function(oid){return S&&S.shipments&&S.shipments.some(function(x){return x.id===oid;});});
+  var missing=toks.length-existing.length;
+  if(!existing.length){ toast('⚠️ Esos links no tienen pedido cargado para imprimir'); return; }
+  if(window.PrintModule&&window.PrintModule.openList){
+    window.PrintModule.openList(existing);
+    if(missing>0) toast('🖨️ '+existing.length+' · '+missing+' sin pedido');
+  } else { toast('⚠️ Impresión no disponible'); }
+}
 
 function _genTokId(){
   const c='ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
@@ -773,7 +827,8 @@ async function loadTokenList(){
       return new Date(iso).toLocaleDateString('es-PE',{day:'2-digit',month:'short'});
     }
     
-    function renderItem(tok){
+    function renderItem(tok, showTime){
+      if(showTime===undefined) showTime=true;
       var exp = tok.expiresAt ? new Date(tok.expiresAt) : null;
       var expired = !!(exp && exp < now);
       var used = !!tok.used;
@@ -791,6 +846,7 @@ async function loadTokenList(){
       var shortLk = lk.length>45 ? lk.substring(0,45)+'…' : lk;
       var lkHref = (tok.prefillLink||'').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
       var tid = (tok.id||'').replace(/"/g,'&quot;');
+      var check = used ? '<span class="tok-check'+(_tokSel[tok.id]?' on':'')+'" data-act="toksel" data-id="'+tid+'" title="Seleccionar para imprimir"></span>' : '';
       var btns = '';
       if(pend){
         btns += '<button class="tok-act-btn" data-id="'+tid+'" data-act="share">📤 Compartir</button>';
@@ -801,10 +857,10 @@ async function loadTokenList(){
 
       return '<div class="tok-list-item">'
         +'<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:3px">'
-        +'<div class="tok-list-name">'+nm+'</div>'+badge
+        +'<div style="display:flex;align-items:center;gap:8px;min-width:0">'+check+'<div class="tok-list-name">'+nm+'</div></div>'+badge
         +'</div>'
         +'<div class="tok-list-meta">'
-        +(ph?'📞 '+ph+'  · ':'')+tiempo
+        +(ph?'📞 '+ph:'')+(showTime?((ph?'  · ':'')+tiempo):'')
         +(expTxt?'<br>⏱ '+expTxt:'')
         +(lk?'<br><a href="'+lkHref+'" target="_blank" rel="noopener" class="link-chip" onclick="event.stopPropagation()" style="margin-top:4px">🔗 '+shortLk+'</a>':'')
         +'</div>'
@@ -812,13 +868,31 @@ async function loadTokenList(){
         +'</div>';
     }
 
-    activos.forEach(function(tok){ html += renderItem(tok); });
+    activos.forEach(function(tok){ html += renderItem(tok, true); });
     if(inactivos.length){
       html += '<div style="font-size:10px;font-weight:700;color:var(--text2);letter-spacing:1px;text-transform:uppercase;margin:12px 0 8px;padding-top:8px;border-top:1px solid var(--bd)">Usados / Vencidos</div>';
-      inactivos.forEach(function(tok){ html += renderItem(tok); });
+      // Barra: seleccionar todo (hoy + usados) + imprimir etiquetas
+      html += '<div class="tok-bar">'
+        + '<button class="tok-act-btn" data-act="selall">☑️ Seleccionar hoy</button>'
+        + '<button class="tok-act-btn" id="tokPrintBtn" data-act="printsel" disabled>🖨️ Imprimir</button>'
+        + '</div>';
+      // Agrupar por día de creación. _tokCache viene ordenado desc → hoy primero.
+      var byDay={}, order=[];
+      inactivos.forEach(function(tok){
+        var d=tok.createdAt?new Date(tok.createdAt):null;
+        var k=(d&&!isNaN(d))?(d.getFullYear()+'-'+d.getMonth()+'-'+d.getDate()):'sin';
+        if(!byDay[k]){ byDay[k]=[]; order.push(k); }
+        byDay[k].push(tok);
+      });
+      order.forEach(function(k){
+        var items=byDay[k], iso=items[0].createdAt, isToday=_isTokToday(iso);
+        html += '<div class="tok-day-hdr">'+_tokDayLabel(iso,isToday)+'</div>';
+        items.forEach(function(tok){ html += renderItem(tok, isToday); });
+      });
     }
     if(!html) html = '<div class="tok-empty">📭 No hay links generados aún.</div>';
     list.innerHTML = html;
+    _updateTokBar();
 
     // Event delegation — usa el id real del documento, nunca la posición en el array
     list.onclick = function(e){
@@ -826,6 +900,9 @@ async function loadTokenList(){
       if(!btn) return;
       var id  = btn.dataset.id;
       var act = btn.dataset.act;
+      if(act==='toksel'){  tokToggleSel(id);  return; }
+      if(act==='selall'){  tokSelAllToday();  return; }
+      if(act==='printsel'){ tokPrintSel();    return; }
       _tokAction(id, act);
     };
     
@@ -856,7 +933,7 @@ function _tokAction(id, action){
   } else if(action==='delete'){
     if(!window._fbDelTok){ toast('⚠️ Error'); return; }
     window._fbDelTok(tok.id||tok._id||'')
-      .then(function(){ toast('🗑️ Link eliminado'); loadTokenList(); })
+      .then(function(){ delete _tokSel[tok.id||tok._id||'']; toast('🗑️ Link eliminado'); loadTokenList(); })
       .catch(function(){ toast('⚠️ Error al eliminar'); });
   }
 }

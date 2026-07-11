@@ -163,6 +163,27 @@ window.PrintModule = {
     this._show();
   },
 
+  // Imprime una LISTA específica de pedidos (por id) — independiente de la
+  // selección del panel (x.sel). La usa Compartir para imprimir etiquetas
+  // de los envíos vinculados a tokens usados, sin tocar nada de Envíos.
+  openList(ids){
+    _injectModal();
+    const S = window.S;
+    if(!S || !S.shipments){ window.toast&&toast('Sin envíos'); return; }
+    const list = (ids||[]).map(id => S.shipments.find(x=>x.id===id)).filter(Boolean);
+    if(!list.length){ window.toast&&toast('Sin pedidos para imprimir'); return; }
+    _scope  = 'list';
+    _list   = list;
+    _bultos = 1;
+    _fmt    = localStorage.getItem('print_fmt') || 'etiqueta';
+    const row = document.getElementById('printScopeRow');
+    if(row) row.innerHTML = '<div style="font-size:12px;color:#8b949e;padding:4px 0">📦 '+list.length+' pedido'+(list.length>1?'s':'')+' seleccionado'+(list.length>1?'s':'')+'</div>';
+    this._updateBultos();
+    this.selectFmt(_fmt);
+    this._updateSubtitle();
+    this._show();
+  },
+
   _show(){
     document.getElementById('printBackdrop').style.display = 'block';
     const sheet = document.getElementById('printSheet');
