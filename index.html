@@ -1445,24 +1445,15 @@ function setChipSort(v){
 }
 
 /* RENDER */
-function render(){
-  updateStats(); updateAdvBar();
-  const sel=S.shipments.filter(x=>x.sel);
-  // Resaltar en azul el botón "seleccionar todo" si hay algún pedido seleccionado
-  const _selBtn=$('selAllBtn'); if(_selBtn) _selBtn.classList.toggle('sel-on', sel.length>0);
+/* Fuente ÚNICA de verdad de "qué envíos se están mostrando": aplica la
+   etiqueta activa (_filt), la búsqueda y los filtros avanzados. La usan
+   render() (lo que se pinta) y selAll() (lo que se selecciona), para que
+   nunca se desincronicen. No ordena (el orden es solo visual). */
+function visibleShipments(){
   const srch=$('fSearch').value.toLowerCase();
   let data=S.shipments;
   if(_filt) data=data.filter(x=>x.status===_filt);
   if(srch) data=data.filter(x=>x.name.toLowerCase().includes(srch)||x.phone.includes(srch)||(x.dni&&x.dni.includes(srch))||x.address.toLowerCase().includes(srch)||x.courier.toLowerCase().includes(srch));
-
-  // Ordenar por fecha de registro — más reciente primero
-  data=data.slice().sort((a,b)=>{
-    const ta=a.createdAt?new Date(a.createdAt).getTime():(a._localTs||0);
-    const tb=b.createdAt?new Date(b.createdAt).getTime():(b._localTs||0);
-    return tb-ta;
-  });
-
-  // Advanced filters
   if(_advActive){
     if(_adv.dateFrom) data=data.filter(x=>x.date&&x.date>=_adv.dateFrom);
     if(_adv.dateTo)   data=data.filter(x=>x.date&&x.date<=_adv.dateTo);
@@ -1472,7 +1463,26 @@ function render(){
     if(_adv.doc==='guia')   data=data.filter(x=>x.docGuia);
     if(_adv.doc==='ticket') data=data.filter(x=>x.docTicket);
     if(_adv.doc==='none')   data=data.filter(x=>!x.docGuia&&!x.docTicket);
-    // Sort
+  }
+  return data;
+}
+
+function render(){
+  updateStats(); updateAdvBar();
+  const sel=S.shipments.filter(x=>x.sel);
+  // Resaltar en azul el botón "seleccionar todo" si hay algún pedido seleccionado
+  const _selBtn=$('selAllBtn'); if(_selBtn) _selBtn.classList.toggle('sel-on', sel.length>0);
+  let data=visibleShipments();   // etiqueta + búsqueda + avanzados (fuente única)
+
+  // Ordenar por fecha de registro — más reciente primero
+  data=data.slice().sort((a,b)=>{
+    const ta=a.createdAt?new Date(a.createdAt).getTime():(a._localTs||0);
+    const tb=b.createdAt?new Date(b.createdAt).getTime():(b._localTs||0);
+    return tb-ta;
+  });
+
+  // Ordenamiento (los filtros avanzados ya se aplicaron en visibleShipments)
+  if(_advActive){
     if(_adv.sort==='oldest') data=[...data].sort((a,b)=>(a.date||'').localeCompare(b.date||''));
     else if(_adv.sort==='newest') data=[...data].sort((a,b)=>(b.date||'').localeCompare(a.date||''));
     else if(_adv.sort==='name') data=[...data].sort((a,b)=>a.name.localeCompare(b.name));
@@ -1567,7 +1577,14 @@ function cardDocs(s,gChk,tChk){
 // de checkbox (causa del pico de escrituras). saveLocal() no toca Firestore.
 function saveLocal(){ try{ lsSet('dpanel', JSON.stringify(window._slimStateForLocal ? window._slimStateForLocal(S) : S)); }catch(e){} }
 function toggleSel(id){const s=S.shipments.find(x=>x.id===id);if(!s)return;s.sel=!s.sel;saveLocal();render()}
-function selAll(){const all=S.shipments.every(x=>x.sel);S.shipments.forEach(x=>x.sel=!all);saveLocal();render()}
+function selAll(){
+  // Selecciona/deselecciona SOLO lo que la etiqueta actual está mostrando
+  // (misma lista que ve el usuario). Respeta selecciones de otras vistas.
+  const vis=visibleShipments();
+  const yaTodos=vis.length>0 && vis.every(x=>x.sel);
+  vis.forEach(x=>x.sel=!yaTodos);
+  saveLocal();render();
+}
 
 /* DOC TOGGLE */
 function togDoc(id,slot){const s=S.shipments.find(x=>x.id===id);if(!s)return;if(slot==='guia')s.chkGuia=!s.chkGuia;else s.chkTicket=!s.chkTicket;save(id);render()}
