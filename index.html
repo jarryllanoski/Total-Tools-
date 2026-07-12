@@ -152,9 +152,11 @@
     // ★ Guardado incremental: decidir qué shipments subir
     // Modo solo-config: si solo cambió config y no hay pedidos sucios pendientes,
     // no se sube ningún pedido (idsASubir = set vacío).
-    const soloConfig = _dirtyConfigOnly && _dirtyShips.size === 0 && !_dirtyAll;
-    const subirTodos = !soloConfig && (_dirtyAll || _dirtyShips.size === 0);
-    const idsASubir = soloConfig ? new Set() : (subirTodos ? null : new Set(_dirtyShips));
+    const nadaEspecifico = _dirtyShips.size === 0 && _dirtySupps.size === 0;
+    const soloConfig = _dirtyConfigOnly && nadaEspecifico && !_dirtyAll;
+    const subirTodos = !soloConfig && (_dirtyAll || nadaEspecifico);
+    const idsASubir   = soloConfig ? new Set() : (subirTodos ? null : new Set(_dirtyShips));
+    const suppsASubir = soloConfig ? new Set() : (subirTodos ? null : new Set(_dirtySupps));
     const saveTs = Date.now(); // capturar antes de writes para que _S_TS coincida exactamente
     try {
       const saves=[];
@@ -175,11 +177,10 @@
         if(idsASubir && !idsASubir.has(s.id)) continue;
         saves.push(fsPatch(shipPath(s.id),slimShipment(s)));
       }
-      // Suppliers: solo cuando es guardado completo (cambian poco y son pocos)
-      if(subirTodos){
-        for(const sup of(data.suppliers||[])){
-          saves.push(fsPatch(suppPath(sup.id),slimSupplier(sup)));
-        }
+      // Suppliers: incremental igual que los pedidos (suppsASubir=null → todos).
+      for(const sup of(data.suppliers||[])){
+        if(suppsASubir && !suppsASubir.has(sup.id)) continue;
+        saves.push(fsPatch(suppPath(sup.id),slimSupplier(sup)));
       }
       await Promise.all(saves);
       window._S_TS = saveTs; // ★ actualizar al ts REAL escrito → evita que _poll recargue datos propios
@@ -188,6 +189,7 @@
       lsSet('dpanel_last_sync', String(saveTs));
       // ★ Éxito: limpiar el registro de sucios
       _dirtyShips.clear();
+      _dirtySupps.clear();
       _dirtyAll = false;
       _dirtyConfigOnly = false;
     } catch(e){
@@ -1091,6 +1093,7 @@ let _fbSaveTimer = null;
 // ★ Guardado incremental: registro de pedidos modificados ("sucios").
 // save(id) marca solo ese pedido para subir. save() sin id = subir todo (seguro).
 let _dirtyShips = new Set();
+let _dirtySupps = new Set();   // proveedores modificados: save('supp:'+id) marca solo ese
 let _dirtyAll = true; // true = subir todo (config/suppliers/masivo); arranque seguro
 let _dirtyConfigOnly = false; // true = subir SOLO config (toggles de Config)
 
@@ -1104,6 +1107,10 @@ const save = (shipId) => {
     // No marca ningún pedido: si no hay otros pedidos sucios pendientes,
     // _fbSave subirá únicamente el documento config (no los 180 pedidos).
     _dirtyConfigOnly = true;
+  } else if(typeof shipId === 'string' && shipId.indexOf('supp:') === 0){
+    // ★ Proveedor específico: sube solo ese proveedor + config, no los 170 pedidos.
+    _dirtySupps.add(shipId.slice(5));
+    _dirtyConfigOnly = false;
   } else if(shipId){
     _dirtyShips.add(shipId);
     _dirtyConfigOnly = false; // hay un pedido real → no es solo-config
@@ -1191,6 +1198,8 @@ window._mergeRemote = (remote) => {
   if(remote.suppliers) {
     remote.suppliers = remote.suppliers.map(rs => {
       const local = (S.suppliers||[]).find(ls => ls.id === rs.id);
+      // Si este proveedor tiene un cambio local aún sin subir, conservar la versión local.
+      if(typeof _dirtySupps !== 'undefined' && _dirtySupps.has(rs.id) && local) return local;
       if(local && rs.cotiz && rs.cotiz.d === '[img]' && local.cotiz) rs.cotiz = local.cotiz;
       return rs;
     });
@@ -1627,7 +1636,7 @@ function toggleShalomAuto(){
   const on=el.classList.contains('on');
   S.config=S.config||{};
   S.config.shalomAutoTrack=on;
-  save();
+  save('config'); // solo cambia config
   toast(on?'🚚 Auto-tracking Shalom activado':'⏸️ Auto-tracking Shalom apagado');
 }
 /* Resaltar (y centrar) una tarjeta por su id — se usa al crear un pedido nuevo */
@@ -1798,6 +1807,7 @@ function globalSuppSearch(raw){
   if(!extracted.length) return;
 
   let marked=0;
+  const touched=new Set();
   extracted.forEach(q=>{
     S.suppliers.forEach(sup=>{
       (sup.items||[]).forEach((it,i)=>{
@@ -1807,13 +1817,14 @@ function globalSuppSearch(raw){
         if(itemCode===searchCode&&!it.done){
           sup.items[i].done=true;
           marked++;
+          touched.add(sup.id);
         }
       });
     });
   });
 
-  if(marked>0){ 
-    save(); 
+  if(marked>0){
+    touched.forEach(id=>save('supp:'+id)); // solo los proveedores realmente tocados
     // Force full re-render of suppliers panel
     const area=$('suppStatsArea');
     if(area) area.innerHTML='';
@@ -1872,7 +1883,7 @@ function toggleAllSuppItems(){
   const sup=S.suppliers.find(x=>x.id===_suppId); if(!sup||!sup.items||!sup.items.length) return;
   const allDone=sup.items.every(x=>x.done);
   sup.items.forEach(x=>x.done=!allDone);
-  save(); render(); renderSuppItems(sup);
+  save('supp:'+sup.id); render(); renderSuppItems(sup);
   toast(allDone?'☐ Todo desmarcado':'✅ Todo marcado');
 }
 
@@ -1899,7 +1910,7 @@ function bulkVerifySupp(){
   } else {
     sup.items.forEach(it=>it.done=!allDone);
   }
-  save(); render(); filterSuppItems();
+  save('supp:'+sup.id); render(); filterSuppItems();
   toast(allDone?'☐ Desmarcados':'✅ '+( q?'Filtrados':'Todos')+' marcados');
 }
 
@@ -1950,7 +1961,7 @@ function editSuppItem(suppId,idx,el){
   const save_=()=>{
     const v=input.value.trim();
     if(v) sup.items[idx].text=v;
-    save(); renderSuppItems(sup);
+    save('supp:'+sup.id); renderSuppItems(sup);
   };
   input.onblur=save_;
   input.onkeydown=e=>{ if(e.key==='Enter') input.blur(); if(e.key==='Escape'){ sup.items[idx].text=old; renderSuppItems(sup); } };
@@ -1964,26 +1975,26 @@ function addSuppItem(){
   if(!sup.items) sup.items=[];
   sup.items.push({text:v,done:false});
   $('suppNewItem').value='';
-  save(); render(); renderSuppItems(sup);
+  save('supp:'+sup.id); render(); renderSuppItems(sup);
 }
 
 function toggleSuppItem(suppId,idx){
   const sup=S.suppliers.find(x=>x.id===suppId); if(!sup) return;
   sup.items[idx].done=!sup.items[idx].done;
-  save(); render(); renderSuppItems(sup);
+  save('supp:'+sup.id); render(); renderSuppItems(sup);
 }
 
 function delSuppItem(suppId,idx){
   const sup=S.suppliers.find(x=>x.id===suppId); if(!sup) return;
   sup.items.splice(idx,1);
-  save(); render(); renderSuppItems(sup);
+  save('supp:'+sup.id); render(); renderSuppItems(sup);
 }
 
 function moveAllToPorAlistar(){
   openPin(()=>{
     const count=S.shipments.filter(x=>x.status==='EN PROCESO').length;
-    S.shipments.forEach(x=>{ if(x.status==='EN PROCESO') x.status='POR ALISTAR'; });
-    save(); render();
+    S.shipments.forEach(x=>{ if(x.status==='EN PROCESO'){ x.status='POR ALISTAR'; save(x.id); } }); // incremental: solo los movidos
+    render();
     toast(`🔵 ${count} pedido${count>1?'s':''} → POR ALISTAR`);
   });
 }
@@ -2003,9 +2014,10 @@ function saveNewSupplier(){
   const name=$('suppNewName').value.trim();
   const phone=$('suppNewPhone').value.trim();
   if(!name){toast('⚠️ Ingresa el nombre');return}
-  S.suppliers.push({id:'sup_'+Date.now(),name,phone,items:[]});
+  const _ns={id:'sup_'+Date.now(),name,phone,items:[]};
+  S.suppliers.push(_ns);
   $('suppNewName').value=''; $('suppNewPhone').value='';
-  save(); render(); closeOverlay('suppNewOverlay');
+  save('supp:'+_ns.id); render(); closeOverlay('suppNewOverlay');
   toast('✅ Proveedor agregado');
 }
 
@@ -2089,7 +2101,7 @@ function loadCotiz(input){
   r.onload=e=>{
     const sup=S.suppliers.find(x=>x.id===_suppId); if(!sup) return;
     sup.cotiz={d:e.target.result,n:file.name,t:file.type};
-    save(); renderCotizArea(sup);
+    save('supp:'+sup.id); renderCotizArea(sup);
     toast('✅ Cotización subida');
   };
   r.readAsDataURL(file);
@@ -2098,7 +2110,7 @@ function loadCotiz(input){
 
 function delCotiz(suppId){
   const sup=S.suppliers.find(x=>x.id===suppId); if(!sup) return;
-  sup.cotiz=null; save(); renderCotizArea(sup);
+  sup.cotiz=null; save('supp:'+sup.id); renderCotizArea(sup);
   toast('🗑️ Cotización eliminada');
 }
 function openEditSupplier(){
@@ -2113,7 +2125,7 @@ function saveEditSupplier(){
   const phone=$('suppEditPhone').value.trim();
   if(!name){toast('⚠️ Ingresa el nombre');return}
   sup.name=name; sup.phone=phone;
-  save(); render();
+  save('supp:'+sup.id); render();
   // Update header in suppOverlay
   $('suppName').textContent='🏭 '+name;
   $('suppPhone').innerHTML=`📞 ${phone} <button onclick="window.open('https://wa.me/51${phone}','_blank')" style="background:rgba(46,160,67,.15);border:1px solid rgba(46,160,67,.3);color:var(--green);border-radius:7px;padding:4px 10px;font-size:12px;font-weight:700;cursor:pointer">💬 WhatsApp</button>`;
