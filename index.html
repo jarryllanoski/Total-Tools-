@@ -1621,8 +1621,10 @@ function selAll(){
   // Selecciona/deselecciona SOLO lo que la etiqueta actual está mostrando
   // (misma lista que ve el usuario). Respeta selecciones de otras vistas.
   const vis=visibleShipments();
-  const yaTodos=vis.length>0 && vis.every(x=>x.sel);
-  vis.forEach(x=>x.sel=!yaTodos);
+  // Tri-estado: si hay CUALQUIER selección visible (botón azul) → limpiar;
+  // si no hay nada seleccionado → seleccionar todo lo visible.
+  const haySeleccion=vis.some(x=>x.sel);
+  vis.forEach(x=>x.sel=!haySeleccion);
   saveLocal();render();
 }
 
