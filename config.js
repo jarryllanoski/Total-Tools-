@@ -152,7 +152,7 @@ function waDT(doc,chk,slot,color){
 function togWADoc(slot){
   const s=S.shipments.find(x=>x.id===_waId);if(!s)return;
   if(slot==='guia')s.chkGuia=!s.chkGuia;else s.chkTicket=!s.chkTicket;
-  save();render();openWA(_waId);
+  save(s.id);render();openWA(_waId); // incremental: solo este pedido
 }
 function selWAMsg(idx){
   _waMsgIdx=idx;
@@ -956,7 +956,7 @@ function changePIN(){
     $('pinMsg').textContent='Ingresa la NUEVA clave (4 dígitos)';
     $('pinMsg').style.color='var(--blue)';
     openOverlay('pinOverlay');
-    _pinCallback=()=>{ S.statusPin=_pinEntry; save(); toast('🔐 Clave actualizada a: '+_pinEntry); };
+    _pinCallback=()=>{ S.statusPin=_pinEntry; save('config'); toast('🔐 Clave actualizada a: '+_pinEntry); };
   });
 }
 /* CONFIG */
@@ -1092,7 +1092,7 @@ function saveLabelEdit(){
       S.labels[_editLabelIdx]=newName;
     }
   }
-  save(); renderChips(); loadCfgUI();
+  save('config'); renderChips(); loadCfgUI(); // solo config (labels/plantillas)
   closeOverlay('labelEditOverlay');
   toast('✅ Guardado');
 }
@@ -1109,7 +1109,7 @@ function openCourierEdit(i){
     <div class="fg"><label class="fl">Nombre</label><input class="fi" id="editCourierInp" value="${v}" maxlength="40"></div>
     <div class="confirm-btns">
       <button class="cbtn-no" onclick="closeOverlay('delOverlay')">Cancelar</button>
-      <button class="cbtn-yes" style="background:var(--blue)" onclick="S.couriers[${i}]=document.getElementById('editCourierInp').value.trim()||S.couriers[${i}];save();loadCfgUI();closeOverlay('delOverlay');toast('✅ Guardado')">Guardar</button>
+      <button class="cbtn-yes" style="background:var(--blue)" onclick="S.couriers[${i}]=document.getElementById('editCourierInp').value.trim()||S.couriers[${i}];save('config');loadCfgUI();closeOverlay('delOverlay');toast('✅ Guardado')">Guardar</button>
     </div>`;
   openOverlay('delOverlay');
 }
@@ -1123,7 +1123,7 @@ function openExtraEdit(i){
     <div class="fg"><label class="fl">Nombre</label><input class="fi" id="editExtraInp" value="${v}" maxlength="40"></div>
     <div class="confirm-btns">
       <button class="cbtn-no" onclick="closeOverlay('delOverlay')">Cancelar</button>
-      <button class="cbtn-yes" style="background:var(--blue)" onclick="S.extraFields[${i}]=document.getElementById('editExtraInp').value.trim()||S.extraFields[${i}];save();loadCfgUI();closeOverlay('delOverlay');toast('✅ Guardado')">Guardar</button>
+      <button class="cbtn-yes" style="background:var(--blue)" onclick="S.extraFields[${i}]=document.getElementById('editExtraInp').value.trim()||S.extraFields[${i}];save('config');loadCfgUI();closeOverlay('delOverlay');toast('✅ Guardado')">Guardar</button>
     </div>`;
   openOverlay('delOverlay');
 }
@@ -1190,7 +1190,7 @@ function confirmDelItem(type,idx){
     if(type==='label'){S.labels.splice(idx,1);renderChips()}
     else if(type==='courier') S.couriers.splice(idx,1);
     else S.extraFields.splice(idx,1);
-    save();loadCfgUI();closeOverlay('delOverlay');toast('🗑️ Eliminado');
+    save('config');loadCfgUI();closeOverlay('delOverlay');toast('🗑️ Eliminado'); // solo config
   };
   openOverlay('delOverlay');
 }
