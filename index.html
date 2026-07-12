@@ -1511,7 +1511,7 @@ function render(){
 function escH(s){ return s==null?'':String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
 function escU(u){ u=String(u==null?'':u).trim(); return (/^https?:\/\//i.test(u)||/^data:image\//i.test(u))?escH(u):'#'; }
 function cardHTML(s){
-  const gChk=s.chkGuia||false, tChk=s.chkTicket||false;
+  const gChk=s.chkGuia||false, tChk=s.chkTicket||false, eChk=s.chkEmbalado||false;
   const msgs=S.msgTemplates[s.status]||['',''];
   const m1=msgs[0]&&msgs[0].trim(), m2=msgs[1]&&msgs[1].trim();
   const pvtNote=s.privateNote||'';
@@ -1534,7 +1534,7 @@ function cardHTML(s){
     </div>
     ${(s.courier||'').toUpperCase().includes('ENCOMIENDA')?((s.ciudadDestino||s.address)?`<div class="card-addr">📦 ${escH(s.ciudadDestino||s.address)}${s.encAgencia?' · 🏪 '+escH(s.encAgencia):''}</div>`:''): (s.address?`<div class="card-addr">🏠 ${escH(s.address)}</div>`:'' )}
     ${s.notes?`<div class="card-note">📝 ${escH(s.notes)}</div>`:''}
-    ${cardDocs(s,gChk,tChk)}
+    ${cardDocs(s,gChk,tChk,eChk)}
     ${(s.trackingOrderNumber||s.shalomGuia)&&typeof Tracking!=='undefined'?Tracking.renderCardBlock(s):''}
     ${(m1||m2)?`<div class="card-msgs">
       ${m1?`<button class="card-msg card-msg-a" onclick="quickMsg('${s.id}',0)"><span class="card-msg-ltr">A</span><span class="card-msg-txt">${escH(fillVars(m1,s).substring(0,70))}${fillVars(m1,s).length>70?'…':''}</span></button>`:''}
@@ -1550,7 +1550,7 @@ function cardHTML(s){
   </div>`;
 }
 
-function cardDocs(s,gChk,tChk){
+function cardDocs(s,gChk,tChk,eChk){
   const has=s.docGuia||s.docEmbalado||s.docTicket||(s.links&&s.links.length);
   if(!has)return'';
   return`<div class="card-docs">
@@ -1559,9 +1559,11 @@ function cardDocs(s,gChk,tChk){
       <div class="doc-lbl">GUÍA</div>
       <div class="doc-chk ${gChk?'on-g':''}" onclick="event.stopPropagation();togDoc('${s.id}','guia')">${gChk?'✓':''}</div>
     </div>`:''}
-    ${s.docEmbalado?`<div class="doc-thumb" style="border:2px solid var(--bd)">
-      <div onclick="openViewer&&openViewer(s.docEmbalado,'📦 Embalado')">${s.docEmbalado.t&&s.docEmbalado.t.startsWith('image/')?`<img src="${escU(s.docEmbalado.d)}" style="width:52px;height:66px;object-fit:cover;display:block">`:`<div class="doc-thumb-pdf"><span style="font-size:20px">📦</span></div>`}</div>
-      <div class="doc-lbl">EMBALADO</div></div>`:''}
+    ${s.docEmbalado?`<div class="doc-thumb" style="border:2px solid ${eChk?'var(--blue)':'var(--bd)'}">
+      <div onclick="qView('${s.id}','embalado')">${s.docEmbalado.t&&s.docEmbalado.t.startsWith('image/')?`<img src="${escU(s.docEmbalado.d)}" style="width:52px;height:66px;object-fit:cover;display:block">`:`<div class="doc-thumb-pdf"><span style="font-size:20px">📦</span></div>`}</div>
+      <div class="doc-lbl">EMBALADO</div>
+      <div class="doc-chk ${eChk?'on-e':''}" onclick="event.stopPropagation();togDoc('${s.id}','embalado')">${eChk?'✓':''}</div>
+    </div>`:''}
     ${s.docTicket?`<div class="doc-thumb" style="border:2px solid ${tChk?'var(--purple)':'var(--bd)'}">
       <div onclick="qView('${s.id}','ticket')">${s.docTicket.t&&s.docTicket.t.startsWith('image/')?`<img src="${escU(s.docTicket.d)}" style="width:52px;height:66px;object-fit:cover;display:block">`:`<div class="doc-thumb-pdf"><span style="font-size:20px">🧾</span></div>`}</div>
       <div class="doc-lbl">TICKET</div>
@@ -1587,7 +1589,7 @@ function selAll(){
 }
 
 /* DOC TOGGLE */
-function togDoc(id,slot){const s=S.shipments.find(x=>x.id===id);if(!s)return;if(slot==='guia')s.chkGuia=!s.chkGuia;else s.chkTicket=!s.chkTicket;save(id);render()}
+function togDoc(id,slot){const s=S.shipments.find(x=>x.id===id);if(!s)return;if(slot==='guia')s.chkGuia=!s.chkGuia;else if(slot==='embalado')s.chkEmbalado=!s.chkEmbalado;else s.chkTicket=!s.chkTicket;save(id);render()}
 
 /* QUICK MSG */
 function quickMsg(id,idx){

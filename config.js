@@ -260,7 +260,7 @@ let _curDoc=null;
 function openViewer(doc,title){_curDoc=doc;if(doc.t&&doc.t.startsWith('image/')){$('viewerImg').src=doc.d;$('viewerTtl').textContent=title;$('viewer').classList.add('open')}else{const a=document.createElement('a');a.href=doc.d;a.target='_blank';a.click()}}
 function closeViewer(){$('viewer').classList.remove('open');$('viewerImg').src=''}
 function dlDoc(){if(!_curDoc)return;const a=document.createElement('a');a.href=_curDoc.d;a.download=_curDoc.n||'doc';a.click()}
-function qView(shipId,slot){const s=S.shipments.find(x=>x.id===shipId);if(!s)return;const d=slot==='guia'?s.docGuia:s.docTicket;if(!d)return;openViewer(d,slot==='guia'?'🚚 Guía Courier':'🧾 Ticket / Boleta')}
+function qView(shipId,slot){const s=S.shipments.find(x=>x.id===shipId);if(!s)return;const d=slot==='guia'?s.docGuia:slot==='embalado'?s.docEmbalado:s.docTicket;if(!d)return;openViewer(d,slot==='guia'?'🚚 Guía Courier':slot==='embalado'?'📦 Embalado':'🧾 Ticket / Boleta')}
 $('viewer').addEventListener('click',e=>{if(e.target===$('viewer'))closeViewer()});
 
 /* LINKS */
@@ -284,7 +284,7 @@ function openForm(id){
   $('fStatus').innerHTML=allStatuses().map(s=>`<option>${s}</option>`).join('');
   $('extraForm').innerHTML=S.extraFields.map(f=>`<div class="fg"><label class="fl">${f}</label><input class="fi xf" data-f="${f}" placeholder="${f}..."></div>`).join('');
   _docs={guia:null,embalado:null,ticket:null};_links=[];
-  refreshSlot('guia');refreshSlot('ticket');renderLinks();
+  refreshSlot('guia');refreshSlot('embalado');refreshSlot('ticket');renderLinks();
   ['inGuiaCam','inGuiaGal','inGuiaPdf','inTicketCam','inTicketGal','inTicketPdf'].forEach(i=>{const e=$(i);if(e)e.value=''});
   if(id){
     const s=S.shipments.find(x=>x.id===id);
@@ -503,7 +503,7 @@ function saveShipment(){
   const dni=($('fDni')||{value:''}).value.trim();
   const _isEncSave=($('fCourier').value||'').toUpperCase().includes('ENCOMIENDA');
   const _encAgencia=_isEncSave?($('fEncAgencia')||{value:''}).value.trim():'';
-  const data={name,phone,dni,address:_isEncSave?'':addr,courier:$('fCourier').value,date:$('fDate').value,status:$('fStatus').value,cost:$('fCost').value,notes:$('fNotes').value.trim(),extra,docGuia:_docs.guia,docEmbalado:_docs.embalado,docTicket:_docs.ticket,links:JSON.parse(JSON.stringify(_links)),sel:false,chkGuia:false,chkTicket:false};
+  const data={name,phone,dni,address:_isEncSave?'':addr,courier:$('fCourier').value,date:$('fDate').value,status:$('fStatus').value,cost:$('fCost').value,notes:$('fNotes').value.trim(),extra,docGuia:_docs.guia,docEmbalado:_docs.embalado,docTicket:_docs.ticket,links:JSON.parse(JSON.stringify(_links)),sel:false,chkGuia:false,chkEmbalado:false,chkTicket:false};
   if(_isEncSave){data.ciudadDestino=addr;data.encAgencia=_encAgencia;}
   // ★ SHALOM: leer campos guía
   const _sGuia   = ($('fShalomGuia')   ? $('fShalomGuia').value.trim()   : '')||'';
@@ -603,7 +603,7 @@ function importExcel(input){
           trackingOrderCode: cod, shalomCodigo: cod,
           links: ((row['Links']||row['Links adicionales']||'').toString().split(' | ').map(u=>u.trim()).filter(Boolean)).map(u=>({u, n:u.length>36?u.slice(0,36)+'…':u})),
           extra:{},docGuia:null,docEmbalado:null,docTicket:null,
-          sel:false,chkGuia:false,chkTicket:false,
+          sel:false,chkGuia:false,chkEmbalado:false,chkTicket:false,
           createdAt: row['Creado'] ? row['Creado']+'T00:00:00.000Z' : new Date().toISOString(),
         });
         added++;
