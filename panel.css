@@ -113,7 +113,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);max
 .doc-chk.on-g{background:var(--green);border-color:var(--green)}
 .doc-chk.on-e{background:var(--blue);border-color:var(--blue)}
 .doc-chk.on-t{background:var(--purple);border-color:var(--purple)}
-.link-chip{display:inline-block;vertical-align:middle;background:var(--bg2);border:1px solid var(--bd);border-radius:6px;padding:3px 7px;font-size:10px;color:var(--text2);align-self:center;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-decoration:none;cursor:pointer}
+.link-chip{display:inline-block;vertical-align:middle;background:var(--bg2);border:1px solid var(--bd);border-radius:6px;padding:3px 7px;font-size:10px;color:var(--text2);align-self:center;max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-decoration:none;cursor:pointer}
 .link-chip:active{background:var(--bg3)}
 /* Compartir: selección de tokens usados + agrupado por día */
 .tok-check{flex:none;width:19px;height:19px;border-radius:5px;border:2px solid var(--bd);background:var(--bg2);cursor:pointer;position:relative;display:inline-block;vertical-align:middle}
