@@ -1537,7 +1537,7 @@ function cardHTML(s){
     </div>
     ${pvtNote?`<div class="pvt-note" id="pvt_${s.id}" style="display:none" ondblclick="openPrivateNote('${s.id}')">🔒 ${escH(pvtNote)}</div>`:''}
     <div class="card-meta">
-      <span class="meta">📞 ${escH(s.phone)}</span>
+      <span class="meta" style="cursor:pointer" onclick="event.stopPropagation();phoneMenu('${escH(s.phone)}')" title="Copiar · Llamar · WhatsApp">📞 ${escH(s.phone)}</span>
       <span class="meta">📅 ${escH(s.date||'—')} <button onclick="copyCardLink('${s.id}')" title="Copiar link" style="background:none;border:none;color:#388bfd;font-size:11px;cursor:pointer;padding:0 0 0 2px;vertical-align:middle">🔗</button></span>
       ${s.cost?`<span class="meta">💰 S/ ${escH(s.cost)}</span>`:''}
     </div>
@@ -1609,6 +1609,35 @@ function toggleShalomAuto(){
   S.config.shalomAutoTrack=on;
   save();
   toast(on?'🚚 Auto-tracking Shalom activado':'⏸️ Auto-tracking Shalom apagado');
+}
+/* Teléfono de la tarjeta: menú con Copiar / Llamar / WhatsApp */
+function phoneMenu(phone){
+  const clean=String(phone).replace(/\D/g,'');
+  const prev=document.getElementById('phoneMenuOv'); if(prev) prev.remove();
+  const ov=document.createElement('div');
+  ov.id='phoneMenuOv';
+  ov.style.cssText='position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.55);display:flex;align-items:flex-end;justify-content:center';
+  ov.onclick=(e)=>{ if(e.target===ov) ov.remove(); };
+  ov.innerHTML=`<div style="background:var(--bg2);border:1px solid var(--bd);border-radius:16px 16px 0 0;width:100%;max-width:480px;padding:16px 14px 22px" onclick="event.stopPropagation()">
+    <div style="text-align:center;font-size:16px;font-weight:700;color:var(--text);margin-bottom:14px">📞 +51 ${clean}</div>
+    <button class="pm-btn" onclick="phoneAct('copy','${clean}')">📋 Copiar número</button>
+    <button class="pm-btn" onclick="phoneAct('call','${clean}')">📞 Llamar</button>
+    <button class="pm-btn" style="color:var(--green);border-color:rgba(46,160,67,.35)" onclick="phoneAct('wa','${clean}')">💬 WhatsApp</button>
+    <button class="pm-btn" style="color:var(--text2)" onclick="phoneAct('cancel','${clean}')">✕ Cancelar</button>
+  </div>`;
+  document.body.appendChild(ov);
+}
+function phoneAct(act,phone){
+  const ov=document.getElementById('phoneMenuOv'); if(ov) ov.remove();
+  if(act==='copy'){
+    const done=()=>toast('📋 Número copiado');
+    if(navigator.clipboard&&navigator.clipboard.writeText){ navigator.clipboard.writeText(phone).then(done).catch(()=>toast('📋 '+phone)); }
+    else { const t=document.createElement('textarea'); t.value=phone; t.style.cssText='position:fixed;top:-9999px'; document.body.appendChild(t); t.select(); try{document.execCommand('copy');done();}catch(e){toast(phone);} t.remove(); }
+  } else if(act==='call'){
+    window.location.href='tel:+51'+phone;
+  } else if(act==='wa'){
+    window.open('https://wa.me/51'+phone,'_blank');
+  }
 }
 /* Ícono 🔄: CON selección → tracking Shalom de las seleccionadas; SIN selección → refrescar */
 function onTrackBtn(){
