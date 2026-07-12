@@ -1537,7 +1537,7 @@ function cardHTML(s){
     </div>
     ${pvtNote?`<div class="pvt-note" id="pvt_${s.id}" style="display:none" ondblclick="openPrivateNote('${s.id}')">🔒 ${escH(pvtNote)}</div>`:''}
     <div class="card-meta">
-      <span class="meta" style="cursor:pointer" onclick="event.stopPropagation();phoneMenu('${escH(s.phone)}')" title="Copiar · Llamar · WhatsApp">📞 ${escH(s.phone)}</span>
+      <span class="meta" style="cursor:pointer" onclick="event.stopPropagation();phoneMenu('${escH(s.phone)}',this)" title="Copiar · Llamar · WhatsApp">📞 ${escH(s.phone)}</span>
       <span class="meta">📅 ${escH(s.date||'—')} <button onclick="copyCardLink('${s.id}')" title="Copiar link" style="background:none;border:none;color:#388bfd;font-size:11px;cursor:pointer;padding:0 0 0 2px;vertical-align:middle">🔗</button></span>
       ${s.cost?`<span class="meta">💰 S/ ${escH(s.cost)}</span>`:''}
     </div>
@@ -1610,22 +1610,31 @@ function toggleShalomAuto(){
   save();
   toast(on?'🚚 Auto-tracking Shalom activado':'⏸️ Auto-tracking Shalom apagado');
 }
-/* Teléfono de la tarjeta: menú con Copiar / Llamar / WhatsApp */
-function phoneMenu(phone){
+/* Teléfono de la tarjeta: popup chico y rápido junto al número (Copiar/Llamar/WA) */
+function phoneMenu(phone, el){
   const clean=String(phone).replace(/\D/g,'');
   const prev=document.getElementById('phoneMenuOv'); if(prev) prev.remove();
-  const ov=document.createElement('div');
+  const ov=document.createElement('div');       // captura toques afuera (transparente, no invasivo)
   ov.id='phoneMenuOv';
-  ov.style.cssText='position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.55);display:flex;align-items:flex-end;justify-content:center';
-  ov.onclick=(e)=>{ if(e.target===ov) ov.remove(); };
-  ov.innerHTML=`<div style="background:var(--bg2);border:1px solid var(--bd);border-radius:16px 16px 0 0;width:100%;max-width:480px;padding:16px 14px 22px" onclick="event.stopPropagation()">
-    <div style="text-align:center;font-size:16px;font-weight:700;color:var(--text);margin-bottom:14px">📞 +51 ${clean}</div>
-    <button class="pm-btn" onclick="phoneAct('copy','${clean}')">📋 Copiar número</button>
-    <button class="pm-btn" onclick="phoneAct('call','${clean}')">📞 Llamar</button>
-    <button class="pm-btn" style="color:var(--green);border-color:rgba(46,160,67,.35)" onclick="phoneAct('wa','${clean}')">💬 WhatsApp</button>
-    <button class="pm-btn" style="color:var(--text2)" onclick="phoneAct('cancel','${clean}')">✕ Cancelar</button>
-  </div>`;
+  ov.style.cssText='position:fixed;inset:0;z-index:9999;background:transparent';
+  ov.onclick=()=>ov.remove();
+  const menu=document.createElement('div');
+  menu.className='ph-menu';
+  menu.onclick=(e)=>e.stopPropagation();
+  menu.innerHTML=`
+    <button class="ph-mi" onclick="phoneAct('copy','${clean}')">📋 Copiar</button>
+    <button class="ph-mi" onclick="phoneAct('call','${clean}')">📞 Llamar</button>
+    <button class="ph-mi" style="color:var(--green)" onclick="phoneAct('wa','${clean}')">💬 WhatsApp</button>`;
+  ov.appendChild(menu);
   document.body.appendChild(ov);
+  try{
+    const r=el.getBoundingClientRect(), mw=menu.offsetWidth, mh=menu.offsetHeight;
+    let left=r.left, top=r.bottom+6;
+    if(left+mw>window.innerWidth-8) left=window.innerWidth-mw-8;
+    if(left<8) left=8;
+    if(top+mh>window.innerHeight-8) top=Math.max(8, r.top-mh-6); // arriba si no cabe abajo
+    menu.style.left=left+'px'; menu.style.top=top+'px';
+  }catch(e){ menu.style.left='50%'; menu.style.top='40%'; }
 }
 function phoneAct(act,phone){
   const ov=document.getElementById('phoneMenuOv'); if(ov) ov.remove();
