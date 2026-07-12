@@ -563,14 +563,16 @@
 <div class="overlay" id="formOverlay">
   <div class="sheet">
     <div class="sheet-handle"></div>
-    <div class="sheet-title" id="formTitle">Nuevo Envío</div>
     <div id="fPasteBox" style="background:rgba(37,211,102,.08);border:1px solid rgba(37,211,102,.28);border-radius:9px;padding:9px 10px;margin-bottom:11px">
-      <div style="font-size:10.5px;color:#25D366;font-weight:600;line-height:1.45;margin-bottom:7px">📲 <b>Opcional</b> — Pega el mensaje que te llegó por WhatsApp y se rellenan Nombre, Teléfono, DNI, Dirección, Courier, Fecha y Notas automáticamente.</div>
-      <div style="display:flex;gap:7px;align-items:flex-start">
-        <textarea class="fi" id="fPaste" rows="1" style="flex:1;height:36px;min-height:36px;resize:none;font-size:12px;line-height:1.4;padding:8px 10px" placeholder="Pega aquí el mensaje del cliente…" onpaste="setTimeout(parseWAOrder,40)"></textarea>
+      <div style="display:flex;gap:7px;align-items:center">
+        <div style="flex:1;position:relative;display:flex">
+          <textarea class="fi" id="fPaste" rows="1" style="flex:1;height:36px;min-height:36px;resize:none;font-size:12px;line-height:1.4;padding:8px 28px 8px 10px" placeholder="Pega el mensaje de WhatsApp…" onpaste="setTimeout(function(){parseWAOrder();_pasteClearToggle();},40)" oninput="_pasteClearToggle()"></textarea>
+          <button type="button" id="fPasteClear" title="Borrar" onclick="clearPaste()" style="display:none;position:absolute;right:5px;top:50%;transform:translateY(-50%);background:none;border:none;color:#8b949e;font-size:15px;cursor:pointer;padding:2px 4px;line-height:1">✕</button>
+        </div>
         <button type="button" style="font-size:12px;font-weight:700;padding:8px 13px;white-space:nowrap;flex-shrink:0;background:#25D366;color:#fff;border:none;border-radius:8px;cursor:pointer;font-family:inherit" onclick="parseWAOrder()">📲 Rellenar</button>
       </div>
     </div>
+    <div class="sheet-title"><span id="formTitle">Nuevo Envío</span><span onclick="if(window.Ayuda)Ayuda.abrir('nuevoEnvio')" style="float:right;font-size:11px;color:#8b949e;cursor:pointer;font-weight:400" title="Ayuda">📖 Ayuda</span></div>
     <div class="frow">
       <div class="fg"><label class="fl">Nombre *</label><input class="fi" id="fName" placeholder="Nombre completo"></div>
       <div class="fg"><label class="fl">Teléfono *</label><input class="fi" id="fPhone" placeholder="9XXXXXXXX" maxlength="9" inputmode="numeric" onpaste="setTimeout(()=>{var v=this.value.replace(/\D/g,'');if(v.startsWith('51')&&v.length>9)v=v.slice(2);this.value=v.slice(-9)},0)" oninput="this.value=this.value.replace(/\D/g,'').slice(0,9)"></div>
@@ -1524,7 +1526,7 @@ function cardHTML(s){
   const msgs=S.msgTemplates[s.status]||['',''];
   const m1=msgs[0]&&msgs[0].trim(), m2=msgs[1]&&msgs[1].trim();
   const pvtNote=s.privateNote||'';
-  return `<div class="card">
+  return `<div class="card" data-id="${s.id}">
     <div class="card-top">
       <div class="chk ${s.sel?'on':''}" onclick="toggleSel('${s.id}')">${s.sel?'✓':''}</div>
       <div class="cname" 
@@ -1610,6 +1612,25 @@ function toggleShalomAuto(){
   save();
   toast(on?'🚚 Auto-tracking Shalom activado':'⏸️ Auto-tracking Shalom apagado');
 }
+/* Resaltar (y centrar) una tarjeta por su id — se usa al crear un pedido nuevo */
+function _highlightCard(id){
+  setTimeout(function(){
+    try{
+      const c=document.querySelector('.card[data-id="'+String(id).replace(/"/g,'')+'"]');
+      if(!c) return;
+      c.scrollIntoView({behavior:'smooth',block:'center'});
+      c.style.transition='background .3s';
+      const prev=c.style.background;
+      c.style.background='rgba(56,139,253,.18)';
+      setTimeout(function(){ c.style.background=prev||''; }, 1800);
+    }catch(e){}
+  }, 250);
+}
+
+/* Barra de pegar WhatsApp: botón ✕ para limpiar lo pegado */
+function _pasteClearToggle(){ const p=document.getElementById('fPaste'),b=document.getElementById('fPasteClear'); if(!p||!b) return; b.style.display=(p.value&&p.value.trim())?'block':'none'; }
+function clearPaste(){ const p=document.getElementById('fPaste'); if(p){ p.value=''; p.focus(); } _pasteClearToggle(); }
+
 /* Copiar el número de la tarjeta (iconito ⧉ al lado del número) */
 function copyPhone(phone){
   const clean=String(phone).replace(/\D/g,'');

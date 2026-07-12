@@ -104,6 +104,27 @@
       ]
     },
 
+    nuevoEnvio: {
+      titulo: 'Nuevo Envío',
+      icono: '➕',
+      pasos: [
+        '📲 ¿Te llegó el pedido por WhatsApp? Pega el mensaje en la barra de arriba y toca "Rellenar": se completan Nombre, Teléfono, DNI, Dirección, Courier, Fecha y Notas automáticamente.',
+        'Revisa y corrige los campos si hace falta.',
+        'El courier viene en SHALOM por defecto; cámbialo si es otro.',
+        'Agrega costo, notas o documentos si lo necesitas.',
+        'Guarda → el pedido aparece resaltado en su etiqueta (NUEVO PEDIDO) y en la campana de notificaciones.'
+      ],
+      faq: [
+        {q:'¿El pegado es obligatorio?', a:'No, es opcional. Si prefieres, llena los campos a mano.'},
+        {q:'¿Cómo borro lo que pegué?', a:'Con la ✕ que aparece dentro de la barra de pegar.'},
+        {q:'¿Puedo editarlo después?', a:'Sí, con el botón ✏️ de la tarjeta.'}
+      ],
+      tips: [
+        'El pegado entiende el formato del mensaje que genera tu propio formulario público de pedidos.',
+        'Solo se guarda ese pedido nuevo, no toda la base — es rápido.'
+      ]
+    },
+
     config: {
       titulo: 'Configuración',
       icono: '⚙️',

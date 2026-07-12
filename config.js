@@ -278,6 +278,8 @@ function openForm(id){
   if(body) body.classList.remove('open');
   if(arrow) arrow.classList.remove('open');
   _editId=id;$('formTitle').textContent=id?'Editar Envío':'Nuevo Envío';
+  if($('fPaste')) $('fPaste').value='';   // limpiar el pegado al abrir
+  if(typeof _pasteClearToggle==='function') _pasteClearToggle();
   // Panel de gestión: SIEMPRE todos los couriers disponibles (independiente
   // de qué esté activo en el formulario público del cliente).
   $('fCourier').innerHTML = (S.couriers||[]).map(c=>`<option>${c}</option>`).join('');
@@ -310,6 +312,8 @@ function openForm(id){
   }else{
     ['fName','fPhone','fAddr','fCost','fNotes'].forEach(i=>$(i).value='');if($('fDni'))$('fDni').value='';if($('fEncAgencia'))$('fEncAgencia').value='';
     $('fDate').valueAsDate=new Date();
+    // Courier por defecto: SHALOM (siempre está en la lista del panel)
+    if($('fCourier')){ const _sh=Array.from($('fCourier').options).find(o=>(o.value||'').toUpperCase().includes('SHALOM')); if(_sh) $('fCourier').value=_sh.value; }
   }
   // ★ SHALOM + ENCOMIENDA: show/hide bloques según courier
   const _showShalomBlock = () => {
@@ -528,7 +532,14 @@ function saveShipment(){
     data.id='id_'+Date.now();data.createdAt=new Date().toISOString();data._localTs=Date.now();S.shipments.push(data);
     // Guardar inmediatamente en Firebase
     if(window._fbSaveShipmentNow) window._fbSaveShipmentNow(data);
-    save(data.id);closeOverlay('formOverlay');render(); // ★ incremental: solo este pedido
+    save(data.id);closeOverlay('formOverlay');
+    // Mostrar el pedido nuevo en SU etiqueta (sin scroll) + resaltarlo
+    if(typeof setFilt==='function') setFilt(data.status); else render();
+    if(typeof _highlightCard==='function') _highlightCard(data.id);
+    // Notificar (campana), igual que los pedidos del formulario público
+    if(window.NotifyModule && data.status==='NUEVO PEDIDO'){
+      window.NotifyModule.add({icon:'📦',title:'Nuevo pedido — '+data.name,sub:(data.courier||'')+' · '+String(data.address||data.ciudadDestino||'—').substring(0,45),shipId:data.id,ts:Date.now()});
+    }
     toast('✅ Envío registrado');
   }
 }
