@@ -108,7 +108,7 @@
       titulo: 'Nuevo Envío',
       icono: '➕',
       pasos: [
-        '📲 ¿Te llegó el pedido por WhatsApp? Pega el mensaje en la barra de arriba y toca "Rellenar": se completan Nombre, Teléfono, DNI, Dirección, Courier, Fecha y Notas automáticamente.',
+        '📲 ¿Tu cliente ya pidió antes y te llegó un nuevo pedido? Pega el mensaje de su pedido anterior en la barra de arriba y toca "Rellenar": se completan Nombre, Teléfono, DNI, Dirección, Courier, Fecha y Notas. Es opcional.',
         'Revisa y corrige los campos si hace falta.',
         'El courier viene en SHALOM por defecto; cámbialo si es otro.',
         'Agrega costo, notas o documentos si lo necesitas.',

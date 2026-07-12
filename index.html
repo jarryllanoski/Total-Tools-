@@ -564,6 +564,7 @@
   <div class="sheet">
     <div class="sheet-handle"></div>
     <div id="fPasteBox" style="background:rgba(37,211,102,.08);border:1px solid rgba(37,211,102,.28);border-radius:9px;padding:9px 10px;margin-bottom:11px">
+      <div style="font-size:10.5px;color:#25D366;font-weight:600;line-height:1.4;margin-bottom:7px">📲 ¿Tu cliente ya pidió antes y te llegó un nuevo pedido? Pega su mensaje del pedido anterior y se llenan los datos solos. <span style="opacity:.7">(Opcional)</span></div>
       <div style="display:flex;gap:7px;align-items:center">
         <div style="flex:1;position:relative;display:flex">
           <textarea class="fi" id="fPaste" rows="1" style="flex:1;height:36px;min-height:36px;resize:none;font-size:12px;line-height:1.4;padding:8px 28px 8px 10px" placeholder="Pega el mensaje de WhatsApp…" onpaste="setTimeout(function(){parseWAOrder();_pasteClearToggle();},40)" oninput="_pasteClearToggle()"></textarea>
@@ -594,9 +595,12 @@
     <div id="extraForm"></div>
     <!-- ★ SHALOM: bloque guía -->
     <div id="shalomGuiaBlock" style="display:none;background:rgba(56,139,253,.06);border:1px solid rgba(56,139,253,.15);border-radius:10px;padding:12px;margin-bottom:11px">
-      <div style="font-size:10px;font-weight:700;color:#388bfd;letter-spacing:.8px;text-transform:uppercase;margin-bottom:10px">🚌 Guía Shalom (opcional)</div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+        <span style="font-size:10px;font-weight:700;color:#388bfd;letter-spacing:.8px;text-transform:uppercase">🚌 Guía Shalom (opcional)</span>
+        <button type="button" id="shalomMicBtn" onclick="shalomVozStart()" title="Dictar guía y código por voz" style="display:none;background:none;border:none;padding:2px 4px;cursor:pointer;font-size:15px;line-height:1;color:#8b949e">🎤</button>
+      </div>
       <div class="frow">
-        <div class="fg"><label class="fl">Número de guía</label><input class="fi" id="fShalomGuia" placeholder="Ej: 82037653" style="font-family:monospace" inputmode="numeric"></div>
+        <div class="fg"><label class="fl">Número de guía</label><input class="fi" id="fShalomGuia" placeholder="Ej: 82037653" style="font-family:monospace" inputmode="numeric" oninput="if(typeof _updateShalomMic==='function')_updateShalomMic()"></div>
         <div class="fg"><label class="fl">Código</label><input class="fi" id="fShalomCodigo" placeholder="TT9C" style="font-family:monospace;text-transform:uppercase" oninput="this.value=this.value.toUpperCase()" maxlength="8"></div>
       </div>
     </div>
@@ -1638,6 +1642,110 @@ function copyPhone(phone){
   if(navigator.clipboard&&navigator.clipboard.writeText){ navigator.clipboard.writeText(clean).then(done).catch(()=>toast('📋 '+clean)); }
   else { const t=document.createElement('textarea'); t.value=clean; t.style.cssText='position:fixed;top:-9999px'; document.body.appendChild(t); t.select(); try{document.execCommand('copy');done();}catch(e){toast(clean);} t.remove(); }
 }
+/* ── Dictado por voz para Guía + Código Shalom ─────────────────────────
+   Reutiliza Web SpeechRecognition (es-PE). Guía = 8 dígitos (auto-salta al
+   código al completar). Código = 4 caracteres (mejor esfuerzo + corregible).
+   El micro solo se ve si el navegador soporta voz Y la guía está vacía.       */
+var _SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition || null;
+var _shalomRec = null;          // instancia activa
+var _shalomVozStage = null;     // 'guia' | 'codigo' | null
+
+function _updateShalomMic(){
+  var btn = document.getElementById('shalomMicBtn');
+  if(!btn) return;
+  var g = document.getElementById('fShalomGuia');
+  var guiaVacia = !g || !(g.value||'').trim();
+  // solo si hay soporte de voz Y la guía aún está vacía
+  btn.style.display = (_SpeechRec && guiaVacia) ? 'block' : 'none';
+}
+
+/* Convierte palabras/frases dictadas a solo dígitos ("ocho dos cero" → 820) */
+function _vozADigitos(txt){
+  var mapa={cero:'0',uno:'1',una:'1',dos:'2',tres:'3',cuatro:'4',cinco:'5',seis:'6',siete:'7',ocho:'8',nueve:'9'};
+  var out=(txt||'').toLowerCase()
+    .replace(/[a-záéíóúñü]+/g, function(w){ return (mapa[w]!==undefined)? mapa[w] : w; });
+  return out.replace(/\D/g,'');
+}
+/* Código: alfanumérico → mayúsculas sin espacios (mejor esfuerzo).
+   Convierte también números dictados en palabra ("nueve" → 9). */
+function _vozACodigo(txt){
+  var mapa={cero:'0',uno:'1',una:'1',dos:'2',tres:'3',cuatro:'4',cinco:'5',seis:'6',siete:'7',ocho:'8',nueve:'9'};
+  var t=(txt||'').toLowerCase().replace(/[a-záéíóúñü]+/g,function(w){ return (mapa[w]!==undefined)? mapa[w] : w; });
+  return t.toUpperCase().replace(/[^A-Z0-9]/g,'');
+}
+
+function _shalomMicVisual(on){
+  var btn=document.getElementById('shalomMicBtn');
+  if(!btn) return;
+  if(on){ btn.textContent='🔴'; btn.style.animation='shalomMicPulse 1s ease-in-out infinite'; btn.title='Escuchando… toca para detener'; }
+  else  { btn.textContent='🎤'; btn.style.animation=''; btn.title='Dictar guía y código por voz'; }
+}
+
+function _shalomVozStop(){
+  _shalomVozStage=null;
+  if(_shalomRec){ try{ _shalomRec.onend=null; _shalomRec.stop(); }catch(e){} _shalomRec=null; }
+  _shalomMicVisual(false);
+}
+
+function shalomVozStart(){
+  if(!_SpeechRec){ toast('🎤 Este navegador no soporta dictado por voz'); return; }
+  // si ya está escuchando, el toque detiene
+  if(_shalomRec){ _shalomVozStop(); return; }
+  var gEl=document.getElementById('fShalomGuia');
+  var cEl=document.getElementById('fShalomCodigo');
+  if(!gEl||!cEl) return;
+  _shalomVozStage = (gEl.value||'').trim().length>=8 ? 'codigo' : 'guia';
+  _shalomVozBeginStage();
+}
+
+function _shalomVozBeginStage(){
+  if(!_SpeechRec) return;
+  var rec = new _SpeechRec();
+  rec.lang='es-PE'; rec.interimResults=true; rec.maxAlternatives=1; rec.continuous=false;
+  _shalomRec=rec;
+  _shalomMicVisual(true);
+  var gEl=document.getElementById('fShalomGuia');
+  var cEl=document.getElementById('fShalomCodigo');
+  if(_shalomVozStage==='guia'){ toast('🎤 Dicta el número de guía (8 dígitos)'); }
+  else { toast('🎤 Dicta el código (4 caracteres)'); }
+
+  rec.onresult=function(ev){
+    var txt='';
+    for(var i=ev.resultIndex;i<ev.results.length;i++){ txt+=ev.results[i][0].transcript; }
+    if(_shalomVozStage==='guia'){
+      var d=_vozADigitos(txt);
+      if(d){ gEl.value=d.substring(0,8); }
+      if((gEl.value||'').length>=8){
+        // guía completa → pasar al código automáticamente
+        gEl.value=gEl.value.substring(0,8);
+        _updateShalomMic();
+        try{ rec.onend=null; rec.stop(); }catch(e){}
+        _shalomRec=null;
+        _shalomVozStage='codigo';
+        cEl.focus();
+        setTimeout(_shalomVozBeginStage,350);
+      }
+    } else if(_shalomVozStage==='codigo'){
+      var c=_vozACodigo(txt);
+      if(c){ cEl.value=c.substring(0,8); }
+    }
+  };
+  rec.onerror=function(e){
+    if(e && (e.error==='not-allowed'||e.error==='service-not-allowed')){ toast('🎤 Permite el micrófono para dictar'); }
+    _shalomVozStop();
+  };
+  rec.onend=function(){
+    // fin natural de una etapa
+    if(_shalomVozStage==='codigo' || (_shalomVozStage==='guia' && (gEl.value||'').length>=8)){
+      _shalomVozStop();
+      if((cEl.value||'').trim() || (gEl.value||'').trim()) toast('✅ Guía Shalom lista — revísala');
+    } else {
+      _shalomVozStop();
+    }
+  };
+  try{ rec.start(); }catch(e){ _shalomVozStop(); }
+}
+
 /* Ícono 🔄: CON selección → tracking Shalom de las seleccionadas; SIN selección → refrescar */
 function onTrackBtn(){
   const sel=S.shipments.filter(x=>x.sel);

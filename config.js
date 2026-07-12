@@ -329,6 +329,7 @@ function openForm(id){
     // SHALOM: precargar agencias para búsqueda instantánea; si no, ocultar dropdown
     if(isShalom){ if(typeof _panelShalomLoad==='function') _panelShalomLoad(); }
     else { const d=$('shDrop'); if(d) d.style.display='none'; }
+    if(typeof _updateShalomMic==='function') _updateShalomMic();
   };
   $('fCourier').onchange = _showShalomBlock;
   if(id){
