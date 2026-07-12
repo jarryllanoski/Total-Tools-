@@ -788,33 +788,68 @@ async function genToken(action){
       else { window.open('https://wa.me/?text='+encodeURIComponent(msg),'_blank'); }
       toast('🔑 Link generado');
     }
-    await loadTokenList();
+    await loadTokenList(true); // acabo de generar un link → forzar refresco
   } catch(e){ toast('⚠️ Error: '+e.message); }
 }
 
-async function loadTokenList(){
+let _tokLastFetch = 0;        // ts del último fetch exitoso
+let _tokRevalidating = false; // evita revalidaciones solapadas
+const _TOK_COOLDOWN = 30000;  // 30s: no re-consultar si se hizo hace poco
+
+// Stale-while-revalidate: si ya hay datos en memoria, se pintan al instante y
+// se revalida por detrás; el spinner queda solo para la primerísima carga.
+// force=true (🔄, generar/borrar, cambio remoto por poll) salta el cooldown.
+async function loadTokenList(force){
   const list=$('tokList');
   if(!list) return;
-  list.innerHTML='<div class="tok-empty">⏳ Cargando...</div>';
-  // Esperar Firebase
-  for(let i=0;i<40;i++){
-    if(window._fbListToks) break;
-    await new Promise(r=>setTimeout(r,100));
-  }
-  if(!window._fbListToks){
-    list.innerHTML='<div class="tok-empty">⚠️ Sin conexión. Toca 🔄</div>';
+  if(_tokCache && _tokCache.length){
+    _renderTokList();                                  // instantáneo, sin red
+    if(force || (Date.now()-_tokLastFetch) > _TOK_COOLDOWN) _revalidateTokens(false);
     return;
   }
+  list.innerHTML='<div class="tok-empty">⏳ Cargando...</div>'; // primera vez
+  await _revalidateTokens(true);
+}
+
+// Consulta Firestore; si cambió (o es la primera carga), actualiza cache y repinta.
+async function _revalidateTokens(isFirst){
+  if(_tokRevalidating) return;
+  _tokRevalidating = true;
+  const list=$('tokList');
   try{
-    const raw = await window._fbListToks();
-    if(!raw||!raw.length){
-      list.innerHTML='<div class="tok-empty">📭 No hay links generados aún.</div>';
+    for(let i=0;i<40;i++){ if(window._fbListToks) break; await new Promise(r=>setTimeout(r,100)); }
+    if(!window._fbListToks){
+      if(isFirst && list) list.innerHTML='<div class="tok-empty">⚠️ Sin conexión. Toca 🔄</div>';
       return;
     }
-    // Normalizar
-    _tokCache = raw
+    const raw = await window._fbListToks();
+    _tokLastFetch = Date.now();
+    const next = (raw||[])
       .map(function(d){ return Object.assign({},d,{id:d.id||d._id||''}); })
       .sort(function(a,b){ return (b.createdAt||'')>(a.createdAt||'')?1:-1; });
+    // diff barato: repintar solo si cambió el conjunto (id/usado/vencimiento)
+    const sig = function(arr){ return (arr||[]).map(function(t){return t.id+'|'+(t.used?1:0)+'|'+(t.expiresAt||'');}).join(','); };
+    const changed = sig(next)!==sig(_tokCache);
+    _tokCache = next;
+    if(changed || isFirst) _renderTokList();
+  }catch(e){
+    if(isFirst && list) list.innerHTML='<div class="tok-empty">⚠️ Error: '+e.message+'<br><button class="tok-act-btn" onclick="loadTokenList(true)" style="margin-top:8px">↻ Reintentar</button></div>';
+    console.error('loadTokenList error:', e);
+  }finally{
+    _tokRevalidating = false;
+  }
+}
+
+// Pinta la lista desde _tokCache (función de estado, sin red).
+function _renderTokList(){
+  const list=$('tokList');
+  if(!list) return;
+  try{
+    if(!_tokCache || !_tokCache.length){
+      list.innerHTML='<div class="tok-empty">📭 No hay links generados aún.</div>';
+      _updateTokBar();
+      return;
+    }
     
     var now = new Date();
     var html = '';
@@ -917,10 +952,8 @@ async function loadTokenList(){
       if(act==='printsel'){ tokPrintSel();    return; }
       _tokAction(id, act);
     };
-    
   }catch(e){
-    list.innerHTML='<div class="tok-empty">⚠️ Error: '+e.message+'<br><button class="tok-act-btn" onclick="loadTokenList()" style="margin-top:8px">↻ Reintentar</button></div>';
-    console.error('loadTokenList error:', e);
+    console.error('renderTokList error:', e);
   }
 }
 
@@ -945,7 +978,7 @@ function _tokAction(id, action){
   } else if(action==='delete'){
     if(!window._fbDelTok){ toast('⚠️ Error'); return; }
     window._fbDelTok(tok.id||tok._id||'')
-      .then(function(){ delete _tokSel[tok.id||tok._id||'']; toast('🗑️ Link eliminado'); loadTokenList(); })
+      .then(function(){ delete _tokSel[tok.id||tok._id||'']; toast('🗑️ Link eliminado'); loadTokenList(true); })
       .catch(function(){ toast('⚠️ Error al eliminar'); });
   }
 }

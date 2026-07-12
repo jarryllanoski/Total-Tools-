@@ -322,7 +322,7 @@
             // Refrescar lista de tokens si la pestaña Compartir está abierta
             if(hasFormNew && document.getElementById('page-compartir')&&
                document.getElementById('page-compartir').classList.contains('active')&&
-               typeof loadTokenList==='function') loadTokenList();
+               typeof loadTokenList==='function') loadTokenList(true); // cambio remoto (cliente usó link) → forzar
           }
         }
       }catch(e){
@@ -475,7 +475,7 @@
   <div class="cfg-sec">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
       <div class="cfg-ttl" style="margin:0">📋 Links generados</div>
-      <button onclick="loadTokenList()" style="background:none;border:none;color:var(--text2);font-size:12px;cursor:pointer;padding:4px 8px">🔄</button>
+      <button onclick="loadTokenList(true)" style="background:none;border:none;color:var(--text2);font-size:12px;cursor:pointer;padding:4px 8px">🔄</button>
     </div>
     <div id="tokList"><div class="tok-empty">Cargando...</div></div>
   </div>
