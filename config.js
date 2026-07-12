@@ -666,24 +666,53 @@ async function _snapshotFormConfig(){
   if(window._fbSaveFormConfig) await window._fbSaveFormConfig(uuid,snap);
   return uuid;
 }
-async function copyLink(){
-  let link=getFormLink();
-  try{const cfgId=await _snapshotFormConfig();link+=`?cfg=${cfgId}`;}catch(e){console.warn('cfg snapshot:',e);}
-  navigator.clipboard.writeText(link).then(()=>toast('🔗 Link copiado')).catch(()=>{
-    const ta=document.createElement('textarea');ta.value=link;document.body.appendChild(ta);ta.select();document.execCommand('copy');document.body.removeChild(ta);toast('🔗 Link copiado');
-  });
+/* ── LINKS RÁPIDOS: ahora generan un TOKEN de un solo uso ──────────────
+   Cada copia/apertura/compartir crea un token anónimo (sin prefill). Al
+   llevar ?t= el formulario va directo a crear pedido (no se desvía al
+   seguimiento del último pedido de este dispositivo). Tras registrarse, la
+   Cloud Function lo marca usado → reabrir muestra "Link ya utilizado".      */
+async function genQuickToken(action){
+  // Abrir la ventana YA (en el gesto) para que móvil no bloquee el popup tras el await.
+  let win=null;
+  if(action==='open'||action==='wa') win=window.open('','_blank');
+  // Esperar Firebase (normalmente ya está → no bloquea)
+  let t=0; while(!window._fbSaveTok && t<30){ await new Promise(r=>setTimeout(r,100)); t++; }
+  if(!window._fbSaveTok){ if(win)win.close(); toast('⚠️ Firebase no listo, intenta de nuevo'); return; }
+  const id = _genTokId();
+  const tok = {
+    id,
+    name:         'Link rápido',   // etiqueta en la lista (NO prefilla el formulario)
+    phone:        '',
+    createdAt:    new Date().toISOString(),
+    prefillName:  '',
+    prefillPhone: '',
+    prefillLink:  '',
+    used:         false,
+    quick:        true,
+    expiresAt:    new Date(Date.now()+7*864e5).toISOString(), // vence en 7 días (autolimpieza)
+  };
+  try{
+    await window._fbSaveTok(tok);
+    let cfgParam='';
+    try{ const cfgId=await _snapshotFormConfig(); cfgParam=`&cfg=${cfgId}`; }catch(e){ console.warn('cfg snapshot:',e); }
+    const url = getFormLink()+'?t='+id+cfgParam;
+    if(action==='copy'){
+      navigator.clipboard.writeText(url).then(()=>toast('🔗 Link copiado')).catch(()=>{
+        const ta=document.createElement('textarea');ta.value=url;document.body.appendChild(ta);ta.select();document.execCommand('copy');document.body.removeChild(ta);toast('🔗 Link copiado');
+      });
+    } else if(action==='wa'){
+      const wa='https://wa.me/?text='+encodeURIComponent('📦 Hola, aquí el link para registrar tu pedido:\n\n'+url);
+      if(win) win.location=wa; else window.open(wa,'_blank');
+    } else { // open
+      if(win) win.location=url; else window.open(url,'_blank');
+    }
+    if(typeof loadTokenList==='function') loadTokenList(true); // aparece en "Links generados"
+  }catch(e){ if(win)win.close(); toast('⚠️ Error: '+e.message); }
 }
-async function shareWA(){
-  let link=getFormLink();
-  try{const cfgId=await _snapshotFormConfig();link+=`?cfg=${cfgId}`;}catch(e){console.warn('cfg snapshot:',e);}
-  window.open(`https://wa.me/?text=${encodeURIComponent('📦 Hola, aquí el link para registrar tu pedido:\n\n'+link)}`);
-}
+function copyLink(){ return genQuickToken('copy'); }
+function openFormLink(){ return genQuickToken('open'); }
+function shareWA(){ return genQuickToken('wa'); }
 function shareTG(){ window.open(`https://t.me/share/url?url=${encodeURIComponent(getFormLink())}`); }
-async function openFormLink(){
-  let link=getFormLink();
-  try{const cfgId=await _snapshotFormConfig();link+=`?cfg=${cfgId}`;}catch(e){console.warn('cfg snapshot:',e);}
-  window.open(link,'_blank');
-}
 
 /* ── TOKENS: SISTEMA COMPLETO ─────────────────────────────────────── */
 let _tokCache = []; // cache local de tokens
