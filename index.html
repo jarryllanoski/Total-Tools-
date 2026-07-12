@@ -290,9 +290,14 @@
   };
 
   window._fbListen = () => {
-    let _listenDelay = 5000;
+    // Poll adaptativo: rápido mientras el usuario trabaja, lento en reposo (ahorra lecturas).
+    const POLL_FAST = 5000;   // hubo actividad reciente
+    const POLL_SLOW = 15000;  // en reposo (sin toques por más de IDLE_MS)
+    const IDLE_MS   = 120000; // 2 min sin interacción → reposo
+    let _listenDelay = POLL_FAST;
     let _listenTimer = null;
     let _listenFails = 0;
+    window._lastActivity = window._lastActivity || Date.now();
 
     async function _poll(){
       try{
@@ -300,7 +305,6 @@
         if(!cfg){ _listenFails++; }
         else {
           _listenFails = 0;
-          _listenDelay = 5000; // reset delay en éxito
           const remoteTs = cfg.ts||0;
           const formTs   = cfg.formTs||0;
           // formTs: escrito solo por Cloud Function o formulario — el panel nunca lo toca
@@ -322,12 +326,21 @@
       }catch(e){
         _listenFails++;
       }
-      // Backoff exponencial: 5s → 10s → 20s → 40s → máx 60s
+      // Delay: backoff exponencial ante fallos; si hay conexión, adaptativo por actividad.
       if(_listenFails > 0){
-        _listenDelay = Math.min(5000 * Math.pow(2, _listenFails), 60000);
+        _listenDelay = Math.min(5000 * Math.pow(2, _listenFails), 60000); // 5→10→20→40→máx 60s
+      } else {
+        const idle = (Date.now() - (window._lastActivity||0)) > IDLE_MS;
+        _listenDelay = idle ? POLL_SLOW : POLL_FAST;
       }
+      window._lastPollDelay = _listenDelay; // exponer para diagnóstico/pruebas
       _listenTimer = setTimeout(_poll, _listenDelay);
     }
+
+    // Cualquier interacción del usuario cuenta como actividad → poll rápido.
+    const _bumpActivity = () => { window._lastActivity = Date.now(); };
+    document.addEventListener('pointerdown', _bumpActivity, {passive:true});
+    document.addEventListener('keydown',     _bumpActivity, {passive:true});
 
     // Pausar cuando la pestaña está oculta (ahorra lecturas)
     document.addEventListener('visibilitychange', () => {
@@ -335,7 +348,8 @@
         clearTimeout(_listenTimer);
       } else {
         _listenFails = 0;
-        _listenDelay = 5000;
+        _listenDelay = POLL_FAST;
+        window._lastActivity = Date.now(); // volver del fondo = actividad → poll rápido
         _poll();
       }
     });
