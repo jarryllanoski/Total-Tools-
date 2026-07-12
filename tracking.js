@@ -270,6 +270,10 @@ var _autoPaused   = false; // pausa tras 3 fallos
 async function autoTrackingCheck() {
   if (_autoRunning) return;
 
+  // Gate: si el usuario apagó el auto-tracking en Config, no consultar solo.
+  // (El botón "Consultar" por tarjeta y el tracking masivo manual siguen funcionando.)
+  if (window.S && window.S.config && window.S.config.shalomAutoTrack === false) return;
+
   // Pausado tras 3 fallos — esperar consulta manual exitosa
   if (_autoPaused) {
     console.log('[Tracking] Auto-check pausado — API caída. Consulta manualmente para reactivar.');
@@ -672,6 +676,59 @@ Tracking.consultarAhora = async function(shipId) {
   } else {
     if (typeof window.toast === 'function') window.toast('🔄 Estado: ' + (ship.trackingStatus || '—'));
   }
+};
+
+/* ── Tracking MASIVO manual (botón 🔄 con selección) ──────────────
+   Consulta Shalom SOLO de los pedidos pasados, una vez por cliente, con
+   cooldown de 30 min. Comparte el mismo trackingLastAutoCheck que el auto
+   y el "Consultar", así no re-consulta lo recién consultado (ahorra API).
+   Reutiliza el mismo motor (consultarShalom + aplicarResultado). No toca
+   el botón "Consultar" por tarjeta. */
+Tracking.bulkTrack = async function(ids) {
+  var COOLDOWN = 30 * 60 * 1000; // 30 min
+  var ahora = Date.now();
+  var ships = (ids || []).map(_findShip).filter(Boolean);
+  var toTrack = [], recientes = 0, sinNum = 0;
+  ships.forEach(function(s){
+    var isShalom = s.courier && String(s.courier).toUpperCase().indexOf('SHALOM') >= 0;
+    var guia = s.trackingOrderNumber || s.shalomGuia || '';
+    if (!isShalom) return;                 // solo Shalom
+    if (s.status === 'FINALIZADO') return; // ya entregado
+    if (!guia) { sinNum++; return; }
+    if (ahora - (s.trackingLastAutoCheck || 0) < COOLDOWN) { recientes++; return; }
+    toTrack.push(s);
+  });
+  if (!toTrack.length) {
+    var m0 = 'Nada nuevo para trackear';
+    if (recientes) m0 += ' · ' + recientes + ' ya consultado' + (recientes!==1?'s':'') + ' hace poco';
+    if (sinNum) m0 += ' · ' + sinNum + ' sin número';
+    if (window.toast) window.toast(m0);
+    return;
+  }
+  if (window.toast) window.toast('⏳ Trackeando ' + toTrack.length + ' Shalom...');
+  var ok = 0, err = 0;
+  for (var i = 0; i < toTrack.length; i++) {
+    var s = toTrack[i];
+    var guia = s.trackingOrderNumber || s.shalomGuia || '';
+    var codigo = s.trackingOrderCode || s.shalomCodigo || '';
+    try {
+      var raw = await consultarShalom(guia, codigo);
+      var res = aplicarResultado(s, raw, 'auto');
+      if (res === 'error') { err++; }
+      else {
+        ok++;
+        if (window.save) window.save(s.id);
+        if (window._fbSaveShipmentNow) window._fbSaveShipmentNow(s);
+      }
+    } catch (e) { err++; }
+    await new Promise(function(r){ setTimeout(r, 600); }); // respiro entre consultas
+  }
+  if (window.render) window.render();
+  var msg = '✅ ' + ok + ' trackeado' + (ok!==1?'s':'');
+  if (recientes) msg += ' · ' + recientes + ' ya consultado' + (recientes!==1?'s':'');
+  if (sinNum) msg += ' · ' + sinNum + ' sin número';
+  if (err) msg += ' · ' + err + ' error' + (err!==1?'es':'');
+  if (window.toast) window.toast(msg);
 };
 
 /* ── verHistorial ────────────────────────────────────────────────── */

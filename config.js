@@ -950,6 +950,8 @@ function changePIN(){
 /* CONFIG */
 function loadCfgUI(){
   $('cfgName').value=S.config.name||'';$('cfgPhone').value=S.config.phone||'';$('cfgCity').value=S.config.city||'';
+  // Toggle auto-tracking Shalom (por defecto encendido)
+  { const t=$('tglShalomAuto'); if(t) t.classList.toggle('on', S.config.shalomAutoTrack!==false); }
 
   // DISPATCH DAYS
   const days=[{n:'Lun',v:1},{n:'Mar',v:2},{n:'Mié',v:3},{n:'Jue',v:4},{n:'Vie',v:5},{n:'Sáb',v:6},{n:'Dom',v:0}];
