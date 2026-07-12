@@ -56,7 +56,7 @@ function openTrash(){
   const now=Date.now();
   const before=S.trash.length;
   S.trash=S.trash.filter(x=>(now-x.deletedAt)<30*24*60*60*1000);
-  if(S.trash.length!==before) save();
+  if(S.trash.length!==before) save('config'); // auto-purga: solo cambia trash (config)
 
   if(!S.trash.length){
     $('trashList').innerHTML='<div style="text-align:center;padding:24px;color:var(--text2)">🗑️<br><br>La papelera está vacía</div>';
@@ -84,7 +84,7 @@ function restoreTrash(i){
   item.shipment.sel=false;
   S.shipments.push(item.shipment);
   S.trash.splice(i,1);
-  save();render();openTrash();toast(`✅ ${item.shipment.name} recuperado`);
+  save(item.shipment.id);render();openTrash();toast(`✅ ${item.shipment.name} recuperado`); // recrea ese pedido + trash (config), no los 170
 }
 
 function emptyTrash(){
@@ -101,7 +101,7 @@ function emptyTrash(){
         await Promise.all(items.map(x=>window._fbDeleteTrashItem(x._id)));
       }
     }catch(e){console.warn('emptyTrash subcol:',e.message);}
-    S.trash=[];save();closeOverlay('delOverlay');openTrash();toast('🗑️ Papelera vaciada');
+    S.trash=[];save('config');closeOverlay('delOverlay');openTrash();toast('🗑️ Papelera vaciada'); // solo config (trash)
     $('delYes').disabled=false;
     $('delYes').textContent='Eliminar definitivamente';
   };

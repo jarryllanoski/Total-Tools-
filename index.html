@@ -2180,8 +2180,8 @@ function applyStatus(st){
   const sel=S.shipments.filter(x=>x.sel);
   if(sel.length>1){
     // Apply to all selected
-    sel.forEach(x=>{ x.status=st; x.sel=false; });
-    save(); render(); closeOverlay('statusOverlay');
+    sel.forEach(x=>{ x.status=st; x.sel=false; save(x.id); }); // incremental: solo los seleccionados
+    render(); closeOverlay('statusOverlay');
     toast(`${stIcon(st)} ${st} → ${sel.length} clientes`);
   } else {
     s.status=st; s.sel=false;
@@ -2206,7 +2206,7 @@ function openDel(id){
       S.trash.push({shipment:s,deletedAt:Date.now()});
       S.shipments=S.shipments.filter(x=>x.id!==id);
       if(window._fbDeleteShipment) window._fbDeleteShipment(id);
-      save();render();closeOverlay('delOverlay');toast('🗑️ Movido a papelera');
+      save('config');render();closeOverlay('delOverlay');toast('🗑️ Movido a papelera'); // solo config (trash): el pedido ya se borró de Firestore
     }catch(e){
       $('delYes').disabled=false;
       $('delYes').textContent='Mover a papelera';
@@ -2228,7 +2228,7 @@ function delSelected(){
       if(window._fbDeleteShipment) window._fbDeleteShipment(s.id);
     });
     S.shipments=S.shipments.filter(x=>!x.sel);
-    save();render();closeOverlay('delOverlay');toast(`🗑️ ${sel.length} movidos a papelera`);
+    save('config');render();closeOverlay('delOverlay');toast(`🗑️ ${sel.length} movidos a papelera`); // solo config (trash): los pedidos ya se borraron de Firestore
   };
   openOverlay('delOverlay');
 }
