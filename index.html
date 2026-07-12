@@ -1562,8 +1562,8 @@ function cardHTML(s){
         style="cursor:pointer;flex:1;user-select:none">
         ${escH(s.name)}${pvtNote?` <span style="font-size:11px;color:var(--purple);opacity:.7">🔒</span>`:''}
       </div>
-      <button class="wa-btn" onclick="openWA('${s.id}')">💬</button>
       <button class="wa-btn" onclick="event.stopPropagation();if(window.Cotizacion)Cotizacion.abrir('${s.id}')" title="Cotización">🧾${(Array.isArray(s.cotizItems)&&s.cotizItems.length)?`<span style="font-size:9px;font-weight:700;color:var(--blue);margin-left:1px">${s.cotizItems.length}</span>`:''}</button>
+      <button class="wa-btn" onclick="openWA('${s.id}')">💬</button>
     </div>
     ${pvtNote?`<div class="pvt-note" id="pvt_${s.id}" style="display:none" ondblclick="openPrivateNote('${s.id}')">🔒 ${escH(pvtNote)}</div>`:''}
     <div class="card-meta">
