@@ -2216,6 +2216,8 @@ function applyStatus(st){
     s.status=st; s.sel=false;
     save(s.id); render(); closeOverlay('statusOverlay'); // ★ incremental: solo este pedido
     toast(`${stIcon(st)} ${st}`);
+    // Hook Cotización: al pasar a EN PROCESO, ofrece enviar los faltantes a un proveedor.
+    if(window.Cotizacion && Cotizacion.onEstado) Cotizacion.onEstado(s.id, st);
   }
 }
 

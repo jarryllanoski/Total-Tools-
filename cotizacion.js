@@ -227,6 +227,7 @@
       +     '<button onclick="Cotizacion._addRow()" style="flex:1;padding:12px;background:var(--bg2);border:1.5px solid var(--bd);border-radius:12px;color:var(--text);font-weight:600;font-size:13px;cursor:pointer;font-family:inherit">➕ Fila</button>'
       +     '<button onclick="Cotizacion.guardar()" style="flex:2;padding:12px;background:var(--green,#2ea043);border:none;border-radius:12px;color:#fff;font-weight:700;font-size:14px;cursor:pointer;font-family:inherit">💾 Guardar</button>'
       +   '</div>'
+      +   '<button onclick="Cotizacion._guardarYEnviar()" style="width:100%;margin-top:8px;padding:12px;background:rgba(56,139,253,.15);border:1.5px solid rgba(56,139,253,.4);border-radius:12px;color:var(--blue);font-weight:700;font-size:13px;cursor:pointer;font-family:inherit">📤 Enviar faltantes a proveedor</button>'
       + '</div>';
     // Cerrar sólo al tocar el fondo (no dentro del panel). El listener nativo de
     // fondo se engancha al cargar, y este overlay se inyecta después → lo ponemos acá.
@@ -234,7 +235,8 @@
     document.body.appendChild(ov);
   }
 
-  var _rows = []; // estado de edición: [{codigo, desc, cant}]
+  var _rows = []; // estado de edición: [{codigo, desc, cant, enTienda}]
+  var _envioId=null, _envioItems=[]; // estado del diálogo "enviar a proveedor" (Fase 2b)
 
   function _renderRows(){
     var el=document.getElementById('cotizList'); if(!el) return;
@@ -275,6 +277,65 @@
     el.textContent=msg||''; el.style.color=color||'var(--text2)';
   }
 
+  // Persiste _rows en el pedido (sin cerrar el panel). Devuelve el shipment.
+  function _persist(){
+    var s=_find(_curId); if(!s) return null;
+    var items=_rows
+      .map(function(r){ return { codigo:(r.codigo||'').trim().toUpperCase(), desc:(r.desc||'').trim(), cant:parseInt(r.cant,10)||1, enTienda:!!r.enTienda, proveedor:null }; })
+      .filter(function(r){ return r.codigo || r.desc; });
+    // Preservar el proveedor asignado por código.
+    if(Array.isArray(s.cotizItems)){
+      items.forEach(function(r){ var prev=s.cotizItems.find(function(p){ return p.codigo===r.codigo; }); if(prev) r.proveedor=prev.proveedor||null; });
+    }
+    s.cotizItems=items;
+    if(typeof save==='function') save(s.id); // incremental
+    return s;
+  }
+
+  /* ── PANEL "ENVIAR A PROVEEDOR" (Fase 2b, auto-inyectado) ──────────────── */
+  function _ensureEnvioPanel(){
+    if(document.getElementById('cotizEnvioOverlay')) return;
+    var ov=document.createElement('div');
+    ov.id='cotizEnvioOverlay'; ov.className='overlay';
+    ov.innerHTML=''
+      + '<div class="sheet" onclick="event.stopPropagation()" style="max-height:85vh;display:flex;flex-direction:column">'
+      +   '<div class="sheet-handle"></div>'
+      +   '<div class="sheet-title">🏭 Enviar a cotizar — <span id="cotizEnvWho"></span></div>'
+      +   '<div id="cotizEnvInfo" style="font-size:11.5px;color:var(--text2);line-height:1.5;margin-bottom:10px"></div>'
+      +   '<div id="cotizEnvList" style="overflow-y:auto;flex:1;min-height:40px;margin-bottom:10px"></div>'
+      +   '<label style="font-size:11px;color:var(--text2);display:block;margin-bottom:4px">Enviar a proveedor:</label>'
+      +   '<select id="cotizEnvSup" style="width:100%;background:var(--bg2);border:1px solid var(--bd);border-radius:10px;color:var(--text);padding:11px;font-size:14px;font-family:inherit;margin-bottom:10px;box-sizing:border-box"></select>'
+      +   '<div style="display:flex;gap:8px">'
+      +     '<button onclick="Cotizacion._closeEnvio()" style="flex:1;padding:12px;background:var(--bg2);border:1.5px solid var(--bd);border-radius:12px;color:var(--text);font-weight:600;font-size:13px;cursor:pointer;font-family:inherit">Ahora no</button>'
+      +     '<button onclick="Cotizacion._confirmEnvio()" style="flex:2;padding:12px;background:var(--blue);border:none;border-radius:12px;color:#fff;font-weight:700;font-size:14px;cursor:pointer;font-family:inherit">📤 Enviar a proveedor</button>'
+      +   '</div>'
+      + '</div>';
+    ov.addEventListener('click', function(e){ if(e.target===ov) Cotizacion._closeEnvio(); });
+    document.body.appendChild(ov);
+  }
+
+  function _openEnvio(s, aEnviar, sinStockN, sups){
+    Cotizacion.cerrar(); // cerrar el panel de cotización si estaba abierto
+    _envioId=s.id; _envioItems=aEnviar;
+    _ensureEnvioPanel();
+    document.getElementById('cotizEnvWho').textContent=s.name||'—';
+    document.getElementById('cotizEnvInfo').innerHTML=
+      'Faltantes que el proveedor tiene: <b>'+aEnviar.length+'</b>'
+      + (sinStockN?(' · <span style="color:#d29922">⚠️ '+sinStockN+' sin stock en el Excel</span>'):'')
+      + (_stock?'':' · <i>(sin Excel cargado — se envían todos los faltantes)</i>');
+    document.getElementById('cotizEnvList').innerHTML=aEnviar.map(function(r){
+      var m=_stockFind(r.codigo);
+      return '<div style="padding:7px 0;border-bottom:1px solid var(--bd);font-size:12.5px">'
+        + '<b style="font-family:monospace">'+_esc(r.codigo)+'</b> · '+_esc(r.desc||'')+' · <b>'+_esc(r.cant)+'</b>u'
+        + (m&&m.precio?(' <span style="color:var(--green,#2ea043)">'+_esc(m.precio)+'</span>'):'')
+        + '</div>';
+    }).join('');
+    var sel=document.getElementById('cotizEnvSup');
+    if(!sups.length){ sel.innerHTML='<option value="">Sin proveedores — agregá uno en Proveedores</option>'; }
+    else { sel.innerHTML=sups.map(function(su){ return '<option value="'+_esc(su.id)+'">'+_esc(su.name||su.id)+'</option>'; }).join(''); }
+    if(typeof openOverlay==='function') openOverlay('cotizEnvioOverlay');
+  }
+
   /* ── API pública ─────────────────────────────────────────────────────── */
   var Cotizacion = {
     parseTexto: parseTexto,
@@ -295,8 +356,8 @@
     },
 
     cerrar: function(){
-      if(typeof closeOverlay==='function') closeOverlay('cotizOverlay');
-      else { var o=document.getElementById('cotizOverlay'); if(o) o.style.display='none'; }
+      var o=document.getElementById('cotizOverlay'); if(!o) return; // aún no inyectado
+      if(typeof closeOverlay==='function') closeOverlay('cotizOverlay'); else o.classList.remove('open');
     },
 
     _togglePaste: function(){
@@ -384,23 +445,72 @@
     },
     getStock: function(){ return _stock; },
 
-    guardar: function(){
-      var s=_find(_curId); if(!s){ _toast('Pedido no encontrado'); return; }
-      var items=_rows
-        .map(function(r){ return { codigo:(r.codigo||'').trim().toUpperCase(), desc:(r.desc||'').trim(), cant:parseInt(r.cant,10)||1, enTienda:!!r.enTienda, proveedor:null }; })
-        .filter(function(r){ return r.codigo || r.desc; });
-      // Preservar el proveedor asignado (Fase 2b) por código, para no perderlo.
-      if(Array.isArray(s.cotizItems)){
-        items.forEach(function(r){
-          var prev=s.cotizItems.find(function(p){ return p.codigo===r.codigo; });
-          if(prev) r.proveedor=prev.proveedor||null;
-        });
+    // ── ENVIAR A PROVEEDOR (Fase 2b) ──────────────────────────────────────
+    // Compara los faltantes con el Excel; abre el diálogo para elegir proveedor.
+    enviarProveedor: function(id){
+      var s=_find(id); if(!s){ _toast('Pedido no encontrado'); return; }
+      var items=Array.isArray(s.cotizItems)?s.cotizItems:[];
+      var faltantes=items.filter(function(r){ return !r.enTienda; });
+      if(!faltantes.length){ _toast('No hay faltantes en esta cotización'); return; }
+      var aEnviar, sinStockN=0;
+      if(_stock){
+        aEnviar=faltantes.filter(function(r){ return !!_stockFind(r.codigo); });
+        sinStockN=faltantes.length-aEnviar.length;
+        if(!aEnviar.length){ _toast('Ningún faltante está en el Excel de stock'); return; }
+      } else {
+        aEnviar=faltantes.slice(); // sin Excel: se envían todos los faltantes
       }
-      s.cotizItems=items;
-      if(typeof save==='function') save(s.id);   // incremental: sólo este pedido (1 escritura)
+      _openEnvio(s, aEnviar, sinStockN, (window.S&&S.suppliers)||[]);
+    },
+
+    // Hook: se llama al cambiar el estado de un pedido. Sólo actúa en EN PROCESO.
+    onEstado: function(id, st){
+      if(!/PROCESO/i.test(st||'')) return;
+      var s=_find(id); if(!s || !Array.isArray(s.cotizItems) || !s.cotizItems.length) return;
+      var faltantes=s.cotizItems.filter(function(r){ return !r.enTienda; });
+      if(!faltantes.length) return;       // nada que conseguir → no molesta
+      this.enviarProveedor(id);           // abre el diálogo (con confirmación)
+    },
+
+    _closeEnvio: function(){
+      if(typeof closeOverlay==='function') closeOverlay('cotizEnvioOverlay');
+      else { var o=document.getElementById('cotizEnvioOverlay'); if(o) o.classList.remove('open'); }
+    },
+
+    _confirmEnvio: function(){
+      var s=_find(_envioId); if(!s){ this._closeEnvio(); return; }
+      var sel=document.getElementById('cotizEnvSup');
+      var supId=sel?sel.value:'';
+      var sup=((window.S&&S.suppliers)||[]).find(function(x){ return x.id===supId; });
+      if(!sup){ _toast('Elegí un proveedor (o agregá uno en Proveedores)'); return; }
+      if(!sup.items) sup.items=[];
+      var added=0;
+      _envioItems.forEach(function(r){
+        var line=(r.cant||1)+' x '+r.codigo+(r.desc?(' — '+r.desc):'');
+        var exists=sup.items.some(function(it){ return (it.text||'').indexOf(r.codigo)>=0; });
+        if(!exists){ sup.items.push({text:line, done:false}); added++; }
+        var ci=(s.cotizItems||[]).find(function(p){ return p.codigo===r.codigo; });
+        if(ci) ci.proveedor=sup.id; // marca a qué proveedor se envió
+      });
+      if(typeof save==='function'){ save('supp:'+sup.id); save(s.id); } // incremental: proveedor + pedido
+      if(typeof render==='function') render();
+      this._closeEnvio();
+      _toast('📤 '+_envioItems.length+' ítem(s) → '+(sup.name||'proveedor')+(added<_envioItems.length?' ('+(_envioItems.length-added)+' ya estaban)':'')+'. Enviá desde Proveedores.');
+    },
+
+    guardar: function(){
+      var s=_persist(); if(!s){ _toast('Pedido no encontrado'); return; }
       if(typeof render==='function') render();
       this.cerrar();
-      _toast('💾 Cotización guardada ('+items.length+' ítem'+(items.length!==1?'s':'')+')');
+      var n=(s.cotizItems||[]).length;
+      _toast('💾 Cotización guardada ('+n+' ítem'+(n!==1?'s':'')+')');
+    },
+
+    // Guarda y abre el diálogo de envío a proveedor (botón del panel).
+    _guardarYEnviar: function(){
+      var s=_persist(); if(!s){ _toast('Pedido no encontrado'); return; }
+      if(typeof render==='function') render();
+      this.enviarProveedor(s.id);
     },
 
     // Para la tarjeta: ¿cuántos ítems tiene la cotización de este pedido?
