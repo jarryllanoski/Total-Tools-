@@ -599,7 +599,7 @@
     <div class="sheet-title"><span id="formTitle">Nuevo Envío</span><span onclick="if(window.Ayuda)Ayuda.abrir('nuevoEnvio')" style="float:right;font-size:11px;color:#8b949e;cursor:pointer;font-weight:400" title="Ayuda">📖 Ayuda</span></div>
     <div class="frow">
       <div class="fg"><label class="fl">Nombre *</label><input class="fi" id="fName" placeholder="Nombre completo"></div>
-      <div class="fg"><label class="fl">Teléfono *</label><input class="fi" id="fPhone" placeholder="9XXXXXXXX" maxlength="9" inputmode="numeric" onpaste="setTimeout(()=>{var v=this.value.replace(/\D/g,'');if(v.startsWith('51')&&v.length>9)v=v.slice(2);this.value=v.slice(-9)},0)" oninput="this.value=this.value.replace(/\D/g,'').slice(0,9)"></div>
+      <div class="fg"><label class="fl">Teléfono *</label><input class="fi" id="fPhone" placeholder="9XXXXXXXX" maxlength="9" inputmode="numeric" onpaste="setTimeout(()=>{var v=this.value.replace(/\D/g,'');if(v.startsWith('51')&&v.length>9)v=v.slice(2);this.value=v.slice(0,9)},0)" oninput="var v=this.value.replace(/\D/g,'');if(v.startsWith('51')&&v.length>9)v=v.slice(2);this.value=v.slice(0,9)"></div>
     </div>
     <div class="frow">
       <div class="fg"><label class="fl">DNI</label><input class="fi" id="fDni" placeholder="12345678" maxlength="8" inputmode="numeric"></div>
