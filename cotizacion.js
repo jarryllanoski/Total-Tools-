@@ -198,7 +198,8 @@
     var ov=document.createElement('div');
     ov.id='cotizOverlay';
     ov.className='overlay';
-    ov.style.cssText='display:none';
+    // OJO: sin display:none inline — la clase .overlay ya lo oculta y .overlay.open
+    // lo muestra; un estilo inline le ganaría a la clase y el panel quedaría invisible.
     ov.innerHTML=''
       + '<div class="sheet" onclick="event.stopPropagation()" style="max-height:88vh;display:flex;flex-direction:column">'
       +   '<div class="sheet-handle"></div>'
@@ -227,7 +228,9 @@
       +     '<button onclick="Cotizacion.guardar()" style="flex:2;padding:12px;background:var(--green,#2ea043);border:none;border-radius:12px;color:#fff;font-weight:700;font-size:14px;cursor:pointer;font-family:inherit">💾 Guardar</button>'
       +   '</div>'
       + '</div>';
-    ov.addEventListener('click', function(){ Cotizacion.cerrar(); });
+    // Cerrar sólo al tocar el fondo (no dentro del panel). El listener nativo de
+    // fondo se engancha al cargar, y este overlay se inyecta después → lo ponemos acá.
+    ov.addEventListener('click', function(e){ if(e.target===ov) Cotizacion.cerrar(); });
     document.body.appendChild(ov);
   }
 
