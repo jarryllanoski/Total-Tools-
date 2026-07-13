@@ -239,6 +239,13 @@
     }
   };
 
+  window._fbDeleteSupplier = async (id) => {
+    for(let i=0; i<3; i++){
+      try{ await fsDel(suppPath(id)); return; }
+      catch(e){ if(i < 2) await new Promise(r=>setTimeout(r, 2000*(i+1))); else console.warn('No se pudo eliminar proveedor:', id, e.message); }
+    }
+  };
+
   // ── TRASH SUBCOLLECTION ────────────────────────────────────────────
   window._fbWriteTrashItem = async (id, item) => {
     await fsPatch('panel/trash/items/' + id, item);
@@ -741,8 +748,11 @@
     </div>
     <div id="suppPhone" style="color:var(--blue);font-size:13px;margin-bottom:10px;display:flex;align-items:center;gap:8px"></div>
 
-    <!-- COTIZACIÓN COMPACTA -->
+    <!-- COTIZACIÓN COMPACTA (PDF / imagen) -->
     <div id="suppCotizArea" style="margin-bottom:8px"></div>
+
+    <!-- EXCEL DE STOCK DEL PROVEEDOR -->
+    <div id="suppStockArea" style="margin-bottom:8px"></div>
 
     <!-- LISTA HEADER -->
     <div style="font-size:10px;font-weight:700;color:var(--text2);letter-spacing:.8px;margin-bottom:6px;cursor:pointer;user-select:none" ondblclick="toggleAllSuppItems()">📋 PENDIENTES</div>
@@ -751,10 +761,14 @@
       <input class="fi" id="suppNewItem" placeholder="Agregar producto o tarea..." style="flex:1" onkeydown="if(event.key==='Enter')addSuppItem()">
       <button class="cfl-plus" onclick="addSuppItem()">＋</button>
     </div>
-    <button class="btn-sec" onclick="closeOverlay('suppOverlay')">Cerrar</button>
+    <div style="display:flex;gap:8px">
+      <button class="btn-sec" style="flex:1" onclick="closeOverlay('suppOverlay')">Cerrar</button>
+      <button id="suppDelBtn" class="btn-sec" style="flex:1;color:var(--red);border-color:rgba(248,81,73,.4);display:none" onclick="delSupplier(_suppId)">🗑️ Eliminar</button>
+    </div>
     <input type="file" id="cotizCam" accept="image/*" capture="environment" style="display:none" onchange="loadCotiz(this)">
     <input type="file" id="cotizGal" accept="image/*" style="display:none" onchange="loadCotiz(this)">
     <input type="file" id="cotizPdf" accept=".pdf,application/pdf" style="display:none" onchange="loadCotiz(this)">
+    <input type="file" id="suppStockFile" accept=".xlsx,.xls,.csv" style="display:none" onchange="loadSuppStock(this)">
   </div>
 </div>
 
@@ -766,6 +780,12 @@
     <div class="fg"><label class="fl">Nombre del proveedor</label><input class="fi" id="suppNewName" placeholder="Ej: Distribuidora ABC..."></div>
     <div class="fg"><label class="fl">Teléfono WhatsApp</label>
       <div class="ph-wrap"><span class="ph-pre">+51</span><input class="fi" id="suppNewPhone" placeholder="9XXXXXXXX" maxlength="9" type="tel"></div>
+    </div>
+    <div class="fg"><label class="fl">Tipo</label>
+      <div style="display:flex;gap:8px">
+        <label style="flex:1;display:flex;align-items:center;justify-content:center;gap:6px;background:var(--bg2);border:1.5px solid var(--bd);border-radius:10px;padding:11px;font-size:13px;font-weight:600;color:var(--text);cursor:pointer"><input type="radio" name="suppTipo" value="proveedor" checked style="accent-color:var(--blue)"> 🏭 Proveedor</label>
+        <label style="flex:1;display:flex;align-items:center;justify-content:center;gap:6px;background:var(--bg2);border:1.5px solid var(--bd);border-radius:10px;padding:11px;font-size:13px;font-weight:600;color:var(--text);cursor:pointer"><input type="radio" name="suppTipo" value="tienda" style="accent-color:var(--green)"> 🏬 Mi tienda</label>
+      </div>
     </div>
     <button class="btn-pri" onclick="saveNewSupplier()">💾 Guardar proveedor</button>
     <button class="btn-sec" onclick="closeOverlay('suppNewOverlay')">Cancelar</button>
@@ -1841,17 +1861,22 @@ function globalSuppSearch(raw){
 
 function renderSuppliersPanel(){
   if(!S.suppliers) S.suppliers=[];
+  if(window.Cotizacion&&Cotizacion.ensureTienda) Cotizacion.ensureTienda(); // 🏬 Tienda fija
   return`<div class="supp-panel">
     <div class="supp-panel-hdr">
       <div class="supp-panel-ttl">🏭 Proveedores</div>
-      <span style="font-size:11px;color:var(--text2)">${S.suppliers.length} proveedor${S.suppliers.length!==1?'es':''}</span>
+      <span style="display:flex;align-items:center;gap:10px">
+        <span style="font-size:11px;color:var(--text2)">${S.suppliers.length} fuente${S.suppliers.length!==1?'s':''}</span>
+        <span onclick="event.stopPropagation();if(window.Ayuda)Ayuda.abrir('proveedores')" style="font-size:12px;color:#a78bfa;cursor:pointer;font-weight:600" title="Ayuda">📖</span>
+      </span>
     </div>
     <div class="supp-cards">
       ${S.suppliers.map(sup=>{
         const pending=sup.items?sup.items.filter(x=>!x.done).length:0;
         const total=sup.items?sup.items.length:0;
+        const esTienda=sup.tipo==='tienda';
         return`<div class="supp-card ${pending>0?'has-pending':''}" onclick="openSupplier('${sup.id}')">
-          <div class="supp-card-name">${sup.name}</div>
+          <div class="supp-card-name">${esTienda?'🏬 ':''}${sup.name}${esTienda?' <span style="font-size:9px;color:var(--green);font-weight:700;background:rgba(46,160,67,.15);border-radius:4px;padding:1px 5px;vertical-align:middle">TIENDA</span>':''}</div>
           <div class="supp-card-phone">
             <span>📞 ${sup.phone}</span>
             <button onclick="event.stopPropagation();window.open('https://wa.me/51${sup.phone}','_blank')" style="background:rgba(46,160,67,.15);border:1px solid rgba(46,160,67,.3);color:var(--green);border-radius:6px;width:24px;height:24px;font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0">💬</button>
@@ -1874,13 +1899,81 @@ function renderSuppliersPanel(){
 function openSupplier(id){
   _suppId=id;
   const sup=S.suppliers.find(x=>x.id===id); if(!sup) return;
-  $('suppName').textContent='🏭 '+sup.name;
+  const esTienda=sup.tipo==='tienda';
+  $('suppName').textContent=(esTienda?'🏬 ':'🏭 ')+sup.name;
   $('suppPhone').innerHTML=`📞 ${sup.phone} <button onclick="window.open('https://wa.me/51${sup.phone}','_blank')" style="background:rgba(46,160,67,.15);border:1px solid rgba(46,160,67,.3);color:var(--green);border-radius:7px;padding:4px 10px;font-size:12px;font-weight:700;cursor:pointer">💬 WhatsApp</button>`;
   renderCotizArea(sup);
+  renderSuppStock(sup);
   renderSuppItems(sup);
   $('suppNewItem').value='';
   const srch=$('suppSearch'); if(srch) srch.value='';
+  const delBtn=$('suppDelBtn'); if(delBtn) delBtn.style.display=esTienda?'none':'block'; // la Tienda no se borra
   openOverlay('suppOverlay');
+}
+
+/* Excel de stock del proveedor (o de la tienda). Reusa la API de Cotización. */
+function renderSuppStock(sup){
+  const area=$('suppStockArea'); if(!area) return;
+  const st=(window.Cotizacion&&Cotizacion.stock)?Cotizacion.stock.get(sup.id):null;
+  const esTienda=sup.tipo==='tienda';
+  const etiqueta=esTienda?'Stock de tienda':'Excel de stock';
+  if(st&&st.meta){
+    area.innerHTML=`<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;background:var(--bg3);border:1px solid var(--bd);border-radius:8px;padding:8px 12px">
+      <span style="font-size:11px;color:var(--text2);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">📊 ${etiqueta}: <b style="color:var(--text)">${st.meta.count}</b> productos${st.fileName?` · ${escH(st.fileName)}`:''}</span>
+      <span style="display:flex;gap:6px;flex-shrink:0">
+        <button onclick="$('suppStockFile').click()" style="background:rgba(56,139,253,.12);border:1px solid rgba(56,139,253,.25);color:var(--blue);border-radius:6px;padding:4px 9px;font-size:10px;font-weight:700;cursor:pointer">🔄</button>
+        <button onclick="delSuppStock('${sup.id}')" style="background:rgba(248,81,73,.1);border:1px solid rgba(248,81,73,.3);color:var(--red);border-radius:6px;padding:4px 9px;font-size:10px;font-weight:700;cursor:pointer">🗑️</button>
+      </span>
+    </div>`;
+  } else {
+    area.innerHTML=`<div style="display:flex;align-items:center;justify-content:space-between;background:var(--bg3);border:1px dashed var(--bd);border-radius:8px;padding:8px 12px">
+      <span style="font-size:11px;color:var(--text2)">📊 Sin ${etiqueta.toLowerCase()}</span>
+      <button onclick="$('suppStockFile').click()" style="background:rgba(56,139,253,.12);border:1px solid rgba(56,139,253,.25);color:var(--blue);border-radius:6px;padding:4px 10px;font-size:11px;font-weight:700;cursor:pointer">＋ Subir Excel</button>
+    </div>`;
+  }
+}
+
+function loadSuppStock(input){
+  const file=input.files[0]; if(!file) return;
+  const sup=S.suppliers.find(x=>x.id===_suppId); if(!sup){ input.value=''; return; }
+  if(typeof XLSX==='undefined'){ toast('⚠️ Librería de Excel no disponible'); input.value=''; return; }
+  const r=new FileReader();
+  r.onload=e=>{
+    try{
+      const wb=XLSX.read(e.target.result,{type:'array'});
+      const ws=wb.Sheets[wb.SheetNames[0]];
+      const aoa=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
+      const n=Cotizacion.stock.importAOA(sup.id, aoa, file.name);
+      if(!n){ toast('⚠️ No se reconoció columna de código en el Excel'); return; }
+      renderSuppStock(sup);
+      toast(`✅ ${n} productos cargados`);
+    }catch(err){ toast('⚠️ '+(err.message||'Error leyendo Excel')); }
+  };
+  r.readAsArrayBuffer(file);
+  input.value='';
+}
+
+function delSuppStock(id){
+  if(window.Cotizacion&&Cotizacion.stock) Cotizacion.stock.del(id);
+  const sup=S.suppliers.find(x=>x.id===id); if(sup) renderSuppStock(sup);
+  toast('🗑️ Excel de stock eliminado');
+}
+
+function delSupplier(id){
+  const sup=S.suppliers.find(x=>x.id===id); if(!sup) return;
+  if(sup.tipo==='tienda'){ toast('🏬 La tienda no se puede eliminar'); return; }
+  $('delMsg').textContent=`¿Eliminar el proveedor "${sup.name}"? Se borra su Excel de stock. No se puede deshacer.`;
+  $('delYes').style.background='var(--red)';
+  $('delYes').textContent='Eliminar proveedor';
+  $('delYes').disabled=false;
+  $('delYes').onclick=()=>{
+    S.suppliers=S.suppliers.filter(x=>x.id!==id);
+    if(window.Cotizacion&&Cotizacion.stock) Cotizacion.stock.del(id);
+    if(window._fbDeleteSupplier) window._fbDeleteSupplier(id); // borra el doc en Firestore
+    save('config'); render(); closeOverlay('delOverlay'); closeOverlay('suppOverlay'); // bump ts para otros dispositivos
+    toast('🗑️ Proveedor eliminado');
+  };
+  openOverlay('delOverlay');
 }
 function toggleAllSuppItems(){
   const sup=S.suppliers.find(x=>x.id===_suppId); if(!sup||!sup.items||!sup.items.length) return;
@@ -2017,11 +2110,16 @@ function saveNewSupplier(){
   const name=$('suppNewName').value.trim();
   const phone=$('suppNewPhone').value.trim();
   if(!name){toast('⚠️ Ingresa el nombre');return}
-  const _ns={id:'sup_'+Date.now(),name,phone,items:[]};
+  const tipoEl=document.querySelector('input[name="suppTipo"]:checked');
+  const tipo=(tipoEl&&tipoEl.value==='tienda')?'tienda':'proveedor';
+  // Tienda exclusiva: si marcás esta como tienda, la anterior pasa a proveedor.
+  if(tipo==='tienda'){ (S.suppliers||[]).forEach(x=>{ if(x.tipo==='tienda'){ x.tipo='proveedor'; save('supp:'+x.id); } }); }
+  const _ns={id:(tipo==='tienda'?'sup_tienda_'+Date.now():'sup_'+Date.now()),name,phone,items:[],tipo};
   S.suppliers.push(_ns);
   $('suppNewName').value=''; $('suppNewPhone').value='';
+  const r=document.querySelector('input[name="suppTipo"][value="proveedor"]'); if(r) r.checked=true;
   save('supp:'+_ns.id); render(); closeOverlay('suppNewOverlay');
-  toast('✅ Proveedor agregado');
+  toast(tipo==='tienda'?'🏬 Tienda definida':'✅ Proveedor agregado');
 }
 
 function openSuppSwitch(){

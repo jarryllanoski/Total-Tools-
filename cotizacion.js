@@ -23,13 +23,28 @@
 
   var _curId = null; // pedido abierto en el panel
 
-  // ── STOCK DE PROVEEDOR (Fase 2a) ────────────────────────────────────────
-  // Catálogo cargado desde un Excel subido. Vive en localStorage (es grande,
-  // no va a Firestore) y sirve para TODOS los pedidos hasta que subas otro.
-  var STOCK_KEY = 'tt_cotiz_stock';
-  var _stock = null; // { catalog:{COD:{codigo,desc,precio,stock}}, meta, fileName, ts }
-  try{ var _sraw = localStorage.getItem(STOCK_KEY); if(_sraw) _stock = JSON.parse(_sraw); }catch(e){}
-  function _stockFind(cod){ if(!_stock||!_stock.catalog||!cod) return null; return _stock.catalog[String(cod).trim().toUpperCase()]||null; }
+  // ── STOCK: API por FUENTE (tienda o proveedor) ──────────────────────────
+  // Cada fuente guarda su catálogo bajo 'tt_stock_<id>'. La UI NUNCA toca el
+  // almacenamiento directo: usa esta API. Así el backend es intercambiable
+  // (localStorage hoy; IndexedDB si el volumen crece) sin tocar la UI —
+  // "funciona con cualquier carga de trabajo".
+  var STOCK_PREFIX = 'tt_stock_';
+  var TIENDA_ID    = 'sup_tienda';   // fuente fija: mi tienda (stock propio)
+  function _stockKey(pid){ return STOCK_PREFIX + pid; }
+  var Stock = {
+    get: function(pid){ try{ var r=localStorage.getItem(_stockKey(pid)); return r?JSON.parse(r):null; }catch(e){ return null; } },
+    set: function(pid,data){ try{ localStorage.setItem(_stockKey(pid), JSON.stringify(data)); return true; }catch(e){ return false; } },
+    del: function(pid){ try{ localStorage.removeItem(_stockKey(pid)); }catch(e){} },
+    // Lookup O(1) por código.
+    find: function(pid,cod){ var s=this.get(pid); if(!s||!s.catalog||!cod) return null; return s.catalog[String(cod).trim().toUpperCase()]||null; },
+    // Parsea el Excel (array-of-arrays) y lo guarda. Devuelve nº de productos.
+    importAOA: function(pid,aoa,fileName){ var res=_detectAndBuild(aoa); if(!res||!res.meta.count) return 0; this.set(pid,{catalog:res.catalog,meta:res.meta,fileName:fileName||'',ts:Date.now()}); return res.meta.count; }
+  };
+  // Migración única del stock global viejo → stock de tienda.
+  try{ if(!localStorage.getItem(_stockKey(TIENDA_ID))){ var _old=localStorage.getItem('tt_cotiz_stock'); if(_old){ localStorage.setItem(_stockKey(TIENDA_ID), _old); localStorage.removeItem('tt_cotiz_stock'); } } }catch(e){}
+
+  function _tiendaStock(){ return Stock.get(TIENDA_ID); }         // el stock de tienda (Excel del panel 🧾)
+  function _stockFind(cod){ return Stock.find(TIENDA_ID, cod); }  // ¿está en tienda?
 
   // Helpers seguros (por si el global no existe en algún contexto)
   function _esc(s){ return (typeof escH==='function') ? escH(s) : String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
@@ -140,8 +155,9 @@
 
   function _renderStockBar(){
     var info=document.getElementById('cotizStockInfo'); if(!info) return;
-    if(_stock && _stock.meta){ info.innerHTML='📊 <b>'+_stock.meta.count+'</b> productos'+(_stock.fileName?(' · '+_esc(_stock.fileName)):''); }
-    else { info.textContent='📊 Sin Excel de stock cargado'; }
+    var t=_tiendaStock();
+    if(t && t.meta){ info.innerHTML='🏬 Stock de tienda: <b>'+t.meta.count+'</b> productos'+(t.fileName?(' · '+_esc(t.fileName)):''); }
+    else { info.textContent='🏬 Sin stock de tienda cargado'; }
   }
 
   /* ── CARGA PEREZOSA DE pdf.js ────────────────────────────────────────── */
@@ -221,8 +237,8 @@
       +     '<button onclick="Cotizacion._parsePasted()" style="width:100%;margin-top:6px;padding:10px;background:var(--blue);border:none;border-radius:10px;color:#fff;font-weight:700;font-size:13px;cursor:pointer;font-family:inherit">✨ Extraer</button>'
       +   '</div>'
       +   '<div id="cotizStockBar" style="display:flex;align-items:center;justify-content:space-between;gap:8px;background:var(--bg2);border:1px solid var(--bd);border-radius:10px;padding:8px 10px;margin-bottom:10px">'
-      +     '<span id="cotizStockInfo" style="font-size:11px;color:var(--text2)">📊 Sin Excel de stock cargado</span>'
-      +     '<label style="font-size:11px;color:var(--blue);cursor:pointer;font-weight:600;white-space:nowrap">Subir Excel<input type="file" accept=".xlsx,.xls,.csv" style="display:none" onchange="Cotizacion._onStock(this)"></label>'
+      +     '<span id="cotizStockInfo" style="font-size:11px;color:var(--text2)">🏬 Sin stock de tienda cargado</span>'
+      +     '<label style="font-size:11px;color:var(--blue);cursor:pointer;font-weight:600;white-space:nowrap">Stock de tienda<input type="file" accept=".xlsx,.xls,.csv" style="display:none" onchange="Cotizacion._onStock(this)"></label>'
       +   '</div>'
       +   '<div id="cotizStatus" style="font-size:12px;color:var(--text2);margin-bottom:6px"></div>'
       +   '<div id="cotizList" style="overflow-y:auto;flex:1;min-height:40px"></div>'
@@ -246,20 +262,21 @@
     var cnt=document.getElementById('cotizCount'); if(cnt) cnt.textContent=_rows.length?(_rows.length+' ítem'+(_rows.length>1?'s':'')):'';
     if(!_rows.length){ el.innerHTML='<div style="text-align:center;color:var(--text2);font-size:12px;padding:18px">Sin ítems todavía. Subí un PDF o pegá el texto.</div>'; return; }
     var html='';
-    // Resumen del cruce (sólo si hay Excel de stock cargado)
-    if(_stock){
+    var hayTienda=!!_tiendaStock();
+    // Resumen del cruce (sólo si hay stock de tienda cargado)
+    if(hayTienda){
       var cmp=Cotizacion.comparar(_rows);
       html+='<div style="font-size:11px;color:var(--text2);margin-bottom:8px;line-height:1.6">'
-        +'🛒 Faltantes: <b>'+cmp.faltantes+'</b> · 📦 en stock proveedor: <b style="color:var(--green,#2ea043)">'+cmp.enStock.length+'</b> · ⚠️ sin stock: <b style="color:#d29922">'+cmp.sinStock.length+'</b>'
+        +'🛒 Faltantes: <b>'+cmp.faltantes+'</b> · 🏬 en tienda (Excel): <b style="color:var(--green,#2ea043)">'+cmp.enStock.length+'</b> · ⚠️ no en tienda: <b style="color:#d29922">'+cmp.sinStock.length+'</b>'
         +'</div>';
     }
     html+=_rows.map(function(r,i){
-      var m = (_stock && !r.enTienda) ? _stockFind(r.codigo) : null;
+      var m = (hayTienda && !r.enTienda) ? _stockFind(r.codigo) : null;
       var stockLine='';
-      if(_stock && !r.enTienda){
+      if(hayTienda && !r.enTienda){
         stockLine = m
-          ? '<div style="font-size:10.5px;color:var(--green,#2ea043);margin-top:5px;padding-left:38px">📦 '+_esc(m.desc||'')+(m.precio?(' · '+_esc(m.precio)):'')+' · stock '+_esc(m.stock||'—')+'</div>'
-          : '<div style="font-size:10.5px;color:#d29922;margin-top:5px;padding-left:38px">⚠️ No está en el Excel de stock</div>';
+          ? '<div style="font-size:10.5px;color:var(--green,#2ea043);margin-top:5px;padding-left:38px">🏬 En tienda (Excel)'+(m.precio?(' · '+_esc(m.precio)):'')+' · stock '+_esc(m.stock||'—')+'</div>'
+          : '<div style="font-size:10.5px;color:#d29922;margin-top:5px;padding-left:38px">⚠️ No está en el stock de tienda</div>';
       }
       return '<div style="border:1px solid var(--bd);border-radius:8px;padding:6px;margin-bottom:6px;background:'+(r.enTienda?'rgba(46,160,67,.08)':'transparent')+'">'
         + '<div style="display:flex;gap:6px;align-items:center">'
@@ -410,15 +427,25 @@
     // Alternar "en tienda" (🏬) vs "falta" (🛒) de un ítem.
     _togTienda: function(i){ if(_rows[i]){ _rows[i].enTienda=!_rows[i].enTienda; _renderRows(); } },
 
-    // ── STOCK: importar Excel y comparar ──────────────────────────────────
-    // importarAOA: construye el catálogo desde array-of-arrays (testeable).
+    // ── STOCK: API pública (usada por el panel 🧾 y por la UI de Proveedores) ─
+    stock: Stock,          // Cotizacion.stock.get/set/del/find/importAOA(pid,...)
+    TIENDA_ID: TIENDA_ID,
+
+    // Asegura (en memoria) que exista la fuente fija "🏬 Tienda" en S.suppliers.
+    ensureTienda: function(){
+      if(!window.S) return null;
+      if(!S.suppliers) S.suppliers=[];
+      var t=S.suppliers.find(function(x){ return x.tipo==='tienda'; });
+      if(!t){ t={ id:TIENDA_ID, name:'Tienda', tipo:'tienda', phone:'', items:[] }; S.suppliers.unshift(t); }
+      return t;
+    },
+
+    // importarAOA (panel 🧾): carga el Excel como STOCK DE TIENDA. Testeable.
     importarAOA: function(aoa, fileName){
-      var res=_detectAndBuild(aoa);
-      if(!res || !res.meta.count) return 0;
-      _stock={ catalog:res.catalog, meta:res.meta, fileName:fileName||'', ts:Date.now() };
-      try{ localStorage.setItem(STOCK_KEY, JSON.stringify(_stock)); }catch(e){}
+      var n=Stock.importAOA(TIENDA_ID, aoa, fileName);
+      if(!n) return 0;
       _renderStockBar(); _renderRows();
-      return res.meta.count;
+      return n;
     },
     _onStock: function(input){
       var file=input && input.files && input.files[0]; if(!file) return;
@@ -432,38 +459,33 @@
           var aoa=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
           var n=Cotizacion.importarAOA(aoa, file.name);
           if(!n){ _setStatus('⚠️ No se reconoció una columna de código en el Excel.','var(--red)'); return; }
-          _setStatus('✓ '+n+' productos cargados del Excel de stock.','var(--green,#2ea043)');
+          _setStatus('✓ '+n+' productos cargados como stock de tienda.','var(--green,#2ea043)');
         }catch(err){ _setStatus('⚠️ '+((err&&err.message)||'Error leyendo el Excel'),'var(--red)'); }
       };
       reader.onerror=function(){ _setStatus('⚠️ No se pudo leer el Excel.','var(--red)'); };
       reader.readAsArrayBuffer(file);
       input.value='';
     },
-    // comparar: separa faltantes (no en tienda) en encontrados/no-encontrados en stock.
+    // comparar: separa faltantes (no en tienda) según el stock de tienda.
     comparar: function(items){
       var faltantes=(items||[]).filter(function(r){ return !r.enTienda; });
       var enStock=[], sinStock=[];
       faltantes.forEach(function(r){ var m=_stockFind(r.codigo); if(m) enStock.push({item:r, match:m}); else sinStock.push(r); });
       return { faltantes:faltantes.length, enStock:enStock, sinStock:sinStock };
     },
-    getStock: function(){ return _stock; },
+    getStock: function(){ return _tiendaStock(); },
 
     // ── ENVIAR A PROVEEDOR (Fase 2b) ──────────────────────────────────────
     // Compara los faltantes con el Excel; abre el diálogo para elegir proveedor.
     enviarProveedor: function(id){
       var s=_find(id); if(!s){ _toast('Pedido no encontrado'); return; }
       var items=Array.isArray(s.cotizItems)?s.cotizItems:[];
-      var faltantes=items.filter(function(r){ return !r.enTienda; });
-      if(!faltantes.length){ _toast('No hay faltantes en esta cotización'); return; }
-      var aEnviar, sinStockN=0;
-      if(_stock){
-        aEnviar=faltantes.filter(function(r){ return !!_stockFind(r.codigo); });
-        sinStockN=faltantes.length-aEnviar.length;
-        if(!aEnviar.length){ _toast('Ningún faltante está en el Excel de stock'); return; }
-      } else {
-        aEnviar=faltantes.slice(); // sin Excel: se envían todos los faltantes
-      }
-      _openEnvio(s, aEnviar, sinStockN, (window.S&&S.suppliers)||[]);
+      // Faltantes = lo que NO tenés en tienda. Se envían todos al proveedor
+      // elegido (el cruce contra el Excel del proveedor llega en Fase B).
+      var aEnviar=items.filter(function(r){ return !r.enTienda; });
+      if(!aEnviar.length){ _toast('No hay faltantes en esta cotización'); return; }
+      var provs=((window.S&&S.suppliers)||[]).filter(function(x){ return x.tipo!=='tienda'; }); // no la Tienda
+      _openEnvio(s, aEnviar, 0, provs);
     },
 
     // Hook: se llama al cambiar el estado de un pedido. Sólo actúa en EN PROCESO.
@@ -536,14 +558,14 @@
       'En cualquier pedido, tocá el icono <b>🧾</b> (al lado del 💬) para abrir la cotización.',
       'Subí el <b>PDF</b> de la boleta o <b>pegá el texto</b>: se extraen <b>código, descripción y cantidad</b> automáticamente. Todo es editable — corregí, agregá (➕ Fila) o borrá (✕) lo que haga falta.',
       'Marcá lo que ya tenés con <b>🏬 en tienda</b>. Lo que quede en <b>🛒</b> son los <b>faltantes</b> (lo que hay que conseguir).',
-      'Tocá <b>Subir Excel</b> y cargá tu lista de stock de proveedor. El sistema detecta solo las columnas (código, descripción, precio, stock). Queda cargado para todos los pedidos.',
-      'Por cada faltante vas a ver <b>📦</b> si el proveedor lo tiene (con precio y stock) o <b>⚠️</b> si no está en el Excel.',
-      'Tocá <b>📤 Enviar faltantes a proveedor</b> (o pasá el pedido a <b>EN PROCESO</b>): elegís a mano el proveedor y los ítems que ese proveedor tiene se agregan a su lista en la sección <b>Proveedores</b>.',
+      'Tocá <b>Stock de tienda</b> y subí el Excel de tu stock. El sistema detecta solo las columnas (código, descripción, precio, stock) y te marca, por cada ítem, si está o no en tu tienda.',
+      'Por cada faltante vas a ver <b>🏬</b> si está en tu stock de tienda, o <b>⚠️</b> si no.',
+      'Tocá <b>📤 Enviar faltantes a proveedor</b> (o pasá el pedido a <b>EN PROCESO</b>): elegís a mano el proveedor y los faltantes se agregan a su lista en la sección <b>Proveedores</b> para que cotice.',
       'Desde <b>Proveedores</b> le enviás la lista por WhatsApp para que te cotice.'
     ],
     faq: [
       {q:'¿Guarda el PDF o la imagen?', a:'No. Solo se guarda el texto extraído (código, descripción, cantidad). Es liviano y no ocupa espacio ni consume datos.'},
-      {q:'¿De dónde sale el stock del proveedor?', a:'De un Excel que vos subís. Se guarda en este dispositivo y sirve para todos los pedidos, hasta que subas otro.'},
+      {q:'¿De dónde sale el “stock de tienda”?', a:'De un Excel que vos subís (tu inventario). Se guarda en este dispositivo y sirve para todos los pedidos, hasta que subas otro.'},
       {q:'¿Qué significa “en tienda” (🏬)?', a:'Que ese producto ya lo tenés. Se excluye de los faltantes y no se manda a cotizar.'},
       {q:'¿Y si un código no aparece en el Excel?', a:'Se marca ⚠️ “sin stock”. Podés conseguirlo por otro lado, o revisar que el código coincida con el del Excel.'},
       {q:'¿Puedo subir una foto/imagen de la boleta?', a:'Por ahora solo PDF o texto pegado. El reconocimiento de imágenes (OCR) llega más adelante.'}
@@ -555,4 +577,32 @@
     ]
   };
   if(window.Ayuda && window.Ayuda.register) window.Ayuda.register('cotizacion', AYUDA_COTIZ);
+
+  /* Ayuda de PROVEEDORES — co-locada acá porque la lógica de stock (Excel por
+     proveedor / tienda) vive en este módulo. ⚠️ Actualizá este bloque y su fecha
+     si cambiás el flujo de proveedores/stock. */
+  var AYUDA_PROVEEDORES = {
+    titulo: 'Proveedores y stock',
+    icono: '🏭',
+    actualizado: '2026-07-13',
+    pasos: [
+      'La sección Proveedores es tu registro de <b>fuentes de stock</b>: tu <b>🏬 Tienda</b> (fija) y tus <b>proveedores</b>.',
+      'Al <b>añadir</b>, elegís el tipo: <b>🏭 Proveedor</b> (secundario) o <b>🏬 Mi tienda</b> (tu stock propio). Solo puede haber una tienda.',
+      'Entrá a cualquier fuente para: subir su <b>PDF/imagen</b> de cotización, subir su <b>Excel de stock</b>, y ver/gestionar su lista de pendientes.',
+      'El <b>Excel de stock</b> se lee solo (detecta las columnas de código, descripción, precio y stock). El de la <b>Tienda</b> es el mismo que subís en el 🧾 del pedido (“Stock de tienda”).',
+      'Podés <b>eliminar</b> un proveedor (la Tienda no se borra). Al borrarlo se elimina también su Excel de stock.',
+      'En una cotización, los <b>faltantes</b> (lo que no tenés en tienda) se envían al proveedor que elijas para que cotice.'
+    ],
+    faq: [
+      {q:'¿Dónde subo mi stock de tienda?', a:'En el 🧾 de cualquier pedido, botón “Stock de tienda”, o en la fuente 🏬 Tienda dentro de Proveedores. Es el mismo stock.'},
+      {q:'¿El Excel y las imágenes se sincronizan entre celulares?', a:'No por ahora: se guardan en este dispositivo (localStorage). La sincronización entre equipos llega más adelante.'},
+      {q:'¿Puedo cambiar cuál es mi tienda?', a:'Sí: al añadir una fuente como “Mi tienda”, la anterior pasa a proveedor. Siempre hay una sola tienda.'},
+      {q:'¿Qué formato tiene que tener el Excel?', a:'Casi cualquiera: el sistema detecta solo la columna de código y las de precio/stock, con encabezados en cualquier fila.'}
+    ],
+    tips: [
+      'Un Excel por fuente: la tienda tiene el suyo y cada proveedor el suyo.',
+      'El sistema escala: buscar un código es instantáneo aunque el Excel tenga miles de productos.'
+    ]
+  };
+  if(window.Ayuda && window.Ayuda.register) window.Ayuda.register('proveedores', AYUDA_PROVEEDORES);
 })();
