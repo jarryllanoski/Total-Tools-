@@ -45,6 +45,19 @@
 
   function _tiendaStock(){ return Stock.get(TIENDA_ID); }         // el stock de tienda (Excel del panel 🧾)
   function _stockFind(cod){ return Stock.find(TIENDA_ID, cod); }  // ¿está en tienda?
+  function _provs(){ return ((window.S&&S.suppliers)||[]).filter(function(x){ return x.tipo!=='tienda'; }); }
+  // ¿hay alguna fuente de stock cargada (tienda o algún proveedor)?
+  function _haySources(){
+    if(_tiendaStock()) return true;
+    return _provs().some(function(pv){ return !!Stock.get(pv.id); });
+  }
+  // Clasifica un ítem: 🏬 en tienda / 🏭 en proveedor(es) / ⚠️ faltante.
+  function _clasificarItem(r){
+    if(r.enTienda || _stockFind(r.codigo)) return { tipo:'tienda' };
+    var enProvs=_provs().filter(function(pv){ return !!Stock.find(pv.id, r.codigo); });
+    if(enProvs.length) return { tipo:'proveedor', provs:enProvs };
+    return { tipo:'faltante' };
+  }
 
   // Helpers seguros (por si el global no existe en algún contexto)
   function _esc(s){ return (typeof escH==='function') ? escH(s) : String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
@@ -262,21 +275,26 @@
     var cnt=document.getElementById('cotizCount'); if(cnt) cnt.textContent=_rows.length?(_rows.length+' ítem'+(_rows.length>1?'s':'')):'';
     if(!_rows.length){ el.innerHTML='<div style="text-align:center;color:var(--text2);font-size:12px;padding:18px">Sin ítems todavía. Subí un PDF o pegá el texto.</div>'; return; }
     var html='';
-    var hayTienda=!!_tiendaStock();
-    // Resumen del cruce (sólo si hay stock de tienda cargado)
-    if(hayTienda){
-      var cmp=Cotizacion.comparar(_rows);
+    var hay=_haySources();
+    // Resumen multi-fuente (sólo si hay alguna fuente de stock cargada)
+    if(hay){
+      var cls=Cotizacion.clasificar(_rows);
       html+='<div style="font-size:11px;color:var(--text2);margin-bottom:8px;line-height:1.6">'
-        +'🛒 Faltantes: <b>'+cmp.faltantes+'</b> · 🏬 en tienda (Excel): <b style="color:var(--green,#2ea043)">'+cmp.enStock.length+'</b> · ⚠️ no en tienda: <b style="color:#d29922">'+cmp.sinStock.length+'</b>'
+        +'🏬 en tienda: <b style="color:var(--green,#2ea043)">'+cls.tienda.length+'</b> · 🏭 en proveedor: <b style="color:var(--blue)">'+cls.proveedor.length+'</b> · ⚠️ faltante: <b style="color:#d29922">'+cls.faltante.length+'</b>'
         +'</div>';
     }
     html+=_rows.map(function(r,i){
-      var m = (hayTienda && !r.enTienda) ? _stockFind(r.codigo) : null;
       var stockLine='';
-      if(hayTienda && !r.enTienda){
-        stockLine = m
-          ? '<div style="font-size:10.5px;color:var(--green,#2ea043);margin-top:5px;padding-left:38px">🏬 En tienda (Excel)'+(m.precio?(' · '+_esc(m.precio)):'')+' · stock '+_esc(m.stock||'—')+'</div>'
-          : '<div style="font-size:10.5px;color:#d29922;margin-top:5px;padding-left:38px">⚠️ No está en el stock de tienda</div>';
+      if(hay && !r.enTienda){
+        var c=_clasificarItem(r);
+        if(c.tipo==='tienda'){
+          var m=_stockFind(r.codigo);
+          stockLine='<div style="font-size:10.5px;color:var(--green,#2ea043);margin-top:5px;padding-left:38px">🏬 En tienda'+(m&&m.precio?(' · '+_esc(m.precio)):'')+(m&&m.stock?(' · stock '+_esc(m.stock)):'')+'</div>';
+        } else if(c.tipo==='proveedor'){
+          stockLine='<div style="font-size:10.5px;color:var(--blue);margin-top:5px;padding-left:38px">🏭 En: '+c.provs.map(function(pv){ return _esc(pv.name||'?'); }).join(', ')+'</div>';
+        } else {
+          stockLine='<div style="font-size:10.5px;color:#d29922;margin-top:5px;padding-left:38px">⚠️ Faltante — no está en tienda ni en proveedores</div>';
+        }
       }
       return '<div style="border:1px solid var(--bd);border-radius:8px;padding:6px;margin-bottom:6px;background:'+(r.enTienda?'rgba(46,160,67,.08)':'transparent')+'">'
         + '<div style="display:flex;gap:6px;align-items:center">'
@@ -334,25 +352,36 @@
     document.body.appendChild(ov);
   }
 
-  function _openEnvio(s, aEnviar, sinStockN, sups){
+  function _openEnvio(s, aEnviar, sups){
     Cotizacion.cerrar(); // cerrar el panel de cotización si estaba abierto
     _envioId=s.id; _envioItems=aEnviar;
     _ensureEnvioPanel();
+    // ¿qué proveedor tiene cada ítem? + sugerir el que cubre más.
+    var cobertura={}; // supId → nº de ítems que tiene
+    aEnviar.forEach(function(r){
+      sups.forEach(function(pv){ if(Stock.find(pv.id, r.codigo)){ cobertura[pv.id]=(cobertura[pv.id]||0)+1; } });
+    });
+    var sugerido=null, mejor=0;
+    sups.forEach(function(pv){ var c=cobertura[pv.id]||0; if(c>mejor){ mejor=c; sugerido=pv; } });
+
     document.getElementById('cotizEnvWho').textContent=s.name||'—';
     document.getElementById('cotizEnvInfo').innerHTML=
-      'Faltantes que el proveedor tiene: <b>'+aEnviar.length+'</b>'
-      + (sinStockN?(' · <span style="color:#d29922">⚠️ '+sinStockN+' sin stock en el Excel</span>'):'')
-      + (_stock?'':' · <i>(sin Excel cargado — se envían todos los faltantes)</i>');
+      '<b>'+aEnviar.length+'</b> faltante(s) a cotizar'
+      + (sugerido?(' · sugerido: <b style="color:var(--blue)">'+_esc(sugerido.name)+'</b> ('+mejor+'/'+aEnviar.length+')'):'');
     document.getElementById('cotizEnvList').innerHTML=aEnviar.map(function(r){
-      var m=_stockFind(r.codigo);
+      var enProvs=sups.filter(function(pv){ return !!Stock.find(pv.id, r.codigo); });
+      var tag = enProvs.length
+        ? '<span style="color:var(--blue)">🏭 '+enProvs.map(function(pv){ return _esc(pv.name||'?'); }).join(', ')+'</span>'
+        : '<span style="color:#d29922">⚠️ ningún proveedor</span>';
       return '<div style="padding:7px 0;border-bottom:1px solid var(--bd);font-size:12.5px">'
         + '<b style="font-family:monospace">'+_esc(r.codigo)+'</b> · '+_esc(r.desc||'')+' · <b>'+_esc(r.cant)+'</b>u'
-        + (m&&m.precio?(' <span style="color:var(--green,#2ea043)">'+_esc(m.precio)+'</span>'):'')
+        + '<div style="font-size:10.5px;margin-top:2px">'+tag+'</div>'
         + '</div>';
     }).join('');
     var sel=document.getElementById('cotizEnvSup');
     if(!sups.length){ sel.innerHTML='<option value="">Sin proveedores — agregá uno en Proveedores</option>'; }
     else { sel.innerHTML=sups.map(function(su){ return '<option value="'+_esc(su.id)+'">'+_esc(su.name||su.id)+'</option>'; }).join(''); }
+    if(sel && sugerido) sel.value=sugerido.id; // preselecciona el sugerido
     if(typeof openOverlay==='function') openOverlay('cotizEnvioOverlay');
   }
 
@@ -466,7 +495,18 @@
       reader.readAsArrayBuffer(file);
       input.value='';
     },
-    // comparar: separa faltantes (no en tienda) según el stock de tienda.
+    // clasificar (Fase B): agrupa los ítems en tienda / proveedor / faltante.
+    clasificar: function(items){
+      var res={ tienda:[], proveedor:[], faltante:[] };
+      (items||[]).forEach(function(r){
+        var c=_clasificarItem(r);
+        if(c.tipo==='tienda') res.tienda.push(r);
+        else if(c.tipo==='proveedor') res.proveedor.push({item:r, provs:c.provs});
+        else res.faltante.push(r);
+      });
+      return res;
+    },
+    // comparar (compat): faltantes según el stock de tienda.
     comparar: function(items){
       var faltantes=(items||[]).filter(function(r){ return !r.enTienda; });
       var enStock=[], sinStock=[];
@@ -480,12 +520,10 @@
     enviarProveedor: function(id){
       var s=_find(id); if(!s){ _toast('Pedido no encontrado'); return; }
       var items=Array.isArray(s.cotizItems)?s.cotizItems:[];
-      // Faltantes = lo que NO tenés en tienda. Se envían todos al proveedor
-      // elegido (el cruce contra el Excel del proveedor llega en Fase B).
-      var aEnviar=items.filter(function(r){ return !r.enTienda; });
-      if(!aEnviar.length){ _toast('No hay faltantes en esta cotización'); return; }
-      var provs=((window.S&&S.suppliers)||[]).filter(function(x){ return x.tipo!=='tienda'; }); // no la Tienda
-      _openEnvio(s, aEnviar, 0, provs);
+      // Faltantes = lo que NO tenés en tienda (por marca 🏬 o por el Excel de tienda).
+      var aEnviar=items.filter(function(r){ return _clasificarItem(r).tipo!=='tienda'; });
+      if(!aEnviar.length){ _toast('Todo está en tienda — no hay faltantes'); return; }
+      _openEnvio(s, aEnviar, _provs()); // proveedores secundarios (no la Tienda)
     },
 
     // Hook: se llama al cambiar el estado de un pedido. Sólo actúa en EN PROCESO.
@@ -553,14 +591,14 @@
   var AYUDA_COTIZ = {
     titulo: 'Cotización',
     icono: '🧾',
-    actualizado: '2026-07-13',
+    actualizado: '2026-07-14',
     pasos: [
       'En cualquier pedido, tocá el icono <b>🧾</b> (al lado del 💬) para abrir la cotización.',
       'Subí el <b>PDF</b> de la boleta o <b>pegá el texto</b>: se extraen <b>código, descripción y cantidad</b> automáticamente. Todo es editable — corregí, agregá (➕ Fila) o borrá (✕) lo que haga falta.',
       'Marcá lo que ya tenés con <b>🏬 en tienda</b>. Lo que quede en <b>🛒</b> son los <b>faltantes</b> (lo que hay que conseguir).',
-      'Tocá <b>Stock de tienda</b> y subí el Excel de tu stock. El sistema detecta solo las columnas (código, descripción, precio, stock) y te marca, por cada ítem, si está o no en tu tienda.',
-      'Por cada faltante vas a ver <b>🏬</b> si está en tu stock de tienda, o <b>⚠️</b> si no.',
-      'Tocá <b>📤 Enviar faltantes a proveedor</b> (o pasá el pedido a <b>EN PROCESO</b>): elegís a mano el proveedor y los faltantes se agregan a su lista en la sección <b>Proveedores</b> para que cotice.',
+      'Subí tu <b>Stock de tienda</b> (Excel) desde acá y el <b>Excel de cada proveedor</b> en la sección Proveedores. El sistema detecta las columnas solo.',
+      'Cada ítem se clasifica automáticamente: <b>🏬 en tienda</b>, <b>🏭 en proveedor</b> (te dice cuál) o <b>⚠️ faltante</b> (no está en ningún lado). Arriba ves el resumen.',
+      'Tocá <b>📤 Enviar faltantes a proveedor</b> (o pasá el pedido a <b>EN PROCESO</b>): te <b>sugiere</b> el proveedor que tiene más ítems; elegís y los faltantes se agregan a su lista en <b>Proveedores</b> para que cotice.',
       'Desde <b>Proveedores</b> le enviás la lista por WhatsApp para que te cotice.'
     ],
     faq: [
