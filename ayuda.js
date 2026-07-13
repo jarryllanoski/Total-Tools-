@@ -289,6 +289,17 @@
     return ov;
   }
 
+  /* ── Registro de ayuda desde otros módulos ───────────────────────────
+     Permite que cada módulo co-loque su propia documentación (junto a su
+     código) y la registre aquí. Así la ayuda no se desactualiza: vive en el
+     mismo archivo que la función. Ej. (en cotizacion.js):
+        if(window.Ayuda) Ayuda.register('cotizacion', { titulo, icono, pasos, faq, tips, actualizado });
+  ────────────────────────────────────────────────────────────────────── */
+  Ayuda.register = function(clave, seccion){
+    if(!clave || !seccion) return;
+    DOCS[clave] = seccion;
+  };
+
   /* ── Abrir la ayuda de un módulo ─────────────────────────────────── */
   Ayuda.abrir = function(clave){
     var doc = DOCS[clave];
@@ -303,7 +314,7 @@
 
     var html = '';
     html += '<div class="ay-title">'+_esc(doc.icono||'📖')+' '+_esc(doc.titulo)+'</div>';
-    html += '<div class="ay-sub">Guía del módulo · actualizado '+_esc(ACTUALIZADO)+'</div>';
+    html += '<div class="ay-sub">Guía del módulo · actualizado '+_esc(doc.actualizado||ACTUALIZADO)+'</div>';
 
     // Pasos
     if(doc.pasos && doc.pasos.length){

@@ -203,9 +203,12 @@
     ov.innerHTML=''
       + '<div class="sheet" onclick="event.stopPropagation()" style="max-height:88vh;display:flex;flex-direction:column">'
       +   '<div class="sheet-handle"></div>'
-      +   '<div class="sheet-title" style="display:flex;align-items:center;justify-content:space-between">'
+      +   '<div class="sheet-title" style="display:flex;align-items:center;justify-content:space-between;gap:8px">'
       +     '<span>🧾 Cotización — <span id="cotizWho"></span></span>'
-      +     '<span id="cotizCount" style="font-size:11px;color:var(--text2);font-weight:400"></span>'
+      +     '<span style="display:flex;align-items:center;gap:10px;flex-shrink:0">'
+      +       '<span id="cotizCount" style="font-size:11px;color:var(--text2);font-weight:400"></span>'
+      +       '<span onclick="if(window.Ayuda)Ayuda.abrir(\'cotizacion\')" style="font-size:12px;color:#a78bfa;cursor:pointer;font-weight:600" title="Ayuda">📖</span>'
+      +     '</span>'
       +   '</div>'
       +   '<div style="font-size:11px;color:var(--text2);line-height:1.5;margin-bottom:10px">Subí el <b>PDF</b> de la boleta o <b>pegá el texto</b>. Se extrae código, descripción y cantidad — todo editable.</div>'
       +   '<div style="display:flex;gap:8px;margin-bottom:10px">'
@@ -518,4 +521,38 @@
   };
 
   window.Cotizacion = Cotizacion;
+
+  /* ══════════════════════════════════════════════════════════════════════
+     AYUDA (co-locada con el módulo — se auto-registra en window.Ayuda).
+     ⚠️ IMPORTANTE: si cambiás el flujo de Cotización, actualizá TAMBIÉN este
+     bloque y su fecha `actualizado`. La ayuda vive acá, junto al código, para
+     que no se desactualice.
+     ══════════════════════════════════════════════════════════════════════ */
+  var AYUDA_COTIZ = {
+    titulo: 'Cotización',
+    icono: '🧾',
+    actualizado: '2026-07-13',
+    pasos: [
+      'En cualquier pedido, tocá el icono <b>🧾</b> (al lado del 💬) para abrir la cotización.',
+      'Subí el <b>PDF</b> de la boleta o <b>pegá el texto</b>: se extraen <b>código, descripción y cantidad</b> automáticamente. Todo es editable — corregí, agregá (➕ Fila) o borrá (✕) lo que haga falta.',
+      'Marcá lo que ya tenés con <b>🏬 en tienda</b>. Lo que quede en <b>🛒</b> son los <b>faltantes</b> (lo que hay que conseguir).',
+      'Tocá <b>Subir Excel</b> y cargá tu lista de stock de proveedor. El sistema detecta solo las columnas (código, descripción, precio, stock). Queda cargado para todos los pedidos.',
+      'Por cada faltante vas a ver <b>📦</b> si el proveedor lo tiene (con precio y stock) o <b>⚠️</b> si no está en el Excel.',
+      'Tocá <b>📤 Enviar faltantes a proveedor</b> (o pasá el pedido a <b>EN PROCESO</b>): elegís a mano el proveedor y los ítems que ese proveedor tiene se agregan a su lista en la sección <b>Proveedores</b>.',
+      'Desde <b>Proveedores</b> le enviás la lista por WhatsApp para que te cotice.'
+    ],
+    faq: [
+      {q:'¿Guarda el PDF o la imagen?', a:'No. Solo se guarda el texto extraído (código, descripción, cantidad). Es liviano y no ocupa espacio ni consume datos.'},
+      {q:'¿De dónde sale el stock del proveedor?', a:'De un Excel que vos subís. Se guarda en este dispositivo y sirve para todos los pedidos, hasta que subas otro.'},
+      {q:'¿Qué significa “en tienda” (🏬)?', a:'Que ese producto ya lo tenés. Se excluye de los faltantes y no se manda a cotizar.'},
+      {q:'¿Y si un código no aparece en el Excel?', a:'Se marca ⚠️ “sin stock”. Podés conseguirlo por otro lado, o revisar que el código coincida con el del Excel.'},
+      {q:'¿Puedo subir una foto/imagen de la boleta?', a:'Por ahora solo PDF o texto pegado. El reconocimiento de imágenes (OCR) llega más adelante.'}
+    ],
+    tips: [
+      'La lista siempre es editable: si el PDF trae un código o cantidad mal, corregilo a mano.',
+      'El Excel puede tener casi cualquier formato: el sistema detecta solo la columna de código y las de precio/stock.',
+      'Enviar dos veces no duplica: si un ítem ya está en el proveedor, no se agrega de nuevo.'
+    ]
+  };
+  if(window.Ayuda && window.Ayuda.register) window.Ayuda.register('cotizacion', AYUDA_COTIZ);
 })();
