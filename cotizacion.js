@@ -43,9 +43,12 @@
   // Migración única del stock global viejo → stock de tienda.
   try{ if(!localStorage.getItem(_stockKey(TIENDA_ID))){ var _old=localStorage.getItem('tt_cotiz_stock'); if(_old){ localStorage.setItem(_stockKey(TIENDA_ID), _old); localStorage.removeItem('tt_cotiz_stock'); } } }catch(e){}
 
-  function _tiendaStock(){ return Stock.get(TIENDA_ID); }         // el stock de tienda (Excel del panel 🧾)
-  function _stockFind(cod){ return Stock.find(TIENDA_ID, cod); }  // ¿está en tienda?
+  // Id real de la fuente "tienda" (por si se creó con otro id vía el formulario).
+  function _tiendaProvId(){ var t=((window.S&&S.suppliers)||[]).find(function(x){ return x.tipo==='tienda'; }); return t?t.id:TIENDA_ID; }
+  function _tiendaStock(){ return Stock.get(_tiendaProvId()); }         // stock de tienda (Excel del panel 🧾)
+  function _stockFind(cod){ return Stock.find(_tiendaProvId(), cod); }  // ¿está en tienda?
   function _provs(){ return ((window.S&&S.suppliers)||[]).filter(function(x){ return x.tipo!=='tienda'; }); }
+  function _provName(id){ var p=((window.S&&S.suppliers)||[]).find(function(x){ return x.id===id; }); return p?(p.name||'proveedor'):'proveedor'; }
   // ¿hay alguna fuente de stock cargada (tienda o algún proveedor)?
   function _haySources(){
     if(_tiendaStock()) return true;
@@ -285,13 +288,16 @@
     }
     html+=_rows.map(function(r,i){
       var stockLine='';
-      if(hay && !r.enTienda){
+      if(!r.enTienda && r.proveedor){
+        // Ya enviado a cotizar → mostrar a quién (con opción de quitar).
+        stockLine='<div style="font-size:10.5px;color:var(--blue);margin-top:5px;padding-left:38px">📤 Enviado a <b>'+_esc(_provName(r.proveedor))+'</b> <span onclick="Cotizacion._quitarEnvio('+i+')" style="color:var(--red);cursor:pointer;margin-left:6px">✕ quitar</span></div>';
+      } else if(hay && !r.enTienda){
         var c=_clasificarItem(r);
         if(c.tipo==='tienda'){
           var m=_stockFind(r.codigo);
           stockLine='<div style="font-size:10.5px;color:var(--green,#2ea043);margin-top:5px;padding-left:38px">🏬 En tienda'+(m&&m.precio?(' · '+_esc(m.precio)):'')+(m&&m.stock?(' · stock '+_esc(m.stock)):'')+'</div>';
         } else if(c.tipo==='proveedor'){
-          stockLine='<div style="font-size:10.5px;color:var(--blue);margin-top:5px;padding-left:38px">🏭 En: '+c.provs.map(function(pv){ return _esc(pv.name||'?'); }).join(', ')+'</div>';
+          stockLine='<div style="font-size:10.5px;color:var(--blue);margin-top:5px;padding-left:38px">🏭 Disponible en: '+c.provs.map(function(pv){ return _esc(pv.name||'?'); }).join(', ')+'</div>';
         } else {
           stockLine='<div style="font-size:10.5px;color:#d29922;margin-top:5px;padding-left:38px">⚠️ Faltante — no está en tienda ni en proveedores</div>';
         }
@@ -319,12 +325,8 @@
   function _persist(){
     var s=_find(_curId); if(!s) return null;
     var items=_rows
-      .map(function(r){ return { codigo:(r.codigo||'').trim().toUpperCase(), desc:(r.desc||'').trim(), cant:parseInt(r.cant,10)||1, enTienda:!!r.enTienda, proveedor:null }; })
+      .map(function(r){ return { codigo:(r.codigo||'').trim().toUpperCase(), desc:(r.desc||'').trim(), cant:parseInt(r.cant,10)||1, enTienda:!!r.enTienda, proveedor:(r.enTienda?null:(r.proveedor||null)) }; })
       .filter(function(r){ return r.codigo || r.desc; });
-    // Preservar el proveedor asignado por código.
-    if(Array.isArray(s.cotizItems)){
-      items.forEach(function(r){ var prev=s.cotizItems.find(function(p){ return p.codigo===r.codigo; }); if(prev) r.proveedor=prev.proveedor||null; });
-    }
     s.cotizItems=items;
     if(typeof save==='function') save(s.id); // incremental
     return s;
@@ -394,7 +396,7 @@
       _curId=id;
       _ensurePanel();
       document.getElementById('cotizWho').textContent = (s.name||'—');
-      _rows = Array.isArray(s.cotizItems) ? s.cotizItems.map(function(r){ return {codigo:r.codigo||'', desc:r.desc||'', cant:r.cant||1, enTienda:!!r.enTienda}; }) : [];
+      _rows = Array.isArray(s.cotizItems) ? s.cotizItems.map(function(r){ return {codigo:r.codigo||'', desc:r.desc||'', cant:r.cant||1, enTienda:!!r.enTienda, proveedor:r.proveedor||null}; }) : [];
       var pb=document.getElementById('cotizPasteBox'); if(pb) pb.style.display='none';
       var pt=document.getElementById('cotizPaste'); if(pt) pt.value='';
       _setStatus('');
@@ -453,8 +455,11 @@
     _addRow: function(){ _rows.push({codigo:'',desc:'',cant:1,enTienda:false}); _renderRows();
       var el=document.getElementById('cotizList'); if(el) el.scrollTop=el.scrollHeight; },
 
-    // Alternar "en tienda" (🏬) vs "falta" (🛒) de un ítem.
-    _togTienda: function(i){ if(_rows[i]){ _rows[i].enTienda=!_rows[i].enTienda; _renderRows(); } },
+    // Alternar "en tienda" (🏬) vs "falta" (🛒). Exclusivo: en tienda limpia el
+    // proveedor. Persiste al toque para que la vista de la Tienda quede en sync.
+    _togTienda: function(i){ if(_rows[i]){ _rows[i].enTienda=!_rows[i].enTienda; if(_rows[i].enTienda) _rows[i].proveedor=null; _persist(); _renderRows(); } },
+    // Quitar el envío a proveedor de un ítem (vuelve a faltante/disponible).
+    _quitarEnvio: function(i){ if(_rows[i]){ _rows[i].proveedor=null; _persist(); _renderRows(); if(typeof render==='function') render(); } },
 
     // ── STOCK: API pública (usada por el panel 🧾 y por la UI de Proveedores) ─
     stock: Stock,          // Cotizacion.stock.get/set/del/find/importAOA(pid,...)
@@ -471,10 +476,36 @@
 
     // importarAOA (panel 🧾): carga el Excel como STOCK DE TIENDA. Testeable.
     importarAOA: function(aoa, fileName){
-      var n=Stock.importAOA(TIENDA_ID, aoa, fileName);
+      var n=Stock.importAOA(_tiendaProvId(), aoa, fileName);
       if(!n) return 0;
       _renderStockBar(); _renderRows();
       return n;
+    },
+
+    // ── VISTAS DERIVADAS (modelo relacional) ──────────────────────────────
+    // Todos los ítems de cotización (de todos los pedidos) asignados a una
+    // fuente. fuente tienda → enTienda=true; proveedor → proveedor===id.
+    // Se calcula al vuelo (no se copia) → siempre en sync.
+    itemsDeFuente: function(fuenteId){
+      var f=((window.S&&S.suppliers)||[]).find(function(x){ return x.id===fuenteId; });
+      var esTienda = f && f.tipo==='tienda';
+      var out=[];
+      ((window.S&&S.shipments)||[]).forEach(function(s){
+        (s.cotizItems||[]).forEach(function(it){
+          var match = esTienda ? !!it.enTienda : (it.proveedor===fuenteId);
+          if(match) out.push({ codigo:it.codigo, desc:it.desc, cant:it.cant, pedidoId:s.id, cliente:s.name });
+        });
+      });
+      return out;
+    },
+    // Reasignar un ítem (pedido+código) a: 'tienda' | providerId | null (quitar).
+    asignar: function(pedidoId, codigo, dest){
+      var s=((window.S&&S.shipments)||[]).find(function(x){ return x.id===pedidoId; }); if(!s) return;
+      var it=(s.cotizItems||[]).find(function(x){ return x.codigo===codigo; }); if(!it) return;
+      if(dest==='tienda'){ it.enTienda=true; it.proveedor=null; }
+      else if(dest){ it.enTienda=false; it.proveedor=dest; }
+      else { it.enTienda=false; it.proveedor=null; }
+      if(typeof save==='function') save(s.id);   // incremental
     },
     _onStock: function(input){
       var file=input && input.files && input.files[0]; if(!file) return;
@@ -546,19 +577,16 @@
       var supId=sel?sel.value:'';
       var sup=((window.S&&S.suppliers)||[]).find(function(x){ return x.id===supId; });
       if(!sup){ _toast('Elegí un proveedor (o agregá uno en Proveedores)'); return; }
-      if(!sup.items) sup.items=[];
-      var added=0;
+      // Modelo relacional: NO se copia texto al proveedor. Solo se asigna el
+      // ítem (fuente única). La ficha del proveedor deriva su lista de acá.
       _envioItems.forEach(function(r){
-        var line=(r.cant||1)+' x '+r.codigo+(r.desc?(' — '+r.desc):'');
-        var exists=sup.items.some(function(it){ return (it.text||'').indexOf(r.codigo)>=0; });
-        if(!exists){ sup.items.push({text:line, done:false}); added++; }
         var ci=(s.cotizItems||[]).find(function(p){ return p.codigo===r.codigo; });
-        if(ci) ci.proveedor=sup.id; // marca a qué proveedor se envió
+        if(ci){ ci.proveedor=sup.id; ci.enTienda=false; }
       });
-      if(typeof save==='function'){ save('supp:'+sup.id); save(s.id); } // incremental: proveedor + pedido
+      if(typeof save==='function') save(s.id);  // incremental: solo el pedido
       if(typeof render==='function') render();
       this._closeEnvio();
-      _toast('📤 '+_envioItems.length+' ítem(s) → '+(sup.name||'proveedor')+(added<_envioItems.length?' ('+(_envioItems.length-added)+' ya estaban)':'')+'. Enviá desde Proveedores.');
+      _toast('📤 '+_envioItems.length+' ítem(s) asignados a '+(sup.name||'proveedor')+'. Míralo en su ficha.');
     },
 
     guardar: function(){
@@ -622,14 +650,15 @@
   var AYUDA_PROVEEDORES = {
     titulo: 'Proveedores y stock',
     icono: '🏭',
-    actualizado: '2026-07-13',
+    actualizado: '2026-07-14',
     pasos: [
       'La sección Proveedores es tu registro de <b>fuentes de stock</b>: tu <b>🏬 Tienda</b> (fija) y tus <b>proveedores</b>.',
       'Al <b>añadir</b>, elegís el tipo: <b>🏭 Proveedor</b> (secundario) o <b>🏬 Mi tienda</b> (tu stock propio). Solo puede haber una tienda.',
       'Entrá a cualquier fuente para: subir su <b>PDF/imagen</b> de cotización, subir su <b>Excel de stock</b>, y ver/gestionar su lista de pendientes.',
       'El <b>Excel de stock</b> se lee solo (detecta las columnas de código, descripción, precio y stock). El de la <b>Tienda</b> es el mismo que subís en el 🧾 del pedido (“Stock de tienda”).',
       'Podés <b>eliminar</b> un proveedor (la Tienda no se borra). Al borrarlo se elimina también su Excel de stock.',
-      'En una cotización, los <b>faltantes</b> (lo que no tenés en tienda) se envían al proveedor que elijas para que cotice.'
+      'Cada ficha muestra <b>“De cotizaciones”</b>: los ítems de pedidos asignados a esa fuente (los que marcaste 🏬 en tienda, o los que enviaste 📤 a ese proveedor). Es una vista <b>en vivo</b> — no se copia, se calcula, así nunca se desincroniza.',
+      'En una cotización, los <b>faltantes</b> (lo que no tenés en tienda) se envían al proveedor que elijas para que cotice; aparecen al instante en su ficha.'
     ],
     faq: [
       {q:'¿Dónde subo mi stock de tienda?', a:'En el 🧾 de cualquier pedido, botón “Stock de tienda”, o en la fuente 🏬 Tienda dentro de Proveedores. Es el mismo stock.'},

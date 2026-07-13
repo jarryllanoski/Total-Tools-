@@ -754,6 +754,9 @@
     <!-- EXCEL DE STOCK DEL PROVEEDOR -->
     <div id="suppStockArea" style="margin-bottom:8px"></div>
 
+    <!-- DE COTIZACIONES (vista derivada — ítems asignados a esta fuente) -->
+    <div id="suppCotizDerived" style="margin-bottom:8px"></div>
+
     <!-- LISTA HEADER -->
     <div style="font-size:10px;font-weight:700;color:var(--text2);letter-spacing:.8px;margin-bottom:6px;cursor:pointer;user-select:none" ondblclick="toggleAllSuppItems()">📋 PENDIENTES</div>
     <div id="suppItemsList" style="min-height:120px;max-height:35vh;overflow-y:auto;margin-bottom:10px"></div>
@@ -1966,6 +1969,7 @@ function openSupplier(id){
   $('suppPhone').innerHTML=`📞 ${sup.phone} <button onclick="window.open('https://wa.me/51${sup.phone}','_blank')" style="background:rgba(46,160,67,.15);border:1px solid rgba(46,160,67,.3);color:var(--green);border-radius:7px;padding:4px 10px;font-size:12px;font-weight:700;cursor:pointer">💬 WhatsApp</button>`;
   renderCotizArea(sup);
   renderSuppStock(sup);
+  renderSuppCotiz(sup);
   renderSuppItems(sup);
   $('suppNewItem').value='';
   const srch=$('suppSearch'); if(srch) srch.value='';
@@ -2019,6 +2023,36 @@ function delSuppStock(id){
   if(window.Cotizacion&&Cotizacion.stock) Cotizacion.stock.del(id);
   const sup=S.suppliers.find(x=>x.id===id); if(sup) renderSuppStock(sup);
   toast('🗑️ Excel de stock eliminado');
+}
+
+/* Vista DERIVADA: ítems de cotización asignados a esta fuente (tienda o proveedor).
+   No se copian: se calculan desde los pedidos → siempre en sync. */
+function renderSuppCotiz(sup){
+  const area=$('suppCotizDerived'); if(!area) return;
+  const items=(window.Cotizacion&&Cotizacion.itemsDeFuente)?Cotizacion.itemsDeFuente(sup.id):[];
+  const esTienda=sup.tipo==='tienda';
+  const titulo=esTienda?'🏬 En tienda (de pedidos)':'📤 De cotizaciones';
+  if(!items.length){
+    area.innerHTML=`<div style="font-size:10px;font-weight:700;color:var(--text2);letter-spacing:.5px;margin-bottom:4px">${titulo}</div>
+      <div style="font-size:11px;color:var(--text2);font-style:italic">Nada asignado todavía.</div>`;
+    return;
+  }
+  area.innerHTML=`<div style="font-size:10px;font-weight:700;color:var(--text2);letter-spacing:.5px;margin-bottom:5px">${titulo} · ${items.length}</div>
+    ${items.map(it=>`<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--bd)">
+      <div style="flex:1;min-width:0">
+        <div style="font-size:12.5px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap"><b style="font-family:monospace">${escH(it.codigo)}</b> · ${escH(it.desc||'')} · <b>${escH(it.cant)}</b>u</div>
+        <div style="font-size:10px;color:var(--text2)">🧾 ${escH(it.cliente||'—')}</div>
+      </div>
+      <button onclick="quitarAsignacion('${escH(it.pedidoId)}','${escH(it.codigo)}')" title="Quitar" style="background:none;border:none;color:var(--red);font-size:16px;cursor:pointer;flex-shrink:0;padding:0 4px">✕</button>
+    </div>`).join('')}`;
+}
+
+/* Quitar la asignación de un ítem (desde la ficha de la fuente). */
+function quitarAsignacion(pedidoId, codigo){
+  if(window.Cotizacion&&Cotizacion.asignar) Cotizacion.asignar(pedidoId, codigo, null);
+  const sup=S.suppliers.find(x=>x.id===_suppId); if(sup) renderSuppCotiz(sup);
+  render();
+  toast('Quitado');
 }
 
 function delSupplier(id){
@@ -2162,9 +2196,12 @@ function sendSuppList(suppId){
   const sup=S.suppliers.find(x=>x.id===suppId); if(!sup) return;
   if(!sup.phone){ toast('⚠️ Sin número de teléfono'); return; }
   const pending=(sup.items||[]).filter(x=>!x.done);
-  if(!pending.length){ toast('✅ Sin pendientes para enviar'); return; }
-  let msg=`Hola! 👋 Te paso la lista de lo que necesito:\n\n`;
-  pending.forEach((it,i)=>{ msg+=`${i+1}. ${it.text}\n`; });
+  // Vista derivada: ítems de cotización asignados a este proveedor.
+  const cotiz=(window.Cotizacion&&Cotizacion.itemsDeFuente)?Cotizacion.itemsDeFuente(suppId):[];
+  if(!pending.length && !cotiz.length){ toast('✅ Nada para enviar'); return; }
+  let msg=`Hola! 👋 Te paso la lista de lo que necesito:\n\n`, n=0;
+  cotiz.forEach(it=>{ msg+=`${++n}. ${it.cant} x ${it.codigo}${it.desc?' — '+it.desc:''}\n`; });
+  pending.forEach(it=>{ msg+=`${++n}. ${it.text}\n`; });
   msg+=`\nGracias 🙏`;
   window.waOpen(sup.phone, msg);
 }
