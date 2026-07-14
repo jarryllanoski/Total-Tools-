@@ -70,44 +70,46 @@ const extraerTexto = async (buf) => {
   return (data && data.text) || "";
 };
 
-// ── Parser (ticket + A4) ───────────────────────────────────────────────────
+// ── Parser (basado en el texto REAL de pdf-parse: columnas pegadas) ─────────
 // Codigo interno: 2-6 letras + un digito + alfanumerico (WAY1A10, THT1320503).
 const COD = /^([A-Z]{2,6}\d[A-Z0-9]{0,10})\b[\s:–—-]*/;
-const CANT_UNITS = "UND|UNID|UN|PZA|PZS|PCS|DOC|JGO|KG|MT|GLN|LT";
-const CANT = new RegExp("^(\\d{1,5})\\s*(?:" + CANT_UNITS + ")\\b", "i");
+const UNIT_WORDS = "UND|UNID|UN|PZA|PZS|PCS|DOC|JGO|KG|MT|GLN|LT";
+const UNIT = new RegExp("^(?:" + UNIT_WORDS + ")\\b", "i");
 const STOP_WORDS = [
   "SUBTOTAL", "SON:", "VENTA NETA", "OPERACI", "IGV", "IMPORTE TOTAL",
-  "TOTAL\\b", "BANCO", "YAPE", "Representaci", "GRACIAS", "I\\.?\\s*G",
+  "TOTAL\\s*S/", "BANCO", "YAPE", "Representaci", "GRACIAS", "EFECTIVO",
+  "CANCELADA", "I\\.?\\s*G",
 ];
 const STOP = new RegExp("^(" + STOP_WORDS.join("|") + ")", "i");
-const A4_HDR = /ITEM\b[\s\S]*CANTIDAD[\s\S]*(DESCRIP|COD)/i;
-const A4_ROW = new RegExp(
-    "^(\\d+)\\s+(\\d+(?:[.,]\\d+)?)\\s+([A-Za-zÁÉÍÓÚ.]+)\\s+" +
-    "(.+?)\\s+([\\d.,]+)\\s+([\\d.,]+)\\s+([\\d.,]+)\\s*$");
+const A4_HDR = /ITEM.*CANTIDAD.*UNIDAD/i;
+const A4_ROW = /^(\d+)UND(\d{6,})$/i;
+const CANT_HDR = /CANT.*(P\.?\s*UNIT|IMPORTE)/i;
 
 // Extrae el codigo interno del inicio de un texto. {codigo, resto}.
-const limpiarCodigo = (linea) => {
-  const s = String(linea);
-  const m = s.match(COD);
-  if (!m) return {codigo: "", resto: s};
-  return {codigo: m[1].toUpperCase(), resto: s.slice(m[0].length)};
+const codeOf = (linea) => {
+  const t = String(linea);
+  const m = t.match(COD);
+  if (!m) return {codigo: "", resto: t};
+  return {codigo: m[1].toUpperCase(), resto: t.slice(m[0].length)};
 };
 
-// Arma un item de ticket a partir de las lineas acumuladas + la cantidad.
-const buildTicket = (buf, cant) => {
+// Arma un item a partir de lineas de descripcion + cantidad (+ ean opcional).
+const buildItem = (buf, cant, ean) => {
   const arr = buf.slice();
-  const c = limpiarCodigo(arr[0] || "");
+  const c = codeOf(arr[0] || "");
   if (c.codigo) arr[0] = c.resto;
-  const desc = arr.join(" ").replace(/\s+/g, " ").trim();
-  return {codigo: c.codigo, desc: desc, cant: cant};
+  let desc = arr.join(" ").replace(/\s+/g, " ").trim();
+  desc = desc.replace(/\s*No asignado\s*$/i, "").trim();
+  return {codigo: c.codigo, desc: desc, cant: cant, ean: ean || ""};
 };
 
-// Ticket: lineas apiladas; un item se cierra en cada linea de cantidad.
+// Ticket: la cantidad viene en lineas sueltas (numero, luego "UND", luego
+// precios); la descripcion son las lineas previas.
 const parseTicket = (lines) => {
   let s = 0;
   let e = lines.length;
   for (let i = 0; i < lines.length; i++) {
-    if (/CANT\b.*IMPORTE|CANT\.?\s*P\.?\s*UNIT/i.test(lines[i])) {
+    if (CANT_HDR.test(lines[i])) {
       s = i + 1;
       break;
     }
@@ -120,35 +122,46 @@ const parseTicket = (lines) => {
   }
   const out = [];
   let buf = [];
-  for (let i = s; i < e; i++) {
-    const mc = lines[i].match(CANT);
-    if (mc) {
+  let i = s;
+  while (i < e) {
+    const ln = lines[i];
+    const next = lines[i + 1] || "";
+    if (/^\d+$/.test(ln) && UNIT.test(next)) {
+      const cant = parseInt(ln, 10) || 1;
       if (buf.length) {
-        out.push(buildTicket(buf, parseInt(mc[1], 10) || 1));
+        out.push(buildItem(buf, cant));
         buf = [];
       }
+      i += 2; // saltar numero + unidad
+      if (lines[i] && /^[\d.,]+$/.test(lines[i])) i += 1; // saltar precios
       continue;
     }
-    buf.push(lines[i]);
+    buf.push(ln);
+    i += 1;
   }
   return out;
 };
 
-// A4: cada producto en una linea con columnas (EAN + codigo interno + LAB).
-const parseA4 = (lines, hdr) => {
+// A4: cada producto viene pegado "ITEM+CANT UND EAN" y en la linea siguiente
+// el codigo interno + descripcion. ITEM = numero de fila secuencial.
+const parseA4 = (lines) => {
+  const hdr = lines.findIndex((l) => A4_HDR.test(l));
   const out = [];
   for (let i = hdr + 1; i < lines.length; i++) {
-    const ln = lines[i];
-    if (STOP.test(ln)) break;
-    const m = ln.match(A4_ROW);
+    if (STOP.test(lines[i])) break;
+    const m = lines[i].match(A4_ROW);
     if (!m) continue;
-    let mid = m[4].trim();
-    const ean = (mid.match(/^\d{6,}/) || [""])[0];
-    mid = mid.replace(/^\d{6,}\s+/, "");
-    const c = limpiarCodigo(mid);
+    const lead = m[1];
+    const ean = m[2];
+    const item = String(out.length + 1);
+    let cant = parseInt(lead, 10) || 1;
+    if (lead.indexOf(item) === 0) {
+      cant = parseInt(lead.slice(item.length), 10) || 1;
+    }
+    const c = codeOf(lines[i + 1] || "");
     const desc = c.resto.replace(/\s*No asignado\s*$/i, "").trim();
-    const cant = parseInt(String(m[2]).replace(",", "."), 10) || 1;
     out.push({codigo: c.codigo, desc: desc, cant: cant, ean: ean});
+    i += 1; // avanzar sobre la linea de descripcion
   }
   return out;
 };
@@ -160,8 +173,8 @@ const parseComprobante = (raw) => {
       .split("\n")
       .map((l) => l.trim())
       .filter(Boolean);
-  const hdr = lines.findIndex((l) => A4_HDR.test(l));
-  return hdr >= 0 ? parseA4(lines, hdr) : parseTicket(lines);
+  const isA4 = lines.some((l) => A4_HDR.test(l));
+  return isA4 ? parseA4(lines) : parseTicket(lines);
 };
 
 // Orquesta todo: valida -> descarga -> extrae texto -> parsea.
