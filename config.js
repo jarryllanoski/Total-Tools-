@@ -539,7 +539,7 @@ function saveShipment(){
     if(typeof _highlightCard==='function') _highlightCard(data.id);
     // Notificar (campana), igual que los pedidos del formulario público
     if(window.NotifyModule && data.status==='NUEVO PEDIDO'){
-      window.NotifyModule.add({icon:'📦',title:'Nuevo pedido — '+data.name,sub:(data.courier||'')+' · '+String(data.address||data.ciudadDestino||'—').substring(0,45),shipId:data.id,ts:Date.now()});
+      window.NotifyModule.add({icon:'📦',title:'Nuevo pedido — '+data.name,sub:(data.courier||'')+' · '+String(data.address||data.ciudadDestino||'—').substring(0,45),shipId:data.id,ts:Date.now(),link:(data.links&&data.links[0]&&data.links[0].u)||''});
     }
     toast('✅ Envío registrado');
   }

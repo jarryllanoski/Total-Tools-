@@ -259,10 +259,12 @@
       }
       _seenIds[s.id] = true;
 
-      // Solo notificar pedidos nuevos recientes (últimas 2 horas) del formulario
+      // Notificar pedidos nuevos recientes (últimas 2 horas): tanto los del
+      // formulario público como los creados a mano (+ azul). Cada dispositivo
+      // deriva la notificación del pedido ya sincronizado → aparece en todos.
       var ts = s.createdAt ? new Date(s.createdAt).getTime() : 0;
       if(!ts || Date.now() - ts > 2*60*60*1000) return;
-      if(s.fromForm){
+      if(s.fromForm || s.status==='NUEVO PEDIDO'){
         window.NotifyModule.add({
           icon:    '📦',
           title:   'Nuevo pedido — ' + s.name,
