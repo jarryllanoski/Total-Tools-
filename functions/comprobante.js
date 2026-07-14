@@ -13,6 +13,24 @@
  */
 
 const pdfParse = require("pdf-parse");
+const crypto = require("crypto");
+
+// Version del parser: si se mejora, se sube este numero para reprocesar.
+const PARSER_VERSION = 2;
+
+// Hash SHA-256 de la URL (para idempotencia).
+const hashUrl = (u) =>
+  crypto.createHash("sha256").update(String(u)).digest("hex");
+
+// Busca, entre los links de un pedido, el del comprobante API Sale.
+const buscarLink = (links) => {
+  const arr = Array.isArray(links) ? links : [];
+  for (let i = 0; i < arr.length; i++) {
+    const u = (arr[i] && arr[i].u) || "";
+    if (/apisale\.institucional\.pe/i.test(u)) return u;
+  }
+  return "";
+};
 
 // ── Seguridad: solo se permite este dominio y estas rutas (anti-SSRF) ──────
 const HOST_PERMITIDO = "apisale.institucional.pe";
@@ -193,4 +211,7 @@ module.exports = {
   extraerTexto,
   parseComprobante,
   procesarUrl,
+  hashUrl,
+  buscarLink,
+  PARSER_VERSION,
 };

@@ -325,11 +325,52 @@
   function _persist(){
     var s=_find(_curId); if(!s) return null;
     var items=_rows
-      .map(function(r){ return { codigo:(r.codigo||'').trim().toUpperCase(), desc:(r.desc||'').trim(), cant:parseInt(r.cant,10)||1, enTienda:!!r.enTienda, proveedor:(r.enTienda?null:(r.proveedor||null)) }; })
+      .map(function(r){ return { codigo:(r.codigo||'').trim().toUpperCase(), desc:(r.desc||'').trim(), cant:parseInt(r.cant,10)||1, enTienda:!!r.enTienda, proveedor:(r.enTienda?null:(r.proveedor||null)), ean:r.ean||'' }; })
       .filter(function(r){ return r.codigo || r.desc; });
     s.cotizItems=items;
     if(typeof save==='function') save(s.id); // incremental
     return s;
+  }
+
+  /* ── EXTRACCIÓN ON-DEMAND DESDE EL COMPROBANTE (Fase 2) ────────────────────
+     Al abrir el 🧾: si el pedido tiene link apisale y aún no fue procesado,
+     llama la Cloud Function (con el token del panel) una sola vez y rellena los
+     productos. Si ya está procesado, no llama (muestra lo guardado).           */
+  var FUNC_EXTRAER = 'https://us-central1-total-tools-24ce8.cloudfunctions.net/extraerComprobante';
+  function _apisaleLink(s){
+    var arr=(s&&s.links)||[];
+    for(var i=0;i<arr.length;i++){ var u=(arr[i]&&arr[i].u)||''; if(/apisale\.institucional\.pe/i.test(u)) return u; }
+    return '';
+  }
+  function _getToken(){
+    var p=Promise.resolve();
+    try{ if(typeof window._authEnsureToken==='function') p=Promise.resolve(window._authEnsureToken()); }catch(e){}
+    return p.then(function(){ try{ return localStorage.getItem('tt_id_token')||''; }catch(e){ return ''; } });
+  }
+  function _maybeExtraer(s){
+    if(!s || !window.fetch) return;
+    if(!_apisaleLink(s)) return;                                   // sin comprobante apisale
+    if(s.extraccion && s.extraccion.estado==='procesado') return; // ya procesado
+    if(Array.isArray(s.cotizItems) && s.cotizItems.length) return; // ya tiene ítems (no pisar)
+    _setStatus('⏳ Extrayendo del comprobante…');
+    _getToken().then(function(tok){
+      var headers = tok ? {'Authorization':'Bearer '+tok} : {};
+      return fetch(FUNC_EXTRAER+'?pedidoId='+encodeURIComponent(s.id), {headers:headers});
+    }).then(function(r){ return r.json(); }).then(function(data){
+      if(_curId!==s.id) return;                                    // el usuario cambió de pedido
+      if(data && data.ok && Array.isArray(data.cotizItems)){
+        s.cotizItems=data.cotizItems;
+        s.extraccion=s.extraccion||{}; s.extraccion.estado='procesado';
+        _rows=data.cotizItems.map(function(r){ return {codigo:r.codigo||'', desc:r.desc||'', cant:r.cant||1, enTienda:!!r.enTienda, proveedor:r.proveedor||null, ean:r.ean||''}; });
+        _renderRows();
+        _setStatus(_rows.length?('✓ '+_rows.length+' producto(s) del comprobante — revisá y corregí si hace falta.'):'El comprobante no arrojó productos — cargá el PDF a mano.', _rows.length?'var(--green,#2ea043)':'#d29922');
+        if(typeof render==='function') render();
+      } else {
+        _setStatus('⚠️ '+((data&&data.motivo)||'No se pudo leer el comprobante')+' — podés subir el PDF a mano.','var(--red)');
+      }
+    }).catch(function(){
+      if(_curId===s.id) _setStatus('⚠️ Error al leer el comprobante — subí el PDF a mano.','var(--red)');
+    });
   }
 
   /* ── PANEL "ENVIAR A PROVEEDOR" (Fase 2b, auto-inyectado) ──────────────── */
@@ -396,7 +437,7 @@
       _curId=id;
       _ensurePanel();
       document.getElementById('cotizWho').textContent = (s.name||'—');
-      _rows = Array.isArray(s.cotizItems) ? s.cotizItems.map(function(r){ return {codigo:r.codigo||'', desc:r.desc||'', cant:r.cant||1, enTienda:!!r.enTienda, proveedor:r.proveedor||null}; }) : [];
+      _rows = Array.isArray(s.cotizItems) ? s.cotizItems.map(function(r){ return {codigo:r.codigo||'', desc:r.desc||'', cant:r.cant||1, enTienda:!!r.enTienda, proveedor:r.proveedor||null, ean:r.ean||''}; }) : [];
       var pb=document.getElementById('cotizPasteBox'); if(pb) pb.style.display='none';
       var pt=document.getElementById('cotizPaste'); if(pt) pt.value='';
       _setStatus('');
@@ -404,6 +445,7 @@
       _renderRows();
       if(typeof openOverlay==='function') openOverlay('cotizOverlay');
       else document.getElementById('cotizOverlay').style.display='flex';
+      _maybeExtraer(s);   // on-demand: si tiene comprobante apisale y no fue procesado
     },
 
     cerrar: function(){

@@ -5,8 +5,9 @@ const {onRequest} = require("firebase-functions/https");
 const {defineSecret} = require("firebase-functions/params");
 const {initializeApp} = require("firebase-admin/app");
 const {getFirestore, FieldValue} = require("firebase-admin/firestore");
+const {getAuth} = require("firebase-admin/auth");
 
-// Modulo aislado de extraccion de comprobantes (Fase 1).
+// Modulo aislado de extraccion de comprobantes.
 const comprobante = require("./comprobante");
 
 setGlobalOptions({maxInstances: 10});
@@ -45,7 +46,7 @@ function setCORS(req, res) {
     res.set("Vary", "Origin");
   }
   res.set("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-  res.set("Access-Control-Allow-Headers", "Content-Type");
+  res.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
 }
 
 // ── formApi ────────────────────────────────────────────────────────────────
@@ -594,11 +595,12 @@ exports.shalomTicket = onRequest(
     },
 );
 
-// ── extraerComprobante (Fase 1: PRUEBA — NO escribe en Firestore) ───────────
-// Descarga el PDF de API Sale desde el servidor, extrae el texto y parsea los
-// productos, y los DEVUELVE en la respuesta. Uso:
-//   ?url=<link apisale>           (prueba directa)
-//   ?pedidoId=<id>                (lee el link del pedido; solo lectura)
+// ── extraerComprobante (Fase 2: on-demand, escribe en el pedido) ────────────
+// Requiere token de Firebase Auth (solo el panel logueado). Uso principal:
+//   ?pedidoId=<id>  -> detecta el link apisale del pedido, descarga, parsea,
+//                      guarda cotizItems + extraccion en el pedido (idempot.).
+//   ?url=<link>     -> modo prueba: solo devuelve texto/productos (no escribe).
+const PV = comprobante.PARSER_VERSION;
 exports.extraerComprobante = onRequest(
     {region: "us-central1"},
     async (req, res) => {
@@ -608,19 +610,86 @@ exports.extraerComprobante = onRequest(
         return;
       }
       try {
-        let url = (req.query.url || "").trim();
-        const pedidoId = (req.query.pedidoId || "").trim();
-        if (!url && pedidoId) {
-          const snap = await db.doc(SHIP_COL + "/" + pedidoId).get();
-          const s = snap.exists ? snap.data() : null;
-          url = (s && s.links && s.links[0] && s.links[0].u) || "";
-        }
-        if (!url) {
-          res.status(400).json({ok: false, motivo: "Falta url o pedidoId"});
+        // Seguridad: exige un ID token valido de Firebase Auth.
+        const authz = req.get("Authorization") || "";
+        const bearer = authz.match(/^Bearer\s+(.+)$/i);
+        if (!bearer) {
+          res.status(401).json({ok: false, motivo: "No autorizado"});
           return;
         }
-        const r = await comprobante.procesarUrl(url);
-        res.status(r.ok ? 200 : 400).json(r);
+        try {
+          await getAuth().verifyIdToken(bearer[1]);
+        } catch (e) {
+          res.status(401).json({ok: false, motivo: "Token invalido"});
+          return;
+        }
+
+        const pedidoId = (req.query.pedidoId || "").trim();
+        const urlDirecta = (req.query.url || "").trim();
+
+        // Modo prueba (?url=): no escribe en Firestore.
+        if (!pedidoId && urlDirecta) {
+          const r = await comprobante.procesarUrl(urlDirecta);
+          res.status(r.ok ? 200 : 400).json(r);
+          return;
+        }
+        if (!pedidoId) {
+          res.status(400).json({ok: false, motivo: "Falta pedidoId"});
+          return;
+        }
+
+        const ref = db.doc(SHIP_COL + "/" + pedidoId);
+        const snap = await ref.get();
+        if (!snap.exists) {
+          res.status(404).json({ok: false, motivo: "Pedido no existe"});
+          return;
+        }
+        const s = snap.data();
+        const link = comprobante.buscarLink(s.links);
+        if (!link) {
+          res.status(400).json({
+            ok: false, motivo: "El pedido no tiene link de comprobante apisale",
+          });
+          return;
+        }
+        const urlHash = comprobante.hashUrl(link);
+
+        // Idempotencia: ya procesado con mismo hash y version -> lo guardado.
+        const ext = s.extraccion || {};
+        if (ext.estado === "procesado" && ext.urlHash === urlHash &&
+            ext.parserVersion === PV) {
+          res.status(200).json({
+            ok: true, estado: "procesado", cacheado: true,
+            cotizItems: s.cotizItems || [],
+          });
+          return;
+        }
+
+        const r = await comprobante.procesarUrl(link);
+        if (!r.ok) {
+          await ref.set({extraccion: {
+            estado: "error", urlHash: urlHash, parserVersion: PV,
+            errorMensaje: r.motivo || "", procesadoEn: new Date().toISOString(),
+          }}, {merge: true});
+          res.status(400).json({ok: false, motivo: r.motivo});
+          return;
+        }
+        const cotizItems = (r.productos || []).map((p) => ({
+          codigo: p.codigo || "", desc: p.desc || "", cant: p.cant || 1,
+          enTienda: false, proveedor: null, ean: p.ean || "",
+        }));
+        const write = {extraccion: {
+          estado: "procesado", urlHash: urlHash, parserVersion: PV,
+          procesadoEn: new Date().toISOString(),
+        }};
+        // No pisar ediciones: solo escribe cotizItems si el pedido no tenia.
+        const tenia = Array.isArray(s.cotizItems) && s.cotizItems.length;
+        if (!tenia) write.cotizItems = cotizItems;
+        await ref.set(write, {merge: true});
+        res.status(200).json({
+          ok: true, estado: "procesado",
+          cotizItems: tenia ? s.cotizItems : cotizItems,
+        });
       } catch (e) {
         console.error("extraerComprobante error:", e);
         const msg = String((e && e.message) || e);
