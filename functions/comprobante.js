@@ -100,7 +100,7 @@ const STOP_WORDS = [
 ];
 const STOP = new RegExp("^(" + STOP_WORDS.join("|") + ")", "i");
 const A4_HDR = /ITEM.*CANTIDAD.*UNIDAD/i;
-const A4_ROW = /^(\d+)UND(\d{6,})$/i;
+const A4_ROW = /^(\d+)UND(\d{6,}|-)$/i;
 const CANT_HDR = /CANT.*(P\.?\s*UNIT|IMPORTE)/i;
 
 // Extrae el codigo interno del inicio de un texto. {codigo, resto}.
@@ -160,26 +160,39 @@ const parseTicket = (lines) => {
   return out;
 };
 
-// A4: cada producto viene pegado "ITEM+CANT UND EAN" y en la linea siguiente
-// el codigo interno + descripcion. ITEM = numero de fila secuencial.
+// A4: cada producto viene pegado "ITEM+CANT UND EAN"; en las lineas
+// siguientes va el codigo interno + descripcion (puede ocupar varias
+// lineas). ITEM = numero de fila secuencial; CANT = lo que sigue al ITEM.
+// El EAN puede ser un guion "-" cuando el producto no tiene codigo de barras.
 const parseA4 = (lines) => {
   const hdr = lines.findIndex((l) => A4_HDR.test(l));
-  const out = [];
+  const rows = [];
   for (let i = hdr + 1; i < lines.length; i++) {
     if (STOP.test(lines[i])) break;
     const m = lines[i].match(A4_ROW);
-    if (!m) continue;
+    if (m) rows.push({m: m, i: i});
+  }
+  const out = [];
+  for (let r = 0; r < rows.length; r++) {
+    const m = rows[r].m;
     const lead = m[1];
-    const ean = m[2];
+    const ean = /^\d+$/.test(m[2]) ? m[2] : "";
     const item = String(out.length + 1);
     let cant = parseInt(lead, 10) || 1;
-    if (lead.indexOf(item) === 0) {
+    if (lead.indexOf(item) === 0 && lead.length > item.length) {
       cant = parseInt(lead.slice(item.length), 10) || 1;
     }
-    const c = codeOf(lines[i + 1] || "");
-    const desc = c.resto.replace(/\s*No asignado\s*$/i, "").trim();
-    out.push({codigo: c.codigo, desc: desc, cant: cant, ean: ean});
-    i += 1; // avanzar sobre la linea de descripcion
+    const start = rows[r].i + 1;
+    const end = (r + 1 < rows.length) ? rows[r + 1].i : lines.length;
+    const buf = [];
+    for (let i = start; i < end; i++) {
+      const ln = lines[i];
+      if (STOP.test(ln)) break;
+      if (/^[\d.,]+$/.test(ln)) continue; // precio
+      if (/^(No|asignado|No asignado)$/i.test(ln)) continue; // "No asignado"
+      buf.push(ln);
+    }
+    out.push(buildItem(buf, cant, ean));
   }
   return out;
 };
