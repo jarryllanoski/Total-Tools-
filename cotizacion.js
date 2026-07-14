@@ -256,6 +256,7 @@
       +     '<span id="cotizStockInfo" style="font-size:11px;color:var(--text2)">🏬 Sin stock de tienda cargado</span>'
       +     '<label style="font-size:11px;color:var(--blue);cursor:pointer;font-weight:600;white-space:nowrap">Stock de tienda<input type="file" accept=".xlsx,.xls,.csv" style="display:none" onchange="Cotizacion._onStock(this)"></label>'
       +   '</div>'
+      +   '<div id="cotizJalarBox"></div>'
       +   '<div id="cotizStatus" style="font-size:12px;color:var(--text2);margin-bottom:6px"></div>'
       +   '<div id="cotizList" style="overflow-y:auto;flex:1;min-height:40px"></div>'
       +   '<div style="display:flex;gap:8px;margin-top:10px">'
@@ -347,11 +348,30 @@
     try{ if(typeof window._authEnsureToken==='function') p=Promise.resolve(window._authEnsureToken()); }catch(e){}
     return p.then(function(){ try{ return localStorage.getItem('tt_id_token')||''; }catch(e){ return ''; } });
   }
+  // Estados donde SÍ se jala automáticamente al abrir (fase de preparación).
+  var _AUTO_STATES = ['NUEVO PEDIDO', 'EN PROCESO', 'POR ALISTAR'];
+  function _puedeJalar(s){
+    return !!_apisaleLink(s) &&
+      !(s.extraccion && s.extraccion.estado==='procesado') &&
+      !(Array.isArray(s.cotizItems) && s.cotizItems.length);
+  }
+  function _renderJalarBox(s){
+    var box=document.getElementById('cotizJalarBox'); if(!box) return;
+    box.innerHTML = _puedeJalar(s)
+      ? '<button onclick="Cotizacion._jalarAhora()" style="width:100%;margin-bottom:10px;padding:11px;background:rgba(56,139,253,.15);border:1.5px solid rgba(56,139,253,.4);border-radius:12px;color:var(--blue);font-weight:700;font-size:13px;cursor:pointer;font-family:inherit">📥 Jalar del comprobante</button>'
+      : '';
+  }
+  // Al abrir: muestra el botón manual y, solo en estados de preparación, auto-jala.
   function _maybeExtraer(s){
     if(!s || !window.fetch) return;
-    if(!_apisaleLink(s)) return;                                   // sin comprobante apisale
-    if(s.extraccion && s.extraccion.estado==='procesado') return; // ya procesado
-    if(Array.isArray(s.cotizItems) && s.cotizItems.length) return; // ya tiene ítems (no pisar)
+    _renderJalarBox(s);
+    if(!_puedeJalar(s)) return;
+    if(_AUTO_STATES.indexOf(s.status)>=0) _extraer(s);
+  }
+  // Llama la Cloud Function y rellena los productos.
+  function _extraer(s){
+    if(!s || !window.fetch) return;
+    var box=document.getElementById('cotizJalarBox'); if(box) box.innerHTML='';
     _setStatus('⏳ Extrayendo del comprobante…');
     _getToken().then(function(tok){
       var headers = tok ? {'Authorization':'Bearer '+tok} : {};
@@ -362,14 +382,15 @@
         s.cotizItems=data.cotizItems;
         s.extraccion=s.extraccion||{}; s.extraccion.estado='procesado';
         _rows=data.cotizItems.map(function(r){ return {codigo:r.codigo||'', desc:r.desc||'', cant:r.cant||1, enTienda:!!r.enTienda, proveedor:r.proveedor||null, ean:r.ean||''}; });
-        _renderRows();
+        _renderJalarBox(s); _renderRows();
         _setStatus(_rows.length?('✓ '+_rows.length+' producto(s) del comprobante — revisá y corregí si hace falta.'):'El comprobante no arrojó productos — cargá el PDF a mano.', _rows.length?'var(--green,#2ea043)':'#d29922');
         if(typeof render==='function') render();
       } else {
+        _renderJalarBox(s);
         _setStatus('⚠️ '+((data&&data.motivo)||'No se pudo leer el comprobante')+' — podés subir el PDF a mano.','var(--red)');
       }
     }).catch(function(){
-      if(_curId===s.id) _setStatus('⚠️ Error al leer el comprobante — subí el PDF a mano.','var(--red)');
+      if(_curId===s.id){ _renderJalarBox(s); _setStatus('⚠️ Error al leer el comprobante — subí el PDF a mano.','var(--red)'); }
     });
   }
 
@@ -587,6 +608,9 @@
       return { faltantes:faltantes.length, enStock:enStock, sinStock:sinStock };
     },
     getStock: function(){ return _tiendaStock(); },
+
+    // Botón manual "📥 Jalar del comprobante" (estados no automáticos).
+    _jalarAhora: function(){ var s=_find(_curId); if(s) _extraer(s); },
 
     // ── ENVIAR A PROVEEDOR (Fase 2b) ──────────────────────────────────────
     // Compara los faltantes con el Excel; abre el diálogo para elegir proveedor.

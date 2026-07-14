@@ -610,7 +610,18 @@ exports.extraerComprobante = onRequest(
         return;
       }
       try {
-        // Seguridad: exige un ID token valido de Firebase Auth.
+        const pedidoId = (req.query.pedidoId || "").trim();
+        const urlDirecta = (req.query.url || "").trim();
+
+        // Modo prueba (?url=): PUBLICO y solo lectura (depurar el parser).
+        // No escribe en Firestore. Solo baja de apisale (whitelist).
+        if (!pedidoId && urlDirecta) {
+          const r = await comprobante.procesarUrl(urlDirecta);
+          res.status(r.ok ? 200 : 400).json(r);
+          return;
+        }
+
+        // El modo que ESCRIBE (?pedidoId=) exige token de Firebase Auth.
         const authz = req.get("Authorization") || "";
         const bearer = authz.match(/^Bearer\s+(.+)$/i);
         if (!bearer) {
@@ -621,16 +632,6 @@ exports.extraerComprobante = onRequest(
           await getAuth().verifyIdToken(bearer[1]);
         } catch (e) {
           res.status(401).json({ok: false, motivo: "Token invalido"});
-          return;
-        }
-
-        const pedidoId = (req.query.pedidoId || "").trim();
-        const urlDirecta = (req.query.url || "").trim();
-
-        // Modo prueba (?url=): no escribe en Firestore.
-        if (!pedidoId && urlDirecta) {
-          const r = await comprobante.procesarUrl(urlDirecta);
-          res.status(r.ok ? 200 : 400).json(r);
           return;
         }
         if (!pedidoId) {
