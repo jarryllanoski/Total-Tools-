@@ -16,7 +16,8 @@ const pdfParse = require("pdf-parse");
 const crypto = require("crypto");
 
 // Version del parser: si se mejora, se sube este numero para reprocesar.
-const PARSER_VERSION = 2;
+// v3: arreglo A4 multi-item (EAN guion, cantidad y descripcion multilinea).
+const PARSER_VERSION = 3;
 
 // Hash SHA-256 de la URL (para idempotencia).
 const hashUrl = (u) =>

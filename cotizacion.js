@@ -350,10 +350,17 @@
   }
   // Estados donde SÍ se jala automáticamente al abrir (fase de preparación).
   var _AUTO_STATES = ['NUEVO PEDIDO', 'EN PROCESO', 'POR ALISTAR'];
+  // Botón manual: hay link apisale y todavía no hay ítems (aunque un intento
+  // previo haya quedado "procesado" pero vacío → vuelve a ofrecer jalar).
   function _puedeJalar(s){
     return !!_apisaleLink(s) &&
-      !(s.extraccion && s.extraccion.estado==='procesado') &&
       !(Array.isArray(s.cotizItems) && s.cotizItems.length);
+  }
+  // Auto-jalar (una sola vez): solo si aún no fue procesado, para no re-jalar
+  // solo en cada apertura si un PDF genuinamente no tiene productos.
+  function _puedeAuto(s){
+    return _puedeJalar(s) &&
+      !(s.extraccion && s.extraccion.estado==='procesado');
   }
   function _renderJalarBox(s){
     var box=document.getElementById('cotizJalarBox'); if(!box) return;
@@ -361,12 +368,12 @@
       ? '<button onclick="Cotizacion._jalarAhora()" style="width:100%;margin-bottom:10px;padding:11px;background:rgba(56,139,253,.15);border:1.5px solid rgba(56,139,253,.4);border-radius:12px;color:var(--blue);font-weight:700;font-size:13px;cursor:pointer;font-family:inherit">📥 Jalar del comprobante</button>'
       : '';
   }
-  // Al abrir: muestra el botón manual y, solo en estados de preparación, auto-jala.
+  // Al abrir: si va a auto-jalar (estado de preparación), va directo a extraer
+  // (muestra ⏳) sin dibujar el botón ni un instante; si no, muestra el manual.
   function _maybeExtraer(s){
     if(!s || !window.fetch) return;
+    if(_puedeAuto(s) && _AUTO_STATES.indexOf(s.status)>=0){ _extraer(s); return; }
     _renderJalarBox(s);
-    if(!_puedeJalar(s)) return;
-    if(_AUTO_STATES.indexOf(s.status)>=0) _extraer(s);
   }
   // Llama la Cloud Function y rellena los productos.
   function _extraer(s){
