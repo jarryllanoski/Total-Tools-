@@ -6,6 +6,9 @@ const {defineSecret} = require("firebase-functions/params");
 const {initializeApp} = require("firebase-admin/app");
 const {getFirestore, FieldValue} = require("firebase-admin/firestore");
 
+// Modulo aislado de extraccion de comprobantes (Fase 1).
+const comprobante = require("./comprobante");
+
 setGlobalOptions({maxInstances: 10});
 initializeApp();
 const db = getFirestore();
@@ -587,6 +590,41 @@ exports.shalomTicket = onRequest(
         res.status(500).json({
           error: "No se pudo generar el ticket. Intenta nuevamente.",
         });
+      }
+    },
+);
+
+// ── extraerComprobante (Fase 1: PRUEBA — NO escribe en Firestore) ───────────
+// Descarga el PDF de API Sale desde el servidor, extrae el texto y parsea los
+// productos, y los DEVUELVE en la respuesta. Uso:
+//   ?url=<link apisale>           (prueba directa)
+//   ?pedidoId=<id>                (lee el link del pedido; solo lectura)
+exports.extraerComprobante = onRequest(
+    {region: "us-central1"},
+    async (req, res) => {
+      setCORS(req, res);
+      if (req.method === "OPTIONS") {
+        res.status(204).send("");
+        return;
+      }
+      try {
+        let url = (req.query.url || "").trim();
+        const pedidoId = (req.query.pedidoId || "").trim();
+        if (!url && pedidoId) {
+          const snap = await db.doc(SHIP_COL + "/" + pedidoId).get();
+          const s = snap.exists ? snap.data() : null;
+          url = (s && s.links && s.links[0] && s.links[0].u) || "";
+        }
+        if (!url) {
+          res.status(400).json({ok: false, motivo: "Falta url o pedidoId"});
+          return;
+        }
+        const r = await comprobante.procesarUrl(url);
+        res.status(r.ok ? 200 : 400).json(r);
+      } catch (e) {
+        console.error("extraerComprobante error:", e);
+        const msg = String((e && e.message) || e);
+        res.status(500).json({ok: false, motivo: msg});
       }
     },
 );
