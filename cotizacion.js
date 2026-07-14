@@ -242,7 +242,7 @@
       +       '<span onclick="if(window.Ayuda)Ayuda.abrir(\'cotizacion\')" style="font-size:12px;color:#a78bfa;cursor:pointer;font-weight:600" title="Ayuda">📖</span>'
       +     '</span>'
       +   '</div>'
-      +   '<div style="font-size:11px;color:var(--text2);line-height:1.5;margin-bottom:10px">Subí el <b>PDF</b> de la boleta o <b>pegá el texto</b>. Se extrae código, descripción y cantidad — todo editable.</div>'
+      +   '<div style="font-size:11px;color:var(--text2);line-height:1.5;margin-bottom:10px">Se <b>jala solo</b> del comprobante del pedido, o subí el <b>PDF</b> / <b>pegá el texto</b>. Se extrae código, descripción y cantidad — todo editable.</div>'
       +   '<div style="display:flex;gap:8px;margin-bottom:10px">'
       +     '<label style="flex:1;padding:12px 8px;background:var(--bg2);border:1.5px solid var(--bd);border-radius:12px;color:var(--text);font-weight:600;font-size:13px;text-align:center;cursor:pointer">📄 Subir PDF'
       +       '<input type="file" accept="application/pdf,.pdf" style="display:none" onchange="Cotizacion._onPdf(this)"></label>'
@@ -695,7 +695,8 @@
     actualizado: '2026-07-14',
     pasos: [
       'En cualquier pedido, tocá el icono <b>🧾</b> (al lado del 💬) para abrir la cotización.',
-      'Subí el <b>PDF</b> de la boleta o <b>pegá el texto</b>: se extraen <b>código, descripción y cantidad</b> automáticamente. Todo es editable — corregí, agregá (➕ Fila) o borrá (✕) lo que haga falta.',
+      'Si el pedido trae el <b>comprobante de venta</b> (link de la boleta), los productos se <b>jalan solos</b> al abrir el 🧾 en los estados de preparación (NUEVO PEDIDO, EN PROCESO, POR ALISTAR). Si no se jalan, tocá <b>📥 Jalar del comprobante</b>. Funciona con boletas <b>ticket</b> y <b>A4</b>.',
+      'También podés subir el <b>PDF</b> de la boleta o <b>pegar el texto</b>: se extraen <b>código, descripción y cantidad</b> automáticamente. Todo es editable — corregí, agregá (➕ Fila) o borrá (✕) lo que haga falta.',
       'Marcá lo que ya tenés con <b>🏬 en tienda</b>. Lo que quede en <b>🛒</b> son los <b>faltantes</b> (lo que hay que conseguir).',
       'Subí tu <b>Stock de tienda</b> (Excel) desde acá y el <b>Excel de cada proveedor</b> en la sección Proveedores. El sistema detecta las columnas solo.',
       'Cada ítem se clasifica automáticamente: <b>🏬 en tienda</b>, <b>🏭 en proveedor</b> (te dice cuál) o <b>⚠️ faltante</b> (no está en ningún lado). Arriba ves el resumen.',
@@ -704,6 +705,8 @@
     ],
     faq: [
       {q:'¿Guarda el PDF o la imagen?', a:'No. Solo se guarda el texto extraído (código, descripción, cantidad). Es liviano y no ocupa espacio ni consume datos.'},
+      {q:'Intenté jalar del comprobante y no trajo nada, ¿ahora qué?', a:'Volvé a abrir el 🧾: el botón 📥 Jalar del comprobante reaparece para reintentar. Si aun así no trae productos, subí el PDF a mano o pegá el texto.'},
+      {q:'¿Reconoce boletas A4 con varios productos?', a:'Sí. Detecta ticket y A4, incluso ítems sin código de barras y descripciones que ocupan varias líneas.'},
       {q:'¿De dónde sale el “stock de tienda”?', a:'De un Excel que vos subís (tu inventario). Se guarda en este dispositivo y sirve para todos los pedidos, hasta que subas otro.'},
       {q:'¿Qué significa “en tienda” (🏬)?', a:'Que ese producto ya lo tenés. Se excluye de los faltantes y no se manda a cotizar.'},
       {q:'¿Y si un código no aparece en el Excel?', a:'Se marca ⚠️ “sin stock”. Podés conseguirlo por otro lado, o revisar que el código coincida con el del Excel.'},

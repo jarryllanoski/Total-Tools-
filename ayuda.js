@@ -42,6 +42,7 @@
     envios: {
       titulo: 'Envíos (Panel principal)',
       icono: '🚚',
+      actualizado: '2026-07-14',
       pasos: [
         'El panel muestra todos tus pedidos agrupados por courier.',
         'Cada tarjeta tiene el nombre, teléfono, dirección y estado del pedido.',
@@ -52,7 +53,8 @@
       ],
       faq: [
         {q:'¿Cómo cambio el estado de un pedido?', a:'Toca la etiqueta de estado grande de la tarjeta y elige el nuevo estado.'},
-        {q:'¿Puedo seleccionar varios pedidos a la vez?', a:'Sí, usa las casillas de cada tarjeta para aplicar un cambio a varios.'}
+        {q:'¿Puedo seleccionar varios pedidos a la vez?', a:'Sí, usa las casillas de cada tarjeta para aplicar un cambio a varios.'},
+        {q:'¿Hay forma de seleccionar todos de una vez?', a:'Sí. El botón de seleccionar todo es de tres estados: si no hay nada marcado, marca todos los visibles; si ya hay algo marcado (se ve azul), lo deselecciona todo.'}
       ],
       tips: [
         'Los pedidos finalizados dejan de consultar Shalom automáticamente para ahorrar recursos.',
@@ -161,6 +163,26 @@
       ]
     },
 
+    linkPersonalizado: {
+      titulo: 'Link personalizado',
+      icono: '✨',
+      actualizado: '2026-07-14',
+      pasos: [
+        'Genera un link con los datos del cliente ya cargados (nombre, teléfono) para que complete su pedido más rápido en el formulario público.',
+        'Podés adjuntar un <b>🔗 link</b> (Drive, Mega, etc.) y ponerle <b>vencimiento</b> (1, 3, 7 o 30 días, o sin vencimiento).',
+        'Usá <b>📋 Generar y copiar</b> para copiarlo, o <b>🔑 Generar y compartir</b> para mandarlo directo por WhatsApp.',
+        'Cada link es de <b>un solo uso</b>: se bloquea después de abrirse una vez, por seguridad.'
+      ],
+      faq: [
+        {q:'¿Por qué se bloquea tras un uso?', a:'Por seguridad: evita que el mismo link circule y lo usen personas no deseadas. Si necesitás otro, generá uno nuevo — toma un segundo.'},
+        {q:'¿Qué pasa si le pongo vencimiento?', a:'El link deja de funcionar al cumplirse el plazo (por ejemplo 7 días), aunque nadie lo haya usado.'},
+        {q:'¿El teléfono es obligatorio?', a:'No, es opcional. Solo sirve para precargarlo en el formulario del cliente.'}
+      ],
+      tips: [
+        'En la lista de "Links generados" ves los que creaste: cuáles ya se usaron y cuáles siguen disponibles.'
+      ]
+    },
+
     importExport: {
       titulo: 'Importar / Exportar Excel',
       icono: '📊',
@@ -217,13 +239,16 @@
     notificaciones: {
       titulo: 'Notificaciones',
       icono: '🔔',
+      actualizado: '2026-07-14',
       pasos: [
         'La campana 🔔 muestra avisos del sistema (pedidos que llegaron a destino, cambios importantes).',
         'Un punto verde indica que hay novedades sin revisar.',
-        'Toca la campana para ver el detalle.'
+        'Toca la campana para ver el detalle.',
+        'Algunas notificaciones traen un botón <b>🔗 Link</b> para abrir el documento o el pedido al instante.'
       ],
       faq: [
-        {q:'¿Las notificaciones llegan al cliente?', a:'No, son avisos internos para ti en el panel.'}
+        {q:'¿Las notificaciones llegan al cliente?', a:'No, son avisos internos para ti en el panel.'},
+        {q:'¿Se sincronizan entre mis dispositivos?', a:'Sí. Si marcas una como leída o impresa en un celular, se ve igual en los demás — el estado vive en la nube, no solo en ese equipo.'}
       ],
       tips: [
         'Revisa las notificaciones al inicio del día para ver qué pedidos avanzaron.'
