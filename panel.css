@@ -61,10 +61,12 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);max
 .chk.on{background:var(--blue);border-color:var(--blue)}
 .cname{font-weight:600;font-size:14px;flex:1}
 .wa-btn{width:28px;height:28px;border-radius:50%;background:rgba(46,160,67,.1);border:1px solid rgba(46,160,67,.2);color:var(--green);font-size:14px;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;font-family:inherit}
-.card-meta{display:flex;gap:10px;margin-bottom:5px;flex-wrap:wrap}
+/* Indentado 26px = ancho de la columna del check (17px + gap 9px): la info del
+   pedido queda alineada bajo el nombre y el 📞 no queda debajo del check. */
+.card-meta{display:flex;gap:10px;margin-bottom:5px;flex-wrap:wrap;padding-left:26px}
 .meta{font-size:11px;color:var(--blue)}
-.card-addr{font-size:11px;color:var(--text2);line-height:1.4}
-.card-note{font-size:11px;color:var(--purple);margin-top:3px}
+.card-addr{font-size:11px;color:var(--text2);line-height:1.4;padding-left:26px}
+.card-note{font-size:11px;color:var(--purple);margin-top:3px;padding-left:26px}
 /* SUPPLIERS */
 .supp-panel{margin-bottom:12px}
 .supp-panel-hdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
