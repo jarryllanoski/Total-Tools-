@@ -613,15 +613,7 @@ exports.extraerComprobante = onRequest(
         const pedidoId = (req.query.pedidoId || "").trim();
         const urlDirecta = (req.query.url || "").trim();
 
-        // Modo prueba (?url=): PUBLICO y solo lectura (depurar el parser).
-        // No escribe en Firestore. Solo baja de apisale (whitelist).
-        if (!pedidoId && urlDirecta) {
-          const r = await comprobante.procesarUrl(urlDirecta);
-          res.status(r.ok ? 200 : 400).json(r);
-          return;
-        }
-
-        // El modo que ESCRIBE (?pedidoId=) exige token de Firebase Auth.
+        // Ambos modos exigen token de Firebase Auth (solo el panel logueado).
         const authz = req.get("Authorization") || "";
         const bearer = authz.match(/^Bearer\s+(.+)$/i);
         if (!bearer) {
@@ -634,6 +626,15 @@ exports.extraerComprobante = onRequest(
           res.status(401).json({ok: false, motivo: "Token invalido"});
           return;
         }
+
+        // Modo prueba (?url=): solo lectura, no escribe en Firestore.
+        // Solo baja de apisale (whitelist). Ahora tambien protegido con token.
+        if (!pedidoId && urlDirecta) {
+          const r = await comprobante.procesarUrl(urlDirecta);
+          res.status(r.ok ? 200 : 400).json(r);
+          return;
+        }
+
         if (!pedidoId) {
           res.status(400).json({ok: false, motivo: "Falta pedidoId"});
           return;
