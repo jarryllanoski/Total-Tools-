@@ -208,10 +208,26 @@ const track = async (numero, codigo, debug) => {
     out.ok = true;
     out.encabezado = extraerEncabezado(textoVisible);
     out.estadoDetectado = detectarEstado(textoVisible);
-    out.textoVisible = String(textoVisible).slice(0, 3000);
     out.netStatus = netStatus;
 
+    // "Sobre" compatible con el que ya interpreta tracking.js (aplicarResultado
+    // / detectarEstadoAuto). Le mandamos el TITULO REAL que muestra Shalom
+    // ("En destino", "Entregado", "En tránsito"...) como "message": ese texto
+    // ya usa las mismas palabras clave que tu cerebro de tracking sabe leer,
+    // asi que NO reinventamos aqui el mapeo a ENVIADO/LLEGÓ A DESTINO/
+    // FINALIZADO — esa regla de negocio sigue viviendo en un solo lugar
+    // (tracking.js), evitando que dos motores decidan cosas distintas.
+    out.statuses = {
+      message: out.encabezado || null,
+      historial: [],
+    };
+
+    // Solo en modo debug incluimos el texto completo de la pagina (puede
+    // traer datos personales del destinatario, p.ej. nombre y DNI en el caso
+    // "Entregado") y la captura. Fuera de debug no se exponen ni se deben
+    // persistir.
     if (debug) {
+      out.textoVisible = String(textoVisible).slice(0, 3000);
       out.screenshot = (await page.screenshot({fullPage: false}))
           .toString("base64");
     }
