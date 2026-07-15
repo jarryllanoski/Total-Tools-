@@ -1,6 +1,6 @@
 # Imagen oficial de Playwright: trae Chromium + dependencias del sistema listas.
 # Esto es lo que hace que "funcione siempre" sin pelear con librerias del navegador.
-FROM mcr.microsoft.com/playwright:v1.49.0-jammy
+FROM mcr.microsoft.com/playwright:v1.55.1-jammy
 
 WORKDIR /app
 
@@ -8,9 +8,9 @@ WORKDIR /app
 ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
 ENV NODE_ENV=production
 
-# Instalar dependencias (sin lockfile: npm install en vez de npm ci).
-COPY package.json ./
-RUN npm install --omit=dev
+# Instalar dependencias de forma reproducible (usa package-lock.json).
+COPY package.json package-lock.json ./
+RUN npm ci --omit=dev
 
 # Copiar el codigo del servicio.
 COPY . .

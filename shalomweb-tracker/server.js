@@ -28,6 +28,23 @@ const RASTREA_URL = process.env.RASTREA_URL || "https://shalom.com.pe/rastrea";
 // Guardia opcional: si defines TRACK_KEY en el deploy, exige ?k=... o header.
 const TRACK_KEY = process.env.TRACK_KEY || "";
 
+// Validacion de entrada: numero solo digitos; codigo solo alfanumerico.
+const RE_NUMERO = /^\d{6,12}$/;
+const RE_CODIGO = /^[A-Za-z0-9]{3,12}$/;
+
+// Tope global de una consulta (backstop; los pasos tienen su propio timeout).
+const TRACK_TIMEOUT_MS = 60000;
+
+// Envuelve una promesa con un limite de tiempo (rechaza si se pasa).
+const withTimeout = (p, ms, label) => {
+  let t;
+  const guard = new Promise((_, rej) => {
+    t = setTimeout(
+        () => rej(new Error("Timeout " + label + " (" + ms + "ms)")), ms);
+  });
+  return Promise.race([p, guard]).finally(() => clearTimeout(t));
+};
+
 // User-Agent realista (navegador de escritorio comun).
 const UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" +
   " (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
@@ -151,6 +168,7 @@ const track = async (numero, codigo, debug) => {
     }
     return out;
   } finally {
+    await page.close().catch(() => {});
     await ctx.close().catch(() => {});
   }
 };
@@ -159,10 +177,12 @@ const authOk = (req) =>
   !TRACK_KEY || req.query.k === TRACK_KEY ||
   req.get("x-track-key") === TRACK_KEY;
 
-// Salud (Cloud Run hace ping a "/").
-app.get("/", (req, res) => {
+// Salud (Cloud Run hace ping a "/"). No abre Chromium.
+const salud = (req, res) => {
   res.json({ok: true, service: "shalomweb-tracker", fase: 1});
-});
+};
+app.get("/", salud);
+app.get("/health", salud);
 
 // Rastreo puntual: /track?numero=88124236&codigo=HHM9[&debug=1]
 app.get("/track", async (req, res) => {
@@ -171,20 +191,31 @@ app.get("/track", async (req, res) => {
     return;
   }
   const numero = String(req.query.numero || "").trim();
-  const codigo = String(req.query.codigo || "").trim();
+  const codigo = String(req.query.codigo || "").trim().toUpperCase();
   const debug = req.query.debug === "1";
   if (!numero || !codigo) {
     res.status(400).json({ok: false, error: "Faltan numero y/o codigo"});
     return;
   }
+  if (!RE_NUMERO.test(numero)) {
+    res.status(400).json({ok: false, error: "numero invalido (6-12 digitos)"});
+    return;
+  }
+  if (!RE_CODIGO.test(codigo)) {
+    res.status(400).json({
+      ok: false, error: "codigo invalido (3-12 letras/numeros)",
+    });
+    return;
+  }
   try {
-    const r = await track(numero, codigo, debug);
+    const r = await withTimeout(
+        track(numero, codigo, debug), TRACK_TIMEOUT_MS, "track");
     res.status(r.ok ? 200 : 502).json(r);
   } catch (e) {
-    res.status(500).json({ok: false, error: String((e && e.message) || e)});
+    res.status(504).json({ok: false, error: String((e && e.message) || e)});
   }
 });
 
-app.listen(PORT, () => {
-  console.log("shalomweb-tracker escuchando en :" + PORT);
+app.listen(PORT, "0.0.0.0", () => {
+  console.log("shalomweb-tracker escuchando en 0.0.0.0:" + PORT);
 });
