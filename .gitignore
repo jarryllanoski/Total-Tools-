@@ -64,6 +64,10 @@ node_modules/
 
 # dotenv environment variables file
 .env
+# Firebase Functions param values (p.ej. .env.total-tools-24ce8) — no secretos
+# pero Firebase recomienda no versionarlos; el default vive en el codigo.
+.env.*
+!.env.example
 
 # dataconnect generated files
 .dataconnect
