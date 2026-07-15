@@ -92,8 +92,17 @@ const KW_ORIGEN = ["en origen"];
 const _norm = (s) => String(s || "").toLowerCase()
     .normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 
-// Detecta el estado a partir del texto visible de la pagina.
-const detectarEstado = (texto) => {
+// Extrae el titulo real del resultado: la linea que sigue al boton "Buscar",
+// ANTES de la lista de la linea de tiempo (que siempre lista los 4 pasos,
+// completados o no — por eso no basta con buscar "entregado" en todo el
+// texto: esa palabra SIEMPRE aparece como etiqueta del ultimo paso).
+const extraerEncabezado = (texto) => {
+  const m = String(texto || "").match(/Buscar\s*\n+\s*([^\n]+)/i);
+  return m ? m[1].trim() : null;
+};
+
+// Clasifica un texto corto (el encabezado) por palabras clave.
+const clasificar = (texto) => {
   const t = _norm(texto);
   const hit = (arr) => arr.some((k) => t.indexOf(_norm(k)) >= 0);
   if (hit(KW_ENTREGADO)) return "ENTREGADO";
@@ -101,6 +110,43 @@ const detectarEstado = (texto) => {
   if (hit(KW_TRANSITO)) return "EN_TRANSITO";
   if (hit(KW_ORIGEN)) return "EN_ORIGEN";
   return null;
+};
+
+// Respaldo: si no se pudo aislar el encabezado (p.ej. cambio el texto del
+// boton), usa la PRIMERA aparicion de cualquier palabra clave en todo el
+// texto — el titulo real siempre aparece antes que la lista de la linea de
+// tiempo, asi que la coincidencia con el indice mas bajo es la correcta.
+const detectarEstadoPorPosicion = (texto) => {
+  const t = _norm(texto);
+  const grupos = [
+    {estado: "ENTREGADO", palabras: KW_ENTREGADO},
+    {estado: "EN_DESTINO", palabras: KW_DESTINO},
+    {estado: "EN_TRANSITO", palabras: KW_TRANSITO},
+    {estado: "EN_ORIGEN", palabras: KW_ORIGEN},
+  ];
+  let mejorEstado = null;
+  let mejorIdx = Infinity;
+  grupos.forEach((g) => {
+    g.palabras.forEach((p) => {
+      const idx = t.indexOf(_norm(p));
+      if (idx >= 0 && idx < mejorIdx) {
+        mejorIdx = idx;
+        mejorEstado = g.estado;
+      }
+    });
+  });
+  return mejorEstado;
+};
+
+// Detecta el estado a partir del texto visible de la pagina (encabezado
+// primero; si no se pudo aislar, cae al metodo por posicion).
+const detectarEstado = (texto) => {
+  const encabezado = extraerEncabezado(texto);
+  if (encabezado) {
+    const c = clasificar(encabezado);
+    if (c) return c;
+  }
+  return detectarEstadoPorPosicion(texto);
 };
 
 // Rastrea un envio. Devuelve {ok, estadoDetectado, textoVisible, ...}.
@@ -160,6 +206,7 @@ const track = async (numero, codigo, debug) => {
         .catch(() => "");
 
     out.ok = true;
+    out.encabezado = extraerEncabezado(textoVisible);
     out.estadoDetectado = detectarEstado(textoVisible);
     out.textoVisible = String(textoVisible).slice(0, 3000);
     out.netStatus = netStatus;
