@@ -2,13 +2,17 @@
 
 const {setGlobalOptions} = require("firebase-functions");
 const {onRequest} = require("firebase-functions/https");
-const {defineSecret} = require("firebase-functions/params");
+const {onSchedule} = require("firebase-functions/v2/scheduler");
+const {defineSecret, defineString} = require("firebase-functions/params");
 const {initializeApp} = require("firebase-admin/app");
 const {getFirestore, FieldValue} = require("firebase-admin/firestore");
 const {getAuth} = require("firebase-admin/auth");
 
 // Modulo aislado de extraccion de comprobantes.
 const comprobante = require("./comprobante");
+// Motor B de tracking Shalom (navegador propio) — aislado del motor A
+// (shalomTracking, API paga) y de tracking.js. Ver shalomweb-tracker/.
+const shalomWebSync = require("./shalomWebSync");
 
 setGlobalOptions({maxInstances: 10});
 initializeApp();
@@ -17,6 +21,13 @@ const db = getFirestore();
 // ── Secret Manager ─────────────────────────────────────────────────────────
 const SHALOM_KEY = defineSecret("SHALOM_KEY");
 const SHALOM_BASE = "https://shalom-api.lat";
+
+// URL del worker propio (Cloud Run, shalomweb-tracker/). No es secreta (el
+// servicio ya es publico de solo-lectura), pero se define como parametro
+// para no hardcodear el proyecto/region y poder cambiarla sin tocar codigo.
+const SHALOMWEB_URL = defineString("SHALOMWEB_TRACKER_URL", {
+  default: "https://shalomweb-tracker-256086864182.us-central1.run.app",
+});
 
 // ── Rutas Firestore (deben coincidir exactamente con el panel) ─────────────
 const CFG_DOC = "panel/config";
@@ -694,6 +705,155 @@ exports.extraerComprobante = onRequest(
         });
       } catch (e) {
         console.error("extraerComprobante error:", e);
+        const msg = String((e && e.message) || e);
+        res.status(500).json({ok: false, motivo: msg});
+      }
+    },
+);
+
+// ── syncShalomWeb (Motor B: tracking Shalom con navegador propio) ──────────
+// Corre cada 30 min por Cloud Scheduler (gestionado por firebase deploy, sin
+// pasos manuales). Por defecto NO HACE NADA: solo actua si
+// panel/config.trackingMotor === "web" — el interruptor que decide cual
+// motor esta "vivo" (nunca los dos a la vez, para que no se pisen). El
+// motor A (shalomTracking, API paga) sigue existiendo sin tocarse.
+const MAX_SHALOMWEB_POR_CORRIDA = 25;
+const PAUSA_ENTRE_CONSULTAS_MS = 2500; // gentil con Shalom/reCAPTCHA
+
+exports.syncShalomWeb = onSchedule(
+    {
+      schedule: "every 30 minutes",
+      timeZone: "America/Lima",
+      region: "us-central1",
+      timeoutSeconds: 540,
+      memory: "256MiB",
+    },
+    async () => {
+      const cfgSnap = await db.doc(CFG_DOC).get();
+      const cfg = cfgSnap.exists ? cfgSnap.data() : {};
+      if (cfg.trackingMotor !== "web") {
+        console.log("[syncShalomWeb] motor 'web' apagado — nada que hacer");
+        return;
+      }
+
+      const workerUrl = SHALOMWEB_URL.value();
+      const nowMs = Date.now();
+
+      const snap = await db.collection(SHIP_COL)
+          .where("courier", "==", "SHALOM").get();
+
+      const vencidos = [];
+      snap.forEach((doc) => {
+        const ship = doc.data();
+        if (shalomWebSync.esElegible(ship) &&
+            shalomWebSync.estaVencido(ship, nowMs)) {
+          vencidos.push({id: doc.id, ship: ship});
+        }
+      });
+
+      console.log(
+          "[syncShalomWeb] elegibles y vencidos:", vencidos.length,
+          "de", snap.size, "pedidos Shalom",
+      );
+
+      const lote = vencidos.slice(0, MAX_SHALOMWEB_POR_CORRIDA);
+      let actualizados = 0;
+      let errores = 0;
+
+      for (let i = 0; i < lote.length; i++) {
+        const item = lote[i];
+        const guia = item.ship.trackingOrderNumber || item.ship.shalomGuia;
+        const codigo = item.ship.trackingOrderCode || item.ship.shalomCodigo;
+        const data = await shalomWebSync.consultarWorker(
+            workerUrl, guia, codigo);
+        const write = shalomWebSync.decidirCambios(
+            item.ship, data, nowMs, cfg);
+        if (write && Object.keys(write).length) {
+          await db.doc(SHIP_COL + "/" + item.id).set(write, {merge: true});
+        }
+        if (data && data.ok) actualizados++; else errores++;
+        if (i < lote.length - 1) {
+          await new Promise((r) => setTimeout(r, PAUSA_ENTRE_CONSULTAS_MS));
+        }
+      }
+
+      console.log(
+          "[syncShalomWeb] listo — consultados:", lote.length,
+          "ok:", actualizados, "errores:", errores,
+          "pendientes para el siguiente ciclo:", vencidos.length - lote.length,
+      );
+    },
+);
+
+// ── syncShalomWebTest (prueba manual, un solo pedido) ───────────────────────
+// Corre el mismo pipeline del motor B para UN pedido puntual, sin depender
+// del interruptor panel/config.trackingMotor ni del scheduler — para probar
+// contra un pedido real antes de activar el ciclo automatico. Requiere login
+// del panel (mismo Bearer que extraerComprobante). Con ?dryRun=1 no escribe.
+exports.syncShalomWebTest = onRequest(
+    {region: "us-central1"},
+    async (req, res) => {
+      setCORS(req, res);
+      if (req.method === "OPTIONS") {
+        res.status(204).send("");
+        return;
+      }
+      try {
+        const authz = req.get("Authorization") || "";
+        const bearer = authz.match(/^Bearer\s+(.+)$/i);
+        if (!bearer) {
+          res.status(401).json({ok: false, motivo: "No autorizado"});
+          return;
+        }
+        try {
+          await getAuth().verifyIdToken(bearer[1]);
+        } catch (e) {
+          res.status(401).json({ok: false, motivo: "Token invalido"});
+          return;
+        }
+
+        const pedidoId = (req.query.pedidoId || "").trim();
+        const dryRun = req.query.dryRun === "1";
+        if (!pedidoId) {
+          res.status(400).json({ok: false, motivo: "Falta pedidoId"});
+          return;
+        }
+
+        const ref = db.doc(SHIP_COL + "/" + pedidoId);
+        const snap = await ref.get();
+        if (!snap.exists) {
+          res.status(404).json({ok: false, motivo: "Pedido no existe"});
+          return;
+        }
+        const ship = snap.data();
+        if (!shalomWebSync.esElegible(ship)) {
+          res.status(400).json({
+            ok: false,
+            motivo: "El pedido no es elegible (no es Shalom, falta guia" +
+              "/codigo, o ya esta en un estado terminal)",
+          });
+          return;
+        }
+
+        const cfgSnap = await db.doc(CFG_DOC).get();
+        const cfg = cfgSnap.exists ? cfgSnap.data() : {};
+        const guia = ship.trackingOrderNumber || ship.shalomGuia;
+        const codigo = ship.trackingOrderCode || ship.shalomCodigo;
+        const nowMs = Date.now();
+
+        const data = await shalomWebSync.consultarWorker(
+            SHALOMWEB_URL.value(), guia, codigo);
+        const write = shalomWebSync.decidirCambios(ship, data, nowMs, cfg);
+
+        if (!dryRun && write && Object.keys(write).length) {
+          await ref.set(write, {merge: true});
+        }
+
+        res.status(200).json({
+          ok: true, dryRun: dryRun, resultadoWorker: data, cambios: write,
+        });
+      } catch (e) {
+        console.error("syncShalomWebTest error:", e);
         const msg = String((e && e.message) || e);
         res.status(500).json({ok: false, motivo: msg});
       }
