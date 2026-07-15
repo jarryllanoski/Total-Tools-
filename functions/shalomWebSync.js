@@ -144,10 +144,22 @@ const decidirCambios = (ship, data, nowMs, cfg) => {
       ESTADOS_PREVIOS.indexOf(ship.status) >= 0) {
     nuevoStatus = "ENVIADO";
   }
-  if (nuevoStatus) write.status = nuevoStatus;
 
-  const estadoFinal = nuevoStatus || ship.status;
-  const detenerse = estadoFinal === "FINALIZADO";
+  // Modo observacion: si el interruptor "cambiar etiqueta" esta APAGADO, el
+  // motor NO mueve la etiqueta del pedido; solo REGISTRA que etiqueta habria
+  // puesto (trackingWebEtiquetaSugerida). Sirve para validar el motor unas
+  // semanas con datos reales, sin riesgo. Por defecto viene apagado.
+  const cambiaEtiqueta = !!(cfg && cfg.trackingWebCambiaEtiqueta);
+  if (nuevoStatus) {
+    write.trackingWebEtiquetaSugerida = nuevoStatus;
+    write.trackingWebEtiquetaSugeridaEn = nowIso;
+    if (cambiaEtiqueta) write.status = nuevoStatus;
+  }
+
+  // Detener el polling cuando Shalom marca entregado (aunque en modo
+  // observacion no hayamos movido la etiqueta): un envio entregado ya no
+  // cambia, no vale la pena seguir consultandolo.
+  const detenerse = autoEstado === "FINALIZADO";
   write.trackingWebActivo = !detenerse;
   if (!detenerse) {
     write.proximaConsultaWeb =

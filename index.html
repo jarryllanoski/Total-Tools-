@@ -579,6 +579,29 @@
       <div><div class="tgl-n">Auto-tracking Shalom</div><div class="tgl-s">Consulta el estado automáticamente (según el estado)</div></div>
       <div class="tgl" id="tglShalomAuto" onclick="toggleShalomAuto()"></div>
     </div>
+
+    <!-- Motor de rastreo (elige qué sistema mantiene los estados al día) -->
+    <div class="fg" style="margin-top:12px">
+      <label class="fl">Motor de rastreo automático</label>
+      <select class="fs" id="cfgTrackingMotor" onchange="setTrackingMotor(this.value)">
+        <option value="off">Apagado (nadie consulta solo)</option>
+        <option value="api">API paga (la de siempre)</option>
+        <option value="web">Mi servidor (nuevo)</option>
+      </select>
+      <div class="tgl-s" style="margin-top:5px">Solo uno funciona a la vez, para que no se pisen. Al elegir “Mi servidor” se apaga la API paga automáticamente.</div>
+    </div>
+
+    <!-- Opciones del motor propio (solo visibles cuando está elegido) -->
+    <div id="cfgTrackingWebBox" style="display:none;margin-top:10px;padding:11px;background:var(--bg2);border:1px solid var(--bd);border-radius:10px">
+      <div class="tgl-row" style="border:none;padding-top:0">
+        <div style="max-width:74%"><div class="tgl-n">Cambiar etiquetas automáticamente</div><div class="tgl-s">Apagado = <b>modo observación</b>: registra lo que dice Shalom sin mover la etiqueta del pedido. Ideal para validar unas semanas.</div></div>
+        <div class="tgl" id="tglTrackingWebEtiqueta" onclick="toggleTrackingWebEtiqueta()"></div>
+      </div>
+      <div class="frow" style="margin-top:10px">
+        <div class="fg"><label class="fl">En tránsito, cada (horas)</label><input class="fi" id="cfgTrackingWebTransitoH" type="number" min="1" max="72" placeholder="12" onchange="setTrackingWebHoras()"></div>
+        <div class="fg"><label class="fl">En destino, cada (horas)</label><input class="fi" id="cfgTrackingWebDestinoH" type="number" min="1" max="168" placeholder="24" onchange="setTrackingWebHoras()"></div>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -1678,6 +1701,40 @@ function toggleShalomAuto(){
   S.config.shalomAutoTrack=on;
   save('config'); // solo cambia config
   toast(on?'🚚 Auto-tracking Shalom activado':'⏸️ Auto-tracking Shalom apagado');
+}
+/* Motor de rastreo: 'off' | 'api' | 'web' (Motor B, mi servidor). Solo uno a
+   la vez: al elegir 'web' se apaga la API paga; al elegir 'api' se prende. */
+function setTrackingMotor(v){
+  S.config=S.config||{};
+  S.config.trackingMotor=v;
+  // Coherencia con el motor viejo (browser/API paga) para que no se pisen.
+  S.config.shalomAutoTrack=(v==='api');
+  const tgl=document.getElementById('tglShalomAuto');
+  if(tgl) tgl.classList.toggle('on', v==='api');
+  const box=document.getElementById('cfgTrackingWebBox');
+  if(box) box.style.display=(v==='web')?'block':'none';
+  save('config');
+  toast(v==='web'?'🖥️ Rastreo con mi servidor activado':(v==='api'?'☁️ Rastreo con API paga activado':'⏸️ Rastreo automático apagado'));
+}
+/* Modo observación vs cambio real de etiquetas (Motor B). */
+function toggleTrackingWebEtiqueta(){
+  const el=document.getElementById('tglTrackingWebEtiqueta'); if(!el) return;
+  el.classList.toggle('on');
+  const on=el.classList.contains('on');
+  S.config=S.config||{};
+  S.config.trackingWebCambiaEtiqueta=on;
+  save('config');
+  toast(on?'🏷️ Cambio de etiquetas ACTIVADO':'👀 Modo observación (no mueve etiquetas)');
+}
+/* Horas programadas del Motor B (tránsito / destino). */
+function setTrackingWebHoras(){
+  S.config=S.config||{};
+  const t=parseInt(document.getElementById('cfgTrackingWebTransitoH').value,10);
+  const d=parseInt(document.getElementById('cfgTrackingWebDestinoH').value,10);
+  if(t>=1&&t<=72) S.config.trackingWebIntervalTransitoH=t;
+  if(d>=1&&d<=168) S.config.trackingWebIntervalDestinoH=d;
+  save('config');
+  toast('⏱️ Horas de rastreo guardadas');
 }
 /* Resaltar (y centrar) una tarjeta por su id — se usa al crear un pedido nuevo */
 function _highlightCard(id){
