@@ -1,19 +1,23 @@
 "use strict";
 
 /*
- * shalomweb-tracker — Fase 1
- * ==========================
+ * shalomweb-tracker — Fase 1b
+ * ============================
  * Servicio que rastrea envios de Shalom usando un NAVEGADOR REAL (Playwright).
  *
  * Idea (limpia y legitima): abrimos shalom.com.pe/rastrea como lo haria una
  * persona, escribimos numero + codigo y damos "Buscar". La PROPIA pagina de
- * Shalom genera su token y su reCAPTCHA (nosotros NO los tocamos ni falsificamos)
- * y hace sus llamadas internas "buscar" y "estados". Nosotros solo INTERCEPTAMOS
- * la respuesta que esa pagina recibe, que ya viene en JSON limpio.
+ * Shalom genera su token, resuelve su reCAPTCHA y descifra su respuesta
+ * (Shalom cifra el cuerpo de "buscar"/"estados"; NO intentamos descifrarlo
+ * nosotros — eso seria romper su cifrado, y no lo vamos a hacer).
  *
- * En Fase 1 devolvemos el JSON crudo de "buscar" y "estados" para validar contra
- * un pedido real. La normalizacion a tus etiquetas (ENVIADO / LLEGO A DESTINO /
- * FINALIZADO) llega en Fase 2. No toca Firestore ni el panel todavia.
+ * En vez de leer la red, leemos el TEXTO YA RENDERIZADO en pantalla — lo mismo
+ * que veria una persona — una vez que la pagina termino de pintar el resultado.
+ * Es el equivalente automatizado de "abrir la pagina y mirar".
+ *
+ * En Fase 1b devolvemos ese texto para validar contra un pedido real. La
+ * normalizacion fina a tus etiquetas (ENVIADO / LLEGO A DESTINO / FINALIZADO)
+ * se termina de afinar en Fase 2. No toca Firestore ni el panel todavia.
  */
 
 const express = require("express");
@@ -78,7 +82,28 @@ const ubicarInputs = async (page) => {
   return {inNum, inCod};
 };
 
-// Rastrea un envio. Devuelve {ok, buscar, estados, ...}.
+// Palabras clave para detectar el estado a partir del texto YA renderizado
+// (no de la red, que va cifrada). Motor propio y separado del de tracking.js.
+const KW_ENTREGADO = ["entregado", "entrega realizada", "recojo completado"];
+const KW_DESTINO = ["en destino", "listo para su recojo", "disponible"];
+const KW_TRANSITO = ["en tránsito", "en transito", "rumbo a su destino"];
+const KW_ORIGEN = ["en origen"];
+
+const _norm = (s) => String(s || "").toLowerCase()
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+
+// Detecta el estado a partir del texto visible de la pagina.
+const detectarEstado = (texto) => {
+  const t = _norm(texto);
+  const hit = (arr) => arr.some((k) => t.indexOf(_norm(k)) >= 0);
+  if (hit(KW_ENTREGADO)) return "ENTREGADO";
+  if (hit(KW_DESTINO)) return "EN_DESTINO";
+  if (hit(KW_TRANSITO)) return "EN_TRANSITO";
+  if (hit(KW_ORIGEN)) return "EN_ORIGEN";
+  return null;
+};
+
+// Rastrea un envio. Devuelve {ok, estadoDetectado, textoVisible, ...}.
 const track = async (numero, codigo, debug) => {
   const browser = await getBrowser();
   const ctx = await browser.newContext({
@@ -88,25 +113,15 @@ const track = async (numero, codigo, debug) => {
   });
   const page = await ctx.newPage();
   const out = {numero: numero, codigo: codigo};
-  const grab = {};
+  const netStatus = {};
 
-  // Interceptar las respuestas internas de la propia pagina.
-  page.on("response", async (resp) => {
+  // Solo registramos el status HTTP (diagnostico). El cuerpo va cifrado por
+  // Shalom y no lo leemos ni intentamos descifrarlo: dejamos que su propia
+  // pagina lo descifre y lo pinte; nosotros leemos la pantalla, no la red.
+  page.on("response", (resp) => {
     const u = resp.url();
-    if (u.indexOf("/rastrea/buscar") >= 0 ||
-        u.indexOf("/rastrea/estados") >= 0) {
-      const key = u.indexOf("/rastrea/buscar") >= 0 ? "buscar" : "estados";
-      try {
-        grab[key] = await resp.json();
-      } catch (e) {
-        try {
-          grab[key + "_text"] = await resp.text();
-        } catch (e2) {
-          grab[key + "_err"] = String((e2 && e2.message) || e2);
-        }
-      }
-      grab[key + "_status"] = resp.status();
-    }
+    if (u.indexOf("/rastrea/buscar") >= 0) netStatus.buscar = resp.status();
+    if (u.indexOf("/rastrea/estados") >= 0) netStatus.estados = resp.status();
   });
 
   try {
@@ -119,14 +134,6 @@ const track = async (numero, codigo, debug) => {
     await inNum.fill(String(numero));
     await inCod.fill(String(codigo));
 
-    // Preparar la espera de las respuestas ANTES de dar click.
-    const waitBuscar = page.waitForResponse(
-        (r) => r.url().indexOf("/rastrea/buscar") >= 0,
-        {timeout: 30000}).catch(() => null);
-    const waitEstados = page.waitForResponse(
-        (r) => r.url().indexOf("/rastrea/estados") >= 0,
-        {timeout: 30000}).catch(() => null);
-
     // Click en "Buscar" (dispara token + reCAPTCHA + llamadas de Shalom).
     const btn = page.getByRole("button", {name: /buscar/i}).first();
     if (await btn.count().catch(() => 0)) {
@@ -135,21 +142,29 @@ const track = async (numero, codigo, debug) => {
       await inCod.press("Enter");
     }
 
-    await Promise.all([waitBuscar, waitEstados]);
-    // Respiro para que se resuelvan los .json() de las respuestas.
-    await page.waitForTimeout(1500);
+    // Esperar a que la propia pagina PINTE el resultado (ya descifrado).
+    // No dependemos de una clase CSS especifica: esperamos a que aparezca
+    // en el texto visible alguna de las palabras clave de estado.
+    const KEY_RE =
+      /entregado|en\s*tr[aá]nsito|en\s*destino|en\s*origen|no\s*se\s*encontr/i;
+    await page.waitForFunction(
+        (re) => re.test(document.body.innerText),
+        KEY_RE,
+        {timeout: 20000},
+    ).catch(() => {});
+
+    // Respiro corto para que termine de asentarse el render.
+    await page.waitForTimeout(800);
+
+    const textoVisible = await page.locator("body").innerText()
+        .catch(() => "");
 
     out.ok = true;
-    out.buscar = grab.buscar || grab.buscar_text || null;
-    out.estados = grab.estados || grab.estados_text || null;
-    out.status = {
-      buscar: grab.buscar_status || null,
-      estados: grab.estados_status || null,
-    };
+    out.estadoDetectado = detectarEstado(textoVisible);
+    out.textoVisible = String(textoVisible).slice(0, 3000);
+    out.netStatus = netStatus;
 
     if (debug) {
-      out.bodyText = await page.locator("body").innerText()
-          .catch(() => "").then((t) => String(t).slice(0, 2500));
       out.screenshot = (await page.screenshot({fullPage: false}))
           .toString("base64");
     }
@@ -157,8 +172,7 @@ const track = async (numero, codigo, debug) => {
   } catch (e) {
     out.ok = false;
     out.error = String((e && e.message) || e);
-    out.buscar = grab.buscar || grab.buscar_text || null;
-    out.estados = grab.estados || grab.estados_text || null;
+    out.netStatus = netStatus;
     if (debug) {
       try {
         out.screenshot = (await page.screenshot()).toString("base64");
