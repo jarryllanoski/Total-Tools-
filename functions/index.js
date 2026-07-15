@@ -730,7 +730,10 @@ exports.syncShalomWeb = onSchedule(
     },
     async () => {
       const cfgSnap = await db.doc(CFG_DOC).get();
-      const cfg = cfgSnap.exists ? cfgSnap.data() : {};
+      // La config del panel vive ANIDADA bajo el campo "config" del documento
+      // (panel/config.config.*), igual que la lee handleConfig. Leer el nivel
+      // raiz daria undefined y el motor nunca arrancaria.
+      const cfg = (cfgSnap.exists && cfgSnap.data().config) || {};
       if (cfg.trackingMotor !== "web") {
         console.log("[syncShalomWeb] motor 'web' apagado — nada que hacer");
         return;
@@ -836,7 +839,9 @@ exports.syncShalomWebTest = onRequest(
         }
 
         const cfgSnap = await db.doc(CFG_DOC).get();
-        const cfg = cfgSnap.exists ? cfgSnap.data() : {};
+        // Config anidada bajo "config" (panel/config.config.*), igual que
+        // handleConfig — no leer el nivel raiz.
+        const cfg = (cfgSnap.exists && cfgSnap.data().config) || {};
         const guia = ship.trackingOrderNumber || ship.shalomGuia;
         const codigo = ship.trackingOrderCode || ship.shalomCodigo;
         const nowMs = Date.now();

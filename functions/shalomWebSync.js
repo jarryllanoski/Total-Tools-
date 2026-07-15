@@ -61,8 +61,8 @@ const esElegible = (ship) => {
 
 // ¿Ya toca consultarlo? (regla exacta: por timestamp, no por "alguien entro").
 const estaVencido = (ship, nowMs) => {
-  if (!ship || !ship.proximaConsultaWeb) return true; // primera vez
-  const t = Date.parse(ship.proximaConsultaWeb);
+  if (!ship || !ship.trackingWebProximaConsulta) return true; // primera vez
+  const t = Date.parse(ship.trackingWebProximaConsulta);
   return !Number.isFinite(t) || t <= nowMs;
 };
 
@@ -92,77 +92,88 @@ const consultarWorker = async (workerUrl, numero, codigo) => {
   }
 };
 
+// Calcula la etiqueta que corresponderia segun lo que dice Shalom (o null si
+// no hay cambio: el pedido ya esta en el estado correcto). Es la MISMA regla
+// del Manual Shalom. Solo SUGIERE — no decide si aplicarla.
+const calcularEtiqueta = (ship, autoEstado) => {
+  if (autoEstado === "FINALIZADO") {
+    return ship.status === "FINALIZADO" ? null : "FINALIZADO";
+  }
+  if (autoEstado === "EN_DESTINO") {
+    const tienePago = ship.cost && parseFloat(ship.cost) > 0;
+    if (tienePago) {
+      return ship.status === "PENDIENTE DE PAGO" ? null : "PENDIENTE DE PAGO";
+    }
+    return ["LLEGÓ A DESTINO", "PENDIENTE DE PAGO", "FINALIZADO"]
+        .indexOf(ship.status) >= 0 ? null : "LLEGÓ A DESTINO";
+  }
+  // autoEstado null (en transito / en origen): solo mueve si aun no salio.
+  if (ESTADOS_PREVIOS.indexOf(ship.status) >= 0) return "ENVIADO";
+  return null;
+};
+
 // Decide que escribir en Firestore para UN pedido, a partir de la respuesta
 // del worker. No escribe nada — solo devuelve el objeto a mergear.
+//
+// MODO OBSERVACION (cfg.trackingWebCambiaEtiqueta !== true): escribe SOLO
+// campos de observacion (trackingWeb*). NUNCA toca campos productivos/visibles
+// (status, trackingStatus, trackingHistory) — el panel se ve identico.
+// MODO ACTIVO (=== true): ademas aplica la etiqueta real y actualiza el
+// tracking visible.
 const decidirCambios = (ship, data, nowMs, cfg) => {
   const nowIso = new Date(nowMs).toISOString();
+  const cambiaEtiqueta = !!(cfg && cfg.trackingWebCambiaEtiqueta);
 
+  // Error del worker: solo campos de observacion, nada visible.
   if (!data || !data.ok) {
     return {
+      trackingWebFuente: "web",
+      trackingWebUltimaConsulta: nowIso,
+      trackingWebError: (data && data.error) || "sin respuesta",
       erroresSeguidosWeb: (ship.erroresSeguidosWeb || 0) + 1,
-      trackingLastAutoCheckWeb: nowIso,
-      // Reintenta en el ciclo corto (como si siguiera en transito).
-      proximaConsultaWeb: calcularProximaConsulta(null, nowMs, cfg),
+      trackingWebActivo: true,
+      trackingWebProximaConsulta: calcularProximaConsulta(null, nowMs, cfg),
     };
   }
 
-  const estadoTexto = (data.statuses && data.statuses.message) || null;
-  const autoEstado = detectarEstadoAuto(estadoTexto);
+  const rawStatus = (data.statuses && data.statuses.message) || null;
+  const autoEstado = detectarEstadoAuto(rawStatus);
+  const sugerida = calcularEtiqueta(ship, autoEstado);
+  const coincide = sugerida ? (sugerida === ship.status) : true;
+
+  // Campos de OBSERVACION — siempre, separados de lo visible.
   const write = {
+    trackingWebFuente: "web",
+    trackingWebRawStatus: rawStatus,
+    trackingWebEstadoNormalizado: autoEstado,
+    trackingWebEtiquetaSugerida: sugerida, // null = ya esta correcto
+    trackingWebCoincide: coincide,
+    trackingWebUltimaConsulta: nowIso,
+    trackingWebError: null,
     erroresSeguidosWeb: 0,
-    trackingLastAutoCheckWeb: nowIso,
   };
 
-  const mismoTexto = ship.trackingStatus === (estadoTexto || "—");
-  if (!mismoTexto && estadoTexto) {
-    write.trackingStatus = estadoTexto;
-    write.trackingMessage = estadoTexto;
+  // MODO ACTIVO: recien aqui se tocan los campos productivos/visibles.
+  if (cambiaEtiqueta && sugerida) {
+    write.status = sugerida;
+    write.trackingStatus = rawStatus;
+    write.trackingMessage = rawStatus;
     write.trackingLastUpdate = nowIso;
     write.trackingMotorOrigen = "web";
     const hist = Array.isArray(ship.trackingHistory) ?
       ship.trackingHistory.slice() : [];
     hist.push({
-      date: nowIso, status: estadoTexto, message: estadoTexto,
-      source: "auto-web",
+      date: nowIso, status: rawStatus, message: rawStatus, source: "auto-web",
     });
     write.trackingHistory = hist;
   }
 
-  let nuevoStatus = null;
-  if (autoEstado === "FINALIZADO" && ship.status !== "FINALIZADO") {
-    nuevoStatus = "FINALIZADO";
-  } else if (autoEstado === "EN_DESTINO") {
-    const tienePago = ship.cost && parseFloat(ship.cost) > 0;
-    if (tienePago && ship.status !== "PENDIENTE DE PAGO") {
-      nuevoStatus = "PENDIENTE DE PAGO";
-    } else if (!tienePago &&
-        ["LLEGÓ A DESTINO", "PENDIENTE DE PAGO", "FINALIZADO"]
-            .indexOf(ship.status) < 0) {
-      nuevoStatus = "LLEGÓ A DESTINO";
-    }
-  } else if (autoEstado === null &&
-      ESTADOS_PREVIOS.indexOf(ship.status) >= 0) {
-    nuevoStatus = "ENVIADO";
-  }
-
-  // Modo observacion: si el interruptor "cambiar etiqueta" esta APAGADO, el
-  // motor NO mueve la etiqueta del pedido; solo REGISTRA que etiqueta habria
-  // puesto (trackingWebEtiquetaSugerida). Sirve para validar el motor unas
-  // semanas con datos reales, sin riesgo. Por defecto viene apagado.
-  const cambiaEtiqueta = !!(cfg && cfg.trackingWebCambiaEtiqueta);
-  if (nuevoStatus) {
-    write.trackingWebEtiquetaSugerida = nuevoStatus;
-    write.trackingWebEtiquetaSugeridaEn = nowIso;
-    if (cambiaEtiqueta) write.status = nuevoStatus;
-  }
-
-  // Detener el polling cuando Shalom marca entregado (aunque en modo
-  // observacion no hayamos movido la etiqueta): un envio entregado ya no
-  // cambia, no vale la pena seguir consultandolo.
+  // El polling se detiene cuando Shalom marca entregado (aunque en observacion
+  // no se haya movido la etiqueta): un envio entregado ya no cambia.
   const detenerse = autoEstado === "FINALIZADO";
   write.trackingWebActivo = !detenerse;
   if (!detenerse) {
-    write.proximaConsultaWeb =
+    write.trackingWebProximaConsulta =
       calcularProximaConsulta(autoEstado, nowMs, cfg);
   }
 
