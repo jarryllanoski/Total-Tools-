@@ -1,0 +1,16 @@
+{
+  "name": "shalomweb-tracker",
+  "version": "1.0.0",
+  "description": "Rastreo propio de Shalom con navegador real (Playwright). Motor B, aislado y separado de la API paga. No falsifica tokens: usa la propia pagina de Shalom e intercepta su respuesta legitima.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "playwright": "1.49.0"
+  }
+}
