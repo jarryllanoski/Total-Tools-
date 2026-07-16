@@ -720,6 +720,70 @@ exports.extraerComprobante = onRequest(
 const MAX_SHALOMWEB_POR_CORRIDA = 25;
 const PAUSA_ENTRE_CONSULTAS_MS = 2500; // gentil con Shalom/reCAPTCHA
 
+// Lee panel/config y devuelve la config ANIDADA bajo "config" (igual que
+// handleConfig: d.config). Leer el nivel raiz da siempre undefined.
+const leerCfgTracking = async () => {
+  const cfgSnap = await db.doc(CFG_DOC).get();
+  const raw = cfgSnap.exists ? cfgSnap.data() : {};
+  return raw.config || {};
+};
+
+// Pipeline completo (consultar vencidos -> decidir -> escribir). Compartido
+// entre el scheduler automatico y el boton manual "Sincronizar ahora", para
+// no duplicar logica. No filtra por trackingMotor — quien llama decide si
+// corresponde ejecutar.
+const runShalomWebSync = async (cfg) => {
+  const workerUrl = SHALOMWEB_URL.value();
+  const nowMs = Date.now();
+
+  const snap = await db.collection(SHIP_COL)
+      .where("courier", "==", "SHALOM").get();
+
+  const vencidos = [];
+  snap.forEach((doc) => {
+    const ship = doc.data();
+    if (shalomWebSync.esElegible(ship) &&
+        shalomWebSync.estaVencido(ship, nowMs)) {
+      vencidos.push({id: doc.id, ship: ship});
+    }
+  });
+
+  const lote = vencidos.slice(0, MAX_SHALOMWEB_POR_CORRIDA);
+  let actualizados = 0;
+  let errores = 0;
+  const detalle = [];
+
+  for (let i = 0; i < lote.length; i++) {
+    const item = lote[i];
+    const guia = item.ship.trackingOrderNumber || item.ship.shalomGuia;
+    const codigo = item.ship.trackingOrderCode || item.ship.shalomCodigo;
+    const data = await shalomWebSync.consultarWorker(workerUrl, guia, codigo);
+    const write = shalomWebSync.decidirCambios(item.ship, data, nowMs, cfg);
+    if (write && Object.keys(write).length) {
+      await db.doc(SHIP_COL + "/" + item.id).set(write, {merge: true});
+    }
+    if (data && data.ok) actualizados++; else errores++;
+    detalle.push({
+      pedido: item.ship.name || item.id,
+      ok: !!(data && data.ok),
+      sugerida: write.trackingWebEtiquetaSugerida || null,
+    });
+    if (i < lote.length - 1) {
+      await new Promise((r) => setTimeout(r, PAUSA_ENTRE_CONSULTAS_MS));
+    }
+  }
+
+  return {
+    pedidosShalom: snap.size,
+    vencidos: vencidos.length,
+    procesados: lote.length,
+    ok: actualizados,
+    errores: errores,
+    pendientes: vencidos.length - lote.length,
+    detalle: detalle,
+  };
+};
+
 exports.syncShalomWeb = onSchedule(
     {
       schedule: "every 30 minutes",
@@ -729,69 +793,72 @@ exports.syncShalomWeb = onSchedule(
       memory: "256MiB",
     },
     async () => {
-      const cfgSnap = await db.doc(CFG_DOC).get();
-      // La config del panel vive ANIDADA bajo el campo "config" del documento
-      // (panel/config.config.*), igual que la lee handleConfig. Leer el nivel
-      // raiz daria undefined y el motor nunca arrancaria.
-      const raw = cfgSnap.exists ? cfgSnap.data() : {};
-      // Diagnostico: que ve realmente la funcion (para confirmar el fix).
-      console.log(
-          "[syncShalomWeb] diag — claves doc:", Object.keys(raw).join(","),
-          "| config.trackingMotor:", raw.config && raw.config.trackingMotor,
-          "| raiz.trackingMotor:", raw.trackingMotor,
-      );
-      const cfg = raw.config || {};
+      const cfg = await leerCfgTracking();
       if (cfg.trackingMotor !== "web") {
         console.log("[syncShalomWeb] motor 'web' apagado — nada que hacer");
         return;
       }
-
-      const workerUrl = SHALOMWEB_URL.value();
-      const nowMs = Date.now();
-
-      const snap = await db.collection(SHIP_COL)
-          .where("courier", "==", "SHALOM").get();
-
-      const vencidos = [];
-      snap.forEach((doc) => {
-        const ship = doc.data();
-        if (shalomWebSync.esElegible(ship) &&
-            shalomWebSync.estaVencido(ship, nowMs)) {
-          vencidos.push({id: doc.id, ship: ship});
-        }
-      });
-
+      const r = await runShalomWebSync(cfg);
       console.log(
-          "[syncShalomWeb] elegibles y vencidos:", vencidos.length,
-          "de", snap.size, "pedidos Shalom",
+          "[syncShalomWeb] listo — pedidos Shalom:", r.pedidosShalom,
+          "vencidos:", r.vencidos, "procesados:", r.procesados,
+          "ok:", r.ok, "errores:", r.errores, "pendientes:", r.pendientes,
       );
+    },
+);
 
-      const lote = vencidos.slice(0, MAX_SHALOMWEB_POR_CORRIDA);
-      let actualizados = 0;
-      let errores = 0;
-
-      for (let i = 0; i < lote.length; i++) {
-        const item = lote[i];
-        const guia = item.ship.trackingOrderNumber || item.ship.shalomGuia;
-        const codigo = item.ship.trackingOrderCode || item.ship.shalomCodigo;
-        const data = await shalomWebSync.consultarWorker(
-            workerUrl, guia, codigo);
-        const write = shalomWebSync.decidirCambios(
-            item.ship, data, nowMs, cfg);
-        if (write && Object.keys(write).length) {
-          await db.doc(SHIP_COL + "/" + item.id).set(write, {merge: true});
-        }
-        if (data && data.ok) actualizados++; else errores++;
-        if (i < lote.length - 1) {
-          await new Promise((r) => setTimeout(r, PAUSA_ENTRE_CONSULTAS_MS));
-        }
+// ── syncShalomWebNow (boton manual "Sincronizar ahora") ────────────────────
+// Corre el mismo pipeline del scheduler pero disparado desde el panel, con
+// respuesta inmediata: siempre devuelve el diagnostico (que motor/config esta
+// leyendo realmente el backend); si el motor esta en "web" ademas sincroniza
+// y devuelve el resultado. Requiere login del panel (mismo Bearer que las
+// demas funciones autenticadas).
+exports.syncShalomWebNow = onRequest(
+    {region: "us-central1", timeoutSeconds: 540, memory: "256MiB"},
+    async (req, res) => {
+      setCORS(req, res);
+      if (req.method === "OPTIONS") {
+        res.status(204).send("");
+        return;
       }
+      try {
+        const authz = req.get("Authorization") || "";
+        const bearer = authz.match(/^Bearer\s+(.+)$/i);
+        if (!bearer) {
+          res.status(401).json({ok: false, motivo: "No autorizado"});
+          return;
+        }
+        try {
+          await getAuth().verifyIdToken(bearer[1]);
+        } catch (e) {
+          res.status(401).json({ok: false, motivo: "Token invalido"});
+          return;
+        }
 
-      console.log(
-          "[syncShalomWeb] listo — consultados:", lote.length,
-          "ok:", actualizados, "errores:", errores,
-          "pendientes para el siguiente ciclo:", vencidos.length - lote.length,
-      );
+        const cfg = await leerCfgTracking();
+        const diag = {
+          trackingMotor: cfg.trackingMotor || null,
+          trackingWebCambiaEtiqueta: !!cfg.trackingWebCambiaEtiqueta,
+          horasTransito: cfg.trackingWebIntervalTransitoH || 12,
+          horasDestino: cfg.trackingWebIntervalDestinoH || 24,
+        };
+
+        if (cfg.trackingMotor !== "web") {
+          res.status(200).json({
+            ok: true, ejecutado: false, diag: diag,
+            motivo: "El motor no esta en 'web' — solo diagnostico, " +
+              "no se sincronizo nada.",
+          });
+          return;
+        }
+
+        const r = await runShalomWebSync(cfg);
+        res.status(200).json({ok: true, ejecutado: true, diag: diag, ...r});
+      } catch (e) {
+        console.error("syncShalomWebNow error:", e);
+        const msg = String((e && e.message) || e);
+        res.status(500).json({ok: false, motivo: msg});
+      }
     },
 );
 

@@ -601,6 +601,8 @@
         <div class="fg"><label class="fl">En tránsito, cada (horas)</label><input class="fi" id="cfgTrackingWebTransitoH" type="number" min="1" max="72" placeholder="12" onchange="setTrackingWebHoras()"></div>
         <div class="fg"><label class="fl">En destino, cada (horas)</label><input class="fi" id="cfgTrackingWebDestinoH" type="number" min="1" max="168" placeholder="24" onchange="setTrackingWebHoras()"></div>
       </div>
+      <button type="button" id="btnSyncShalomWebNow" onclick="syncShalomWebNow()" style="width:100%;margin-top:10px;padding:11px;background:rgba(56,139,253,.15);border:1.5px solid rgba(56,139,253,.4);border-radius:10px;color:var(--blue);font-weight:700;font-size:13px;cursor:pointer;font-family:inherit">🔄 Sincronizar ahora</button>
+      <div id="syncShalomWebResult" style="display:none;margin-top:10px;padding:10px;background:var(--bg);border:1px solid var(--bd);border-radius:9px;font-size:11.5px;color:var(--text2);line-height:1.6;white-space:pre-wrap"></div>
     </div>
   </div>
 </div>
@@ -1735,6 +1737,40 @@ function setTrackingWebHoras(){
   if(d>=1&&d<=168) S.config.trackingWebIntervalDestinoH=d;
   save('config');
   toast('⏱️ Horas de rastreo guardadas');
+}
+/* Boton manual: corre el pipeline del Motor B YA (sin esperar al scheduler
+   cada 30 min) y muestra el diagnostico + resultado directo en el panel. */
+async function syncShalomWebNow(){
+  const btn=document.getElementById('btnSyncShalomWebNow');
+  const box=document.getElementById('syncShalomWebResult');
+  if(!btn||!box) return;
+  btn.disabled=true; btn.textContent='⏳ Sincronizando…';
+  box.style.display='block'; box.textContent='Consultando…';
+  try{
+    if(typeof window._authEnsureToken==='function') await window._authEnsureToken();
+    const tok=localStorage.getItem('tt_id_token')||'';
+    const r=await fetch('https://us-central1-total-tools-24ce8.cloudfunctions.net/syncShalomWebNow',{headers:{Authorization:'Bearer '+tok}}).then(x=>x.json());
+    if(!r.ok){ box.textContent='⚠️ '+(r.motivo||'Error desconocido'); return; }
+    const d=r.diag||{};
+    let txt='Motor leído: '+(d.trackingMotor||'—')+' | Cambia etiqueta: '+(d.trackingWebCambiaEtiqueta?'activado':'observación')+'\n';
+    txt+='Horas: tránsito '+d.horasTransito+'h · destino '+d.horasDestino+'h\n';
+    if(!r.ejecutado){
+      txt+='\n'+(r.motivo||'No se ejecutó.');
+    } else {
+      txt+='\nPedidos Shalom: '+r.pedidosShalom+' | Vencidos: '+r.vencidos+' | Procesados: '+r.procesados;
+      txt+='\nOK: '+r.ok+' · Errores: '+r.errores+' · Pendientes próxima ronda: '+r.pendientes;
+      if(r.detalle&&r.detalle.length){
+        txt+='\n\n'+r.detalle.map(function(x){ return (x.ok?'✓':'✗')+' '+x.pedido+(x.sugerida?' → '+x.sugerida:''); }).join('\n');
+      }
+    }
+    box.textContent=txt;
+    toast(r.ejecutado?'🔄 Sincronizado: '+r.procesados+' pedido(s)':'ℹ️ Solo diagnóstico (motor no está en "web")');
+    if(typeof render==='function') render();
+  }catch(e){
+    box.textContent='⚠️ Error de red: '+(e&&e.message||e);
+  }finally{
+    btn.disabled=false; btn.textContent='🔄 Sincronizar ahora';
+  }
 }
 /* Resaltar (y centrar) una tarjeta por su id — se usa al crear un pedido nuevo */
 function _highlightCard(id){
