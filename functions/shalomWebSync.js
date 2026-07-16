@@ -115,11 +115,13 @@ const calcularEtiqueta = (ship, autoEstado) => {
 // Decide que escribir en Firestore para UN pedido, a partir de la respuesta
 // del worker. No escribe nada — solo devuelve el objeto a mergear.
 //
-// MODO OBSERVACION (cfg.trackingWebCambiaEtiqueta !== true): escribe SOLO
-// campos de observacion (trackingWeb*). NUNCA toca campos productivos/visibles
-// (status, trackingStatus, trackingHistory) — el panel se ve identico.
-// MODO ACTIVO (=== true): ademas aplica la etiqueta real y actualiza el
-// tracking visible.
+// Dos niveles independientes:
+//  - TRACKING VISIBLE (trackingStatus/trackingHistory + campos trackingWeb*)
+//    se escribe SIEMPRE — revive la tarjeta del panel como el Motor A. Su
+//    visibilidad para el CLIENTE se filtra aparte en handleTrack.
+//  - ETIQUETA INTERNA (status): SOLO si cfg.trackingWebCambiaEtiqueta === true.
+//    Mientras este apagado, el pedido no se mueve de columna (modo observacion
+//    de la etiqueta).
 const decidirCambios = (ship, data, nowMs, cfg) => {
   const nowIso = new Date(nowMs).toISOString();
   const cambiaEtiqueta = !!(cfg && cfg.trackingWebCambiaEtiqueta);
@@ -153,9 +155,13 @@ const decidirCambios = (ship, data, nowMs, cfg) => {
     erroresSeguidosWeb: 0,
   };
 
-  // MODO ACTIVO: recien aqui se tocan los campos productivos/visibles.
-  if (cambiaEtiqueta && sugerida) {
-    write.status = sugerida;
+  // TRACKING VISIBLE (texto de Shalom): se escribe SIEMPRE que el texto cambie,
+  // sin importar el modo. Esto revive la tarjeta del panel como con el Motor A.
+  // Marcamos trackingMotorOrigen="web" para poder filtrar este dato en el link
+  // del cliente (solo se le muestra si el operador activo esa opcion). NO toca
+  // la etiqueta interna (status).
+  const mismoTexto = ship.trackingStatus === (rawStatus || "—");
+  if (rawStatus && !mismoTexto) {
     write.trackingStatus = rawStatus;
     write.trackingMessage = rawStatus;
     write.trackingLastUpdate = nowIso;
@@ -166,6 +172,12 @@ const decidirCambios = (ship, data, nowMs, cfg) => {
       date: nowIso, status: rawStatus, message: rawStatus, source: "auto-web",
     });
     write.trackingHistory = hist;
+  }
+
+  // ETIQUETA INTERNA (status): SOLO en modo activo. Mueve el pedido de columna
+  // y decide FINALIZADO/PENDIENTE. Sigue controlada por "cambiar etiquetas".
+  if (cambiaEtiqueta && sugerida) {
+    write.status = sugerida;
   }
 
   // El polling se detiene cuando Shalom marca entregado (aunque en observacion

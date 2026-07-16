@@ -304,12 +304,34 @@ async function handleTrack(req, res) {
   const code = (order.id || "").slice(-4).toUpperCase();
   const frozen = ["ENTREGADO", "CANCELADO"].includes(order.status || "");
   // A-2: no exponer datos que la vista de seguimiento no necesita
-  // (teléfono, costo, notas privadas, GPS, documentos internos).
+  // (teléfono, costo, notas privadas, GPS, documentos internos, y los campos
+  // internos del Motor B de tracking).
   const safe = Object.assign({}, order, {code, frozen});
   ["phone", "cost", "privateNote", "gpsCoords",
     "docGuia", "docEmbalado", "docComprobante", "docTicket",
-    "sel", "chkGuia", "chkEmbalado", "chkComprobante", "fromForm"]
+    "sel", "chkGuia", "chkEmbalado", "chkComprobante", "fromForm",
+    "trackingWebRawStatus", "trackingWebEstadoNormalizado",
+    "trackingWebEtiquetaSugerida", "trackingWebCoincide",
+    "trackingWebUltimaConsulta", "trackingWebProximaConsulta",
+    "trackingWebError", "trackingWebFuente", "trackingWebActivo",
+    "erroresSeguidosWeb"]
       .forEach((k) => delete safe[k]);
+
+  // Estado de Shalom del Motor B: solo se muestra al cliente si el operador
+  // activo esa opcion. Si esta apagado, ocultamos el texto de tracking del
+  // link publico (el panel siempre lo ve). Solo aplica cuando el dato vino
+  // del Motor B (trackingMotorOrigen === "web"); si venia del Motor A viejo,
+  // no se toca. Solo leemos config cuando hace falta (ahorro de lecturas).
+  if (order.trackingMotorOrigen === "web") {
+    const cfgSnap = await db.doc(CFG_DOC).get();
+    const cfg = (cfgSnap.exists && cfgSnap.data().config) || {};
+    if (!cfg.trackingWebMostrarCliente) {
+      ["trackingStatus", "trackingMessage", "trackingLastUpdate"]
+          .forEach((k) => delete safe[k]);
+    }
+  }
+  delete safe.trackingMotorOrigen;
+
   res.json({status: "ok", order: safe});
 }
 

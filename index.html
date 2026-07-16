@@ -597,6 +597,10 @@
         <div style="max-width:74%"><div class="tgl-n">Cambiar etiquetas automáticamente</div><div class="tgl-s">Apagado = <b>modo observación</b>: registra lo que dice Shalom sin mover la etiqueta del pedido. Ideal para validar unas semanas.</div></div>
         <div class="tgl" id="tglTrackingWebEtiqueta" onclick="toggleTrackingWebEtiqueta()"></div>
       </div>
+      <div class="tgl-row" style="border:none">
+        <div style="max-width:74%"><div class="tgl-n">📱 Mostrar en el link del cliente</div><div class="tgl-s">El cliente ve el estado de Shalom en su link de seguimiento. Apagado = solo tú lo ves en el panel.</div></div>
+        <div class="tgl" id="tglTrackingWebCliente" onclick="toggleTrackingWebCliente()"></div>
+      </div>
       <div class="frow" style="margin-top:10px">
         <div class="fg"><label class="fl">En tránsito, cada (horas)</label><input class="fi" id="cfgTrackingWebTransitoH" type="number" min="1" max="72" placeholder="12" onchange="setTrackingWebHoras()"></div>
         <div class="fg"><label class="fl">En destino, cada (horas)</label><input class="fi" id="cfgTrackingWebDestinoH" type="number" min="1" max="168" placeholder="24" onchange="setTrackingWebHoras()"></div>
@@ -1727,6 +1731,16 @@ function toggleTrackingWebEtiqueta(){
   S.config.trackingWebCambiaEtiqueta=on;
   save('config');
   toast(on?'🏷️ Cambio de etiquetas ACTIVADO':'👀 Modo observación (no mueve etiquetas)');
+}
+/* Mostrar el estado de Shalom (Motor B) en el link del cliente. */
+function toggleTrackingWebCliente(){
+  const el=document.getElementById('tglTrackingWebCliente'); if(!el) return;
+  el.classList.toggle('on');
+  const on=el.classList.contains('on');
+  S.config=S.config||{};
+  S.config.trackingWebMostrarCliente=on;
+  save('config');
+  toast(on?'📱 El cliente verá el estado de Shalom':'🙈 Estado de Shalom solo en tu panel');
 }
 /* Horas programadas del Motor B (tránsito / destino). */
 function setTrackingWebHoras(){

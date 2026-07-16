@@ -1033,6 +1033,8 @@ function loadCfgUI(){
     const box=$('cfgTrackingWebBox'); if(box) box.style.display=(motor==='web')?'block':'none';
     const te=$('tglTrackingWebEtiqueta');
     if(te) te.classList.toggle('on', !!S.config.trackingWebCambiaEtiqueta);
+    const tc=$('tglTrackingWebCliente');
+    if(tc) tc.classList.toggle('on', !!S.config.trackingWebMostrarCliente);
     const th=$('cfgTrackingWebTransitoH');
     if(th) th.value=S.config.trackingWebIntervalTransitoH||12;
     const dh=$('cfgTrackingWebDestinoH');
