@@ -733,7 +733,14 @@ exports.syncShalomWeb = onSchedule(
       // La config del panel vive ANIDADA bajo el campo "config" del documento
       // (panel/config.config.*), igual que la lee handleConfig. Leer el nivel
       // raiz daria undefined y el motor nunca arrancaria.
-      const cfg = (cfgSnap.exists && cfgSnap.data().config) || {};
+      const raw = cfgSnap.exists ? cfgSnap.data() : {};
+      // Diagnostico: que ve realmente la funcion (para confirmar el fix).
+      console.log(
+          "[syncShalomWeb] diag — claves doc:", Object.keys(raw).join(","),
+          "| config.trackingMotor:", raw.config && raw.config.trackingMotor,
+          "| raiz.trackingMotor:", raw.trackingMotor,
+      );
+      const cfg = raw.config || {};
       if (cfg.trackingMotor !== "web") {
         console.log("[syncShalomWeb] motor 'web' apagado — nada que hacer");
         return;
