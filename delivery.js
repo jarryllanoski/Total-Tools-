@@ -254,7 +254,8 @@ DeliveryModule._selDrv=function(name,phone){
     ship._dlvDriver=name;ship._dlvDriverPhone=phone||'';
     var raw=(document.getElementById('dlvRutaLink')||{value:''}).value.trim();
     if(raw){var n=_normLink(raw);if(n)ship._dlvRutaLink=n;}
-    else if(ship._dlvRutaLink){delete ship._dlvRutaLink;}
+    // null (no delete): con updateMask, quitar por omisión ya no borra en Firestore.
+    else if(ship._dlvRutaLink){ship._dlvRutaLink=null;}
     // Guardado incremental REAL a Firestore (window.save es const, no existe
     // en window → era no-op). Reusa _fbSaveShipmentNow (1 pedido, con reintentos).
     if(typeof global._fbSaveShipmentNow==='function')global._fbSaveShipmentNow(ship);
@@ -284,7 +285,7 @@ DeliveryModule._saveRuta=function(){
   var ship=((global.S&&global.S.shipments)||[]).find(function(x){return x.id===_currentShipId;});
   if(!ship)return;
   var raw=(document.getElementById('dlvRutaLink')||{value:''}).value.trim();
-  if(!raw){ delete ship._dlvRutaLink; }
+  if(!raw){ ship._dlvRutaLink=null; } // null, no delete: propaga el "quitar" con updateMask
   else{ var n=_normLink(raw); if(!n){if(typeof global.toast==='function')global.toast('⚠️ Link de ruta inválido');return;} ship._dlvRutaLink=n; }
   if(typeof global._fbSaveShipmentNow==='function')global._fbSaveShipmentNow(ship);
   DeliveryModule._closeDrv();_render();

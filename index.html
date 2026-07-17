@@ -71,10 +71,23 @@
   }
 
   async function fsPatch(path,obj){
-    const fields={};Object.keys(obj).forEach(k=>{fields[k]=toFs(obj[k])});
+    const keys=Object.keys(obj);
+    // Guard: nunca mandar un PATCH sin campos. Sin fields NI mask, Firestore
+    // reemplazaría el documento con {} y borraría todo. Con 0 campos: no-op.
+    if(!keys.length) return;
+    const fields={};keys.forEach(k=>{fields[k]=toFs(obj[k])});
     const h=await _authHeaders();
     h['Content-Type']='application/json';
-    const r=await fetch(`${BASE}/${path}?key=${KEY}`,{
+    // ★ Escritura incremental por updateMask (merge real). SIN mask, un PATCH de
+    // Firestore REEMPLAZA el documento entero y BORRA los campos no enviados —
+    // por eso un dispositivo con copia vieja pisaba trackingStatus (motor B u
+    // otro device). Con updateMask solo se tocan ESTOS campos; el resto del doc
+    // queda intacto. Cada field path va entre backticks (escapados) para admitir
+    // cualquier nombre de campo sin romper el path. Para "borrar" un campo se
+    // envía con valor null (queda en el mask): quitar por omisión ya no borra.
+    const mask=keys.map(k=>'updateMask.fieldPaths='+
+      encodeURIComponent('`'+k.replace(/([\\`])/g,'\\$1')+'`')).join('&');
+    const r=await fetch(`${BASE}/${path}?key=${KEY}&${mask}`,{
       method:'PATCH',
       headers:h,
       body:JSON.stringify({fields})
