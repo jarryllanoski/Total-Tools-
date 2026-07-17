@@ -639,6 +639,13 @@ async function _consultarMotorB(ship, shipId) {
     var data = await r.json();
     if (data && data.ok && data.cambios) {
       Object.keys(data.cambios).forEach(function(k){ ship[k] = data.cambios[k]; });
+      // ★ Robustez: refrescar SIEMPRE la pantalla con el estado fresco que leyó
+      // el worker, aunque el backend ya coincidiera (en ese caso 'cambios' no
+      // trae trackingStatus por la guarda "no reescribir si no cambió", y la
+      // tarjeta local podría quedar con un valor viejo). Solo actualiza el
+      // display; no escribe en Firestore.
+      var msg = data.resultadoWorker && data.resultadoWorker.statuses && data.resultadoWorker.statuses.message;
+      if (msg) { ship.trackingStatus = msg; ship.trackingMessage = msg; }
       if (typeof window.render === 'function') window.render();
       if (typeof window.toast === 'function') window.toast('🔄 Estado: ' + (ship.trackingStatus || '—'));
     } else {
