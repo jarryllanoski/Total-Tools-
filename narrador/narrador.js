@@ -144,7 +144,11 @@
     return 'delivery';
   }
   function agenciaSel(){
-    return txt('#shalomSelTxt') || txt('.sel-badge span') || rowVal('Agencia') || rowVal('Direcci[oó]n') || '';
+    // Una agencia es un NOMBRE, no una dirección. No caemos a la fila
+    // "Dirección" (dirección completa de destino) porque se colaba entera en el
+    // mensaje de Delfi ("llegó a la agencia <dirección de 8 líneas>"). Si no hay
+    // nombre de agencia real, se devuelve '' y s3_agencia queda corto y limpio.
+    return txt('#shalomSelTxt') || txt('.sel-badge span') || rowVal('Agencia') || '';
   }
   // Courier del FORMULARIO: el select #f_courier está vacío hasta que el cliente
   // elige. Los campos existen ocultos, así que el tipo se deduce por sección
