@@ -620,6 +620,37 @@ Tracking._guardarEdicion = function(shipId) {
   if (typeof window.toast  === 'function') window.toast('✅ Tracking guardado');
 };
 
+/* ── consultarAhora vía MOTOR B (tu servidor) ────────────────────────
+   Reusa la Cloud Function syncShalomWebTest (1 pedido, autenticada) que ya
+   consulta el worker propio y escribe en Firestore. Aplica los cambios
+   devueltos al pedido local y refresca la tarjeta. No toca la API paga. */
+async function _consultarMotorB(ship, shipId) {
+  var btn = document.getElementById('btn-consult-'+shipId);
+  if (btn) { btn.innerHTML = '<span class="trk-spin-inline"></span> Consultando...'; btn.disabled = true; }
+  if (typeof window.toast === 'function') window.toast('⏳ Consultando tu servidor...');
+  try {
+    var tok = '';
+    try {
+      if (typeof window._authEnsureToken === 'function') await window._authEnsureToken();
+      tok = localStorage.getItem('tt_id_token') || '';
+    } catch(e){}
+    var url = 'https://us-central1-total-tools-24ce8.cloudfunctions.net/syncShalomWebTest?pedidoId=' + encodeURIComponent(shipId);
+    var r = await fetch(url, { headers: { Authorization: 'Bearer ' + tok } });
+    var data = await r.json();
+    if (data && data.ok && data.cambios) {
+      Object.keys(data.cambios).forEach(function(k){ ship[k] = data.cambios[k]; });
+      if (typeof window.render === 'function') window.render();
+      if (typeof window.toast === 'function') window.toast('🔄 Estado: ' + (ship.trackingStatus || '—'));
+    } else {
+      if (typeof window.toast === 'function') window.toast('⚠️ ' + ((data && data.motivo) || 'No se pudo consultar tu servidor'));
+      if (btn) { btn.innerHTML = '⟳ Consultar'; btn.disabled = false; }
+    }
+  } catch (e) {
+    if (typeof window.toast === 'function') window.toast('⚠️ Error de red al consultar tu servidor');
+    if (btn) { btn.innerHTML = '⟳ Consultar'; btn.disabled = false; }
+  }
+}
+
 /* ── consultarAhora ──────────────────────────────────────────────── */
 Tracking.consultarAhora = async function(shipId) {
   var ship = _findShip(shipId);
@@ -641,6 +672,11 @@ Tracking.consultarAhora = async function(shipId) {
     if (typeof window.toast === 'function') window.toast('⚠️ Primero guarda el número de orden');
     return;
   }
+
+  // Rutear al MOTOR ELEGIDO: si es "web" (tu servidor), va por Motor B; si no
+  // ('api' u otro), sigue el camino de siempre (Motor A / API paga, intacto).
+  var motor = (window.S && window.S.config && window.S.config.trackingMotor) || '';
+  if (motor === 'web') { await _consultarMotorB(ship, shipId); return; }
 
   // Mostrar spinner en el botón
   var btn = document.getElementById('btn-consult-'+shipId);

@@ -317,12 +317,12 @@ async function handleTrack(req, res) {
     "erroresSeguidosWeb"]
       .forEach((k) => delete safe[k]);
 
-  // Estado de Shalom del Motor B: solo se muestra al cliente si el operador
-  // activo esa opcion. Si esta apagado, ocultamos el texto de tracking del
-  // link publico (el panel siempre lo ve). Solo aplica cuando el dato vino
-  // del Motor B (trackingMotorOrigen === "web"); si venia del Motor A viejo,
-  // no se toca. Solo leemos config cuando hace falta (ahorro de lecturas).
-  if (order.trackingMotorOrigen === "web") {
+  // Estado de Shalom: solo se muestra al cliente si el operador activo la
+  // opcion "Mostrar en el link del cliente". Filtro MOTOR-AGNOSTICO: aplica
+  // sin importar que motor genero el dato (A o B). Si esta apagado, ocultamos
+  // el texto de tracking del link publico (el panel siempre lo ve). Solo
+  // leemos config cuando hay un estado que potencialmente ocultar.
+  if (order.trackingStatus) {
     const cfgSnap = await db.doc(CFG_DOC).get();
     const cfg = (cfgSnap.exists && cfgSnap.data().config) || {};
     if (!cfg.trackingWebMostrarCliente) {
@@ -762,13 +762,37 @@ const runShalomWebSync = async (cfg) => {
       .where("courier", "==", "SHALOM").get();
 
   const vencidos = [];
+  const rellenar = []; // backfill: tienen dato observado pero tarjeta vacia
   snap.forEach((doc) => {
     const ship = doc.data();
     if (shalomWebSync.esElegible(ship) &&
         shalomWebSync.estaVencido(ship, nowMs)) {
       vencidos.push({id: doc.id, ship: ship});
     }
+    // Backfill: el Motor B ya observo el estado (trackingWebRawStatus) pero
+    // la tarjeta (trackingStatus) esta vacia o desactualizada. Copiamos el
+    // dato existente SIN volver a consultar Shalom. Aplica a cualquier pedido
+    // Shalom con dato observado (incluidos terminales).
+    if (ship.trackingWebRawStatus &&
+        ship.trackingStatus !== ship.trackingWebRawStatus) {
+      rellenar.push({id: doc.id, ship: ship});
+    }
   });
+
+  // Backfill primero (instantaneo, sin red).
+  let rellenados = 0;
+  for (let i = 0; i < rellenar.length; i++) {
+    const item = rellenar[i];
+    const raw = item.ship.trackingWebRawStatus;
+    await db.doc(SHIP_COL + "/" + item.id).set({
+      trackingStatus: raw,
+      trackingMessage: raw,
+      trackingLastUpdate: item.ship.trackingWebUltimaConsulta ||
+        new Date(nowMs).toISOString(),
+      trackingMotorOrigen: "web",
+    }, {merge: true});
+    rellenados++;
+  }
 
   const lote = vencidos.slice(0, MAX_SHALOMWEB_POR_CORRIDA);
   let actualizados = 0;
@@ -799,6 +823,7 @@ const runShalomWebSync = async (cfg) => {
     pedidosShalom: snap.size,
     vencidos: vencidos.length,
     procesados: lote.length,
+    rellenados: rellenados,
     ok: actualizados,
     errores: errores,
     pendientes: vencidos.length - lote.length,

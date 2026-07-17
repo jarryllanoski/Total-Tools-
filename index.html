@@ -575,10 +575,6 @@
   <!-- CONFIGURACIÓN SHALOM -->
   <div class="cfg-sec">
     <div class="cfg-ttl">🚚 Configuración Shalom</div>
-    <div class="tgl-row" style="border:none">
-      <div><div class="tgl-n">Auto-tracking Shalom</div><div class="tgl-s">Consulta el estado automáticamente (según el estado)</div></div>
-      <div class="tgl" id="tglShalomAuto" onclick="toggleShalomAuto()"></div>
-    </div>
 
     <!-- Motor de rastreo (elige qué sistema mantiene los estados al día) -->
     <div class="fg" style="margin-top:12px">
@@ -1773,6 +1769,7 @@ async function syncShalomWebNow(){
     } else {
       txt+='\nPedidos Shalom: '+r.pedidosShalom+' | Vencidos: '+r.vencidos+' | Procesados: '+r.procesados;
       txt+='\nOK: '+r.ok+' · Errores: '+r.errores+' · Pendientes próxima ronda: '+r.pendientes;
+      txt+='\n📋 Rellenados en tarjeta (sin consultar): '+(r.rellenados||0);
       if(r.detalle&&r.detalle.length){
         txt+='\n\n'+r.detalle.map(function(x){ return (x.ok?'✓':'✗')+' '+x.pedido+(x.sugerida?' → '+x.sugerida:''); }).join('\n');
       }
