@@ -1923,6 +1923,22 @@ function renderTrackResult(ship, code){
   const stages = ['Recibido','Preparando','En camino','En destino','Entregado'];
   const tc     = (ship.id||'').slice(-4).toUpperCase();
 
+  // Seguimiento Shalom: si el bloque Shalom se va a mostrar y su estado real va
+  // MÁS ADELANTADO que la etiqueta interna (modo observación: Shalom ya "en
+  // destino"/"entregado" pero status sin cambiar), el bloque Shalom manda y
+  // ocultamos la barra genérica para no contradecirla. Al activar "cambiar
+  // etiqueta", status se sincroniza con Shalom, las fases coinciden y la barra
+  // genérica reaparece sola. Reutiliza _shalomFase/statusToStage; sin campos ni
+  // toggles nuevos.
+  const shalomBlock = _shalomTrackingBlock(ship);
+  let hideGenericProg = false;
+  if(shalomBlock){
+    const fIdx = _shalomFase((ship.trackingStatus||'').trim()).idx;
+    // fase Shalom (0 origen,1 camino,2 destino,3 entregado) → stage genérico
+    const shalomStage = fIdx<=1 ? 2 : fIdx===2 ? 3 : fIdx>=3 ? 4 : -1;
+    hideGenericProg = shalomStage > stage;
+  }
+
   const dateLabel = ship.date
     ? new Date(ship.date+'T12:00:00').toLocaleDateString('es-PE',{weekday:'short',year:'numeric',month:'short',day:'numeric'})
     : '—';
@@ -1960,11 +1976,11 @@ function renderTrackResult(ship, code){
           ${meta.emoji} ${esc(ship.status||'Desconocido')}
         </div>
       </div>
-      ${_shalomTrackingBlock(ship)}
-      <div class="tk-section">
+      ${shalomBlock}
+      ${hideGenericProg ? '' : `<div class="tk-section">
         <div class="tk-lbl">Progreso</div>
         <div class="track-prog">${progHtml}</div>
-      </div>
+      </div>`}
       <div class="tk-section">
         <div class="tk-lbl">Detalle</div>
         <div class="tk-row"><span class="tk-row-lbl">Cliente</span><span class="tk-row-val">${esc(ship.name||'—')}</span></div>
