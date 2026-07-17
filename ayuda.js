@@ -253,6 +253,29 @@
       tips: [
         'Revisa las notificaciones al inicio del día para ver qué pedidos avanzaron.'
       ]
+    },
+
+    shalomConfig: {
+      titulo: 'Rastreo Shalom (Configuración)',
+      icono: '🚚',
+      actualizado: '2026-07-17',
+      pasos: [
+        '<b>Motor de rastreo</b>: elige quién consulta Shalom. <b>Mi servidor</b> (recomendado) o <b>API paga</b>. Solo uno funciona a la vez, para que no se pisen.',
+        '<b>Cambiar etiquetas automáticamente</b>: apagado = <b>modo observación</b> — ves el estado real de Shalom en la tarjeta <b>sin</b> que el pedido cambie de columna. Prendido = mueve la etiqueta solo (En destino → LLEGÓ A DESTINO, con saldo → PENDIENTE DE PAGO, Entregado → FINALIZADO).',
+        '<b>Mostrar en el link del cliente</b>: decides si el cliente ve el estado de Shalom en su seguimiento. Apagado = solo tú lo ves en el panel.',
+        '<b>Horas</b>: cada cuántas horas se consulta en tránsito (12) y en destino (24).',
+        '<b>🔄 Sincronizar ahora</b>: fuerza la consulta al instante (sin esperar el ciclo) y rellena las tarjetas que ya tenían dato pero se veían vacías.'
+      ],
+      faq: [
+        {q:'¿Por qué veo el estado pero la etiqueta del pedido no cambia?', a:'Porque "Cambiar etiquetas" está apagado (modo observación). Es a propósito: ves lo que dice Shalom sin mover el pedido de columna. Cuando confíes en el rastreo, préndelo.'},
+        {q:'¿Qué es "Mi servidor"?', a:'Tu propia infraestructura que lee la página pública de Shalom, sin depender de la API paga. Corre sola cada cierto tiempo, aunque el panel esté cerrado.'},
+        {q:'¿El cliente ve el estado de Shalom?', a:'Solo si activas "Mostrar en el link del cliente". Por defecto está apagado — solo tú lo ves en el panel.'},
+        {q:'Un pedido dice "Sin consultas aún", ¿qué hago?', a:'Presiona 🔄 Sincronizar ahora: fuerza la consulta y rellena la tarjeta al instante.'}
+      ],
+      tips: [
+        'Para validar el motor nuevo unas semanas sin riesgo: déjalo en "Mi servidor" con "Cambiar etiquetas" apagado (observación).',
+        'El botón ⟳ Consultar de cada tarjeta usa el motor que tengas elegido aquí.'
+      ]
     }
 
   };
