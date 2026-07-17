@@ -1931,11 +1931,11 @@ function renderTrackResult(ship, code){
   // genérica reaparece sola. Reutiliza _shalomFase/statusToStage; sin campos ni
   // toggles nuevos.
   const shalomBlock = _shalomTrackingBlock(ship);
-  let hideGenericProg = false;
+  let hideGenericProg = false, shalomStage = -1;
   if(shalomBlock){
     const fIdx = _shalomFase((ship.trackingStatus||'').trim()).idx;
     // fase Shalom (0 origen,1 camino,2 destino,3 entregado) → stage genérico
-    const shalomStage = fIdx<=1 ? 2 : fIdx===2 ? 3 : fIdx>=3 ? 4 : -1;
+    shalomStage = fIdx<=1 ? 2 : fIdx===2 ? 3 : fIdx>=3 ? 4 : -1;
     hideGenericProg = shalomStage > stage;
   }
 
@@ -1965,7 +1965,7 @@ function renderTrackResult(ship, code){
     <div id="refreshRow" class="refresh-row">
       <span class="refresh-lbl">🔄 Se actualiza automáticamente</span>
     </div>
-    <div class="track-card">
+    <div class="track-card"${hideGenericProg ? ` data-shalom-st="${shalomStage}"` : ''}>
       <div class="tk-section">
         <div class="tk-lbl">Código de seguimiento</div>
         <div style="font-size:22px;font-weight:700;color:var(--purple);letter-spacing:3px">#${esc(tc)}</div>

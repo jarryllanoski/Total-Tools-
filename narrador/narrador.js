@@ -167,12 +167,24 @@
     // status-badge muestra el estado; lo mapeo a las 5 etapas reales
     var badge = txt('.status-badge').toUpperCase();
     if(!badge) return null;
-    if(/FINALIZADO|ENTREGADO/.test(badge)) return {st:4};
-    if(/PENDIENTE DE PAGO/.test(badge))    return {st:3, pago:true};
-    if(/DESTINO/.test(badge))              return {st:3};
-    if(/ENVIADO/.test(badge))              return {st:2};
-    if(/ALISTAR|ALISTADO/.test(badge))     return {st:1};
-    return {st:0};
+    var base;
+    if(/FINALIZADO|ENTREGADO/.test(badge)) base={st:4};
+    else if(/PENDIENTE DE PAGO/.test(badge)) base={st:3, pago:true};
+    else if(/DESTINO/.test(badge))         base={st:3};
+    else if(/ENVIADO/.test(badge))         base={st:2};
+    else if(/ALISTAR|ALISTADO/.test(badge)) base={st:1};
+    else base={st:0};
+    // Seguimiento Shalom: renderTrackResult publica la etapa real de Shalom en
+    // data-shalom-st SOLO cuando va más adelantada que la etiqueta interna
+    // (modo observación). Delfi la lee y narra el estado real, reusando la fase
+    // ya calculada (sin duplicar lógica). Al coincidir/activar etiqueta, el
+    // atributo no se emite y Delfi vuelve a leer el badge.
+    var card = app.querySelector('.track-card[data-shalom-st]');
+    if(card){
+      var ss = parseInt(card.getAttribute('data-shalom-st'), 10);
+      if(!isNaN(ss) && ss > base.st) return {st:ss};
+    }
+    return base;
   }
 
   // ── 6. Lógica del FORMULARIO (Heavy) ───────────────────────────────
