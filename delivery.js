@@ -109,7 +109,7 @@ function _html(){
       '<div style="font-size:10px;color:#8b949e;text-align:center;margin-top:4px;margin-bottom:14px">Desliza el dedo para firmar</div>'+
       '<div style="display:flex;gap:9px">'+
         '<button onclick="DeliveryModule._closeConf()" style="flex:1;padding:12px;background:#1c2333;border:1px solid #30363d;border-radius:10px;color:#8b949e;font-size:13px;cursor:pointer;font-family:inherit">Cancelar</button>'+
-        '<button onclick="DeliveryModule._confirmar()" style="flex:2;padding:12px;background:linear-gradient(135deg,var(--green),#1a7f37);border:none;border-radius:10px;color:#fff;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">✅ Confirmar entrega</button>'+
+        '<button id="dlvConfBtn" onclick="DeliveryModule._confirmar()" style="flex:2;padding:12px;background:linear-gradient(135deg,var(--green),#1a7f37);border:none;border-radius:10px;color:#fff;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">✅ Confirmar entrega</button>'+
       '</div>'+
     '</div>';
   oc.addEventListener('click',function(e){if(e.target===oc)DeliveryModule._closeConf();});
@@ -255,7 +255,9 @@ DeliveryModule._selDrv=function(name,phone){
     var raw=(document.getElementById('dlvRutaLink')||{value:''}).value.trim();
     if(raw){var n=_normLink(raw);if(n)ship._dlvRutaLink=n;}
     else if(ship._dlvRutaLink){delete ship._dlvRutaLink;}
-    if(typeof global.save==='function')global.save();
+    // Guardado incremental REAL a Firestore (window.save es const, no existe
+    // en window → era no-op). Reusa _fbSaveShipmentNow (1 pedido, con reintentos).
+    if(typeof global._fbSaveShipmentNow==='function')global._fbSaveShipmentNow(ship);
   }
   DeliveryModule._closeDrv();_render();
   if(typeof global.toast==='function')global.toast('🛵 '+name+' asignado');
@@ -284,7 +286,7 @@ DeliveryModule._saveRuta=function(){
   var raw=(document.getElementById('dlvRutaLink')||{value:''}).value.trim();
   if(!raw){ delete ship._dlvRutaLink; }
   else{ var n=_normLink(raw); if(!n){if(typeof global.toast==='function')global.toast('⚠️ Link de ruta inválido');return;} ship._dlvRutaLink=n; }
-  if(typeof global.save==='function')global.save();
+  if(typeof global._fbSaveShipmentNow==='function')global._fbSaveShipmentNow(ship);
   DeliveryModule._closeDrv();_render();
   if(typeof global.toast==='function')global.toast(ship._dlvRutaLink?'🗺️ Ruta guardada':'Ruta quitada');
 };
@@ -319,7 +321,7 @@ DeliveryModule._openConf=function(id){
     c.ontouchend=function(){_signing=false;};
   },150);
 };
-DeliveryModule._closeConf=function(){document.getElementById('dlvConfOv').classList.remove('open');_currentShipId=null;};
+DeliveryModule._closeConf=function(){document.getElementById('dlvConfOv').classList.remove('open');_currentShipId=null;_fotoBase64=null;};
 DeliveryModule._foto=function(input){
   var file=input.files[0];if(!file)return;
   var r=new FileReader();
@@ -327,17 +329,46 @@ DeliveryModule._foto=function(input){
   r.readAsDataURL(file);
 };
 DeliveryModule._clearSign=function(){var c=document.getElementById('dlvSign');if(c&&_signCtx)_signCtx.clearRect(0,0,c.width,c.height);};
-DeliveryModule._confirmar=function(){
+DeliveryModule._confirmar=async function(){
+  if(DeliveryModule._confirming)return; // evitar doble envío durante la subida
   var recep=(document.getElementById('dlvRecep')||{value:''}).value.trim();
   if(!recep){if(typeof global.toast==='function')global.toast('⚠️ Escribe el nombre de quien recibe');return;}
   var ship=((global.S&&global.S.shipments)||[]).find(function(x){return x.id===_currentShipId;});
   if(!ship)return;
-  var firma=null;var c=document.getElementById('dlvSign');if(c&&_signCtx)firma=c.toDataURL('image/png');
+  var firmaB64=null;var c=document.getElementById('dlvSign');if(c&&_signCtx)firmaB64=c.toDataURL('image/png');
+
+  DeliveryModule._confirming=true;
+  var btn=document.getElementById('dlvConfBtn');
+  var btnTxt=btn?btn.textContent:'';
+  if(btn){btn.disabled=true;btn.textContent='⏳ Guardando…';}
+
+  // ★ Foto y firma van a Firebase Storage (URL), NO base64 en el doc: evita
+  // superar el limite de 1MB por documento de Firestore (que haria fallar el
+  // guardado). Reusa StorageModule.uploadFile/base64ToFile. Si la subida falla,
+  // igual se registra la entrega (la foto/firma son complementarias).
+  var SM=global.StorageModule;
+  if(SM&&SM.uploadFile&&SM.base64ToFile){
+    if(_fotoBase64){
+      try{
+        var ff=SM.base64ToFile(_fotoBase64,'delivery-foto.jpg','image/jpeg');
+        var upF=await SM.uploadFile(ff,ship.id,'delivery-foto');
+        ship._dlvFoto=upF.d;
+      }catch(e){ if(typeof global.toast==='function')global.toast('⚠️ No se pudo subir la foto — se guardó sin ella'); }
+    }
+    if(firmaB64){
+      try{
+        var fs=SM.base64ToFile(firmaB64,'delivery-firma.png','image/png');
+        var upS=await SM.uploadFile(fs,ship.id,'delivery-firma');
+        ship._dlvFirma=upS.d;
+      }catch(e){ /* firma opcional: seguir */ }
+    }
+  }
+
   ship.status='FINALIZADO';ship._dlvDone=true;ship._dlvReceptor=recep;ship._dlvFecha=new Date().toISOString();
-  if(_fotoBase64)ship._dlvFoto=_fotoBase64;
-  if(firma)ship._dlvFirma=firma;
-  if(typeof global.save==='function')global.save();
+  if(typeof global._fbSaveShipmentNow==='function')global._fbSaveShipmentNow(ship);
   if(typeof global.render==='function')global.render();
+  DeliveryModule._confirming=false;
+  if(btn){btn.disabled=false;btn.textContent=btnTxt;}
   DeliveryModule._closeConf();_render();
   if(typeof global.toast==='function')global.toast('✅ Entregado — '+recep);
 };
