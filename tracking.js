@@ -620,36 +620,57 @@ Tracking._guardarEdicion = function(shipId) {
   if (typeof window.toast  === 'function') window.toast('✅ Tracking guardado');
 };
 
-/* ── consultarAhora vía MOTOR B (tu servidor) ────────────────────────
-   Reusa la Cloud Function syncShalomWebTest (1 pedido, autenticada) que ya
-   consulta el worker propio y escribe en Firestore. Aplica los cambios
-   devueltos al pedido local y refresca la tarjeta. No toca la API paga. */
+/* ── MOTOR B (tu servidor): throttle compartido con el scheduler ──────
+   _motorBVencido replica el criterio de estaVencido del backend: ¿ya toca
+   consultar este pedido? (por timestamp trackingWebProximaConsulta, no por
+   "alguien entró"). Así el botón/masivo del panel y el scheduler NO se pisan ni
+   estampidan el worker. Sin fecha (nunca consultado) → vencido = true. */
+function _motorBVencido(ship) {
+  var prox = ship && ship.trackingWebProximaConsulta ?
+    Date.parse(ship.trackingWebProximaConsulta) : 0;
+  return !(prox && isFinite(prox) && prox > Date.now());
+}
+
+/* Consulta UN pedido por Motor B vía syncShalomWebTest (autenticada, escribe en
+   Firestore) y aplica el resultado al pedido local. Reutilizado por el botón
+   por-tarjeta (force=true, manual explícito) y el masivo (force=false, respeta
+   el throttle). Devuelve 'ok' | 'skip' | 'error'. No toca el botón ni hace
+   render: eso lo decide el llamador. */
+async function _motorBConsultarUno(ship, shipId, force) {
+  if (!force && !_motorBVencido(ship)) return 'skip';
+  var tok = '';
+  try {
+    if (typeof window._authEnsureToken === 'function') await window._authEnsureToken();
+    tok = localStorage.getItem('tt_id_token') || '';
+  } catch(e){}
+  var url = 'https://us-central1-total-tools-24ce8.cloudfunctions.net/syncShalomWebTest?pedidoId=' + encodeURIComponent(shipId);
+  var r = await fetch(url, { headers: { Authorization: 'Bearer ' + tok } });
+  var data = await r.json();
+  if (data && data.ok && data.cambios) {
+    Object.keys(data.cambios).forEach(function(k){ ship[k] = data.cambios[k]; });
+    // Refrescar SIEMPRE con el estado fresco del worker aunque el backend ya
+    // coincidiera (en ese caso 'cambios' no trae trackingStatus por la guarda
+    // "no reescribir si no cambió"). Solo display local; Firestore lo escribió
+    // el backend (con updateMask ya no lo pisa otro device).
+    var msg = data.resultadoWorker && data.resultadoWorker.statuses && data.resultadoWorker.statuses.message;
+    if (msg) { ship.trackingStatus = msg; ship.trackingMessage = msg; }
+    return 'ok';
+  }
+  return 'error';
+}
+
+/* ── consultarAhora vía MOTOR B: botón por-tarjeta (manual = forzado) ── */
 async function _consultarMotorB(ship, shipId) {
   var btn = document.getElementById('btn-consult-'+shipId);
   if (btn) { btn.innerHTML = '<span class="trk-spin-inline"></span> Consultando...'; btn.disabled = true; }
   if (typeof window.toast === 'function') window.toast('⏳ Consultando tu servidor...');
   try {
-    var tok = '';
-    try {
-      if (typeof window._authEnsureToken === 'function') await window._authEnsureToken();
-      tok = localStorage.getItem('tt_id_token') || '';
-    } catch(e){}
-    var url = 'https://us-central1-total-tools-24ce8.cloudfunctions.net/syncShalomWebTest?pedidoId=' + encodeURIComponent(shipId);
-    var r = await fetch(url, { headers: { Authorization: 'Bearer ' + tok } });
-    var data = await r.json();
-    if (data && data.ok && data.cambios) {
-      Object.keys(data.cambios).forEach(function(k){ ship[k] = data.cambios[k]; });
-      // ★ Robustez: refrescar SIEMPRE la pantalla con el estado fresco que leyó
-      // el worker, aunque el backend ya coincidiera (en ese caso 'cambios' no
-      // trae trackingStatus por la guarda "no reescribir si no cambió", y la
-      // tarjeta local podría quedar con un valor viejo). Solo actualiza el
-      // display; no escribe en Firestore.
-      var msg = data.resultadoWorker && data.resultadoWorker.statuses && data.resultadoWorker.statuses.message;
-      if (msg) { ship.trackingStatus = msg; ship.trackingMessage = msg; }
+    var res = await _motorBConsultarUno(ship, shipId, true); // botón manual = forzar
+    if (res === 'ok') {
       if (typeof window.render === 'function') window.render();
       if (typeof window.toast === 'function') window.toast('🔄 Estado: ' + (ship.trackingStatus || '—'));
     } else {
-      if (typeof window.toast === 'function') window.toast('⚠️ ' + ((data && data.motivo) || 'No se pudo consultar tu servidor'));
+      if (typeof window.toast === 'function') window.toast('⚠️ No se pudo consultar tu servidor');
       if (btn) { btn.innerHTML = '⟳ Consultar'; btn.disabled = false; }
     }
   } catch (e) {
@@ -727,7 +748,57 @@ Tracking.consultarAhora = async function(shipId) {
    y el "Consultar", así no re-consulta lo recién consultado (ahorra API).
    Reutiliza el mismo motor (consultarShalom + aplicarResultado). No toca
    el botón "Consultar" por tarjeta. */
+/* ── Masivo por MOTOR B (tu servidor) ────────────────────────────────
+   Consulta 1-por-pedido seleccionado vía syncShalomWebTest, secuencial y con
+   espaciado (el worker es concurrency 1). Respeta el throttle compartido
+   trackingWebProximaConsulta: salta lo que aún no vence (no re-consulta lo
+   recién hecho por el scheduler u otro operador). */
+async function _bulkTrackMotorB(ids) {
+  var ships = (ids || []).map(_findShip).filter(Boolean);
+  var toTrack = [], recientes = 0, sinNum = 0;
+  ships.forEach(function(s){
+    var isShalom = s.courier && String(s.courier).toUpperCase().indexOf('SHALOM') >= 0;
+    var guia = s.trackingOrderNumber || s.shalomGuia || '';
+    var codigo = s.trackingOrderCode || s.shalomCodigo || '';
+    if (!isShalom) return;                 // solo Shalom
+    if (s.status === 'FINALIZADO') return; // ya entregado
+    if (!guia || !codigo) { sinNum++; return; }
+    if (!_motorBVencido(s)) { recientes++; return; } // throttle compartido
+    toTrack.push(s);
+  });
+  if (!toTrack.length) {
+    var m0 = 'Nada nuevo para consultar';
+    if (recientes) m0 += ' · ' + recientes + ' consultado' + (recientes!==1?'s':'') + ' hace poco';
+    if (sinNum) m0 += ' · ' + sinNum + ' sin número/código';
+    if (window.toast) window.toast(m0);
+    return;
+  }
+  if (window.toast) window.toast('⏳ Consultando ' + toTrack.length + ' Shalom (tu servidor)...');
+  var ok = 0, err = 0;
+  for (var i = 0; i < toTrack.length; i++) {
+    var s = toTrack[i];
+    try {
+      var res = await _motorBConsultarUno(s, s.id, false); // masivo = respeta throttle
+      if (res === 'ok') { ok++; } else if (res === 'error') { err++; }
+    } catch (e) { err++; }
+    if (i < toTrack.length - 1) {
+      await new Promise(function(r){ setTimeout(r, 800); }); // gentil con el worker
+    }
+  }
+  if (window.render) window.render();
+  var msg = '✅ ' + ok + ' consultado' + (ok!==1?'s':'');
+  if (recientes) msg += ' · ' + recientes + ' hace poco';
+  if (sinNum) msg += ' · ' + sinNum + ' sin número';
+  if (err) msg += ' · ' + err + ' error' + (err!==1?'es':'');
+  if (window.toast) window.toast(msg);
+}
+
+/* ── bulkTrack: enruta por motor (masivo desde el ícono 🔄 con selección) ─
+   Si el motor es "web" (tu servidor) → Motor B con throttle compartido; si es
+   "api" (u otro) → camino de siempre (Motor A / API paga), intacto. */
 Tracking.bulkTrack = async function(ids) {
+  var motor = (window.S && window.S.config && window.S.config.trackingMotor) || '';
+  if (motor === 'web') { return _bulkTrackMotorB(ids); }
   var COOLDOWN = 30 * 60 * 1000; // 30 min
   var ahora = Date.now();
   var ships = (ids || []).map(_findShip).filter(Boolean);

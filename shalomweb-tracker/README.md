@@ -44,7 +44,8 @@ gcloud run deploy shalomweb-tracker \
   --cpu 2 \
   --concurrency 1 \
   --timeout 120 \
-  --min-instances 0
+  --min-instances 0 \
+  --max-instances 3
 ```
 Al terminar imprime una **Service URL** (algo como
 `https://shalomweb-tracker-xxxxx-uc.a.run.app`).
@@ -58,6 +59,10 @@ una captura en base64 y el texto de la página). Con eso afinamos.
 
 ## Notas
 - `--concurrency 1`: un navegador por instancia (estable). Cloud Run autoescala.
+- `--max-instances 3`: techo de navegadores en paralelo. Protege costo y evita
+  disparar reCAPTCHA por concurrencia si el manual, el masivo y el scheduler
+  coinciden. El panel ya espacia y comparte el throttle `trackingWebProximaConsulta`,
+  así que un techo bajo es suficiente. (Requiere re-desplegar el worker para aplicar.)
 - `--allow-unauthenticated`: solo para probar en Fase 1. En Fase 5 lo cerramos
   (o defines `TRACK_KEY` y se exige `?k=...`).
 - reCAPTCHA v3 le pone *score* a los navegadores automáticos: si `buscar`
