@@ -825,7 +825,7 @@ function renderForm(){
         <div class="ferr" id="err_name">Ingresa tu nombre completo</div>
       </div>
       <div class="fg">
-        <input class="fi" id="f_phone" type="tel" inputmode="numeric" pattern="[0-9]*"
+        <input class="fi phone-norm" id="f_phone" type="tel" inputmode="numeric" pattern="[0-9]*"
           placeholder="Número WhatsApp *" maxlength="9" autocomplete="tel"
           oninput="onPhoneInput(this.value)">
         <div class="ferr" id="err_phone">Ingresa un número de 9 dígitos</div>
@@ -942,6 +942,22 @@ function renderForm(){
   /* Asistente paso a paso (solo presentación; no cambia la lógica) */
   wzInit();
 }
+
+/* ─── NORMALIZACIÓN DE TELÉFONO (misma regla del panel) ──────────────
+   Borra no-dígitos, quita el prefijo Perú (+51) si sobra y corta a 9. Se aplica
+   por delegación a cualquier input con clase "phone-norm" (aquí: f_phone). Corre
+   en captura, ANTES del oninput inline, así onPhoneInput recibe el valor ya
+   limpio y pegar "+51 984..." deja de romper la validación de 9 dígitos. */
+function normPeruPhone(s){
+  var v=String(s==null?'':s).replace(/\D/g,'');
+  if(v.startsWith('51')&&v.length>9) v=v.slice(2);
+  return v.slice(0,9);
+}
+(function(){
+  function _norm(el){ if(el && el.classList && el.classList.contains('phone-norm')) el.value=normPeruPhone(el.value); }
+  document.addEventListener('input', function(e){ _norm(e.target); }, true);
+  document.addEventListener('paste', function(e){ var el=e.target; if(el&&el.classList&&el.classList.contains('phone-norm')) setTimeout(function(){ _norm(el); },0); }, true);
+})();
 
 /* ─── PHONE DETECTION ────────────────────────────────────────────── */
 function onPhoneInput(val){

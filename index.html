@@ -473,9 +473,7 @@
       <input class="fi" id="tokName" placeholder="Nombre del cliente (ej. Juan Pérez)" maxlength="60" autocomplete="off">
     </div>
     <div class="fg">
-      <input class="fi" id="tokPhone" type="tel" inputmode="numeric" placeholder="Teléfono del cliente (opcional)" autocomplete="off"
-        onpaste="setTimeout(()=>{var v=this.value.replace(/\D/g,'');if(v.startsWith('51')&&v.length>9)v=v.slice(2);this.value=v.slice(0,9)},0)"
-        oninput="var v=this.value.replace(/\D/g,'');if(v.startsWith('51')&&v.length>9)v=v.slice(2);this.value=v.slice(0,9)">
+      <input class="fi phone-norm" id="tokPhone" type="tel" inputmode="numeric" placeholder="Teléfono del cliente (opcional)" autocomplete="off">
     </div>
     <div class="fg">
       <input class="fi" id="tokLink" type="url" inputmode="url" placeholder="🔗 Link adjunto (Drive, Mega, etc.) — opcional" autocomplete="off">
@@ -518,7 +516,7 @@
     <div class="cfg-ttl">🏪 Datos públicos</div>
     <div class="fg"><label class="fl">Nombre del negocio</label><input class="fi" id="cfgName" placeholder="Mi Negocio"></div>
     <div class="fg"><label class="fl">WhatsApp</label>
-      <div class="ph-wrap"><span class="ph-pre">+51</span><input class="fi" id="cfgPhone" placeholder="978772252" maxlength="9"></div>
+      <div class="ph-wrap"><span class="ph-pre">+51</span><input class="fi phone-norm" id="cfgPhone" placeholder="978772252" maxlength="9"></div>
     </div>
     <div class="fg"><label class="fl">Ciudad</label><input class="fi" id="cfgCity" placeholder="Lima, Perú"></div>
   </div>
@@ -637,7 +635,7 @@
     <div class="sheet-title"><span id="formTitle">Nuevo Envío</span><span onclick="if(window.Ayuda)Ayuda.abrir('nuevoEnvio')" style="float:right;font-size:11px;color:#8b949e;cursor:pointer;font-weight:400" title="Ayuda">📖 Ayuda</span></div>
     <div class="frow">
       <div class="fg"><label class="fl">Nombre *</label><input class="fi" id="fName" placeholder="Nombre completo"></div>
-      <div class="fg"><label class="fl">Teléfono *</label><input class="fi" id="fPhone" placeholder="9XXXXXXXX" maxlength="9" inputmode="numeric" onpaste="setTimeout(()=>{var v=this.value.replace(/\D/g,'');if(v.startsWith('51')&&v.length>9)v=v.slice(2);this.value=v.slice(0,9)},0)" oninput="var v=this.value.replace(/\D/g,'');if(v.startsWith('51')&&v.length>9)v=v.slice(2);this.value=v.slice(0,9)"></div>
+      <div class="fg"><label class="fl">Teléfono *</label><input class="fi phone-norm" id="fPhone" placeholder="9XXXXXXXX" maxlength="9" inputmode="numeric"></div>
     </div>
     <div class="frow">
       <div class="fg"><label class="fl">DNI</label><input class="fi" id="fDni" placeholder="12345678" maxlength="8" inputmode="numeric"></div>
@@ -820,7 +818,7 @@
     <div class="sheet-title">➕ Nuevo proveedor</div>
     <div class="fg"><label class="fl">Nombre del proveedor</label><input class="fi" id="suppNewName" placeholder="Ej: Distribuidora ABC..."></div>
     <div class="fg"><label class="fl">Teléfono WhatsApp</label>
-      <div class="ph-wrap"><span class="ph-pre">+51</span><input class="fi" id="suppNewPhone" placeholder="9XXXXXXXX" maxlength="9" type="tel"></div>
+      <div class="ph-wrap"><span class="ph-pre">+51</span><input class="fi phone-norm" id="suppNewPhone" placeholder="9XXXXXXXX" maxlength="9" type="tel"></div>
     </div>
     <div class="fg"><label class="fl">Tipo</label>
       <div style="display:flex;gap:8px">
@@ -854,7 +852,7 @@
     <div class="sheet-title">✏️ Editar proveedor</div>
     <div class="fg"><label class="fl">Nombre</label><input class="fi" id="suppEditName" placeholder="Nombre del proveedor..."></div>
     <div class="fg"><label class="fl">Teléfono WhatsApp</label>
-      <div class="ph-wrap"><span class="ph-pre">+51</span><input class="fi" id="suppEditPhone" placeholder="9XXXXXXXX" maxlength="9" type="tel"></div>
+      <div class="ph-wrap"><span class="ph-pre">+51</span><input class="fi phone-norm" id="suppEditPhone" placeholder="9XXXXXXXX" maxlength="9" type="tel"></div>
     </div>
     <button class="btn-pri" onclick="saveEditSupplier()">💾 Guardar cambios</button>
     <button class="btn-sec" onclick="closeOverlay('suppEditOverlay')">Cancelar</button>
@@ -1139,6 +1137,27 @@ function lsSet(k,v){try{localStorage.setItem(k,v)}catch(e){_mem[k]=v}}
 
 let S=JSON.parse(lsGet('dpanel')||'{}');
 window.S = S; // ★ Exponer S globalmente para tracking.js
+
+// ── Normalización de teléfono (una sola regla, reutilizada en todos los campos)
+// Borra lo que no sea dígito, quita el prefijo Perú (+51) si sobra y corta a 9.
+// Es la MISMA regla que ya funcionaba en el link personalizado; ahora vive en un
+// solo lugar. Se aplica por DELEGACIÓN: cualquier input con clase "phone-norm"
+// (estático o creado dinámicamente, como el del motorizado) se limpia solo, sin
+// cablear cada campo. Los valores de cada campo siguen 100% independientes.
+function normPeruPhone(s){
+  var v=String(s==null?'':s).replace(/\D/g,'');
+  if(v.startsWith('51')&&v.length>9) v=v.slice(2);
+  return v.slice(0,9);
+}
+window.normPeruPhone=normPeruPhone;
+(function(){
+  function _norm(el){ if(el && el.classList && el.classList.contains('phone-norm')) el.value=normPeruPhone(el.value); }
+  // captura: corre ANTES del oninput inline del campo, así quien lea this.value
+  // (ej. onPhoneInput) recibe el valor ya limpio.
+  document.addEventListener('input', function(e){ _norm(e.target); }, true);
+  document.addEventListener('paste', function(e){ var el=e.target; if(el&&el.classList&&el.classList.contains('phone-norm')) setTimeout(function(){ _norm(el); },0); }, true);
+})();
+
 if(!S.shipments)    S.shipments=[];
 if(!S.couriers)     S.couriers=[];
 if(!S.extraFields)  S.extraFields=[];
