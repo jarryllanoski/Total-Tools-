@@ -569,6 +569,7 @@ function showTokenScreen(icon, title, msg){
     <div class="unconf-ttl">${esc(title)}</div>
     <div class="unconf-sub">${esc(msg).replace(/\n/g,'<br>')}</div>
   </div>`);
+  if(window.TTFormLoader) TTFormLoader.ready(); // pantalla final de link → ocultar loader
 }
 
 /* ─── LOAD CONFIG (vía Cloud Function) ───────────────────────────── */
@@ -601,6 +602,10 @@ async function loadCfg(){
     if(cfg && !cfg.error){ CFG = cfg; renderForm(); }
   }catch(e){
     console.warn('Config no disponible:', e.message);
+  }finally{
+    // Config resuelta (o timeout) y form renderizado → recién ahora ocultar el
+    // loader, cubriendo el doble-render por debajo (sin flash ni spinner básico).
+    if(window.TTFormLoader) TTFormLoader.ready();
   }
 }
 
@@ -619,6 +624,7 @@ async function loadCfgThenTrack(token){
     if(cfg && !cfg.error) CFG = cfg;
   }catch(e){ console.warn('Config no disponible'); }
   renderTracking(token);
+  if(window.TTFormLoader) TTFormLoader.ready(); // tracking renderizado → ocultar loader del form
 }
 
 /* ─── HEADER HTML ───────────────────────────────────────────────── */

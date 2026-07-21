@@ -14,9 +14,9 @@
   var slow=false;
   try{ var c=navigator.connection; if(c&&(c.saveData||/(^|-)2g$/.test(c.effectiveType||''))) slow=true; }catch(e){}
 
-  var MIN = slow?300:1000;   // tiempo mínimo visible (para que se aprecie la marca)
-  var MAX = slow?1500:2800;  // tope de seguridad (nunca colgar)
-  var start = Date.now(), hidden=false, ov;
+  var MIN = slow?300:600;     // mínimo visible (evita parpadeo si la carga es instantánea/cacheada)
+  var CAP = slow?12000:9000;  // tope de SEGURIDAD (solo si la red muere). En lento MÁS largo, no menos.
+  var start = Date.now(), hidden=false, readyCalled=false, ov;
 
   var st=document.createElement('style');
   st.textContent=''
@@ -61,15 +61,14 @@
 
   function fade(){ if(!ov)return; if(raf)cancelAnimationFrame(raf); ov.classList.add('out'); setTimeout(function(){ if(ov){ov.remove();ov=null;} }, 520); }
   function done(){ if(hidden)return; hidden=true; }
-  function ready(){ var t=Date.now()-start; setTimeout(done, Math.max(0, MIN-t)); }
-
-  // Ocultar cuando el formulario aparece (#f_name) o por tope de tiempo
-  if(document.getElementById('f_name')) ready();
-  else{
-    try{
-      var mo=new MutationObserver(function(){ if(document.getElementById('f_name')){ mo.disconnect(); ready(); } });
-      mo.observe(document.documentElement,{childList:true,subtree:true});
-    }catch(e){ ready(); }
+  // Señal REAL de "listo": el formulario/tracking terminó de renderizar (config
+  // incluida). Respeta un MIN para no parpadear. Reemplaza el ocultar por timer
+  // corto + el observer de #f_name, que dejaban ver el spinner básico y el flash
+  // del segundo render (el "carga, retrocede, carga").
+  function ready(){
+    if(readyCalled) return; readyCalled=true;
+    setTimeout(done, Math.max(0, MIN-(Date.now()-start)));
   }
-  setTimeout(done, MAX); // seguridad: nunca quedarse cargando
+  window.TTFormLoader = { ready: ready };
+  setTimeout(done, CAP); // tope de seguridad: nunca quedarse cargando
 })();
