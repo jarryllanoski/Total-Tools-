@@ -856,7 +856,7 @@ function renderForm(){
       <div id="encomiendaBox" style="display:none;margin-top:4px">
         <div class="section-ttl">📦 Datos de envío</div>
         <div class="fg">
-          <input class="fi" id="f_ciudad" type="text" placeholder="Ciudad de destino *" autocomplete="off">
+          <input class="fi" id="f_ciudad" type="text" placeholder="Ciudad de destino *" autocomplete="off" data-wz-focus>
           <div class="ferr" id="err_ciudad">Ingresa la ciudad de destino</div>
         </div>
         <div class="fg" style="margin-bottom:0">
@@ -1154,7 +1154,7 @@ function renderAgencyBox(courierName){
       <span class="agc-lbl">Busca tu agencia *</span>
       <div style="position:relative;margin-bottom:10px">
         <span style="position:absolute;left:14px;top:50%;transform:translateY(-50%);font-size:15px;opacity:.65;pointer-events:none">🔍</span>
-        <input class="fi" id="shalomAgInput" autocomplete="off"
+        <input class="fi" id="shalomAgInput" autocomplete="off" data-wz-focus
           style="padding-left:42px"
           placeholder="Buscar sede Shalom…"
           oninput="shalomOnInput(this.value)">
@@ -1188,7 +1188,7 @@ function renderAgencyBox(courierName){
         Indica el departamento, provincia, distrito y dirección de la agencia donde quieres recoger tu pedido.
       </div>
       <div class="fg" style="margin-bottom:8px">
-        <textarea class="fi" id="agcManualInput" rows="3"
+        <textarea class="fi" id="agcManualInput" rows="3" data-wz-focus
           placeholder="Ej: Arequipa / Cerro Colorado — Av. Ejército 123, agencia Olva Zamácola"
           oninput="onAgencyManual(this.value)"
           style="resize:vertical;min-height:70px;font-family:inherit"></textarea>
@@ -2337,17 +2337,45 @@ function wzProgress(){
   box.innerHTML='<div class="wz-ptxt">Paso '+(idx+1)+' de '+seq.length+'</div>'
     +'<div class="wz-pbar"><i style="width:'+pct+'%"></i></div>';
 }
-function wzShow(step){
+// Enfoca el primer campo de texto VISIBLE del paso activo (si lo hay) para que
+// salga el teclado y parpadee el cursor. DEBE llamarse dentro del gesto del
+// usuario (toque) para que iOS abra el teclado. Devuelve true si enfocó algo.
+// En pasos sin campo de texto (courier, fecha, delivery antes de elegir modo,
+// retiro) no enfoca nada → el paso sube al inicio como antes.
+function wzFocusFirst(){
+  try{
+    var step=document.querySelector('.wz-step[data-step="'+_wzStep+'"]');
+    if(!step) return false;
+    // Campos marcados a propósito con data-wz-focus (buscador Shalom, agencia
+    // manual OLVA, ciudad de Otras Agencias). Evita enfocar por error un campo
+    // secundario (ej. DNI en la cascada, o Referencia en delivery) o un select.
+    var cands=step.querySelectorAll('[data-wz-focus]'), el=null;
+    for(var i=0;i<cands.length;i++){ var c=cands[i]; if(c.offsetParent!==null && !c.disabled && !c.readOnly){ el=c; break; } }
+    if(!el) return false;
+    el.focus(); // dentro del gesto → abre el teclado; el navegador ya sube el campo
+    // Red de seguridad: recentra el campo sobre el teclado tras su animación,
+    // por si algún navegador no lo subió solo (que no lo tape el teclado).
+    setTimeout(function(){ try{ el.scrollIntoView({block:'center',behavior:'smooth'}); }catch(e){} }, 300);
+    return true;
+  }catch(e){ return false; }
+}
+function wzShow(step, doFocus){
   _wzStep=step;
   var steps=document.querySelectorAll('.wz-step');
   for(var i=0;i<steps.length;i++){ steps[i].hidden=(+steps[i].getAttribute('data-step')!==step); }
   wzProgress();
-  try{ window.scrollTo({top:0,behavior:'smooth'}); }catch(e){ try{ window.scrollTo(0,0); }catch(_){} }
+  var focused = doFocus ? wzFocusFirst() : false;
+  if(!focused){
+    try{ window.scrollTo({top:0,behavior:'smooth'}); }catch(e){ try{ window.scrollTo(0,0); }catch(_){} }
+  }
 }
 function wzNext(){
   if(!wzValidate(_wzStep)) return;   // muestra los errores y no avanza
   var seq=wzSeq(); var idx=seq.indexOf(_wzStep);
-  if(idx>=0&&idx<seq.length-1) wzShow(seq[idx+1]);
+  // doFocus=true: enfoca el primer campo del paso siguiente. wzNext se llama
+  // dentro del gesto (botón "Continuar" o toque del courier), así el teclado
+  // abre también en iPhone.
+  if(idx>=0&&idx<seq.length-1) wzShow(seq[idx+1], true);
 }
 function wzBack(){
   var seq=wzSeq(); var idx=seq.indexOf(_wzStep);
@@ -2362,11 +2390,15 @@ function wzInit(){
     ['f_name','f_phone'].forEach(function(id){
       var el=$(id); if(el) el.addEventListener('keydown',function(ev){ if(ev.key==='Enter'){ ev.preventDefault(); wzNext(); } });
     });
-    // Auto-avance al elegir courier (elección clara → siguiente paso)
+    // Auto-avance al elegir courier (elección clara → siguiente paso). INMEDIATO
+    // y dentro del gesto (pickCourier→dispatch change): sin setTimeout, para que
+    // al enfocar el primer campo del paso 3 el teclado abra también en iPhone.
+    // onCourierChange (onchange inline) ya corrió antes y dejó visible el bloque
+    // correcto (agencia/otras/delivery), así que wzFocusFirst enfoca el campo justo.
     var cs=$('f_courier');
     if(cs) cs.addEventListener('change',function(){
       if(_wzStep!==2||!this.value) return;
-      setTimeout(function(){ if(_wzStep===2&&selCourierName) wzNext(); },550);
+      if(selCourierName) wzNext();
     });
     wzShow(1);
   }catch(e){ /* nunca romper el formulario */ }
