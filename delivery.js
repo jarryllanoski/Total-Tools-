@@ -131,7 +131,7 @@ function _html(){
       '<div style="font-size:10px;font-weight:700;color:#8b949e;letter-spacing:.8px;text-transform:uppercase;margin-bottom:8px">NUEVO MOTORIZADO</div>'+
       '<input id="dlvDrvName" class="fi" placeholder="Nombre..." style="margin-bottom:8px">'+
       '<div style="display:flex;gap:8px;margin-bottom:12px">'+
-        '<input id="dlvDrvPhone" class="fi phone-norm" placeholder="Teléfono (opcional)" inputmode="numeric" maxlength="9" style="flex:1">'+
+        '<input id="dlvDrvPhone" class="fi phone-norm" placeholder="Teléfono (opcional)" inputmode="numeric" style="flex:1">'+
         '<button onclick="DeliveryModule._addDrv()" style="background:var(--blue);border:none;border-radius:8px;color:#fff;padding:0 16px;font-size:18px;font-weight:700;cursor:pointer">+</button>'+
       '</div>'+
       '<button onclick="DeliveryModule._closeDrv()" style="width:100%;padding:11px;background:#1c2333;border:1px solid #30363d;border-radius:10px;color:#8b949e;font-size:13px;cursor:pointer;font-family:inherit">Cerrar</button>'+
