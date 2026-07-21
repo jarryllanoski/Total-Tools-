@@ -2167,6 +2167,7 @@ async function shalomBuscar(q){
   const spin = $('shalomSpin');
   try{
     let resultados = [];
+    let aviso = '';
     // 1. Buscar en cache local
     if(window._shalomData && window._shalomData.length){
       const _nrm = s => String(s==null?'':s).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
@@ -2185,9 +2186,20 @@ async function shalomBuscar(q){
       });
       _claveM.sort((a,b)=>a.score-b.score||a.idx-b.idx);
       resultados = _claveM.map(x=>x.ag);
-      // La dirección solo rellena si faltan resultados (no mezcla otras provincias)
-      if(resultados.length < 8) resultados = resultados.concat(_dirM.map(x=>x.ag));
-      resultados = resultados.slice(0,8);
+      // Tope 40: cubre cualquier departamento salvo Lima (186). El dropdown scrollea.
+      const TOPE = 40;
+      // Relleno por dirección solo si falta para llenar, CON GUARDA:
+      //  - si hay coincidencias por ubicación → solo del MISMO departamento (no mezcla zonas).
+      //  - si NO hay ninguna (búsqueda por landmark/dirección pura) → permite todas
+      //    (si no, devolvería 0 y rompería ese caso).
+      if(resultados.length < TOPE && _dirM.length){
+        const deps = new Set(_claveM.map(x=>x.ag.departamento));
+        const relleno = _claveM.length ? _dirM.filter(x=>deps.has(x.ag.departamento)) : _dirM;
+        resultados = resultados.concat(relleno.map(x=>x.ag));
+      }
+      // Aviso solo cuando hay MUCHAS por ubicación (caso Lima): guiar a afinar.
+      if(_claveM.length > TOPE) aviso = _claveM.length + ' sedes — escribe tu distrito (ej. Miraflores) para afinar';
+      resultados = resultados.slice(0, TOPE);
     }
     // 2. Si no hay resultados, consultar API
     if(!resultados.length){
@@ -2195,11 +2207,11 @@ async function shalomBuscar(q){
       if(r.ok){
         const j = await r.json();
         const lista = j.resultados || j.agencias || j.data || j || [];
-        resultados = (Array.isArray(lista)?lista:[]).slice(0,8);
+        resultados = (Array.isArray(lista)?lista:[]).slice(0,40);
       }
     }
     if(spin) spin.style.display='none';
-    shalomMostrar(resultados);
+    shalomMostrar(resultados, aviso);
   }catch(e){
     if(spin) spin.style.display='none';
     if(drop){
@@ -2215,7 +2227,7 @@ async function shalomBuscar(q){
   }
 }
 
-function shalomMostrar(agencias){
+function shalomMostrar(agencias, aviso){
   const drop = $('shalomDrop');
   if(!drop) return;
   if(!agencias.length){
@@ -2229,7 +2241,10 @@ function shalomMostrar(agencias){
     return;
   }
   window._shalomCache = agencias;
-  drop.innerHTML = agencias.map((ag,i)=>{
+  const avisoHtml = aviso
+    ? '<div style="padding:8px 12px;background:rgba(79,142,247,.08);border-bottom:1px solid var(--bd);font-size:11px;color:var(--blue);line-height:1.4">📍 '+esc(aviso)+'</div>'
+    : '';
+  drop.innerHTML = avisoHtml + agencias.map((ag,i)=>{
     const nombre = ag.lugar_over||ag.nombre||'—';
     const dir    = ag.direccion||'';
     const geo    = [ag.zona||ag.distrito, ag.provincia, ag.departamento].filter(Boolean).join(' · ');
