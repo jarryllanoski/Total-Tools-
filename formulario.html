@@ -1152,6 +1152,7 @@ function renderAgencyBox(courierName){
   if((courierName||'').toUpperCase().includes('SHALOM')){
     agBox.innerHTML = `<div class="agc-box">
       <span class="agc-lbl">Elige tu sede Shalom *</span>
+      <button type="button" onclick="shalomCerca()" style="width:100%;display:flex;align-items:center;justify-content:center;gap:8px;background:rgba(79,142,247,.12);border:1px solid rgba(79,142,247,.3);border-radius:10px;color:var(--blue);padding:11px;font-size:13.5px;font-weight:700;cursor:pointer;font-family:inherit;margin:6px 0 10px">📍 Ver sedes cerca de mí</button>
       <div style="position:relative;margin-bottom:10px">
         <span style="position:absolute;left:14px;top:50%;transform:translateY(-50%);font-size:15px;opacity:.65;pointer-events:none">🔍</span>
         <input class="fi" id="shalomAgInput" autocomplete="off" data-wz-focus
@@ -2162,6 +2163,42 @@ function shalomOnInput(val){
   _shalomTimer = setTimeout(()=> shalomBuscar(val), 350);
 }
 
+// Distancia en km entre dos coordenadas (haversine, client-side).
+function _haversineKm(la1,lo1,la2,lo2){
+  var R=6371, toR=Math.PI/180;
+  var dLa=(la2-la1)*toR, dLo=(lo2-lo1)*toR;
+  var a=Math.sin(dLa/2)*Math.sin(dLa/2)+Math.cos(la1*toR)*Math.cos(la2*toR)*Math.sin(dLo/2)*Math.sin(dLo/2);
+  return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
+}
+// "Ver sedes cerca de mí": pide ubicación (helper robusto reutilizado del GPS de
+// delivery), ordena las agencias por distancia y muestra las más cercanas.
+function shalomCerca(){
+  var drop=$('shalomDrop');
+  if(drop){ drop.style.display='block'; drop.innerHTML='<div style="padding:12px 14px;color:var(--text2);font-size:13px">📡 Buscando tu ubicación…</div>'; }
+  var enApp=_gpsWebviewInApp();
+  _obtenerUbicacion(function(pos){
+    var la=pos.coords.latitude, lo=pos.coords.longitude;
+    var lista=(window._shalomData||[]).map(function(ag){
+      var alat=parseFloat(ag.latitud), alon=parseFloat(ag.longitud);
+      if(!isFinite(alat)||!isFinite(alon)||(alat===0&&alon===0)) return null;
+      var c=Object.assign({}, ag); c._distKm=_haversineKm(la,lo,alat,alon); return c;
+    }).filter(Boolean).sort(function(a,b){return a._distKm-b._distKm;}).slice(0,6);
+    if(!lista.length){ shalomMostrar([]); return; }
+    shalomMostrar(lista, 'Sedes más cercanas a tu ubicación');
+  }, function(codigo){
+    if(!drop) return;
+    var guia;
+    if(codigo==='denegado')      guia='⚠️ Tu ubicación está bloqueada. Actívala en el candado 🔒 → Permisos → Ubicación, o escribe tu distrito arriba.';
+    else if(codigo==='no_soporta') guia='⚠️ Tu navegador no soporta ubicación. Escribe tu distrito arriba.';
+    else if(codigo==='inseguro')   guia='⚠️ La ubicación necesita conexión segura (https). Escribe tu distrito arriba.';
+    else                           guia='⚠️ No se pudo obtener tu ubicación. Reintenta o escribe tu distrito arriba.';
+    var banner = enApp
+      ? '<div style="background:rgba(234,179,8,.1);border:1px solid rgba(234,179,8,.3);border-radius:8px;padding:8px 10px;margin-bottom:8px;font-size:12px;color:var(--text);line-height:1.5">📲 Para usar tu ubicación, abre este enlace en <b>Chrome/Safari</b> (menú ⋮ → "Abrir en el navegador"). <button onclick="_gpsCopiarLink(this)" style="background:none;border:none;color:var(--blue);cursor:pointer;font-family:inherit;font-size:12px;text-decoration:underline;padding:0">Copiar enlace</button></div>'
+      : '';
+    drop.innerHTML='<div style="padding:12px 14px">'+banner+'<div style="color:var(--text2);font-size:13px;line-height:1.5;margin-bottom:6px">'+guia+'</div><button onclick="shalomCerca()" style="background:none;border:none;font-size:12px;color:var(--blue);cursor:pointer;font-family:inherit;padding:0;text-decoration:underline">🔄 Reintentar</button></div>';
+    drop.style.display='block';
+  });
+}
 async function shalomBuscar(q){
   const drop = $('shalomDrop');
   const spin = $('shalomSpin');
@@ -2250,8 +2287,12 @@ function shalomMostrar(agencias, aviso){
     const geo    = [ag.zona||ag.distrito, ag.provincia, ag.departamento].filter(Boolean).join(' · ');
     const tel    = ag.telefono||'';
     const hor    = ag.hora_atencion||'';
+    const distTxt = (ag._distKm!=null && isFinite(ag._distKm))
+      ? (ag._distKm<1 ? Math.round(ag._distKm*1000)+' m' : ag._distKm.toFixed(1)+' km')
+      : '';
     return `<div onclick="shalomSel(${i})" class="agc-item" style="border-radius:0;margin:0;border:none;border-bottom:1px solid var(--bd)">
       <div style="font-weight:700;font-size:13px">${esc(nombre)}</div>
+      ${distTxt?`<div style="font-size:11px;color:var(--green);font-weight:700;margin-top:2px">📏 a ${distTxt}</div>`:''}
       ${dir?`<div style="font-size:11px;color:var(--text2);margin-top:2px">📍 ${esc(dir)}</div>`:''}
       ${geo?`<div style="font-size:10px;color:var(--blue);margin-top:2px">${esc(geo)}</div>`:''}
       ${tel?`<div style="font-size:10px;color:var(--text2);margin-top:1px">📞 ${esc(tel)}</div>`:''}
@@ -2313,6 +2354,7 @@ window.shalomManual  = shalomManual;
 window.shalomReset   = shalomReset;
 // ★ Alias para compatibilidad con botón Reintentar
 window.shalomBuscar  = shalomBuscar;
+window.shalomCerca   = shalomCerca;
 
 /* ─── ASISTENTE PASO A PASO (solo presentación) ──────────────────────
    El formulario se muestra por pasos para que sea más rápido de llenar y
