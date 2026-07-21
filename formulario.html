@@ -1382,54 +1382,93 @@ function _parseNominatimAddr(d){
   return parts.join(', ')||d.display_name||'';
 }
 
-function getGPS(){
+// Navegador in-app (webview) donde la geolocalización suele bloquearse.
+function _gpsWebviewInApp(){
+  var ua=navigator.userAgent||'';
+  return /WhatsApp|Instagram|FBAN|FBAV|FB_IAB|Line\/|MicroMessenger|TikTok|Snapchat/i.test(ua);
+}
+// Adquisición robusta y REUTILIZABLE de ubicación. Pre-chequea el permiso (para
+// no fallar en silencio cuando está denegado) y hace DOS etapas: alta precisión
+// y, si falla por timeout/no-disponible, baja precisión (wifi/celda). Nunca se
+// cuelga (timeouts) y siempre resuelve por onOk o onErr.
+// onErr(codigo) con codigo: 'denegado' | 'no_soporta' | 'inseguro' | 'fallo'.
+function _obtenerUbicacion(onOk, onErr){
+  if(!window.isSecureContext){ onErr('inseguro'); return; }
+  if(!navigator.geolocation){ onErr('no_soporta'); return; }
+  var listo=false;
+  var ok=function(pos){ if(listo) return; listo=true; onOk(pos); };
+  var pedir=function(){
+    var etapa2=function(){
+      navigator.geolocation.getCurrentPosition(ok, function(err){
+        if(listo) return; listo=true;
+        onErr(err&&err.code===1?'denegado':'fallo');
+      }, {enableHighAccuracy:false, timeout:8000, maximumAge:120000});
+    };
+    navigator.geolocation.getCurrentPosition(ok, function(err){
+      if(listo) return;
+      if(err&&err.code===1){ listo=true; onErr('denegado'); return; }
+      etapa2(); // timeout / no disponible → reintento en baja precisión
+    }, {enableHighAccuracy:true, timeout:8000, maximumAge:60000});
+  };
+  // Pre-chequeo de permiso (si la API existe): denegado → no llamar, guiar.
+  if(navigator.permissions&&navigator.permissions.query){
+    navigator.permissions.query({name:'geolocation'}).then(function(st){
+      if(st&&st.state==='denied'){ onErr('denegado'); return; }
+      pedir();
+    }).catch(function(){ pedir(); });
+  } else { pedir(); }
+}
+function _gpsMostrar(html){ const r=$('addrGpsResult'); if(r){ r.classList.add('show'); r.innerHTML=html; } }
+function _gpsManualLink(){ return '<button onclick="setAddrMode(\'manual\')" style="background:none;border:none;font-size:12px;color:var(--blue);cursor:pointer;font-family:inherit;padding:0;margin-top:8px;text-decoration:underline">✏️ Escribir dirección manual →</button>'; }
+function _gpsRetryBtn(){ return '<button onclick="getGPS()" style="background:none;border:none;font-size:12px;color:var(--blue);cursor:pointer;font-family:inherit;padding:0;margin-top:8px;margin-right:14px;text-decoration:underline">🔄 Reintentar</button>'; }
+function _gpsCopiarLink(btn){ try{ if(navigator.clipboard) navigator.clipboard.writeText(location.href); if(btn){ var o=btn.textContent; btn.textContent='✓ Copiado'; setTimeout(function(){ btn.textContent=o; },1500); } }catch(e){} }
+// Éxito: idéntico al comportamiento anterior (reverse-geocode + UI + campos).
+async function _gpsOnSuccess(pos){
   const result=$('addrGpsResult');
-  if(result){ result.classList.add('show'); result.innerHTML='<span style="color:var(--text2)">📡 Obteniendo ubicación...</span>'; }
-  if(!navigator.geolocation){
-    if(result) result.innerHTML='⚠️ Tu navegador no soporta GPS. Usa el modo Manual.';
-    return;
+  const {latitude:lat,longitude:lon}=pos.coords;
+  let addrText='';
+  try{
+    const r=await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json&accept-language=es`);
+    const d=await r.json();
+    addrText=_parseNominatimAddr(d)||`${lat.toFixed(5)}, ${lon.toFixed(5)}`;
+  }catch(e){
+    addrText=`${lat.toFixed(5)}, ${lon.toFixed(5)}`;
   }
-  navigator.geolocation.getCurrentPosition(
-    async pos=>{
-      const {latitude:lat,longitude:lon}=pos.coords;
-      let addrText='';
-      try{
-        const r=await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json&accept-language=es`);
-        const d=await r.json();
-        addrText=_parseNominatimAddr(d)||`${lat.toFixed(5)}, ${lon.toFixed(5)}`;
-      }catch(e){
-        addrText=`${lat.toFixed(5)}, ${lon.toFixed(5)}`;
-      }
-      _deliveryAddr=addrText;
-      _addrMode='gps';
-      _gpsLat=lat; _gpsLon=lon;
-      // Mostrar botones de nuevo con opción de cambiar
-      const addrOptsEl=$('addrOpts');
-      if(addrOptsEl) addrOptsEl.style.display='none'; // mantener oculto
-      const mapsUrl=`https://maps.google.com/?q=${lat},${lon}`;
-      if(result){
-        result.classList.add('show');
-        result.innerHTML=`<div style="display:flex;align-items:flex-start;gap:8px">
-          <span style="font-size:18px;flex-shrink:0">📍</span>
-          <div style="flex:1">
-            <div style="font-size:14px;font-weight:600;color:var(--text);line-height:1.4">${esc(addrText)}</div>
-            <div style="margin-top:8px;display:flex;gap:12px;align-items:center;flex-wrap:wrap">
-              <a href="${mapsUrl}" target="_blank" rel="noopener" style="font-size:12px;color:var(--blue);text-decoration:none">🗺️ Ver en Google Maps</a>
-              <button onclick="setAddrMode('manual')" style="background:none;border:none;font-size:12px;color:var(--text2);cursor:pointer;font-family:inherit;padding:0;text-decoration:underline">✏️ Usar otra dirección</button>
-            </div>
-          </div>
-        </div>`;
-      }
-      $('err_deliveryAddr')&&$('err_deliveryAddr').classList.remove('show');
-    },
-    err=>{
-      const msg=err.code===1
-        ?'⚠️ Permiso denegado. Activa la ubicación en tu navegador, luego vuelve a intentar.'
-        :'⚠️ No se pudo obtener la ubicación. Intenta con modo Manual.';
-      if(result) result.innerHTML=msg+`<br><button onclick="setAddrMode('manual')" style="background:none;border:none;font-size:12px;color:var(--blue);cursor:pointer;font-family:inherit;padding:0;margin-top:6px;text-decoration:underline">Ir a modo manual →</button>`;
-    },
-    {enableHighAccuracy:true,timeout:15000}
-  );
+  _deliveryAddr=addrText;
+  _addrMode='gps';
+  _gpsLat=lat; _gpsLon=lon;
+  const addrOptsEl=$('addrOpts');
+  if(addrOptsEl) addrOptsEl.style.display='none';
+  const mapsUrl=`https://maps.google.com/?q=${lat},${lon}`;
+  if(result){
+    result.classList.add('show');
+    result.innerHTML=`<div style="display:flex;align-items:flex-start;gap:8px">
+      <span style="font-size:18px;flex-shrink:0">📍</span>
+      <div style="flex:1">
+        <div style="font-size:14px;font-weight:600;color:var(--text);line-height:1.4">${esc(addrText)}</div>
+        <div style="margin-top:8px;display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+          <a href="${mapsUrl}" target="_blank" rel="noopener" style="font-size:12px;color:var(--blue);text-decoration:none">🗺️ Ver en Google Maps</a>
+          <button onclick="setAddrMode('manual')" style="background:none;border:none;font-size:12px;color:var(--text2);cursor:pointer;font-family:inherit;padding:0;text-decoration:underline">✏️ Usar otra dirección</button>
+        </div>
+      </div>
+    </div>`;
+  }
+  $('err_deliveryAddr')&&$('err_deliveryAddr').classList.remove('show');
+}
+function getGPS(){
+  _gpsMostrar('<span style="color:var(--text2)">📡 Buscando tu ubicación…</span><br>'+_gpsManualLink());
+  var enApp=_gpsWebviewInApp();
+  _obtenerUbicacion(_gpsOnSuccess, function(codigo){
+    var guia;
+    if(codigo==='denegado')      guia='⚠️ Tu ubicación está bloqueada. Actívala en el candado 🔒 → Permisos → Ubicación, y reintenta.';
+    else if(codigo==='no_soporta') guia='⚠️ Tu navegador no soporta ubicación. Escribe la dirección manual.';
+    else if(codigo==='inseguro')   guia='⚠️ La ubicación necesita una conexión segura (https). Escribe la dirección manual.';
+    else                           guia='⚠️ No se pudo obtener tu ubicación. Reintenta o escribe la dirección.';
+    var banner = enApp
+      ? '<div style="background:rgba(234,179,8,.1);border:1px solid rgba(234,179,8,.3);border-radius:8px;padding:8px 10px;margin-bottom:8px;font-size:12px;color:var(--text);line-height:1.5">📲 Para usar tu ubicación, abre este enlace en <b>Chrome/Safari</b> (menú ⋮ → "Abrir en el navegador"). <button onclick="_gpsCopiarLink(this)" style="background:none;border:none;color:var(--blue);cursor:pointer;font-family:inherit;font-size:12px;text-decoration:underline;padding:0">Copiar enlace</button></div>'
+      : '';
+    _gpsMostrar(banner+'<div style="color:var(--text2);font-size:13px;line-height:1.5;margin-bottom:4px">'+guia+'</div>'+_gpsRetryBtn()+_gpsManualLink());
+  });
 }
 
 function editGpsAddr(){
@@ -2424,6 +2463,7 @@ window.selAgency            = selAgency;
 window.resetAgencySelection = resetAgencySelection;
 window.setAddrMode          = setAddrMode;
 window.getGPS               = getGPS;
+window._gpsCopiarLink       = _gpsCopiarLink;
 window.editGpsAddr          = editGpsAddr;
 window.onAddrSearch         = onAddrSearch;
 window.selSugAddress        = selSugAddress;
