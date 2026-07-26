@@ -1852,10 +1852,13 @@ var _shalomVozStage = null;     // 'guia' | 'codigo' | null
 function _updateShalomMic(){
   var btn = document.getElementById('shalomMicBtn');
   if(!btn) return;
+  // Siempre visible si el navegador soporta voz. (Antes se ocultaba al llenar la
+  // guía, dejando la etapa 'código' sin mic visible → confuso.)
+  btn.style.display = _SpeechRec ? 'block' : 'none';
+  if(_shalomRec) return; // escuchando: el visual lo maneja _shalomMicVisual
   var g = document.getElementById('fShalomGuia');
-  var guiaVacia = !g || !(g.value||'').trim();
-  // solo si hay soporte de voz Y la guía aún está vacía
-  btn.style.display = (_SpeechRec && guiaVacia) ? 'block' : 'none';
+  var guiaLista = !!(g && (g.value||'').trim().length>=8);
+  btn.title = guiaLista ? '🎤 Dicta el código por voz' : '🎤 Dicta la guía por voz';
 }
 
 /* Convierte palabras/frases dictadas a solo dígitos ("ocho dos cero" → 820) */
@@ -1915,18 +1918,27 @@ function _shalomVozBeginStage(){
       var d=_vozADigitos(txt);
       if(d){ gEl.value=d.substring(0,8); }
       if((gEl.value||'').length>=8){
-        // guía completa → pasar al código automáticamente
+        // Guía completa → DETENER, sin auto-saltar a mitad de frase (esa
+        // transición era la causa de que la guía se colara en el código). El mic
+        // queda visible y pasa a sugerir "dicta el código"; el usuario lo toca
+        // cuando quiera (o escribe el código a mano).
         gEl.value=gEl.value.substring(0,8);
-        _updateShalomMic();
         try{ rec.onend=null; rec.stop(); }catch(e){}
         _shalomRec=null;
-        _shalomVozStage='codigo';
+        _shalomVozStage=null;
+        _shalomMicVisual(false);
+        _updateShalomMic();
         cEl.focus();
-        setTimeout(_shalomVozBeginStage,350);
+        toast('✅ Guía lista — toca 🎤 para dictar el código, o escríbelo');
       }
     } else if(_shalomVozStage==='codigo'){
       var c=_vozACodigo(txt);
-      if(c){ cEl.value=c.substring(0,8); }
+      // Guardia anti-leak: un código real es corto y alfanumérico. Si el
+      // resultado trae 5+ dígitos seguidos o contiene la guía completa, es la
+      // guía colándose → ignorar.
+      var guia=(gEl.value||'').trim();
+      var esGuia = /\d{5,}/.test(c) || (guia && c.indexOf(guia)!==-1);
+      if(c && !esGuia){ cEl.value=c.substring(0,8); }
     }
   };
   rec.onerror=function(e){
@@ -1934,12 +1946,11 @@ function _shalomVozBeginStage(){
     _shalomVozStop();
   };
   rec.onend=function(){
-    // fin natural de una etapa
-    if(_shalomVozStage==='codigo' || (_shalomVozStage==='guia' && (gEl.value||'').length>=8)){
-      _shalomVozStop();
-      if((cEl.value||'').trim() || (gEl.value||'').trim()) toast('✅ Guía Shalom lista — revísala');
-    } else {
-      _shalomVozStop();
+    var eraCodigo = _shalomVozStage==='codigo';
+    _shalomVozStop();
+    _updateShalomMic(); // reflejar la etapa (guía/código) en el mic tras terminar
+    if(eraCodigo && (cEl.value||'').trim()){
+      toast('✅ Código dictado — revísalo (puedes corregirlo a mano)');
     }
   };
   try{ rec.start(); }catch(e){ _shalomVozStop(); }
