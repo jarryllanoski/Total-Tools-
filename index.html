@@ -1713,13 +1713,16 @@ function cardDocs(s,gChk,tChk,eChk){
 function saveLocal(){ try{ lsSet('dpanel', JSON.stringify(window._slimStateForLocal ? window._slimStateForLocal(S) : S)); }catch(e){} }
 function toggleSel(id){const s=S.shipments.find(x=>x.id===id);if(!s)return;s.sel=!s.sel;saveLocal();render()}
 function selAll(){
-  // Selecciona/deselecciona SOLO lo que la etiqueta actual está mostrando
-  // (misma lista que ve el usuario). Respeta selecciones de otras vistas.
-  const vis=visibleShipments();
-  // Tri-estado: si hay CUALQUIER selección visible (botón azul) → limpiar;
-  // si no hay nada seleccionado → seleccionar todo lo visible.
-  const haySeleccion=vis.some(x=>x.sel);
-  vis.forEach(x=>x.sel=!haySeleccion);
+  // DESELECCIONAR es GLOBAL: si hay CUALQUIER selección (en esta etiqueta o en
+  // otra), un toque limpia TODO, sin importar dónde se marcó. SELECCIONAR es
+  // contextual: solo si no hay nada seleccionado en ningún lado, marca lo VISIBLE
+  // de la etiqueta actual. La selección es estado efímero de UI → saveLocal
+  // (nunca escribe en Firestore).
+  if(S.shipments.some(x=>x.sel)){
+    S.shipments.forEach(x=>{ x.sel=false; });   // deselección total
+  } else {
+    visibleShipments().forEach(x=>{ x.sel=true; }); // selección contextual
+  }
   saveLocal();render();
 }
 
