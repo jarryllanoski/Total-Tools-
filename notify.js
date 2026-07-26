@@ -187,32 +187,28 @@
   function _verShipment(id){
     _closePanel();
 
-    // Limpiar filtros para que la card sea visible
-    if(typeof window.setFilt === 'function') window.setFilt('');
-    if(typeof window.render === 'function') window.render();
+    var ship = window.S && window.S.shipments && window.S.shipments.find(function(s){ return s.id===id; });
 
-    // Buscar la card en el DOM y hacer scroll
-    setTimeout(function(){
-      // Buscar card por id del shipment en el HTML
-      var cards = document.querySelectorAll('.card');
-      var target = null;
-      cards.forEach(function(c){
-        if(c.innerHTML.indexOf(id) !== -1) target = c;
-      });
+    // "Ver" es navegación determinista: llevar a la ETIQUETA donde vive el pedido
+    // y destrabar lo que pudiera ocultarlo (búsqueda + filtros avanzados), para
+    // que SIEMPRE aparezca. (Antes iba a TODOS y podía quedar oculto por una
+    // búsqueda activa.)
+    var srch = document.getElementById('fSearch');
+    if(srch && srch.value){ srch.value=''; }
+    if(typeof window.clearAdvSearch === 'function') window.clearAdvSearch(); // resetea avanzados + render
+    if(typeof window.setFilt === 'function') window.setFilt(ship ? ship.status : ''); // su estado (o TODOS si no está) + render
+    else if(typeof window.render === 'function') window.render();
 
-      if(target){
-        target.scrollIntoView({behavior:'smooth', block:'center'});
-        target.classList.add('notify-card-highlight');
-        setTimeout(function(){ target.classList.remove('notify-card-highlight'); }, 3000);
-      } else {
-        // Fallback: buscar por nombre del shipment
-        var ship = window.S && window.S.shipments && window.S.shipments.find(function(s){ return s.id===id; });
-        if(ship && typeof window._setSearch !== 'undefined'){
-          var inp = document.getElementById('fSearch');
-          if(inp){ inp.value = ship.name; if(typeof window.render==='function') window.render(); }
-        }
-      }
-    }, 300);
+    // Buscar la card por su id ESTABLE (data-id ya existe en el render), no
+    // escaneando innerHTML (frágil: el id podía coincidir dentro de otra card).
+    // Scroll + resaltado tras el render, en el siguiente frame (sin timeouts mágicos).
+    requestAnimationFrame(function(){
+      var target = document.querySelector('.card[data-id="' + String(id).replace(/["\\]/g,'\\$&') + '"]');
+      if(!target) return;
+      try{ target.scrollIntoView({behavior:'smooth', block:'center'}); }catch(e){ try{ target.scrollIntoView(); }catch(_){} }
+      target.classList.add('notify-card-highlight');
+      setTimeout(function(){ target.classList.remove('notify-card-highlight'); }, 3000);
+    });
   }
 
   /* ── IMPRIMIR ────────────────────────────────────────────────────── */
