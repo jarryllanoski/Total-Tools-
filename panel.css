@@ -47,11 +47,17 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);max
 .chip.active{background:var(--blue);border-color:var(--blue);color:#fff}
 
 /* COURIER GROUP */
-.cgroup{background:var(--bg3);border-radius:11px;border:1px solid var(--bd);margin-bottom:10px;overflow:hidden}
-.cgroup-hdr{padding:10px 14px;display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--bd);background:rgba(46,160,67,.05)}
+.cgroup{background:var(--bg3);border-radius:11px;border:1px solid var(--bd);margin-bottom:10px}
+/* Encabezado PEGAJOSO: se queda arriba mientras recorres el grupo y lo reemplaza
+   el del siguiente courier al llegar. (overflow:hidden se quitó de .cgroup porque
+   rompe position:sticky; las cards son transparentes, solo redondeamos el header.) */
+.cgroup-hdr{padding:10px 14px;display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--bd);background:var(--bg3);position:sticky;top:0;z-index:5;border-radius:10px 10px 0 0}
 .cgroup-bar{width:3px;height:20px;border-radius:2px;background:var(--purple);flex-shrink:0}
-.cgroup-name{font-family:'Syne',sans-serif;font-weight:700;font-size:14px;flex:1}
-.cgroup-cnt{background:var(--bg2);border:1px solid var(--bd);border-radius:5px;padding:1px 7px;font-size:11px}
+.cgroup-name{font-family:'Syne',sans-serif;font-weight:700;font-size:14px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cgroup-actions{display:flex;align-items:center;gap:1px;flex-shrink:0}
+.cgroup-btn{background:none;border:none;cursor:pointer;font-size:14px;line-height:1;padding:4px 5px;border-radius:6px;color:var(--text2);font-family:inherit}
+.cgroup-btn:active{background:rgba(255,255,255,.10)}
+.cgroup-cnt{background:var(--bg2);border:1px solid var(--bd);border-radius:5px;padding:1px 7px;font-size:11px;flex-shrink:0}
 
 /* CARD */
 .card{padding:12px 14px;border-bottom:1px solid var(--bd)}

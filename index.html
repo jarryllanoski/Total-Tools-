@@ -1634,13 +1634,61 @@ function render(){
   if(!data.length){area.innerHTML='<div class="empty-st"><div style="font-size:36px">📭</div><p style="margin-top:10px">Sin envíos. Presiona ➕</p></div>';return}
   area.innerHTML=Object.entries(groups).map(([courier,items])=>`
     <div class="cgroup">
-      <div class="cgroup-hdr"><div class="cgroup-bar"></div><span>🚚</span><div class="cgroup-name">${courier}</div><div class="cgroup-cnt">${items.length}</div></div>
+      <div class="cgroup-hdr"><div class="cgroup-bar"></div><span>${_courierIcon(courier)}</span><div class="cgroup-name">${escH(courier)}</div><div class="cgroup-actions"><button class="cgroup-btn" title="Seleccionar solo ${escH(courier)}" onclick="selCourier('${escJs(courier)}')">☑️</button><button class="cgroup-btn" title="Imprimir ${escH(courier)}" onclick="printGroup('${escJs(courier)}')">🖨️</button><button class="cgroup-btn" title="Tarjeta anterior" onclick="scrollCard(-1)">▲</button><button class="cgroup-btn" title="Tarjeta siguiente" onclick="scrollCard(1)">▼</button></div><div class="cgroup-cnt">${items.length}</div></div>
       ${items.map(s=>cardHTML(s)).join('')}
     </div>`).join('');
 }
 
 /* Sanitización XSS: datos de pedidos vienen del formulario público */
 function escH(s){ return s==null?'':String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
+/* Escape para strings dentro de onclick='...(' (comillas simples / backslash) */
+function escJs(s){ return String(s==null?'':s).replace(/\\/g,'\\\\').replace(/'/g,"\\'"); }
+
+/* ── Encabezado de courier: icono, seleccionar, imprimir, scroll por tarjeta ── */
+// Icono según el courier (reusa el criterio del formulario).
+function _courierIcon(name){
+  var u=(name||'').toUpperCase();
+  if(u.includes('SHALOM'))                              return '🚌';
+  if(u.includes('OLVA'))                                return '📬';
+  if(u.includes('MARVISUR'))                            return '🚐';
+  if(u.includes('DINSIDES'))                            return '📦';
+  if(u.includes('DELIVERY')||u.includes('MOTORIZADO')) return '🛵';
+  if(u.includes('RETIRO')||u.includes('TIENDA'))        return '🏪';
+  if(u.includes('ENCOMIENDA')||u.includes('OTRAS'))     return '📦';
+  return '🚚';
+}
+// Seleccionar/deseleccionar SOLO ese courier (toggle contextual). Convive con el
+// deseleccionar-global de selAll (que limpia todo). Estado efímero → saveLocal.
+function selCourier(courier){
+  const vis=visibleShipments().filter(s=>s.courier===courier);
+  const haySel=vis.some(x=>x.sel);
+  vis.forEach(x=>x.sel=!haySel);
+  saveLocal();render();
+}
+// Imprimir SOLO ese courier (los visibles según el filtro actual). Reusa PrintModule.openList.
+function printGroup(courier){
+  const ids=visibleShipments().filter(s=>s.courier===courier).map(s=>s.id);
+  if(window.PrintModule) PrintModule.openList(ids);
+  else if(window.toast) toast('Impresión no disponible');
+}
+// Desplazar UNA tarjeta a la vez (▼ siguiente, ▲ anterior), alineándola justo
+// debajo del encabezado sticky. Usa la posición real de las cards y el alto real
+// del header (sin píxeles hardcodeados).
+function scrollCard(dir){
+  const cards=document.querySelectorAll('#cardsArea .card');
+  if(!cards.length) return;
+  const hdr=document.querySelector('.cgroup-hdr');
+  const off=(hdr?hdr.getBoundingClientRect().height:44)+6; // offset del header pegajoso
+  // "tarjeta actual arriba" = la de top más cercano a la línea de referencia
+  let cur=0, best=Infinity;
+  for(let i=0;i<cards.length;i++){
+    const d=Math.abs(cards[i].getBoundingClientRect().top-off);
+    if(d<best){ best=d; cur=i; }
+  }
+  const t=Math.max(0,Math.min(cards.length-1, cur+dir));
+  const y=window.scrollY + cards[t].getBoundingClientRect().top - off;
+  window.scrollTo({top:Math.max(0,y), behavior:'smooth'});
+}
 function escU(u){ u=String(u==null?'':u).trim(); return (/^https?:\/\//i.test(u)||/^data:image\//i.test(u))?escH(u):'#'; }
 function cardHTML(s){
   const gChk=s.chkGuia||false, tChk=s.chkTicket||false, eChk=s.chkEmbalado||false;
