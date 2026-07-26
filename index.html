@@ -1634,7 +1634,7 @@ function render(){
   if(!data.length){area.innerHTML='<div class="empty-st"><div style="font-size:36px">📭</div><p style="margin-top:10px">Sin envíos. Presiona ➕</p></div>';return}
   area.innerHTML=Object.entries(groups).map(([courier,items])=>`
     <div class="cgroup">
-      <div class="cgroup-hdr"><div class="cgroup-bar"></div><span>${_courierIcon(courier)}</span><div class="cgroup-name">${escH(courier)}</div><div class="cgroup-actions"><button class="cgroup-btn" title="Seleccionar solo ${escH(courier)}" onclick="selCourier('${escJs(courier)}')">☑️</button><button class="cgroup-btn" title="Imprimir ${escH(courier)}" onclick="printGroup('${escJs(courier)}')">🖨️</button><button class="cgroup-btn" title="Tarjeta anterior" onclick="scrollCard(-1)">▲</button><button class="cgroup-btn" title="Tarjeta siguiente" onclick="scrollCard(1)">▼</button></div><div class="cgroup-cnt">${items.length}</div></div>
+      <div class="cgroup-hdr"><div class="cgroup-bar"></div><span>${_courierIcon(courier)}</span><div class="cgroup-name">${escH(courier)}</div><div class="cgroup-spacer"></div><button class="cgroup-btn" title="Imprimir ${escH(courier)}" onclick="printGroup('${escJs(courier)}')">🖨️</button><div class="cgroup-spacer"></div><div class="cgroup-actions"><button class="cgroup-btn" title="Tarjeta anterior" onclick="scrollCard(-1)">▲</button><button class="cgroup-btn" title="Tarjeta siguiente" onclick="scrollCard(1)">▼</button></div><div class="cgroup-cnt">${items.length}</div></div>
       ${items.map(s=>cardHTML(s)).join('')}
     </div>`).join('');
 }
@@ -1656,14 +1656,6 @@ function _courierIcon(name){
   if(u.includes('RETIRO')||u.includes('TIENDA'))        return '🏪';
   if(u.includes('ENCOMIENDA')||u.includes('OTRAS'))     return '📦';
   return '🚚';
-}
-// Seleccionar/deseleccionar SOLO ese courier (toggle contextual). Convive con el
-// deseleccionar-global de selAll (que limpia todo). Estado efímero → saveLocal.
-function selCourier(courier){
-  const vis=visibleShipments().filter(s=>s.courier===courier);
-  const haySel=vis.some(x=>x.sel);
-  vis.forEach(x=>x.sel=!haySel);
-  saveLocal();render();
 }
 // Imprimir SOLO ese courier (los visibles según el filtro actual). Reusa PrintModule.openList.
 function printGroup(courier){

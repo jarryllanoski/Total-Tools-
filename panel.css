@@ -1,7 +1,10 @@
 @import url('https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@400;500;600&display=swap');
 :root{--bg:#0d1117;--bg2:#161b22;--bg3:#1c2333;--bd:#30363d;--green:#2ea043;--blue:#388bfd;--red:#f78166;--purple:#a371f7;--text:#e6edf3;--text2:#8b949e}
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-html,body{overflow-x:hidden;overflow-y:auto}
+/* overflow-x:clip recorta el desborde horizontal SIN crear contenedor de scroll
+   (a diferencia de hidden), por eso el encabezado de courier position:sticky sí
+   funciona. No mezclar con overflow-y:auto (clip se convertiría en hidden). */
+html,body{overflow-x:clip}
 body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);max-width:480px;margin:0 auto;min-height:100vh}
 
 /* HEADER */
@@ -53,7 +56,8 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);max
    rompe position:sticky; las cards son transparentes, solo redondeamos el header.) */
 .cgroup-hdr{padding:10px 14px;display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--bd);background:var(--bg3);position:sticky;top:0;z-index:5;border-radius:10px 10px 0 0}
 .cgroup-bar{width:3px;height:20px;border-radius:2px;background:var(--purple);flex-shrink:0}
-.cgroup-name{font-family:'Syne',sans-serif;font-weight:700;font-size:14px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cgroup-name{font-family:'Syne',sans-serif;font-weight:700;font-size:14px;flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cgroup-spacer{flex:1;min-width:6px}
 .cgroup-actions{display:flex;align-items:center;gap:1px;flex-shrink:0}
 .cgroup-btn{background:none;border:none;cursor:pointer;font-size:14px;line-height:1;padding:4px 5px;border-radius:6px;color:var(--text2);font-family:inherit}
 .cgroup-btn:active{background:rgba(255,255,255,.10)}
