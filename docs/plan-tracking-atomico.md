@@ -1,8 +1,15 @@
-# Plan senior (PENDIENTE) — Tracking Shalom: escritor atómico por evento
+# Plan senior — Tracking Shalom: escritor atómico por evento
 
-> Estado: **APROBADO, sin implementar.** Guardado a pedido del usuario (no tiene
-> PC a la mano para el `firebase deploy` del backend). Retomar cuando avise.
-> No implementar hasta su "ok".
+> Estado: **IMPLEMENTADO en el código (commit en `main`). Pendiente el
+> `firebase deploy` del backend desde la PC del usuario** (el frontend ya toma
+> efecto por GitHub Pages). Ver "Deploy" al final.
+>
+> Backend: `functions/shalomWebSync.js` (helper `appendTracking` + guardia
+> `!mismoTexto || registroIncompleto`), `functions/index.js` (backfill usa el
+> append, ahora con historial). Frontend: `tracking.js` (helpers
+> `_appendTrackingLocal`/`_registroIncompleto` + override coherente en Motor B).
+> Verificado: `scratchpad/test_tracking_backend.js` (10/10) y
+> `scratchpad/test_tracking_render.js`.
 
 ## Problema observado
 Algunos pedidos Shalom muestran **chip + hora + botón Historial**; otros solo el

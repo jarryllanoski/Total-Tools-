@@ -636,6 +636,25 @@ function _motorBVencido(ship) {
    por-tarjeta (force=true, manual explícito) y el masivo (force=false, respeta
    el throttle). Devuelve 'ok' | 'skip' | 'error'. No toca el botón ni hace
    render: eso lo decide el llamador. */
+/* ¿El registro visible está incompleto? (tiene status pero le falta hora o
+   historial). Mismo criterio que el backend → coherencia entre A y B. */
+function _registroIncompleto(ship) {
+  return !ship.trackingLastUpdate ||
+    !(ship.trackingHistory && ship.trackingHistory.length);
+}
+/* Escritor atómico LOCAL (mismo contrato que el backend appendTracking): deja
+   status/message/lastUpdate/historial/motorOrigen coherentes en una sola pasada.
+   Solo display; en Motor B, Firestore lo escribe el backend. */
+function _appendTrackingLocal(ship, status, source) {
+  var now = new Date().toISOString();
+  if (!ship.trackingHistory) ship.trackingHistory = [];
+  ship.trackingHistory.push({date: now, status: status, message: status, source: source || 'web'});
+  ship.trackingStatus     = status;
+  ship.trackingMessage    = status;
+  ship.trackingLastUpdate = now;
+  ship.trackingMotorOrigen = 'web';
+}
+
 async function _motorBConsultarUno(ship, shipId, force) {
   if (!force && !_motorBVencido(ship)) return 'skip';
   var tok = '';
@@ -647,13 +666,18 @@ async function _motorBConsultarUno(ship, shipId, force) {
   var r = await fetch(url, { headers: { Authorization: 'Bearer ' + tok } });
   var data = await r.json();
   if (data && data.ok && data.cambios) {
+    // El backend ya devuelve el BLOQUE COHERENTE cuando hay algo que escribir
+    // (incluye reparaciones de registros incompletos). Lo aplicamos tal cual.
     Object.keys(data.cambios).forEach(function(k){ ship[k] = data.cambios[k]; });
-    // Refrescar SIEMPRE con el estado fresco del worker aunque el backend ya
-    // coincidiera (en ese caso 'cambios' no trae trackingStatus por la guarda
-    // "no reescribir si no cambió"). Solo display local; Firestore lo escribió
-    // el backend (con updateMask ya no lo pisa otro device).
+    // Caso borde: el backend no reescribió (mismo texto y registro completo)
+    // pero el device local está desincronizado o su registro está incompleto.
+    // Escribimos el bloque coherente LOCAL (mismo contrato) en vez de un
+    // override parcial de status/message sin hora ni historial.
     var msg = data.resultadoWorker && data.resultadoWorker.statuses && data.resultadoWorker.statuses.message;
-    if (msg) { ship.trackingStatus = msg; ship.trackingMessage = msg; }
+    if (msg && !('trackingStatus' in data.cambios) &&
+        (msg !== ship.trackingStatus || _registroIncompleto(ship))) {
+      _appendTrackingLocal(ship, msg, 'web');
+    }
     return 'ok';
   }
   return 'error';

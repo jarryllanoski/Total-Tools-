@@ -784,13 +784,12 @@ const runShalomWebSync = async (cfg) => {
   for (let i = 0; i < rellenar.length; i++) {
     const item = rellenar[i];
     const raw = item.ship.trackingWebRawStatus;
-    await db.doc(SHIP_COL + "/" + item.id).set({
-      trackingStatus: raw,
-      trackingMessage: raw,
-      trackingLastUpdate: item.ship.trackingWebUltimaConsulta ||
-        new Date(nowMs).toISOString(),
-      trackingMotorOrigen: "web",
-    }, {merge: true});
+    // Mismo escritor atomico que Motor B → el backfill ahora TAMBIEN escribe
+    // trackingHistory (antes faltaba: dejaba hora pero sin boton Historial).
+    const nowIso = item.ship.trackingWebUltimaConsulta ||
+      new Date(nowMs).toISOString();
+    const block = shalomWebSync.appendTracking(item.ship, raw, "backfill", nowIso);
+    await db.doc(SHIP_COL + "/" + item.id).set(block, {merge: true});
     rellenados++;
   }
 

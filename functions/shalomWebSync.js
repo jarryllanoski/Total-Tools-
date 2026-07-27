@@ -112,6 +112,24 @@ const calcularEtiqueta = (ship, autoEstado) => {
   return null;
 };
 
+// Escritor ATOMICO por evento del tracking visible. Deriva y setea, en UN solo
+// bloque, el conjunto coherente: es IMPOSIBLE escribir un estado sin su hora ni
+// su historial (son la misma entrada). Lo usan decidirCambios (Motor B) y el
+// backfill. `source` es el origen del evento en el historial (auto-web/backfill/
+// repair); trackingMotorOrigen queda como marca del motor ("web").
+const appendTracking = (ship, status, source, nowIso) => {
+  const hist = Array.isArray(ship.trackingHistory) ?
+    ship.trackingHistory.slice() : [];
+  hist.push({date: nowIso, status: status, message: status, source: source});
+  return {
+    trackingStatus: status,
+    trackingMessage: status,
+    trackingLastUpdate: nowIso,
+    trackingMotorOrigen: "web",
+    trackingHistory: hist,
+  };
+};
+
 // Decide que escribir en Firestore para UN pedido, a partir de la respuesta
 // del worker. No escribe nada — solo devuelve el objeto a mergear.
 //
@@ -160,18 +178,16 @@ const decidirCambios = (ship, data, nowMs, cfg) => {
   // Marcamos trackingMotorOrigen="web" para poder filtrar este dato en el link
   // del cliente (solo se le muestra si el operador activo esa opcion). NO toca
   // la etiqueta interna (status).
+  // Se escribe el bloque coherente cuando el texto cambia O cuando el registro
+  // esta INCOMPLETO (tiene status pero le falta hora o historial). Esto ultimo
+  // AUTO-REPARA los registros legacy en la proxima consulta, aunque el texto no
+  // haya cambiado (antes la guarda `!mismoTexto` los dejaba incompletos para
+  // siempre). appendTracking garantiza que nunca quede un subconjunto.
   const mismoTexto = ship.trackingStatus === (rawStatus || "—");
-  if (rawStatus && !mismoTexto) {
-    write.trackingStatus = rawStatus;
-    write.trackingMessage = rawStatus;
-    write.trackingLastUpdate = nowIso;
-    write.trackingMotorOrigen = "web";
-    const hist = Array.isArray(ship.trackingHistory) ?
-      ship.trackingHistory.slice() : [];
-    hist.push({
-      date: nowIso, status: rawStatus, message: rawStatus, source: "auto-web",
-    });
-    write.trackingHistory = hist;
+  const registroIncompleto = !ship.trackingLastUpdate ||
+    !(Array.isArray(ship.trackingHistory) && ship.trackingHistory.length);
+  if (rawStatus && (!mismoTexto || registroIncompleto)) {
+    Object.assign(write, appendTracking(ship, rawStatus, "auto-web", nowIso));
   }
 
   // ETIQUETA INTERNA (status): SOLO en modo activo. Mueve el pedido de columna
@@ -199,4 +215,5 @@ module.exports = {
   calcularProximaConsulta,
   consultarWorker,
   decidirCambios,
+  appendTracking,
 };
