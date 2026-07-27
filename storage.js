@@ -177,32 +177,16 @@ function patchLoadDoc() {
         // Refrescar UI
         if (typeof refreshSlot === 'function') refreshSlot(slot);
 
-        // Lógica de auto-cambio de estado (igual que el original)
-        if (slot === 'guia') {
-          global.toast('🚚 Guía subida ✓');
-          var autoSts = ['NUEVO PEDIDO','EN PROCESO','POR ALISTAR','ALISTADO'];
-          if (shipId) {
-            var ship = global.S && global.S.shipments && global.S.shipments.find(function(x){ return x.id === shipId; });
-            if (ship && autoSts.includes(ship.status)) {
-              ship.status = 'ENVIADO';
-              var fStatus = document.getElementById('fStatus');
-              if (fStatus) fStatus.value = 'ENVIADO';
-              global.toast('🚚 Guía subida → Estado cambiado a ENVIADO');
-            }
-          }
-        } else if (slot === 'embalado') {
-          global.toast('📦 Embalado subido ✓');
-          if (shipId) {
-            var ship2 = global.S && global.S.shipments && global.S.shipments.find(function(x){ return x.id === shipId; });
-            if (ship2 && (ship2.status === 'POR ALISTAR' || ship2.status === 'EN PROCESO')) {
-              ship2.status = 'ALISTADO';
-              var fStatus2 = document.getElementById('fStatus');
-              if (fStatus2) fStatus2.value = 'ALISTADO';
-              global.toast('📦 Embalado → Estado cambiado a ALISTADO');
-            }
-          }
-        } else {
-          global.toast('🧾 Documento subido ✓');
+        // Confirmación de subida por slot
+        var subMsg = slot === 'guia'     ? '🚚 Guía / Ticket subido ✓'
+                   : slot === 'embalado' ? '📦 Embalado subido ✓'
+                   :                        '🧾 Boleta / Factura subida ✓';
+        global.toast(subMsg);
+
+        // Auto-avanzar estado (escalera monotónica, respeta el toggle de config).
+        // Fuente única: index.html → autoEstadoPorDoc.
+        if (shipId && typeof global.autoEstadoPorDoc === 'function') {
+          global.autoEstadoPorDoc(shipId, slot);
         }
 
         console.log('[Storage] Subido:', docObj.path, '→', docObj.d);

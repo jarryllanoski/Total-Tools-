@@ -147,6 +147,48 @@
       ]
     },
 
+    documentos: {
+      titulo: 'Documentos del envío',
+      icono: '📎',
+      pasos: [
+        'Cada envío tiene 3 documentos. De izquierda a derecha:',
+        '🧾 <b>Boleta / Factura</b>: el comprobante del cliente. Al subirlo, el pedido pasa a <b>EN PROCESO</b>.',
+        '📦 <b>Embalado</b>: foto del paquete ya empacado. Al subirlo, pasa a <b>ALISTADO</b>.',
+        '🚚 <b>Guía / Ticket</b>: la guía o ticket de la agencia (Shalom, Olva…). Al subirlo, pasa a <b>ENVIADO</b>. Aquí está el botón <b>Jalar ticket de Shalom</b>.',
+        'En cada uno: <b>＋ Agregar</b> → Tomar foto, Galería o PDF. Con el documento cargado aparecen <b>Ver</b> y <b>Quitar</b>.',
+        'Con <b>🔗 Agregar link</b> pegas enlaces de Drive, Mega, etc.'
+      ],
+      faq: [
+        {q:'¿El estado cambia siempre solo?', a:'Solo si está encendido el interruptor <b>Auto-avanzar estado al subir documento</b> en Configuración. El estado solo AVANZA, nunca retrocede.'},
+        {q:'¿Puedo enviar los documentos por WhatsApp?', a:'Sí. Los tres (Boleta, Embalado y Guía) se pueden marcar en el envío de WhatsApp del pedido. Vienen desmarcados; marca los que quieras adjuntar.'},
+        {q:'¿Qué es "Jalar ticket de Shalom"?', a:'Trae automáticamente el ticket oficial de Shalom usando el número de guía y el código, y lo coloca en Guía / Ticket.'}
+      ],
+      tips: [
+        'Los documentos se guardan como imagen/PDF en la nube (no pesan en la base), por eso siguen ahí aunque cambies de teléfono.',
+        'Límite de 8 MB por archivo.'
+      ]
+    },
+
+    autoEstadoDoc: {
+      titulo: 'Auto-avanzar estado al subir documento',
+      icono: '📄',
+      pasos: [
+        'Cuando subes un documento al pedido, su estado puede avanzar solo:',
+        '🧾 Boleta / Factura → <b>EN PROCESO</b>',
+        '📦 Embalado → <b>ALISTADO</b>',
+        '🚚 Guía / Ticket → <b>ENVIADO</b>',
+        'Solo avanza hacia adelante: nunca regresa un pedido a un estado anterior.',
+        'Con el interruptor <b>apagado</b>, subir documentos no toca el estado — lo cambias tú a mano.'
+      ],
+      faq: [
+        {q:'¿Qué pasa si el pedido ya está más adelantado?', a:'No lo toca. Ej.: si ya está ENVIADO y subes la boleta, no vuelve a EN PROCESO.'},
+        {q:'¿Afecta a los pedidos viejos?', a:'No. Solo actúa en el momento en que subes un documento; no reescribe nada del pasado.'}
+      ],
+      tips: [
+        'Déjalo encendido para que el estado siga el flujo real del pedido sin cambiarlo a mano.'
+      ]
+    },
+
     compartir: {
       titulo: 'Compartir',
       icono: '🔗',

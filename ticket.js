@@ -2,7 +2,7 @@
  * ticket.js — Jalar ticket de Shalom (PNG) v1
  * ============================================
  * Llama a POST /api/ticket-image con orderNumber + orderCode,
- * recibe un PNG y lo coloca en el slot TICKET del formulario.
+ * recibe un PNG y lo coloca en el slot GUÍA / TICKET (agencia) del formulario.
  *
  *   orderNumber = trackingOrderNumber / shalomGuia   (campo fShalomGuia)
  *   orderCode   = trackingOrderCode   / shalomCodigo (campo fShalomCodigo)
@@ -134,21 +134,27 @@
       var shipId   = (typeof _editId !== 'undefined') ? _editId : null;
       var docObj;
 
+      // El ticket de Shalom ES el documento de la agencia → va al slot 'guia'
+      // (etiqueta "Guía / Ticket"), no al de Boleta/Factura del cliente.
       if (shipId && global.StorageModule &&
           typeof global.StorageModule.uploadFile === 'function') {
         // Pedido existente → subir directo a Firebase Storage (URL persistente)
         var file = new File([blob], fileName, { type: 'image/png' });
-        docObj   = await global.StorageModule.uploadFile(file, shipId, 'ticket');
+        docObj   = await global.StorageModule.uploadFile(file, shipId, 'guia');
       } else {
         // Pedido nuevo → base64 temporal (storage.js lo migra a Storage al guardar)
         var dataUrl = await _blobToDataUrl(blob);
         docObj = { d: dataUrl, n: fileName, t: 'image/png' };
       }
 
-      if (typeof _docs !== 'undefined')        _docs.ticket = docObj;
-      if (typeof refreshSlot === 'function')   refreshSlot('ticket');
+      if (typeof _docs !== 'undefined')        _docs.guia = docObj;
+      if (typeof refreshSlot === 'function')   refreshSlot('guia');
+      // Auto-avanzar estado (respeta el toggle de config); solo pedido existente.
+      if (shipId && typeof global.autoEstadoPorDoc === 'function') {
+        global.autoEstadoPorDoc(shipId, 'guia');
+      }
 
-      _toast('🧾 Ticket cargado ✓ — Guarda el pedido para conservarlo');
+      _toast('🚚 Guía / Ticket cargado ✓ — Guarda el pedido para conservarlo');
     } catch (e) {
       console.warn('[Ticket] Error:', e.message);
       _toast('⚠️ No se pudo generar el ticket: ' + e.message);
@@ -160,10 +166,10 @@
     }
   };
 
-  /* ── INYECTAR BOTÓN EN EL SLOT TICKET ────────────────────────────── */
+  /* ── INYECTAR BOTÓN EN EL SLOT GUÍA / TICKET (agencia) ───────────── */
   function _injectBtn() {
-    var addBtn = document.getElementById('addBtnTicket');
-    if (!addBtn) return;                               // slot ticket aún no existe
+    var addBtn = document.getElementById('addBtnGuia');
+    if (!addBtn) return;                               // slot guía aún no existe
     if (document.getElementById('btnJalarTicket')) return; // ya inyectado
 
     var b = document.createElement('button');
@@ -176,7 +182,7 @@
       'background:rgba(163,113,247,.15);border:1px solid rgba(163,113,247,.35);color:#a371f7;';
     b.onclick = function () { TicketModule.jalar(); };
 
-    // Insertar justo después del botón "+ Agregar" del slot ticket
+    // Insertar justo después del botón "+ Agregar" del slot guía / ticket
     addBtn.parentNode.insertBefore(b, addBtn.nextSibling);
   }
 

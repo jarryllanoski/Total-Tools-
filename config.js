@@ -113,12 +113,12 @@ let _waId=null, _waMsgIdx=-1;
 function openWA(id){
   _waId=id; _waMsgIdx=-1;
   const s=S.shipments.find(x=>x.id===id);if(!s)return;
-  const gChk=s.chkGuia||false, tChk=s.chkTicket||false;
+  const gChk=s.chkGuia||false, tChk=s.chkTicket||false, eChk=s.chkEmbalado||false;
   const msgs=S.msgTemplates[s.status]||['',''];
   const hasMsg=(msgs[0]&&msgs[0].trim())||(msgs[1]&&msgs[1].trim());
 
   // Sin docs marcados y sin mensajes → WhatsApp directo
-  if(!gChk&&!tChk&&!hasMsg){
+  if(!gChk&&!tChk&&!eChk&&!hasMsg){
     window.waOpen(s.phone);
     return;
   }
@@ -127,10 +127,11 @@ function openWA(id){
   // Con docs marcados → abrir sheet completo
   $('waInfo').innerHTML=`<div style="font-weight:700;font-size:14px;margin-bottom:4px">${esc(s.name)}</div><div style="color:var(--blue)">📞 +51 ${esc(s.phone)}</div><div style="color:var(--text2);font-size:12px;margin-top:2px">🏠 ${esc(s.address)}</div>`;
   let html='';
-  if(s.docGuia||s.docTicket){
+  if(s.docTicket||s.docEmbalado||s.docGuia){
     html+=`<div style="font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;margin-bottom:8px">Documentos a enviar:</div><div class="wa-doc-grid">`;
-    if(s.docGuia){html+=waDT(s.docGuia,gChk,'guia','var(--green)');}
     if(s.docTicket){html+=waDT(s.docTicket,tChk,'ticket','var(--purple)');}
+    if(s.docEmbalado){html+=waDT(s.docEmbalado,eChk,'embalado','var(--blue)');}
+    if(s.docGuia){html+=waDT(s.docGuia,gChk,'guia','var(--green)');}
     html+='</div>';
   }
   if(hasMsg){
@@ -143,15 +144,19 @@ function openWA(id){
   openOverlay('waOverlay');
 }
 function waDT(doc,chk,slot,color){
+  const meta={guia:{lbl:'GUÍA',icon:'🚚'},embalado:{lbl:'EMBALADO',icon:'📦'},ticket:{lbl:'BOLETA',icon:'🧾'}};
+  const m=meta[slot]||{lbl:slot.toUpperCase(),icon:'📄'};
   return`<div onclick="event.stopPropagation();togWADoc('${slot}')" style="position:relative;cursor:pointer;border-radius:9px;overflow:hidden;border:2px solid ${chk?color:'var(--bd)'};${chk?'box-shadow:0 0 0 2px rgba(46,160,67,.25)':''}">
-    ${doc.t&&doc.t.startsWith('image/')?`<img src="${doc.d}" style="width:80px;height:100px;object-fit:cover;display:block">`:`<div class="wa-doc-pdf"><span style="font-size:28px">${slot==='guia'?'📄':'🧾'}</span></div>`}
-    <div class="wa-doc-lbl">${slot==='guia'?'GUÍA':'TICKET'}</div>
-    <div id="waChk_${slot}" class="wa-doc-chk" style="background:${chk?(slot==='guia'?'var(--green)':'var(--purple)'):'rgba(0,0,0,.3)'};">${chk?'✓':''}</div>
+    ${doc.t&&doc.t.startsWith('image/')?`<img src="${doc.d}" style="width:80px;height:100px;object-fit:cover;display:block">`:`<div class="wa-doc-pdf"><span style="font-size:28px">${m.icon}</span></div>`}
+    <div class="wa-doc-lbl">${m.lbl}</div>
+    <div id="waChk_${slot}" class="wa-doc-chk" style="background:${chk?color:'rgba(0,0,0,.3)'};">${chk?'✓':''}</div>
   </div>`;
 }
 function togWADoc(slot){
   const s=S.shipments.find(x=>x.id===_waId);if(!s)return;
-  if(slot==='guia')s.chkGuia=!s.chkGuia;else s.chkTicket=!s.chkTicket;
+  if(slot==='guia')s.chkGuia=!s.chkGuia;
+  else if(slot==='embalado')s.chkEmbalado=!s.chkEmbalado;
+  else s.chkTicket=!s.chkTicket;
   save(s.id);render();openWA(_waId); // incremental: solo este pedido
 }
 function selWAMsg(idx){
@@ -161,15 +166,16 @@ function selWAMsg(idx){
 }
 async function doWASend(){
   const s=S.shipments.find(x=>x.id===_waId);if(!s)return;
-  const gChk=s.chkGuia||false,tChk=s.chkTicket||false;
+  const gChk=s.chkGuia||false,tChk=s.chkTicket||false,eChk=s.chkEmbalado||false;
   const phone='51'+s.phone;
   let msg='';
   if(_waMsgIdx>=0){const msgs=S.msgTemplates[s.status]||['',''];const t=msgs[_waMsgIdx];if(t&&t.trim())msg=fillVars(t,s)}
-  if(!gChk&&!tChk){window.open(msg?`https://wa.me/${phone}?text=${encodeURIComponent(msg)}`:`https://wa.me/${phone}`,'_blank');closeOverlay('waOverlay');return}
+  if(!gChk&&!tChk&&!eChk){window.open(msg?`https://wa.me/${phone}?text=${encodeURIComponent(msg)}`:`https://wa.me/${phone}`,'_blank');closeOverlay('waOverlay');return}
   closeOverlay('waOverlay');
   const docs=[];
+  if(tChk&&s.docTicket)docs.push({doc:s.docTicket,label:'Boleta'});
+  if(eChk&&s.docEmbalado)docs.push({doc:s.docEmbalado,label:'Embalado'});
   if(gChk&&s.docGuia)docs.push({doc:s.docGuia,label:'Guia'});
-  if(tChk&&s.docTicket)docs.push({doc:s.docTicket,label:'Ticket'});
   if(navigator.share){
     try{
       async function b2f(d,n){const r=await fetch(d);const b=await r.blob();return new File([b],n,{type:b.type})}
@@ -231,9 +237,9 @@ function refreshSlot(slot){
   const doc=_docs[slot],Slot=cap(slot);
   const prev=$('prev'+Slot),act=$('act'+Slot),btn=$('addBtn'+Slot),lbl=$('lbl'+Slot);
   const meta={
-    guia:     {icon:'🚚',label:'Guía courier',  cls:'fg'},
-    embalado: {icon:'📦',label:'Embalado',       cls:'fe'},
-    ticket:   {icon:'🧾',label:'Ticket / Boleta',cls:'ft'},
+    guia:     {icon:'🚚',label:'Guía / Ticket',   cls:'fg'},
+    embalado: {icon:'📦',label:'Embalado',        cls:'fe'},
+    ticket:   {icon:'🧾',label:'Boleta / Factura',cls:'ft'},
   };
   const m=meta[slot]||{icon:'📄',label:slot,cls:''};
   if(!doc){
@@ -251,7 +257,7 @@ function refreshSlot(slot){
 function clearSlot(slot){_docs[slot]=null;const Slot=cap(slot);['Cam','Gal','Pdf'].forEach(s=>{const e=$('in'+Slot+s);if(e)e.value=''});refreshSlot(slot);toast('Documento quitado ✓')}
 function viewSlot(slot){
   const d=_docs[slot];if(!d)return;
-  const labels={guia:'🚚 Guía courier',embalado:'📦 Embalado',ticket:'🧾 Ticket / Boleta'};
+  const labels={guia:'🚚 Guía / Ticket',embalado:'📦 Embalado',ticket:'🧾 Boleta / Factura'};
   openViewer(d,labels[slot]||slot);
 }
 
@@ -260,7 +266,7 @@ let _curDoc=null;
 function openViewer(doc,title){_curDoc=doc;if(doc.t&&doc.t.startsWith('image/')){$('viewerImg').src=doc.d;$('viewerTtl').textContent=title;$('viewer').classList.add('open')}else{const a=document.createElement('a');a.href=doc.d;a.target='_blank';a.click()}}
 function closeViewer(){$('viewer').classList.remove('open');$('viewerImg').src=''}
 function dlDoc(){if(!_curDoc)return;const a=document.createElement('a');a.href=_curDoc.d;a.download=_curDoc.n||'doc';a.click()}
-function qView(shipId,slot){const s=S.shipments.find(x=>x.id===shipId);if(!s)return;const d=slot==='guia'?s.docGuia:slot==='embalado'?s.docEmbalado:s.docTicket;if(!d)return;openViewer(d,slot==='guia'?'🚚 Guía Courier':slot==='embalado'?'📦 Embalado':'🧾 Ticket / Boleta')}
+function qView(shipId,slot){const s=S.shipments.find(x=>x.id===shipId);if(!s)return;const d=slot==='guia'?s.docGuia:slot==='embalado'?s.docEmbalado:s.docTicket;if(!d)return;openViewer(d,slot==='guia'?'🚚 Guía / Ticket':slot==='embalado'?'📦 Embalado':'🧾 Boleta / Factura')}
 $('viewer').addEventListener('click',e=>{if(e.target===$('viewer'))closeViewer()});
 
 /* LINKS */
@@ -287,7 +293,7 @@ function openForm(id){
   $('extraForm').innerHTML=S.extraFields.map(f=>`<div class="fg"><label class="fl">${f}</label><input class="fi xf" data-f="${f}" placeholder="${f}..."></div>`).join('');
   _docs={guia:null,embalado:null,ticket:null};_links=[];
   refreshSlot('guia');refreshSlot('embalado');refreshSlot('ticket');renderLinks();
-  ['inGuiaCam','inGuiaGal','inGuiaPdf','inTicketCam','inTicketGal','inTicketPdf'].forEach(i=>{const e=$(i);if(e)e.value=''});
+  ['inGuiaCam','inGuiaGal','inGuiaPdf','inEmbCam','inEmbGal','inEmbPdf','inTicketCam','inTicketGal','inTicketPdf'].forEach(i=>{const e=$(i);if(e)e.value=''});
   if(id){
     const s=S.shipments.find(x=>x.id===id);
     if(!s){toast('⚠️ Recarga la página e intenta de nuevo');return;}
@@ -1026,6 +1032,8 @@ function loadCfgUI(){
   $('cfgName').value=S.config.name||'';$('cfgPhone').value=S.config.phone||'';$('cfgCity').value=S.config.city||'';
   // Toggle auto-tracking Shalom (por defecto encendido)
   { const t=$('tglShalomAuto'); if(t) t.classList.toggle('on', S.config.shalomAutoTrack!==false); }
+  // Toggle auto-estado al subir documento (por defecto encendido)
+  { const t=$('tglAutoEstadoDoc'); if(t) t.classList.toggle('on', S.config.autoEstadoDoc!==false); }
   // Motor de rastreo (Fase 4): selector + opciones del motor propio.
   {
     const motor=S.config.trackingMotor||'off';
