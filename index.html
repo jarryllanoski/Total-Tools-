@@ -1657,9 +1657,15 @@ function _courierIcon(name){
   if(u.includes('ENCOMIENDA')||u.includes('OTRAS'))     return '📦';
   return '🚚';
 }
-// Imprimir SOLO ese courier (los visibles según el filtro actual). Reusa PrintModule.openList.
+// Imprimir el grupo de un courier RESPETANDO la selección (como el botón global):
+//  · si hay seleccionados en ese courier → imprime SOLO esos.
+//  · si no hay ninguno seleccionado en ese courier → imprime todo el grupo visible.
+// Reusa PrintModule.openList.
 function printGroup(courier){
-  const ids=visibleShipments().filter(s=>s.courier===courier).map(s=>s.id);
+  const grp=visibleShipments().filter(s=>s.courier===courier);
+  const sel=grp.filter(s=>s.sel);
+  const ids=(sel.length?sel:grp).map(s=>s.id);
+  if(!ids.length) return;
   if(window.PrintModule) PrintModule.openList(ids);
   else if(window.toast) toast('Impresión no disponible');
 }
@@ -1669,8 +1675,10 @@ function printGroup(courier){
 function scrollCard(dir){
   const cards=document.querySelectorAll('#cardsArea .card');
   if(!cards.length) return;
-  const hdr=document.querySelector('.cgroup-hdr');
-  const off=(hdr?hdr.getBoundingClientRect().height:44)+6; // offset del header pegajoso
+  const appHdr=document.querySelector('.hdr');       // barra superior fija
+  const chdr=document.querySelector('.cgroup-hdr');  // encabezado de courier fijo
+  const off=(appHdr?appHdr.getBoundingClientRect().height:0)
+           +(chdr?chdr.getBoundingClientRect().height:44)+6; // debajo de AMBOS fijos
   // "tarjeta actual arriba" = la de top más cercano a la línea de referencia
   let cur=0, best=Infinity;
   for(let i=0;i<cards.length;i++){
@@ -2718,6 +2726,14 @@ function toggleDocsAccordion(){
 // Al abrir el form, cerrar el acordeón por defecto
 var _origOpenForm = typeof openForm === 'function' ? openForm : null;
 
+// Exponer la altura REAL de la barra superior (.hdr) como --hdr-h para que el
+// encabezado de courier (position:sticky) se fije JUSTO debajo y no quede
+// escondido tras la barra. Se recalcula ante cambios de tamaño (rotar, teclado,
+// distintos teléfonos) → sin píxeles hardcodeados.
+function _syncHdrHeight(){
+  var h=document.querySelector('.hdr');
+  if(h) document.documentElement.style.setProperty('--hdr-h', h.getBoundingClientRect().height+'px');
+}
 window.addEventListener('load', function(){
   // Asegurar window.S sincronizado
   if(typeof S !== 'undefined') window.S = S;
@@ -2725,7 +2741,11 @@ window.addEventListener('load', function(){
     Tracking.init();
     render(); // re-render para mostrar bloques tracking
   }
+  _syncHdrHeight();
+  var h=document.querySelector('.hdr');
+  if(h && window.ResizeObserver){ try{ new ResizeObserver(_syncHdrHeight).observe(h); }catch(e){} }
 });
+window.addEventListener('resize', _syncHdrHeight);
 </script>
 </body>
 </html>

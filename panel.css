@@ -53,8 +53,11 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);max
 .cgroup{background:var(--bg3);border-radius:11px;border:1px solid var(--bd);margin-bottom:10px}
 /* Encabezado PEGAJOSO: se queda arriba mientras recorres el grupo y lo reemplaza
    el del siguiente courier al llegar. (overflow:hidden se quitó de .cgroup porque
-   rompe position:sticky; las cards son transparentes, solo redondeamos el header.) */
-.cgroup-hdr{padding:10px 14px;display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--bd);background:var(--bg3);position:sticky;top:0;z-index:5;border-radius:10px 10px 0 0}
+   rompe position:sticky; las cards son transparentes, solo redondeamos el header.)
+   top:var(--hdr-h): se fija JUSTO debajo de la barra superior de la app (.hdr, que
+   también es sticky top:0 con z-index mayor); si no se fijara ahí quedaría oculto
+   detrás de ella. --hdr-h la calcula el JS con la altura real de .hdr (fallback 60px). */
+.cgroup-hdr{padding:10px 14px;display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--bd);background:var(--bg3);position:sticky;top:var(--hdr-h,60px);z-index:5;border-radius:10px 10px 0 0}
 .cgroup-bar{width:3px;height:20px;border-radius:2px;background:var(--purple);flex-shrink:0}
 .cgroup-name{font-family:'Syne',sans-serif;font-weight:700;font-size:14px;flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .cgroup-spacer{flex:1;min-width:6px}
