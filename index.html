@@ -1657,16 +1657,14 @@ function _courierIcon(name){
   if(u.includes('ENCOMIENDA')||u.includes('OTRAS'))     return '📦';
   return '🚚';
 }
-// Imprimir el grupo de un courier RESPETANDO la selección (como el botón global):
-//  · si hay seleccionados en ese courier → imprime SOLO esos.
-//  · si no hay ninguno seleccionado en ese courier → imprime todo el grupo visible.
-// Reusa PrintModule.openList.
+// Imprimir SOLO lo seleccionado de ese courier (contrato único, como el resto de
+// la app: imprimir = lo seleccionado). Si no hay ninguno seleccionado en ese
+// courier, NO imprime nada y guía con un aviso (evita el "imprime todo" que
+// confundía y también el no-op silencioso). Reusa PrintModule.openList.
 function printGroup(courier){
-  const grp=visibleShipments().filter(s=>s.courier===courier);
-  const sel=grp.filter(s=>s.sel);
-  const ids=(sel.length?sel:grp).map(s=>s.id);
-  if(!ids.length) return;
-  if(window.PrintModule) PrintModule.openList(ids);
+  const sel=visibleShipments().filter(s=>s.courier===courier && s.sel);
+  if(!sel.length){ if(window.toast) toast('Selecciona pedidos de '+courier+' para imprimir 🖨️'); return; }
+  if(window.PrintModule) PrintModule.openList(sel.map(s=>s.id));
   else if(window.toast) toast('Impresión no disponible');
 }
 // Desplazar UNA tarjeta a la vez (▼ siguiente, ▲ anterior), alineándola justo
