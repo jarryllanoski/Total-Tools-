@@ -67,13 +67,13 @@
         if(t){
           if(t==='agencia')    return txt('#shalomSelTxt')||txt('.sel-badge span')||'';
           if(t==='encomienda'){ var c=val('f_ciudad'), a=val('f_agencia'); return c?(c+(a?' — '+a:'')):''; }
-          if(t==='delivery'){ var d=val('addrManualInput')||txt('#addrGpsResult'); var r=val('f_ref'); return d?(d+(r?' ('+r+')':'')):''; }
+          if(t==='delivery'){ var d=(window.getDeliveryAddr?window.getDeliveryAddr():val('addrManualInput')); var r=val('f_ref'); return d?(d+(r?' ('+r+')':'')):''; }
           return ''; // retiro en tienda: sin destino
         }
         // Fallback (sin asistente): deducir por lo que está visible.
         var ag=txt('#shalomSelTxt')||txt('.sel-badge span'); if(ag) return ag;
         if(visible('f_ciudad')){ var c2=val('f_ciudad'), a2=val('f_agencia'); return c2?(c2+(a2?' — '+a2:'')):''; }
-        var d2=val('addrManualInput')||txt('#addrGpsResult'); var r2=val('f_ref');
+        var d2=(window.getDeliveryAddr?window.getDeliveryAddr():val('addrManualInput')); var r2=val('f_ref');
         if(d2) return d2+(r2?' ('+r2+')':'');
         return '';
     }},

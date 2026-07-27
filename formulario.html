@@ -760,6 +760,7 @@ function brandFooterHtml(){
 function renderForm(){
   clearTrackRefresh();
   _knownClient=null; _deliveryAddr=''; _addrMode=''; _gpsLat=null; _gpsLon=null;
+  _showRef(false); _manualNote('');   // estado inicial: Referencia oculta
   const extraF   = ((CFG&&CFG.extraFields)||[]).filter(f=>f&&f.visible!==false);
   // Couriers: usar config de Firebase o defaults de tu app
   const couriers = (CFG&&CFG.couriers)||['SHALOM','OLVA COURIER','MARVISUR','DELIVERY','RETIRO EN TIENDA','OTRAS AGENCIAS'];
@@ -897,11 +898,12 @@ function renderForm(){
           <div id="addrGpsResult" class="addr-result"></div>
         </div>
         <div id="addrManualPanel" style="display:none">
+          <div id="addrManualNote" style="display:none;margin-bottom:8px"></div>
           <textarea class="fi" id="addrManualInput" rows="2"
             placeholder="Escribe la dirección completa *" autocomplete="street-address"></textarea>
         </div>
         <div class="ferr" id="err_deliveryAddr" style="margin-top:4px">Ingresa la dirección de entrega</div>
-        <div class="fg" style="margin-top:10px;margin-bottom:0">
+        <div class="fg" id="refField" style="margin-top:10px;margin-bottom:0;display:none">
           <input class="fi" id="f_ref" type="text"
             placeholder="Referencia (ej: frente al mercado, casa azul...)">
         </div>
@@ -1113,6 +1115,7 @@ function mostrarOtrasOpciones(){
   if(shortcut) shortcut.style.display='none';
   const opts=$('addrOpts');
   if(opts) opts.style.display='flex';
+  _showRef(false); _manualNote('');   // aún sin modo elegido → Referencia oculta
 }
 
 function useKnownAddress(){
@@ -1134,6 +1137,7 @@ function useKnownAddress(){
     if(addrBox&&errDiv) addrBox.insertBefore(confirmed,errDiv);
   }
   confirmed.innerHTML=`<div class="addr-result show" style="display:block">📍 ${esc(_deliveryAddr.length>90?_deliveryAddr.slice(0,90)+'…':_deliveryAddr)}</div><button class="btn-sec" style="margin-top:6px;padding:10px;font-size:13px" onclick="changeAddress()">✏️ Cambiar dirección</button>`;
+  _showRef(true);   // dirección de siempre confirmada → mostrar Referencia
   $('err_deliveryAddr')&&$('err_deliveryAddr').classList.remove('show');
 }
 
@@ -1141,6 +1145,7 @@ function changeAddress(){
   _deliveryAddr=''; _addrMode='';
   const confirmed=$('addrConfirmed');
   if(confirmed) confirmed.remove();
+  _showRef(false); _manualNote('');   // sin dirección → ocultar Referencia y nota
   // Volver a mostrar el estado inicial (dirección de siempre + opciones)
   _updateKnownAddrShortcut();
 }
@@ -1342,6 +1347,20 @@ function resetAgency(){
 }
 
 /* ─── DELIVERY ADDRESS ──────────────────────────────────────────── */
+/* Fuente ÚNICA de la dirección de delivery (misma lógica que usa el pedido):
+   manual → textarea; gps/known → _deliveryAddr. La usan submitOrder y la boleta
+   → nunca se raspa el texto del cuadro GPS (que trae botones/errores). */
+function getDeliveryAddr(){
+  return _addrMode==='manual'
+    ? ($('addrManualInput')||{value:''}).value.trim()
+    : (_deliveryAddr||'').trim();
+}
+window.getDeliveryAddr = getDeliveryAddr;
+/* Referencia: aparece recién cuando ya hay una dirección elegida. */
+function _showRef(show){ const e=$('refField'); if(e) e.style.display=show?'block':'none'; }
+/* Nota guía sobre el cuadro manual (cuando el GPS falla de forma permanente). */
+function _manualNote(html){ const e=$('addrManualNote'); if(e){ e.style.display=html?'block':'none'; e.innerHTML=html||''; } }
+
 function setAddrMode(mode){
   _addrMode=mode;
   _deliveryAddr='';
@@ -1372,6 +1391,8 @@ function setAddrMode(mode){
   if(result){ result.classList.remove('show'); result.innerHTML=''; }
   const ta=$('addrManualInput');
   if(ta) ta.value='';
+  _manualNote('');                 // limpiar nota guía al cambiar de modo
+  _showRef(mode==='manual');       // manual: Referencia visible; gps: espera al éxito
   $('err_deliveryAddr')&&$('err_deliveryAddr').classList.remove('show');
   if(mode==='gps') getGPS();
 }
@@ -1460,21 +1481,27 @@ async function _gpsOnSuccess(pos){
       </div>
     </div>`;
   }
+  _showRef(true);   // ya hay dirección → mostrar Referencia
   $('err_deliveryAddr')&&$('err_deliveryAddr').classList.remove('show');
 }
 function getGPS(){
   _gpsMostrar('<span style="color:var(--text2)">📡 Buscando tu ubicación…</span><br>'+_gpsManualLink());
   var enApp=_gpsWebviewInApp();
   _obtenerUbicacion(_gpsOnSuccess, function(codigo){
-    var guia;
-    if(codigo==='denegado')      guia='⚠️ Tu ubicación está bloqueada. Actívala en el candado 🔒 → Permisos → Ubicación, y reintenta.';
-    else if(codigo==='no_soporta') guia='⚠️ Tu navegador no soporta ubicación. Escribe la dirección manual.';
-    else if(codigo==='inseguro')   guia='⚠️ La ubicación necesita una conexión segura (https). Escribe la dirección manual.';
-    else                           guia='⚠️ No se pudo obtener tu ubicación. Reintenta o escribe la dirección.';
     var banner = enApp
       ? '<div style="background:rgba(234,179,8,.1);border:1px solid rgba(234,179,8,.3);border-radius:8px;padding:8px 10px;margin-bottom:8px;font-size:12px;color:var(--text);line-height:1.5">📲 Para usar tu ubicación, abre este enlace en <b>Chrome/Safari</b> (menú ⋮ → "Abrir en el navegador"). <button onclick="_gpsCopiarLink(this)" style="background:none;border:none;color:var(--blue);cursor:pointer;font-family:inherit;font-size:12px;text-decoration:underline;padding:0">Copiar enlace</button></div>'
       : '';
-    _gpsMostrar(banner+'<div style="color:var(--text2);font-size:13px;line-height:1.5;margin-bottom:4px">'+guia+'</div>'+_gpsRetryBtn()+_gpsManualLink());
+    // Fallas PERMANENTES (denegado / no soporta / inseguro): el GPS no se puede
+    // recuperar → pasamos a MANUAL automáticamente para que el cliente no quede
+    // atascado, con una nota (y el aviso de abrir en navegador si es webview).
+    var permanente = (codigo==='denegado'||codigo==='no_soporta'||codigo==='inseguro');
+    if(permanente){
+      setAddrMode('manual');   // muestra el cuadro manual + Referencia; limpia la nota
+      _manualNote(banner+'<div style="color:var(--text2);font-size:13px;line-height:1.5">⚠️ No pudimos usar tu ubicación automáticamente. Escribe la dirección de entrega abajo 👇</div>');
+    } else {
+      // Transitoria (timeout / no disponible): mantener Reintentar + opción manual.
+      _gpsMostrar(banner+'<div style="color:var(--text2);font-size:13px;line-height:1.5;margin-bottom:4px">⚠️ No se pudo obtener tu ubicación. Reintenta o escribe la dirección.</div>'+_gpsRetryBtn()+_gpsManualLink());
+    }
   });
 }
 
@@ -1681,7 +1708,7 @@ async function submitOrder(){
   let deliveryAddress='';
   let referencia='';
   if(selCourierType==='delivery'){
-    deliveryAddress=_addrMode==='manual'?($('addrManualInput')||{value:''}).value.trim():_deliveryAddr;
+    deliveryAddress=getDeliveryAddr();   // fuente única (misma que usa la boleta)
     referencia=($('f_ref')||{value:''}).value.trim();
     if(!deliveryAddress){$('err_deliveryAddr')&&$('err_deliveryAddr').classList.add('show');ok=false;}
     else               {$('err_deliveryAddr')&&$('err_deliveryAddr').classList.remove('show');}
