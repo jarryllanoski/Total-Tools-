@@ -115,8 +115,8 @@ const calcularEtiqueta = (ship, autoEstado) => {
 // Escritor ATOMICO por evento del tracking visible. Deriva y setea, en UN solo
 // bloque, el conjunto coherente: es IMPOSIBLE escribir un estado sin su hora ni
 // su historial (son la misma entrada). Lo usan decidirCambios (Motor B) y el
-// backfill. `source` es el origen del evento en el historial (auto-web/backfill/
-// repair); trackingMotorOrigen queda como marca del motor ("web").
+// backfill. `source` es el origen del evento en el historial
+// (auto-web/backfill/repair); trackingMotorOrigen = marca del motor ("web").
 const appendTracking = (ship, status, source, nowIso) => {
   const hist = Array.isArray(ship.trackingHistory) ?
     ship.trackingHistory.slice() : [];

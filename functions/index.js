@@ -788,7 +788,8 @@ const runShalomWebSync = async (cfg) => {
     // trackingHistory (antes faltaba: dejaba hora pero sin boton Historial).
     const nowIso = item.ship.trackingWebUltimaConsulta ||
       new Date(nowMs).toISOString();
-    const block = shalomWebSync.appendTracking(item.ship, raw, "backfill", nowIso);
+    const block = shalomWebSync.appendTracking(
+        item.ship, raw, "backfill", nowIso);
     await db.doc(SHIP_COL + "/" + item.id).set(block, {merge: true});
     rellenados++;
   }
