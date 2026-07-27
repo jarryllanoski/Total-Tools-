@@ -17,6 +17,7 @@ function _injectModal(){
   z-index:9998;backdrop-filter:blur(4px)"></div>
 <div id="printSheet" style="
   display:none;position:fixed;left:0;right:0;bottom:0;z-index:9999;
+  max-width:480px;margin-left:auto;margin-right:auto;
   background:#1c2333;border-radius:20px 20px 0 0;border-top:1px solid #30363d;
   padding:0 0 env(safe-area-inset-bottom);max-height:90vh;overflow-y:auto;
   transform:translateY(100%);transition:transform .3s cubic-bezier(.32,0,.67,0)">
