@@ -51,29 +51,34 @@ function _css(){
     '#dlvHdr{background:#1c2333;padding:12px 16px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #30363d;flex-shrink:0}'+
     '#dlvBody{flex:1;overflow-y:auto;padding:12px 14px;-webkit-overflow-scrolling:touch}'+
     '.dlvc{background:#0d1117;border:1px solid #30363d;border-radius:11px;margin-bottom:9px;overflow:hidden}'+
-    '.dlvc-hdr{display:flex;align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid #30363d}'+
+    /* ENCABEZADO en columna: fila superior (num+nombre+entregar) + meta (tel·fecha·monto) */
+    '.dlvc-hdr{display:flex;flex-direction:column;gap:7px;padding:10px 12px;border-bottom:1px solid #30363d}'+
+    '.dlvc-hdr-top{display:flex;align-items:center;gap:8px}'+
     '.dlvc-num{width:24px;height:24px;border-radius:50%;background:var(--blue);color:#fff;font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0}'+
     '.dlvc-name{flex:1;font-size:13px;font-weight:700;color:#e6edf3;line-height:1.3;min-width:0}'+
-    '.dlvc-edit{width:30px;height:28px;border-radius:8px;border:1px solid #30363d;background:#1c2333;color:#8b949e;font-size:13px;cursor:pointer;font-family:inherit;flex-shrink:0;display:flex;align-items:center;justify-content:center}'+
     '.dlvc-entr{padding:6px 11px;border-radius:8px;border:none;background:linear-gradient(135deg,var(--green),#1a7f37);color:#fff;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap}'+
-    '.dlvc-body{padding:10px 12px}'+
-    /* META (teléfono·monto·fecha) justo debajo del nombre */
-    '.dlvc-meta{display:flex;align-items:center;gap:5px 10px;margin-bottom:8px;flex-wrap:wrap}'+
-    '.dlvc-meta span{font-size:11px;color:#8b949e}'+
+    '.dlvc-headmeta{display:flex;align-items:center;gap:5px 10px;flex-wrap:wrap;padding-left:32px}'+
+    '.dlvc-headmeta span{font-size:11px;color:#8b949e}'+
     '.dlvc-phone{color:var(--blue)!important;font-weight:700;cursor:pointer;-webkit-tap-highlight-color:transparent}'+
+    '.dlvc-body{padding:10px 12px}'+
     /* Chips de link (reusa .link-chip del panel) */
     '.dlvc-links{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px}'+
     /* Dirección: color normal, clickable a Maps, con pin solo si hay GPS */
     '.dlvc-addr-row{display:flex;align-items:flex-start;gap:6px;margin-bottom:8px}'+
     '.dlvc-addr{flex:1;font-size:12px;color:#c9d1d9;line-height:1.5;cursor:pointer;-webkit-tap-highlight-color:transparent}'+
     '.dlvc-pin{flex-shrink:0;background:rgba(56,139,253,.12);border:1px solid rgba(56,139,253,.3);border-radius:7px;color:var(--blue);font-size:13px;line-height:1;padding:4px 7px;cursor:pointer;font-family:inherit}'+
-    '.dlvc-drv{display:flex;align-items:center;gap:6px;background:rgba(163,113,247,.08);border:1px solid rgba(163,113,247,.2);border-radius:8px;padding:7px 10px;margin-bottom:2px;cursor:pointer}'+
-    '.dlvc-drv-info{flex:1;min-width:0}'+
-    '.dlvc-drv-name{font-size:12px;font-weight:700;color:#a371f7}'+
-    '.dlvc-drv-phone{font-size:10px;color:#8b949e}'+
-    '.dlvc-drv-btns{display:flex;gap:4px}'+
-    '.dlvc-drv-btn{width:27px;height:27px;border-radius:6px;border:none;font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center}'+
-    '.dlvc-add-drv{font-size:11px;color:#8b949e;background:rgba(163,113,247,.06);border:1px dashed rgba(163,113,247,.25);border-radius:8px;padding:7px 10px;margin-bottom:2px;cursor:pointer;width:100%;text-align:left;font-family:inherit}'+
+    /* Bloque MOTORIZADO / INDRIVER — estilo recuadro como Guía Shalom (solo lectura) */
+    '.dlvc-drvbox{background:rgba(163,113,247,.06);border:1px solid rgba(163,113,247,.22);border-radius:9px;padding:9px 10px;margin-bottom:8px}'+
+    '.dlvc-drvbox-ttl{font-size:9.5px;font-weight:700;color:#a371f7;letter-spacing:.7px;text-transform:uppercase;margin-bottom:5px}'+
+    '.dlvc-drvbox-row{display:flex;align-items:center;gap:8px}'+
+    '.dlvc-drvbox-info{flex:1;min-width:0}'+
+    '.dlvc-drvbox-name{font-size:12.5px;font-weight:700;color:#e6edf3;line-height:1.3}'+
+    '.dlvc-drvbox-empty{font-size:11.5px;color:#6e7681;font-style:italic}'+
+    /* PARTE BAJA: estado del pedido + botón editar */
+    '.dlvc-foot{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 12px;border-top:1px solid #30363d}'+
+    '.dlvc-status{font-size:11px;font-weight:700;padding:3px 9px;border-radius:20px;background:rgba(245,158,11,.12);color:#f59e0b}'+
+    '.dlvc-status.done{background:rgba(46,160,67,.15);color:var(--green)}'+
+    '.dlvc-edit{display:flex;align-items:center;gap:5px;padding:6px 12px;border-radius:8px;border:1px solid #30363d;background:#1c2333;color:#c9d1d9;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap}'+
     '#dlvConfOv,#dlvDrvOv{display:none;position:fixed;inset:0;background:rgba(0,0,0,.88);z-index:900;align-items:flex-end;justify-content:center}'+
     '#dlvConfOv.open,#dlvDrvOv.open{display:flex}'+
     '.dlv-sheet{background:#161b22;border-radius:16px 16px 0 0;padding:18px;width:100%;max-width:480px;border:1px solid #30363d;animation:dlvUp .2s ease;max-height:88vh;overflow-y:auto}'+
@@ -185,49 +190,56 @@ function _render(){
       return '<a href="'+_escAttr(l.u)+'" target="_blank" rel="noopener" class="link-chip" style="text-decoration:none">🔗 '+_esc(l.n||'Link')+'</a>';
     }).join('');
 
-    // Driver: nombre · número · chip inDriver + acciones (WhatsApp / llamar)
-    var drvHtml=drv
-      ?'<div class="dlvc-drv" onclick="DeliveryModule._openDrv(\''+s.id+'\')">'+
-          '<span style="font-size:15px">🛵</span>'+
-          '<div class="dlvc-drv-info">'+
-            '<div class="dlvc-drv-name">'+_esc(drv)+(drvPhone?' · <span style="color:#8b949e;font-weight:400">'+_esc(drvPhone)+'</span>':'')+'</div>'+
-            (rutaLink?'<a href="'+_escAttr(rutaLink)+'" target="_blank" rel="noopener" class="link-chip" style="text-decoration:none;margin-top:4px" onclick="event.stopPropagation()">🔗 inDriver</a>':'')+
+    // Bloque MOTORIZADO / INDRIVER (solo lectura, estilo recuadro como Guía Shalom).
+    // Nombre · número(tap→llamar/WA) + chip inDriver al costado. Se edita en ✏️ Editar.
+    var drvNum=drvPhone
+      ?' <span class="dlvc-phone" style="font-size:11.5px" onclick="DeliveryModule._phoneActions(\''+_esc(drvPhone)+'\')">· '+_esc(drvPhone)+'</span>'
+      :'';
+    var indriverChip=rutaLink
+      ?'<a href="'+_escAttr(rutaLink)+'" target="_blank" rel="noopener" class="link-chip" style="text-decoration:none;flex-shrink:0">🔗 inDriver</a>'
+      :'';
+    var drvBox=
+      '<div class="dlvc-drvbox">'+
+        '<div class="dlvc-drvbox-ttl">🛵 Motorizado / inDriver</div>'+
+        '<div class="dlvc-drvbox-row">'+
+          '<div class="dlvc-drvbox-info">'+
+            (drv
+              ?'<span class="dlvc-drvbox-name">'+_esc(drv)+'</span>'+drvNum
+              :'<span class="dlvc-drvbox-empty">Sin asignar — toca ✏️ Editar</span>')+
           '</div>'+
-          '<div class="dlvc-drv-btns">'+
-            (drvPhone
-              ?'<button class="dlvc-drv-btn" style="background:rgba(37,211,102,.15);color:#25d366" onclick="event.stopPropagation();window.open(\'https://wa.me/51'+drvPhone+'\',\'_blank\')" title="WhatsApp">💬</button>'+
-               '<button class="dlvc-drv-btn" style="background:rgba(56,139,253,.15);color:var(--blue)" onclick="event.stopPropagation();window.open(\'tel:'+drvPhone+'\')" title="Llamar">📞</button>'
-              :'')+
-          '</div>'+
-        '</div>'
-      :'<button class="dlvc-add-drv" onclick="DeliveryModule._openDrv(\''+s.id+'\')">🛵 + Asignar motorizado</button>';
+          indriverChip+
+        '</div>'+
+      '</div>';
 
     return '<div class="dlvc">'+
+      // ENCABEZADO: fila superior (num+nombre+entregar) + meta (tel·fecha·monto) debajo del nombre
       '<div class="dlvc-hdr">'+
-        '<div class="dlvc-num" style="background:'+(isDone?'var(--green)':'var(--blue)')+'">'+
-          (isDone?'✓':(i+1))+
+        '<div class="dlvc-hdr-top">'+
+          '<div class="dlvc-num" style="background:'+(isDone?'var(--green)':'var(--blue)')+'">'+(isDone?'✓':(i+1))+'</div>'+
+          '<div class="dlvc-name">'+_esc(s.name)+'</div>'+
+          (!isDone
+            ?'<button class="dlvc-entr" onclick="DeliveryModule._openConf(\''+s.id+'\')">📦 Entregar</button>'
+            :'<span style="font-size:11px;color:var(--green);font-weight:700;white-space:nowrap">✅ Listo</span>')+
         '</div>'+
-        '<div class="dlvc-name">'+_esc(s.name)+'</div>'+
-        (!isDone&&drv?'<button class="dlvc-edit" onclick="DeliveryModule._openDrv(\''+s.id+'\')" title="Editar motorizado / inDriver">✏️</button>':'')+
-        (!isDone
-          ?'<button class="dlvc-entr" onclick="DeliveryModule._openConf(\''+s.id+'\')">📦 Entregar</button>'
-          :'<span style="font-size:11px;color:var(--green);font-weight:700;white-space:nowrap">✅ Listo</span>')+
-      '</div>'+
-      '<div class="dlvc-body">'+
-        // Teléfono (tap → llamar/WhatsApp) · monto · fecha — justo debajo del nombre
-        '<div class="dlvc-meta">'+
-          '<span class="dlvc-phone" onclick="DeliveryModule._phoneActions(\''+s.id+'\')">📞 '+_esc(s.phone||'—')+'</span>'+
-          (s.cost?'<span>S/ '+_esc(s.cost)+'</span>':'')+
+        '<div class="dlvc-headmeta">'+
+          '<span class="dlvc-phone" onclick="DeliveryModule._phoneActions(\''+_esc(s.phone||'')+'\')">📞 '+_esc(s.phone||'—')+'</span>'+
           (s.date?'<span>📅 '+_esc(s.date)+'</span>':'')+
+          (s.cost?'<span>S/ '+_esc(s.cost)+'</span>':'')+
         '</div>'+
-        // Link(s) del documento del cliente (apisale…)
-        (linksHtml?'<div class="dlvc-links">'+linksHtml+'</div>':'')+
-        // Dirección: color normal, clickable a Maps; pin 📍 solo si el registro tiene GPS
+      '</div>'+
+      // CUERPO: dirección, link y bloque motorizado
+      '<div class="dlvc-body">'+
         '<div class="dlvc-addr-row">'+
           '<span class="dlvc-addr" onclick="DeliveryModule._openMaps(\''+s.id+'\')">🏠 '+_esc(addr)+'</span>'+
           (hasGps?'<button class="dlvc-pin" onclick="DeliveryModule._openMaps(\''+s.id+'\')" title="Ubicación GPS (usar mi ubicación)">📍</button>':'')+
         '</div>'+
-        (!isDone?drvHtml:'')+
+        (linksHtml?'<div class="dlvc-links">'+linksHtml+'</div>':'')+
+        (!isDone?drvBox:'')+
+      '</div>'+
+      // PARTE BAJA: estado del pedido + botón editar (siempre visible)
+      '<div class="dlvc-foot">'+
+        '<span class="dlvc-status'+(isDone?' done':'')+'">'+_esc(isDone?'ENTREGADO':(s.status||'—'))+'</span>'+
+        '<button class="dlvc-edit" onclick="DeliveryModule._openDrv(\''+s.id+'\')" title="Editar motorizado / inDriver">✏️ Editar</button>'+
       '</div>'+
     '</div>';
   }).join('');
@@ -315,10 +327,9 @@ DeliveryModule._openMaps=function(id){
   if(ship) window.open(_mapsUrl(ship),'_blank');
 };
 
-/* Tap al teléfono del cliente → mini-hoja con Llamar / WhatsApp (reusa tel:/wa.me). */
-DeliveryModule._phoneActions=function(id){
-  var ship=((global.S&&global.S.shipments)||[]).find(function(x){return x.id===id;});
-  var phone=ship&&ship.phone?String(ship.phone).trim():'';
+/* Tap a un teléfono (cliente o motorizado) → mini-hoja Llamar / WhatsApp (reusa tel:/wa.me). */
+DeliveryModule._phoneActions=function(phone){
+  phone=phone?String(phone).trim():'';
   if(!phone){ if(typeof global.toast==='function')global.toast('Sin teléfono'); return; }
   var ov=document.createElement('div');
   ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.88);z-index:960;display:flex;align-items:flex-end;justify-content:center';
