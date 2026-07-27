@@ -26,6 +26,7 @@ var _tapTimer      = null;
 function _loadDrivers(){ try{ _drivers=JSON.parse(localStorage.getItem('tt_drivers')||'[]'); }catch(e){ _drivers=[]; } }
 function _saveDrivers(){ try{ localStorage.setItem('tt_drivers',JSON.stringify(_drivers)); }catch(e){} }
 function _esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function _escAttr(s){ return String(s||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/'/g,'&#39;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
 function _getShips(){
   return ((global.S&&global.S.shipments)||[]).filter(function(s){
@@ -52,12 +53,20 @@ function _css(){
     '.dlvc{background:#0d1117;border:1px solid #30363d;border-radius:11px;margin-bottom:9px;overflow:hidden}'+
     '.dlvc-hdr{display:flex;align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid #30363d}'+
     '.dlvc-num{width:24px;height:24px;border-radius:50%;background:var(--blue);color:#fff;font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0}'+
-    '.dlvc-name{flex:1;font-size:13px;font-weight:700;color:#e6edf3;line-height:1.3}'+
+    '.dlvc-name{flex:1;font-size:13px;font-weight:700;color:#e6edf3;line-height:1.3;min-width:0}'+
+    '.dlvc-edit{width:30px;height:28px;border-radius:8px;border:1px solid #30363d;background:#1c2333;color:#8b949e;font-size:13px;cursor:pointer;font-family:inherit;flex-shrink:0;display:flex;align-items:center;justify-content:center}'+
     '.dlvc-entr{padding:6px 11px;border-radius:8px;border:none;background:linear-gradient(135deg,var(--green),#1a7f37);color:#fff;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap}'+
     '.dlvc-body{padding:10px 12px}'+
-    '.dlvc-addr{font-size:12px;color:var(--blue);margin-bottom:8px;line-height:1.5;cursor:pointer;text-decoration:underline;text-underline-offset:2px;-webkit-tap-highlight-color:transparent}'+
-    '.dlvc-meta{display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap}'+
+    /* META (teléfono·monto·fecha) justo debajo del nombre */
+    '.dlvc-meta{display:flex;align-items:center;gap:5px 10px;margin-bottom:8px;flex-wrap:wrap}'+
     '.dlvc-meta span{font-size:11px;color:#8b949e}'+
+    '.dlvc-phone{color:var(--blue)!important;font-weight:700;cursor:pointer;-webkit-tap-highlight-color:transparent}'+
+    /* Chips de link (reusa .link-chip del panel) */
+    '.dlvc-links{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px}'+
+    /* Dirección: color normal, clickable a Maps, con pin solo si hay GPS */
+    '.dlvc-addr-row{display:flex;align-items:flex-start;gap:6px;margin-bottom:8px}'+
+    '.dlvc-addr{flex:1;font-size:12px;color:#c9d1d9;line-height:1.5;cursor:pointer;-webkit-tap-highlight-color:transparent}'+
+    '.dlvc-pin{flex-shrink:0;background:rgba(56,139,253,.12);border:1px solid rgba(56,139,253,.3);border-radius:7px;color:var(--blue);font-size:13px;line-height:1;padding:4px 7px;cursor:pointer;font-family:inherit}'+
     '.dlvc-drv{display:flex;align-items:center;gap:6px;background:rgba(163,113,247,.08);border:1px solid rgba(163,113,247,.2);border-radius:8px;padding:7px 10px;margin-bottom:2px;cursor:pointer}'+
     '.dlvc-drv-info{flex:1;min-width:0}'+
     '.dlvc-drv-name{font-size:12px;font-weight:700;color:#a371f7}'+
@@ -121,12 +130,12 @@ function _html(){
     '<div class="dlv-sheet">'+
       '<div style="width:36px;height:4px;background:#30363d;border-radius:2px;margin:0 auto 14px"></div>'+
       '<div style="font-family:Syne,sans-serif;font-weight:800;font-size:16px;margin-bottom:12px">🛵 Asignar motorizado</div>'+
-      '<div style="font-size:10px;font-weight:700;color:#8b949e;letter-spacing:.8px;text-transform:uppercase;margin-bottom:6px">🗺️ Link de ruta (opcional)</div>'+
+      '<div style="font-size:10px;font-weight:700;color:#8b949e;letter-spacing:.8px;text-transform:uppercase;margin-bottom:6px">🔗 Link inDriver (opcional)</div>'+
       '<div style="display:flex;gap:8px;margin-bottom:6px">'+
-        '<input id="dlvRutaLink" class="fi" placeholder="https://… o ubicación en vivo" inputmode="url" style="flex:1">'+
+        '<input id="dlvRutaLink" class="fi" placeholder="https://… link del viaje inDriver" inputmode="url" style="flex:1">'+
         '<button onclick="DeliveryModule._genRuta()" title="Generar ruta en Maps" style="background:rgba(56,139,253,.12);border:1px solid rgba(56,139,253,.25);border-radius:8px;color:var(--blue);padding:0 12px;font-size:13px;cursor:pointer;font-family:inherit;white-space:nowrap">🗺️ Maps</button>'+
       '</div>'+
-      '<button onclick="DeliveryModule._saveRuta()" style="width:100%;padding:9px;background:rgba(163,113,247,.1);border:1px solid rgba(163,113,247,.3);border-radius:8px;color:#a371f7;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;margin-bottom:14px">💾 Guardar link de ruta</button>'+
+      '<button onclick="DeliveryModule._saveRuta()" style="width:100%;padding:9px;background:rgba(163,113,247,.1);border:1px solid rgba(163,113,247,.3);border-radius:8px;color:#a371f7;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;margin-bottom:14px">💾 Guardar link inDriver</button>'+
       '<div id="dlvDrvList" style="display:flex;flex-direction:column;gap:7px;margin-bottom:12px;max-height:200px;overflow-y:auto"></div>'+
       '<div style="font-size:10px;font-weight:700;color:#8b949e;letter-spacing:.8px;text-transform:uppercase;margin-bottom:8px">NUEVO MOTORIZADO</div>'+
       '<input id="dlvDrvName" class="fi" placeholder="Nombre..." style="margin-bottom:8px">'+
@@ -171,15 +180,20 @@ function _render(){
     var addr=[s.address,s.referencia].filter(Boolean).join(' · ')||'—';
     var hasGps=!!s.gpsCoords;
 
+    // Chips de link del cliente (apisale, etc.) — abren en pestaña nueva como en el panel
+    var linksHtml=(s.links||[]).map(function(l){
+      return '<a href="'+_escAttr(l.u)+'" target="_blank" rel="noopener" class="link-chip" style="text-decoration:none">🔗 '+_esc(l.n||'Link')+'</a>';
+    }).join('');
+
+    // Driver: nombre · número · chip inDriver + acciones (WhatsApp / llamar)
     var drvHtml=drv
       ?'<div class="dlvc-drv" onclick="DeliveryModule._openDrv(\''+s.id+'\')">'+
           '<span style="font-size:15px">🛵</span>'+
           '<div class="dlvc-drv-info">'+
-            '<div class="dlvc-drv-name">'+_esc(drv)+'</div>'+
-            (drvPhone?'<div class="dlvc-drv-phone">📞 '+_esc(drvPhone)+'</div>':'')+
+            '<div class="dlvc-drv-name">'+_esc(drv)+(drvPhone?' · <span style="color:#8b949e;font-weight:400">'+_esc(drvPhone)+'</span>':'')+'</div>'+
+            (rutaLink?'<a href="'+_escAttr(rutaLink)+'" target="_blank" rel="noopener" class="link-chip" style="text-decoration:none;margin-top:4px" onclick="event.stopPropagation()">🔗 inDriver</a>':'')+
           '</div>'+
           '<div class="dlvc-drv-btns">'+
-            (rutaLink?'<button class="dlvc-drv-btn" style="background:rgba(163,113,247,.15);color:#a371f7" onclick="event.stopPropagation();DeliveryModule._verRuta(\''+s.id+'\')" title="Ver ruta">🗺️</button>':'')+
             (drvPhone
               ?'<button class="dlvc-drv-btn" style="background:rgba(37,211,102,.15);color:#25d366" onclick="event.stopPropagation();window.open(\'https://wa.me/51'+drvPhone+'\',\'_blank\')" title="WhatsApp">💬</button>'+
                '<button class="dlvc-drv-btn" style="background:rgba(56,139,253,.15);color:var(--blue)" onclick="event.stopPropagation();window.open(\'tel:'+drvPhone+'\')" title="Llamar">📞</button>'
@@ -193,21 +207,25 @@ function _render(){
         '<div class="dlvc-num" style="background:'+(isDone?'var(--green)':'var(--blue)')+'">'+
           (isDone?'✓':(i+1))+
         '</div>'+
-        '<div class="dlvc-name">'+_esc(s.name)+
-          (s.cost?'<div style="font-size:10px;color:#8b949e;font-weight:400">S/ '+_esc(s.cost)+'</div>':'')+
-        '</div>'+
+        '<div class="dlvc-name">'+_esc(s.name)+'</div>'+
+        (!isDone&&drv?'<button class="dlvc-edit" onclick="DeliveryModule._openDrv(\''+s.id+'\')" title="Editar motorizado / inDriver">✏️</button>':'')+
         (!isDone
           ?'<button class="dlvc-entr" onclick="DeliveryModule._openConf(\''+s.id+'\')">📦 Entregar</button>'
           :'<span style="font-size:11px;color:var(--green);font-weight:700;white-space:nowrap">✅ Listo</span>')+
       '</div>'+
       '<div class="dlvc-body">'+
-        '<div class="dlvc-addr" onclick="window.open(\''+_mapsUrl(s)+'\',\'_blank\')">'+
-          (hasGps?'📍 ':'🏠 ')+_esc(addr)+
-        '</div>'+
+        // Teléfono (tap → llamar/WhatsApp) · monto · fecha — justo debajo del nombre
         '<div class="dlvc-meta">'+
-          '<span>📞 '+_esc(s.phone||'—')+'</span>'+
+          '<span class="dlvc-phone" onclick="DeliveryModule._phoneActions(\''+s.id+'\')">📞 '+_esc(s.phone||'—')+'</span>'+
+          (s.cost?'<span>S/ '+_esc(s.cost)+'</span>':'')+
           (s.date?'<span>📅 '+_esc(s.date)+'</span>':'')+
-          '<span style="color:'+(isDone?'var(--green)':'#f59e0b')+'">'+_esc(s.status)+'</span>'+
+        '</div>'+
+        // Link(s) del documento del cliente (apisale…)
+        (linksHtml?'<div class="dlvc-links">'+linksHtml+'</div>':'')+
+        // Dirección: color normal, clickable a Maps; pin 📍 solo si el registro tiene GPS
+        '<div class="dlvc-addr-row">'+
+          '<span class="dlvc-addr" onclick="DeliveryModule._openMaps(\''+s.id+'\')">🏠 '+_esc(addr)+'</span>'+
+          (hasGps?'<button class="dlvc-pin" onclick="DeliveryModule._openMaps(\''+s.id+'\')" title="Ubicación GPS (usar mi ubicación)">📍</button>':'')+
         '</div>'+
         (!isDone?drvHtml:'')+
       '</div>'+
@@ -291,11 +309,31 @@ DeliveryModule._saveRuta=function(){
   DeliveryModule._closeDrv();_render();
   if(typeof global.toast==='function')global.toast(ship._dlvRutaLink?'🗺️ Ruta guardada':'Ruta quitada');
 };
-DeliveryModule._verRuta=function(id){
+/* Abrir la dirección en Google Maps (por id, para no meter la URL en el HTML). */
+DeliveryModule._openMaps=function(id){
   var ship=((global.S&&global.S.shipments)||[]).find(function(x){return x.id===id;});
-  var url=ship&&ship._dlvRutaLink?String(ship._dlvRutaLink):'';
-  if(!/^https?:\/\//i.test(url)){if(typeof global.toast==='function')global.toast('⚠️ Link de ruta inválido');return;}
-  window.open(url,'_blank');
+  if(ship) window.open(_mapsUrl(ship),'_blank');
+};
+
+/* Tap al teléfono del cliente → mini-hoja con Llamar / WhatsApp (reusa tel:/wa.me). */
+DeliveryModule._phoneActions=function(id){
+  var ship=((global.S&&global.S.shipments)||[]).find(function(x){return x.id===id;});
+  var phone=ship&&ship.phone?String(ship.phone).trim():'';
+  if(!phone){ if(typeof global.toast==='function')global.toast('Sin teléfono'); return; }
+  var ov=document.createElement('div');
+  ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.88);z-index:960;display:flex;align-items:flex-end;justify-content:center';
+  ov.innerHTML='<div class="dlv-sheet">'+
+    '<div style="width:36px;height:4px;background:#30363d;border-radius:2px;margin:0 auto 14px"></div>'+
+    '<div style="font-family:Syne,sans-serif;font-weight:800;font-size:16px;margin-bottom:14px">📞 '+_esc(phone)+'</div>'+
+    '<a href="tel:'+_escAttr(phone)+'" style="display:block;text-align:center;padding:13px;background:rgba(56,139,253,.15);border:1px solid rgba(56,139,253,.35);border-radius:10px;color:var(--blue);font-weight:700;font-size:14px;text-decoration:none;margin-bottom:9px">📞 Llamar</a>'+
+    '<a href="https://wa.me/51'+encodeURIComponent(phone)+'" target="_blank" rel="noopener" style="display:block;text-align:center;padding:13px;background:rgba(37,211,102,.15);border:1px solid rgba(37,211,102,.35);border-radius:10px;color:#25d366;font-weight:700;font-size:14px;text-decoration:none;margin-bottom:9px">💬 WhatsApp</a>'+
+    '<button type="button" style="width:100%;padding:12px;background:#1c2333;border:1px solid #30363d;border-radius:10px;color:#8b949e;font-size:13px;cursor:pointer;font-family:inherit">Cancelar</button>'+
+  '</div>';
+  function close(){ if(ov.parentNode) ov.parentNode.removeChild(ov); }
+  ov.addEventListener('click',function(e){ if(e.target===ov) close(); });
+  ov.querySelector('button').addEventListener('click',close);
+  [].forEach.call(ov.querySelectorAll('a'),function(a){ a.addEventListener('click',function(){ setTimeout(close,60); }); });
+  document.body.appendChild(ov);
 };
 
 /* ── Confirmar entrega ───────────────────────────────────────────── */
