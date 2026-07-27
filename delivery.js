@@ -135,18 +135,23 @@ function _html(){
     '<div class="dlv-sheet">'+
       '<div style="width:36px;height:4px;background:#30363d;border-radius:2px;margin:0 auto 14px"></div>'+
       '<div style="font-family:Syne,sans-serif;font-weight:800;font-size:16px;margin-bottom:12px">🛵 Asignar motorizado</div>'+
-      '<div style="font-size:10px;font-weight:700;color:#8b949e;letter-spacing:.8px;text-transform:uppercase;margin-bottom:6px">🔗 Link inDriver (opcional)</div>'+
-      '<div style="display:flex;gap:8px;margin-bottom:6px">'+
+      // LINK INDRIVER — patrón "Agregar link" (input + Add + chip con ↗/✕)
+      '<div style="font-size:10px;font-weight:700;color:#8b949e;letter-spacing:.8px;text-transform:uppercase;margin-bottom:7px">🔗 Link inDriver (opcional)</div>'+
+      '<div class="link-row">'+
         '<input id="dlvRutaLink" class="fi" placeholder="https://… link del viaje inDriver" inputmode="url" style="flex:1">'+
-        '<button onclick="DeliveryModule._genRuta()" title="Generar ruta en Maps" style="background:rgba(56,139,253,.12);border:1px solid rgba(56,139,253,.25);border-radius:8px;color:var(--blue);padding:0 12px;font-size:13px;cursor:pointer;font-family:inherit;white-space:nowrap">🗺️ Maps</button>'+
+        '<button class="link-add" type="button" onclick="DeliveryModule._addRuta()">+ Add</button>'+
       '</div>'+
-      '<button onclick="DeliveryModule._saveRuta()" style="width:100%;padding:9px;background:rgba(163,113,247,.1);border:1px solid rgba(163,113,247,.3);border-radius:8px;color:#a371f7;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;margin-bottom:14px">💾 Guardar link inDriver</button>'+
+      '<div class="link-list" id="dlvRutaList" style="margin-bottom:14px"></div>'+
+      // LISTA de motorizados guardados (tocar para asignar)
       '<div id="dlvDrvList" style="display:flex;flex-direction:column;gap:7px;margin-bottom:12px;max-height:200px;overflow-y:auto"></div>'+
-      '<div style="font-size:10px;font-weight:700;color:#8b949e;letter-spacing:.8px;text-transform:uppercase;margin-bottom:8px">NUEVO MOTORIZADO</div>'+
-      '<input id="dlvDrvName" class="fi" placeholder="Nombre..." style="margin-bottom:8px">'+
-      '<div style="display:flex;gap:8px;margin-bottom:12px">'+
-        '<input id="dlvDrvPhone" class="fi phone-norm" placeholder="Teléfono (opcional)" inputmode="numeric" style="flex:1">'+
-        '<button onclick="DeliveryModule._addDrv()" style="background:var(--blue);border:none;border-radius:8px;color:#fff;padding:0 16px;font-size:18px;font-weight:700;cursor:pointer">+</button>'+
+      // NUEVO MOTORIZADO — bloque estilo "Guía Shalom" (recuadro + 2 campos etiquetados)
+      '<div style="background:rgba(163,113,247,.06);border:1px solid rgba(163,113,247,.22);border-radius:10px;padding:12px;margin-bottom:12px">'+
+        '<div style="font-size:10px;font-weight:700;color:#a371f7;letter-spacing:.8px;text-transform:uppercase;margin-bottom:10px">🛵 Nuevo motorizado</div>'+
+        '<div class="frow">'+
+          '<div class="fg"><label class="fl">Nombre</label><input id="dlvDrvName" class="fi" placeholder="Nombre..."></div>'+
+          '<div class="fg"><label class="fl">Teléfono</label><input id="dlvDrvPhone" class="fi phone-norm" placeholder="Opcional" inputmode="numeric"></div>'+
+        '</div>'+
+        '<button type="button" onclick="DeliveryModule._addDrv()" style="width:100%;margin-top:9px;padding:9px;background:var(--blue);border:none;border-radius:8px;color:#fff;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">+ Agregar</button>'+
       '</div>'+
       '<button onclick="DeliveryModule._closeDrv()" style="width:100%;padding:11px;background:#1c2333;border:1px solid #30363d;border-radius:10px;color:#8b949e;font-size:13px;cursor:pointer;font-family:inherit">Cerrar</button>'+
     '</div>';
@@ -262,7 +267,15 @@ DeliveryModule._openDrv=function(id){
         '</div>';
       }).join('')
     :'<div style="text-align:center;padding:16px;color:#8b949e;font-size:12px">Sin motorizados. Agrega uno abajo.</div>';
-  var _rl=document.getElementById('dlvRutaLink'); if(_rl) _rl.value=(ship&&ship._dlvRutaLink)||'';
+  // Input vacío; el link inDriver guardado se muestra como chip (patrón Agregar link)
+  var _rl=document.getElementById('dlvRutaLink'); if(_rl) _rl.value='';
+  var _rlist=document.getElementById('dlvRutaList');
+  if(_rlist){
+    var link=ship&&ship._dlvRutaLink?String(ship._dlvRutaLink):'';
+    _rlist.innerHTML=link
+      ?'<div class="link-item"><span>🔗</span><div class="link-name">'+_esc(link.length>34?link.slice(0,34)+'…':link)+'</div><a href="'+_escAttr(link)+'" target="_blank" rel="noopener" style="color:var(--blue);font-size:12px;text-decoration:none">↗</a><button class="link-del" type="button" onclick="DeliveryModule._removeRuta()">✕</button></div>'
+      :'';
+  }
   document.getElementById('dlvDrvOv').classList.add('open');
 };
 DeliveryModule._addDrv=function(){
@@ -282,10 +295,10 @@ DeliveryModule._selDrv=function(name,phone){
   var ship=((global.S&&global.S.shipments)||[]).find(function(x){return x.id===_currentShipId;});
   if(ship){
     ship._dlvDriver=name;ship._dlvDriverPhone=phone||'';
+    // Link pendiente en el input (aún sin + Add) → se guarda al asignar.
+    // NO se borra por input vacío: el link se quita con el ✕ del chip.
     var raw=(document.getElementById('dlvRutaLink')||{value:''}).value.trim();
     if(raw){var n=_normLink(raw);if(n)ship._dlvRutaLink=n;}
-    // null (no delete): con updateMask, quitar por omisión ya no borra en Firestore.
-    else if(ship._dlvRutaLink){ship._dlvRutaLink=null;}
     // Guardado incremental REAL a Firestore (window.save es const, no existe
     // en window → era no-op). Reusa _fbSaveShipmentNow (1 pedido, con reintentos).
     if(typeof global._fbSaveShipmentNow==='function')global._fbSaveShipmentNow(ship);
@@ -304,22 +317,29 @@ function _normLink(u){
   if(/^[a-z][a-z0-9+.-]*:/i.test(u)) return ''; // otros esquemas rechazados
   return 'https://'+u;
 }
-DeliveryModule._genRuta=function(){
-  var ship=((global.S&&global.S.shipments)||[]).find(function(x){return x.id===_currentShipId;});
-  if(!ship)return;
-  var dest=ship.gpsCoords||[ship.address,ship.referencia].filter(Boolean).join(', ');
-  var inp=document.getElementById('dlvRutaLink');
-  if(inp)inp.value='https://www.google.com/maps/dir/?api=1&destination='+encodeURIComponent(dest);
-};
-DeliveryModule._saveRuta=function(){
+/* + Add: guarda el link inDriver del pedido y lo muestra como chip (patrón Agregar link). */
+DeliveryModule._addRuta=function(){
   var ship=((global.S&&global.S.shipments)||[]).find(function(x){return x.id===_currentShipId;});
   if(!ship)return;
   var raw=(document.getElementById('dlvRutaLink')||{value:''}).value.trim();
-  if(!raw){ ship._dlvRutaLink=null; } // null, no delete: propaga el "quitar" con updateMask
-  else{ var n=_normLink(raw); if(!n){if(typeof global.toast==='function')global.toast('⚠️ Link de ruta inválido');return;} ship._dlvRutaLink=n; }
+  if(!raw){ if(typeof global.toast==='function')global.toast('Ingresa un link'); return; }
+  var n=_normLink(raw);
+  if(!n){ if(typeof global.toast==='function')global.toast('⚠️ Link inválido'); return; }
+  ship._dlvRutaLink=n;
   if(typeof global._fbSaveShipmentNow==='function')global._fbSaveShipmentNow(ship);
-  DeliveryModule._closeDrv();_render();
-  if(typeof global.toast==='function')global.toast(ship._dlvRutaLink?'🗺️ Ruta guardada':'Ruta quitada');
+  DeliveryModule._openDrv(_currentShipId); // re-render chip + limpia input
+  _render();                                // refresca la tarjeta
+  if(typeof global.toast==='function')global.toast('🔗 Link inDriver agregado');
+};
+/* ✕ del chip: quita el link inDriver del pedido. */
+DeliveryModule._removeRuta=function(){
+  var ship=((global.S&&global.S.shipments)||[]).find(function(x){return x.id===_currentShipId;});
+  if(!ship)return;
+  ship._dlvRutaLink=null; // null, no delete: propaga el "quitar" con updateMask
+  if(typeof global._fbSaveShipmentNow==='function')global._fbSaveShipmentNow(ship);
+  DeliveryModule._openDrv(_currentShipId);
+  _render();
+  if(typeof global.toast==='function')global.toast('Link quitado');
 };
 /* Abrir la dirección en Google Maps (por id, para no meter la URL en el HTML). */
 DeliveryModule._openMaps=function(id){
