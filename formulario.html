@@ -759,6 +759,12 @@ function brandFooterHtml(){
 
 function renderForm(){
   clearTrackRefresh();
+  // Datos del negocio para la etiqueta viva (REMITENTE). Se lee del mismo CFG.
+  window._bizInfo = {
+    name:  (CFG&&(CFG.name||CFG.config&&CFG.config.name))||'Mi Negocio',
+    phone: ((CFG&&(CFG.config&&CFG.config.phone||CFG.phone))||'').toString().trim(),
+    city:  (CFG&&(CFG.city||CFG.config&&CFG.config.city))||''
+  };
   _knownClient=null; _deliveryAddr=''; _addrMode=''; _gpsLat=null; _gpsLon=null;
   _showRef(false); _manualNote('');   // estado inicial: Referencia oculta
   const extraF   = ((CFG&&CFG.extraFields)||[]).filter(f=>f&&f.visible!==false);
@@ -1792,29 +1798,27 @@ async function submitOrder(){
 }
 
 /* ─── CONFIRMACIÓN INLINE ───────────────────────────────────────────
-   Al registrar el pedido NO se cambia de pantalla: se ocultan los pasos
-   del formulario, la boleta (con los datos) se queda arriba y CONGELADA,
-   y aparece el botón de WhatsApp. Sin recargar, sin salto. La lógica de
-   guardado no cambia. */
+   El pedido YA se registró (fuente de verdad → ya llega al panel). No se
+   cambia de pantalla: se ocultan los pasos del formulario, la etiqueta con
+   los datos se queda arriba y CONGELADA, y aparece el botón "Ir a WhatsApp"
+   (ancla nativa = abre WhatsApp de forma 100% confiable, sin bloqueo de
+   pop-ups). El registro no depende de WhatsApp. */
 function showInlineConfirmed(order, trackCode, trackToken){
   const waHref = _construirWaHref(order, trackCode, trackToken);
-  window._ttFrozen = true;                 // congela la boleta (sin ✎ / sin tap-editar)
+  window._ttFrozen = true;                 // detiene la actualización de la etiqueta
   // Ocultar los inputs del formulario (todos los pasos + la barra de progreso)
   document.querySelectorAll('.wz-step').forEach(s=>{ s.hidden=true; });
   const prog=$('wzProgress'); if(prog) prog.style.display='none';
-  const bol=document.getElementById('tt-bol'); if(bol) bol.classList.add('frozen');
-  // Insertar el bloque confirmado en el contenedor del formulario (queda
-  // debajo de la boleta). Usa clase .tt-confirmed (NO .success) para que la
-  // boleta permanezca visible.
+  // Insertar el bloque confirmado debajo de la etiqueta (queda visible).
   const anyStep=document.querySelector('.wz-step');
   const cont=(anyStep&&anyStep.parentNode)||document.getElementById('app');
   let box=$('ttConfirmed');
   if(!box){ box=document.createElement('div'); box.id='ttConfirmed'; box.className='tt-confirmed'; cont.appendChild(box); }
   box.innerHTML=`
     <div style="text-align:center;padding:10px 0 4px">
-      <div style="font-size:17px;font-weight:800;color:#f5a623;letter-spacing:.3px">⚠️ ¡Falta 1 paso!</div>
-      <div style="font-size:13.5px;color:var(--text2);margin-top:6px;line-height:1.5">Envía tu pedido por WhatsApp para <b style="color:var(--text)">confirmarlo</b> y recibir tu link de seguimiento.</div>
-      ${waHref?`<a class="btn-wa" href="${esc(waHref)}" target="_blank" rel="noopener" style="font-size:17px;padding:18px;margin-top:14px">💬 Confirmar mi pedido por WhatsApp</a>
+      <div style="font-size:17px;font-weight:800;color:#1eb954;letter-spacing:.3px">✅ Pedido registrado</div>
+      <div style="font-size:13.5px;color:var(--text2);margin-top:6px;line-height:1.5">Ya recibimos tu pedido. Toca el botón para <b style="color:var(--text)">enviarlo por WhatsApp</b> y recibir tu link de seguimiento.</div>
+      ${waHref?`<a class="btn-wa" href="${esc(waHref)}" target="_blank" rel="noopener" style="font-size:17px;padding:18px;margin-top:14px">💬 Ir a WhatsApp</a>
       <div style="font-size:12px;color:var(--text2);margin-top:8px">📍 Al enviarlo recibes tu link de seguimiento</div>`
               :'<div class="error-box" style="margin-top:12px">No se pudo generar el enlace de WhatsApp. Contáctanos directamente.</div>'}
     </div>`;
@@ -2592,7 +2596,7 @@ window.toggleShalomHelp     = toggleShalomHelp;
 })();
 </script>
 <script src="loading-screen.js?v=1"></script>
-<script defer src="narrador/boleta.js?v=1"></script>
+<script defer src="narrador/etiqueta.js?v=1"></script>
 <script defer src="narrador/narrador.js?v=1"></script>
 </body>
 </html>
