@@ -274,6 +274,11 @@ async function autoTrackingCheck() {
   // (El botón "Consultar" por tarjeta y el tracking masivo manual siguen funcionando.)
   if (window.S && window.S.config && window.S.config.shalomAutoTrack === false) return;
 
+  // Gate MOTOR: si el motor activo es "web" (Motor B / mi servidor), el Motor A
+  // (API paga) NO debe auto-consultar — el backend ya mantiene el estado. Evita
+  // cobros de la API paga y que los dos motores se pisen las etiquetas.
+  if (window.S && window.S.config && window.S.config.trackingMotor === 'web') return;
+
   // Pausado tras 3 fallos — esperar consulta manual exitosa
   if (_autoPaused) {
     console.log('[Tracking] Auto-check pausado — API caída. Consulta manualmente para reactivar.');

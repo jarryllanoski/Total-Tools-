@@ -307,9 +307,16 @@ async function handleTrack(req, res) {
   // (teléfono, costo, notas privadas, GPS, documentos internos, y los campos
   // internos del Motor B de tracking).
   const safe = Object.assign({}, order, {code, frozen});
+  // NOTA: DNI y notas (dni/dniRecoger/dniDestinatario, notes) SE MANTIENEN a
+  // pedido del operador — el cliente puede verlos en su link. Lo que NO se
+  // expone: fotos/firmas de entrega y datos internos del motorizado/cotización.
   ["phone", "cost", "privateNote", "gpsCoords",
     "docGuia", "docEmbalado", "docComprobante", "docTicket",
     "sel", "chkGuia", "chkEmbalado", "chkComprobante", "fromForm",
+    // Entrega/motorizado (internos — no autorizados para el cliente):
+    "_dlvFoto", "_dlvFirma", "_dlvReceptor", "_dlvDriver",
+    "_dlvDriverPhone", "_dlvRutaLink", "_dlvDone", "_dlvFecha",
+    "cotizItems", "extraccion",
     "trackingWebRawStatus", "trackingWebEstadoNormalizado",
     "trackingWebEtiquetaSugerida", "trackingWebCoincide",
     "trackingWebUltimaConsulta", "trackingWebProximaConsulta",
