@@ -242,8 +242,8 @@
       +       '<span onclick="if(window.Ayuda)Ayuda.abrir(\'cotizacion\')" style="font-size:12px;color:#a78bfa;cursor:pointer;font-weight:600" title="Ayuda">📖</span>'
       +     '</span>'
       +   '</div>'
-      +   '<div style="font-size:11px;color:var(--text2);line-height:1.5;margin-bottom:10px">Se <b>jala solo</b> del comprobante del pedido, o subí el <b>PDF</b> / <b>pegá el texto</b>. Se extrae código, descripción y cantidad — todo editable.</div>'
-      +   '<div style="display:flex;gap:8px;margin-bottom:10px">'
+      +   '<div id="cotizDesc" style="font-size:11px;color:var(--text2);line-height:1.5;margin-bottom:10px">Se <b>jala solo</b> del comprobante del pedido, o subí el <b>PDF</b> / <b>pegá el texto</b>. Se extrae código, descripción y cantidad — todo editable.</div>'
+      +   '<div id="cotizInputRow" style="display:flex;gap:8px;margin-bottom:10px">'
       +     '<label style="flex:1;padding:12px 8px;background:var(--bg2);border:1.5px solid var(--bd);border-radius:12px;color:var(--text);font-weight:600;font-size:13px;text-align:center;cursor:pointer">📄 Subir PDF'
       +       '<input type="file" accept="application/pdf,.pdf" style="display:none" onchange="Cotizacion._onPdf(this)"></label>'
       +     '<button onclick="Cotizacion._togglePaste()" style="flex:1;padding:12px 8px;background:var(--bg2);border:1.5px solid var(--bd);border-radius:12px;color:var(--text);font-weight:600;font-size:13px;cursor:pointer;font-family:inherit">📋 Pegar texto</button>'
@@ -259,11 +259,11 @@
       +   '<div id="cotizJalarBox"></div>'
       +   '<div id="cotizStatus" style="font-size:12px;color:var(--text2);margin-bottom:6px"></div>'
       +   '<div id="cotizList" style="overflow-y:auto;flex:1;min-height:40px"></div>'
-      +   '<div style="display:flex;gap:8px;margin-top:10px">'
+      +   '<div id="cotizBtnRow" style="display:flex;gap:8px;margin-top:10px">'
       +     '<button onclick="Cotizacion._addRow()" style="flex:1;padding:12px;background:var(--bg2);border:1.5px solid var(--bd);border-radius:12px;color:var(--text);font-weight:600;font-size:13px;cursor:pointer;font-family:inherit">➕ Fila</button>'
       +     '<button onclick="Cotizacion.guardar()" style="flex:2;padding:12px;background:var(--green,#2ea043);border:none;border-radius:12px;color:#fff;font-weight:700;font-size:14px;cursor:pointer;font-family:inherit">💾 Guardar</button>'
       +   '</div>'
-      +   '<button onclick="Cotizacion._guardarYEnviar()" style="width:100%;margin-top:8px;padding:12px;background:rgba(56,139,253,.15);border:1.5px solid rgba(56,139,253,.4);border-radius:12px;color:var(--blue);font-weight:700;font-size:13px;cursor:pointer;font-family:inherit">📤 Enviar faltantes a proveedor</button>'
+      +   '<button id="cotizSendBtn" onclick="Cotizacion._guardarYEnviar()" style="width:100%;margin-top:8px;padding:12px;background:rgba(56,139,253,.15);border:1.5px solid rgba(56,139,253,.4);border-radius:12px;color:var(--blue);font-weight:700;font-size:13px;cursor:pointer;font-family:inherit">📤 Enviar faltantes a proveedor</button>'
       + '</div>';
     // Cerrar sólo al tocar el fondo (no dentro del panel). El listener nativo de
     // fondo se engancha al cargar, y este overlay se inyecta después → lo ponemos acá.
@@ -273,11 +273,36 @@
 
   var _rows = []; // estado de edición: [{codigo, desc, cant, enTienda}]
   var _envioId=null, _envioItems=[]; // estado del diálogo "enviar a proveedor" (Fase 2b)
+  var _readonly = false; // modo SOLO LECTURA (desde "Links generados"): ver, no editar/enviar
+
+  // Muestra/oculta los controles que MUTAN según el modo. En lectura solo se ve.
+  function _applyReadonlyUI(){
+    var ro=_readonly;
+    var els={cotizDesc:'block',cotizInputRow:'flex',cotizStockBar:'flex',cotizBtnRow:'flex',cotizSendBtn:'block'};
+    Object.keys(els).forEach(function(id){
+      var e=document.getElementById(id); if(e) e.style.display = ro ? 'none' : els[id];
+    });
+    if(ro){
+      var pb=document.getElementById('cotizPasteBox'); if(pb) pb.style.display='none';
+      var jb=document.getElementById('cotizJalarBox'); if(jb) jb.innerHTML='';
+    }
+  }
 
   function _renderRows(){
     var el=document.getElementById('cotizList'); if(!el) return;
     var cnt=document.getElementById('cotizCount'); if(cnt) cnt.textContent=_rows.length?(_rows.length+' ítem'+(_rows.length>1?'s':'')):'';
-    if(!_rows.length){ el.innerHTML='<div style="text-align:center;color:var(--text2);font-size:12px;padding:18px">Sin ítems todavía. Subí un PDF o pegá el texto.</div>'; return; }
+    if(!_rows.length){ el.innerHTML='<div style="text-align:center;color:var(--text2);font-size:12px;padding:18px">'+(_readonly?'Sin ítems en el comprobante.':'Sin ítems todavía. Subí un PDF o pegá el texto.')+'</div>'; return; }
+    // SOLO LECTURA: código · descripción · cantidad, sin inputs ni acciones.
+    if(_readonly){
+      el.innerHTML=_rows.map(function(r){
+        return '<div style="border:1px solid var(--bd);border-radius:8px;padding:8px 10px;margin-bottom:6px;display:flex;gap:8px;align-items:center">'
+          + '<span style="font-family:monospace;font-size:12px;color:var(--text2);min-width:64px">'+_esc(r.codigo||'—')+'</span>'
+          + '<span style="flex:1;min-width:0;font-size:12.5px">'+_esc(r.desc||'—')+'</span>'
+          + '<span style="font-size:12px;color:var(--text2);white-space:nowrap">x'+_esc(r.cant||1)+'</span>'
+          + '</div>';
+      }).join('');
+      return;
+    }
     var html='';
     var hay=_haySources();
     // Resumen multi-fuente (sólo si hay alguna fuente de stock cargada)
@@ -460,10 +485,12 @@
   var Cotizacion = {
     parseTexto: parseTexto,
 
-    abrir: function(id){
+    abrir: function(id, ro){
       var s=_find(id); if(!s){ _toast('Pedido no encontrado'); return; }
       _curId=id;
+      _readonly = !!ro;
       _ensurePanel();
+      _applyReadonlyUI();
       document.getElementById('cotizWho').textContent = (s.name||'—');
       _rows = Array.isArray(s.cotizItems) ? s.cotizItems.map(function(r){ return {codigo:r.codigo||'', desc:r.desc||'', cant:r.cant||1, enTienda:!!r.enTienda, proveedor:r.proveedor||null, ean:r.ean||''}; }) : [];
       var pb=document.getElementById('cotizPasteBox'); if(pb) pb.style.display='none';
@@ -473,8 +500,15 @@
       _renderRows();
       if(typeof openOverlay==='function') openOverlay('cotizOverlay');
       else document.getElementById('cotizOverlay').style.display='flex';
-      _maybeExtraer(s);   // on-demand: si tiene comprobante apisale y no fue procesado
+      if(_readonly){
+        // Solo lectura: si aún no hay ítems y tiene link, extrae UNA vez (sin botón).
+        if(_puedeJalar(s)) _extraer(s);
+      } else {
+        _maybeExtraer(s);   // on-demand: si tiene comprobante apisale y no fue procesado
+      }
     },
+    // Vista SOLO LECTURA (desde "Links generados"): ver sin editar ni enviar.
+    ver: function(id){ return this.abrir(id, true); },
 
     cerrar: function(){
       var o=document.getElementById('cotizOverlay'); if(!o) return; // aún no inyectado

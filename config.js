@@ -960,7 +960,19 @@ function _renderTokList(){
           : '<span class="tok-badge tok-badge-ok">● Disponible</span>';
       var tiempo = timeAgo(tok.createdAt);
       var expTxt = exp ? ((expired?'Venció ':'Vence ')+exp.toLocaleDateString('es-PE',{day:'2-digit',month:'short'})) : '';
-      var nm = (tok.name||'—').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+      // Token USADO → busca el pedido real vinculado (orderId) para mostrar sus
+      // datos (nombre/DNI/courier) y ofrecer ver el comprobante.
+      var ord = (used && tok.orderId && window.S && S.shipments)
+        ? S.shipments.find(function(x){return x.id===tok.orderId;}) : null;
+      var nmRaw = (ord && ord.name) ? ord.name : (tok.name||'—');
+      var nm = String(nmRaw).replace(/</g,'&lt;').replace(/>/g,'&gt;');
+      var dni = ord ? String(ord.dni||ord.dniRecoger||ord.dniDestinatario||'').trim() : '';
+      var cour = ord ? String(ord.courier||'').trim() : '';
+      var dniEsc = dni.replace(/</g,'&lt;').replace(/>/g,'&gt;');
+      var courEsc = cour.replace(/</g,'&lt;').replace(/>/g,'&gt;');
+      var courIcon = (cour && window._courierIcon) ? window._courierIcon(cour) : '';
+      var hasApi = !!(ord && Array.isArray(ord.links) && ord.links.some(function(l){return /apisal/i.test((l&&l.u)||'');}));
+      var extraido = !!(ord && ((Array.isArray(ord.cotizItems)&&ord.cotizItems.length) || (ord.extraccion&&ord.extraccion.estado==='procesado')));
       var ph = (tok.phone||'').replace(/</g,'&lt;').replace(/>/g,'&gt;');
       var lk = (tok.prefillLink||'').replace(/</g,'&lt;').replace(/>/g,'&gt;');
       var shortLk = lk.length>45 ? lk.substring(0,45)+'…' : lk;
@@ -973,6 +985,8 @@ function _renderTokList(){
         if(ph) btns += '<button class="tok-act-btn" style="color:var(--green);border-color:rgba(46,160,67,.4)" data-id="'+tid+'" data-act="wa">💬 WA</button>';
         btns += '<button class="tok-act-btn" data-id="'+tid+'" data-act="open">↗</button>';
       }
+      // Documento (comprobante apisale) — solo lectura. "Ver" si ya extraído, "Extraer" si no.
+      if(hasApi) btns += '<button class="tok-act-btn" data-id="'+tid+'" data-act="docview" title="Ver comprobante (solo lectura)">📄 '+(extraido?'Ver':'Extraer')+'</button>';
       btns += '<button class="tok-act-btn tok-act-del" data-id="'+tid+'" data-act="delete">🗑️</button>';
 
       return '<div class="tok-list-item">'
@@ -981,6 +995,8 @@ function _renderTokList(){
         +'</div>'
         +'<div class="tok-list-meta">'
         +(ph?'📞 '+ph:'')+(showTime?((ph?'  · ':'')+tiempo):'')
+        +(dni?'<br>🪪 DNI '+dniEsc:'')
+        +(cour?'<br>'+(courIcon?courIcon+' ':'🚚 ')+courEsc:'')
         +(expTxt?'<br>⏱ '+expTxt:'')
         +(lk?'<br><a href="'+lkHref+'" target="_blank" rel="noopener" class="link-chip" onclick="event.stopPropagation()" style="margin-top:4px">🔗 '+shortLk+'</a>':'')
         +'</div>'
@@ -1049,11 +1065,29 @@ function _tokAction(id, action){
   } else if(action==='open'){
     window.open(url,'_blank');
   } else if(action==='delete'){
-    if(!window._fbDelTok){ toast('⚠️ Error'); return; }
-    window._fbDelTok(tok.id||tok._id||'')
-      .then(function(){ delete _tokSel[tok.id||tok._id||'']; toast('🗑️ Link eliminado'); loadTokenList(true); })
-      .catch(function(){ toast('⚠️ Error al eliminar'); });
+    _confirmDelToken(tok);
+  } else if(action==='docview'){
+    var oid = tok.orderId||'';
+    if(oid && window.Cotizacion && Cotizacion.ver){ Cotizacion.ver(oid); }
+    else { toast('Este link no tiene comprobante para ver'); }
   }
+}
+
+// Borrado con confirmación (modal). Solo elimina el TOKEN, nunca el pedido real.
+function _confirmDelToken(tok){
+  var quien = String(tok.name||tok.phone||'este link').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  if($('delMsg')) $('delMsg').innerHTML='¿Eliminar el link de <b>'+quien+'</b>?<br><span style="font-size:11px;color:var(--text2)">Solo se borra el link. El pedido registrado NO se toca.</span>';
+  if($('delYes')){
+    $('delYes').style.background='var(--red)';
+    $('delYes').onclick=function(){
+      closeOverlay('delOverlay');
+      if(!window._fbDelTok){ toast('⚠️ Error'); return; }
+      window._fbDelTok(tok.id||tok._id||'')
+        .then(function(){ delete _tokSel[tok.id||tok._id||'']; toast('🗑️ Link eliminado'); loadTokenList(true); })
+        .catch(function(){ toast('⚠️ Error al eliminar'); });
+    };
+  }
+  openOverlay('delOverlay');
 }
 
 function changePIN(){
