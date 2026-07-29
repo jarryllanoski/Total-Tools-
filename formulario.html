@@ -139,6 +139,10 @@ textarea.fi{resize:vertical;line-height:1.5}
 .loading-screen{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:60vh;gap:16px}
 .spin{width:44px;height:44px;border:3px solid var(--bd);border-top-color:var(--blue);border-radius:50%;animation:spin .7s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
+/* Pin "buscando ubicación": late/rebota mientras geolocaliza (feedback en el botón, no abajo) */
+.geo-pin{display:inline-block;animation:geoPulse 1s ease-in-out infinite}
+@keyframes geoPulse{0%,100%{transform:translateY(0) scale(1);opacity:1}50%{transform:translateY(-3px) scale(1.25);opacity:.55}}
+@media(prefers-reduced-motion:reduce){.geo-pin{animation:none}}
 .spin-lbl{color:var(--text2);font-size:14px}
 
 .loading-overlay{position:fixed;inset:0;background:rgba(8,8,16,.75);display:flex;align-items:center;justify-content:center;z-index:999;backdrop-filter:blur(4px)}
@@ -634,7 +638,10 @@ function headerHtml(ayudaTipo){
   const bizCity = (CFG&&(CFG.city||CFG.config&&CFG.config.city)) || '';
   // ayudaTipo: 'track' = ayuda de seguimiento, cualquier otro = ayuda del formulario
   const ayudaFn = ayudaTipo==='track' ? 'abrirAyudaTrack()' : 'abrirAyudaForm()';
-  return `<div class="biz-header" style="position:relative"><div class="biz-name">${esc(bizName)}</div>${bizCity?`<div class="biz-city">📍 ${esc(bizCity)}</div>`:''}<div onclick="${ayudaFn}" style="position:absolute;top:2px;right:0;display:flex;align-items:center;gap:4px;background:rgba(167,139,250,.12);border:1px solid rgba(167,139,250,.3);color:#a78bfa;border-radius:8px;padding:5px 10px;cursor:pointer;font-size:12px;font-weight:700" title="Ayuda">📖 Ayuda</div></div>`;
+  // En el FORMULARIO la dirección ya va en el REMITENTE de la etiqueta viva, así
+  // que aquí se omite (evita duplicarla). En SEGUIMIENTO no hay etiqueta → se muestra.
+  const showCity = bizCity && ayudaTipo==='track';
+  return `<div class="biz-header" style="position:relative"><div class="biz-name">${esc(bizName)}</div>${showCity?`<div class="biz-city">📍 ${esc(bizCity)}</div>`:''}<div onclick="${ayudaFn}" style="position:absolute;top:2px;right:0;display:flex;align-items:center;gap:4px;background:rgba(167,139,250,.12);border:1px solid rgba(167,139,250,.3);color:#a78bfa;border-radius:8px;padding:5px 10px;cursor:pointer;font-size:12px;font-weight:700" title="Ayuda">📖 Ayuda</div></div>`;
 }
 
 /* ─── Ayuda del formulario (autocontenida, pública) ──────────────── */
@@ -2219,21 +2226,34 @@ function _cercaSoloBuscador(){
   var btn=document.getElementById('shalomCercaBtn'); if(btn) btn.style.display='none';
   var drop=$('shalomDrop'); if(drop){ drop.style.display='none'; drop.innerHTML=''; }
 }
+// Estado visual del botón "Ver sedes cerca de mí": el feedback de "buscando"
+// vive EN el botón (pin latiendo), no abajo con un mensaje de parabólica.
+function _cercaBtnBuscando(on){
+  var btn=document.getElementById('shalomCercaBtn'); if(!btn) return;
+  if(on){
+    btn.disabled=true; btn.style.opacity='.75'; btn.style.cursor='progress';
+    btn.innerHTML='<span class="geo-pin">📍</span> Buscando tu ubicación…';
+  }else{
+    btn.disabled=false; btn.style.opacity=''; btn.style.cursor='pointer';
+    btn.innerHTML='📍 Ver sedes cerca de mí';
+  }
+}
 async function shalomCerca(){
   if(_cercaEnCurso) return;                 // doble-toque: ya hay uno en curso
   _cercaEnCurso=true;
   var myToken=++_cercaToken;                 // token de ESTA petición
+  _cercaBtnBuscando(true);                    // feedback EN el botón (pin animado)
   var drop=$('shalomDrop');
-  if(drop){ drop.style.display='block'; drop.innerHTML='<div style="padding:12px 14px;color:var(--text2);font-size:13px">📡 Buscando tu ubicación…</div>'; }
+  if(drop){ drop.style.display='none'; drop.innerHTML=''; } // sin mensaje abajo
   // Datos aún no cargados → cargarlos primero (evita "Sin resultados" falso).
   if(!(window._shalomData && window._shalomData.length)){
     try{ await shalomPrecargar(); }catch(e){}
   }
   // Si mientras cargaba el cliente escribió u otra acción tomó el relevo → abortar.
-  if(myToken!==_cercaToken){ _cercaEnCurso=false; return; }
+  if(myToken!==_cercaToken){ _cercaEnCurso=false; _cercaBtnBuscando(false); return; }
   if(!(window._shalomData && window._shalomData.length)){ _cercaEnCurso=false; _cercaSoloBuscador(); return; }
   _obtenerUbicacion(function(pos){
-    _cercaEnCurso=false;
+    _cercaEnCurso=false; _cercaBtnBuscando(false);
     if(myToken!==_cercaToken) return;        // carrera: el cliente ya escribió → ignorar
     var la=pos.coords.latitude, lo=pos.coords.longitude;
     var lista=(window._shalomData||[]).map(function(ag){
@@ -2244,7 +2264,7 @@ async function shalomCerca(){
     if(!lista.length){ _cercaSoloBuscador(); return; }   // sin coordenadas → solo buscador
     shalomMostrar(lista, 'Sedes más cercanas a tu ubicación');
   }, function(){
-    _cercaEnCurso=false;
+    _cercaEnCurso=false; _cercaBtnBuscando(false);
     if(myToken!==_cercaToken) return;
     _cercaSoloBuscador();                     // cualquier fallo/negación → solo buscador
   });
@@ -2328,8 +2348,11 @@ function shalomMostrar(agencias, aviso){
     return;
   }
   window._shalomCache = agencias;
-  // Encabezado IMPERATIVO fijo: le dice al cliente que solo debe TOCAR, no escribir.
-  const instruccion = '<div style="padding:9px 12px;background:rgba(79,142,247,.12);border-bottom:1px solid var(--bd);font-size:12px;font-weight:700;color:var(--blue);text-align:center">👇 Toca tu sede — no hace falta escribir</div>';
+  // Encabezado IMPERATIVO: "toca, no escribas". Pero NO tiene sentido mostrarlo
+  // mientras el cliente ESCRIBE (se contradice). Solo aparece cuando la lista
+  // llega sin tecleo: "cerca de mí" o lista inicial (buscador vacío).
+  const _q = (($('shalomAgInput')||{}).value||'').trim();
+  const instruccion = _q ? '' : '<div style="padding:9px 12px;background:rgba(79,142,247,.12);border-bottom:1px solid var(--bd);font-size:12px;font-weight:700;color:var(--blue);text-align:center">👇 Toca tu sede — no hace falta escribir</div>';
   const avisoHtml = aviso
     ? '<div style="padding:8px 12px;background:rgba(79,142,247,.08);border-bottom:1px solid var(--bd);font-size:11px;color:var(--blue);line-height:1.4">📍 '+esc(aviso)+'</div>'
     : '';
