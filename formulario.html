@@ -2324,10 +2324,12 @@ function shalomMostrar(agencias, aviso){
     return;
   }
   window._shalomCache = agencias;
+  // Encabezado IMPERATIVO fijo: le dice al cliente que solo debe TOCAR, no escribir.
+  const instruccion = '<div style="padding:9px 12px;background:rgba(79,142,247,.12);border-bottom:1px solid var(--bd);font-size:12px;font-weight:700;color:var(--blue);text-align:center">👇 Toca tu sede — no hace falta escribir</div>';
   const avisoHtml = aviso
     ? '<div style="padding:8px 12px;background:rgba(79,142,247,.08);border-bottom:1px solid var(--bd);font-size:11px;color:var(--blue);line-height:1.4">📍 '+esc(aviso)+'</div>'
     : '';
-  drop.innerHTML = avisoHtml + agencias.map((ag,i)=>{
+  drop.innerHTML = instruccion + avisoHtml + agencias.map((ag,i)=>{
     const nombre = ag.lugar_over||ag.nombre||'—';
     const dir    = ag.direccion||'';
     const geo    = [ag.zona||ag.distrito, ag.provincia, ag.departamento].filter(Boolean).join(' · ');
@@ -2336,13 +2338,17 @@ function shalomMostrar(agencias, aviso){
     const distTxt = (ag._distKm!=null && isFinite(ag._distKm))
       ? (ag._distKm<1 ? Math.round(ag._distKm*1000)+' m' : ag._distKm.toFixed(1)+' km')
       : '';
-    return `<div onclick="shalomSel(${i})" class="agc-item" style="border-radius:0;margin:0;border:none;border-bottom:1px solid var(--bd)">
-      <div style="font-weight:700;font-size:13px">${esc(nombre)}</div>
-      ${distTxt?`<div style="font-size:11px;color:var(--green);font-weight:700;margin-top:2px">📏 a ${distTxt}</div>`:''}
-      ${dir?`<div style="font-size:11px;color:var(--text2);margin-top:2px">📍 ${esc(dir)}</div>`:''}
-      ${geo?`<div style="font-size:10px;color:var(--blue);margin-top:2px">${esc(geo)}</div>`:''}
-      ${tel?`<div style="font-size:10px;color:var(--text2);margin-top:1px">📞 ${esc(tel)}</div>`:''}
-      ${hor?`<div style="font-size:10px;color:var(--text2);margin-top:1px">🕐 ${esc(hor)}</div>`:''}
+    // Chevron › a la derecha → la tarjeta se ve como algo que se TOCA (botón), no como info.
+    return `<div onclick="shalomSel(${i})" class="agc-item" style="border-radius:0;margin:0;border:none;border-bottom:1px solid var(--bd);display:flex;align-items:center;gap:8px">
+      <div style="flex:1;min-width:0">
+        <div style="font-weight:700;font-size:13px">${esc(nombre)}</div>
+        ${distTxt?`<div style="font-size:11px;color:var(--green);font-weight:700;margin-top:2px">📏 a ${distTxt}</div>`:''}
+        ${dir?`<div style="font-size:11px;color:var(--text2);margin-top:2px">📍 ${esc(dir)}</div>`:''}
+        ${geo?`<div style="font-size:10px;color:var(--blue);margin-top:2px">${esc(geo)}</div>`:''}
+        ${tel?`<div style="font-size:10px;color:var(--text2);margin-top:1px">📞 ${esc(tel)}</div>`:''}
+        ${hor?`<div style="font-size:10px;color:var(--text2);margin-top:1px">🕐 ${esc(hor)}</div>`:''}
+      </div>
+      <div style="font-size:22px;color:var(--blue);flex-shrink:0;line-height:1" aria-hidden="true">›</div>
     </div>`;
   }).join('');
   drop.style.display='block';
