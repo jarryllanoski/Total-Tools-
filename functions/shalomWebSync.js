@@ -137,12 +137,21 @@ const appendTracking = (ship, status, source, nowIso) => {
 //  - TRACKING VISIBLE (trackingStatus/trackingHistory + campos trackingWeb*)
 //    se escribe SIEMPRE — revive la tarjeta del panel como el Motor A. Su
 //    visibilidad para el CLIENTE se filtra aparte en handleTrack.
-//  - ETIQUETA INTERNA (status): SOLO si cfg.trackingWebCambiaEtiqueta === true.
-//    Mientras este apagado, el pedido no se mueve de columna (modo observacion
-//    de la etiqueta).
+//  - ETIQUETA INTERNA (status): segun el MODO de etiquetaModo (off/auto/semi).
+// Modo de etiquetas (agnostico al motor): off | auto | semi.
+//  - off : no mueve ninguna etiqueta (observacion).
+//  - auto: mueve todo, incluido FINALIZADO.
+//  - semi: mueve todo MENOS FINALIZADO (cierre manual del operador).
+// Compat: si no existe el campo nuevo, deriva del flag viejo booleano.
+const etiquetaModo = (cfg) => {
+  const m = cfg && cfg.trackingEtiquetaModo;
+  if (m === "off" || m === "auto" || m === "semi") return m;
+  return (cfg && cfg.trackingWebCambiaEtiqueta) ? "auto" : "off";
+};
+
 const decidirCambios = (ship, data, nowMs, cfg) => {
   const nowIso = new Date(nowMs).toISOString();
-  const cambiaEtiqueta = !!(cfg && cfg.trackingWebCambiaEtiqueta);
+  const modoEtiqueta = etiquetaModo(cfg);
 
   // Error del worker: solo campos de observacion, nada visible.
   if (!data || !data.ok) {
@@ -190,9 +199,10 @@ const decidirCambios = (ship, data, nowMs, cfg) => {
     Object.assign(write, appendTracking(ship, rawStatus, "auto-web", nowIso));
   }
 
-  // ETIQUETA INTERNA (status): SOLO en modo activo. Mueve el pedido de columna
-  // y decide FINALIZADO/PENDIENTE. Sigue controlada por "cambiar etiquetas".
-  if (cambiaEtiqueta && sugerida) {
+  // ETIQUETA INTERNA (status): segun el MODO. "off" no mueve nada; "auto" mueve
+  // todo; "semi" mueve todo MENOS FINALIZADO (el operador lo cierra a mano).
+  if (modoEtiqueta !== "off" && sugerida &&
+      !(modoEtiqueta === "semi" && sugerida === "FINALIZADO")) {
     write.status = sugerida;
   }
 
@@ -216,4 +226,5 @@ module.exports = {
   consultarWorker,
   decidirCambios,
   appendTracking,
+  etiquetaModo,
 };

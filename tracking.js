@@ -141,6 +141,23 @@ function detectarEstadoAuto(estadoTexto) {
 /* ══════════════════════════════════════════════
    APLICAR RESULTADO AL SHIPMENT
 ══════════════════════════════════════════════ */
+/* Modo de movimiento de etiquetas (AGNÓSTICO AL MOTOR), leído de la config.
+   Mismo criterio y compatibilidad que el backend: 'off' | 'auto' | 'semi'. */
+function _etiquetaModo(){
+  var c = window.S && window.S.config;
+  var m = c && c.trackingEtiquetaModo;
+  if (m === 'off' || m === 'auto' || m === 'semi') return m;
+  return (c && c.trackingWebCambiaEtiqueta) ? 'auto' : 'off';
+}
+/* ¿Se puede mover la etiqueta a `target`? off=nunca; semi=todo menos FINALIZADO;
+   auto=todo. (El tracking/observación se registra igual en los 3 modos.) */
+function _puedeMoverEtiqueta(target){
+  var m = _etiquetaModo();
+  if (m === 'off') return false;
+  if (m === 'semi' && target === 'FINALIZADO') return false;
+  return true;
+}
+
 function aplicarResultado(ship, raw, source) {
   var now = new Date().toISOString();
 
@@ -217,31 +234,33 @@ function aplicarResultado(ship, raw, source) {
 
   // ★ Automatizaciones de estado — solo para courier SHALOM
   var isShalom = ship.courier && ship.courier.toUpperCase().includes('SHALOM');
+  // El movimiento de la ETIQUETA (ship.status) respeta el modo (off/auto/semi).
+  // El tracking/observación ya se registró arriba; aquí solo se decide mover o no.
   if (isShalom) {
     if (autoEstado === 'FINALIZADO' && ship.status !== 'FINALIZADO') {
-      ship.status = 'FINALIZADO';
+      if (_puedeMoverEtiqueta('FINALIZADO')) ship.status = 'FINALIZADO';
       return 'FINALIZADO';
     }
     if (autoEstado === 'EN_DESTINO') {
       // Si tiene saldo pendiente → PENDIENTE DE PAGO, sino → LLEGÓ A DESTINO
       if (ship.cost && parseFloat(ship.cost) > 0 && ship.status !== 'PENDIENTE DE PAGO') {
-        ship.status = 'PENDIENTE DE PAGO';
+        if (_puedeMoverEtiqueta('PENDIENTE DE PAGO')) ship.status = 'PENDIENTE DE PAGO';
         return 'PENDIENTE DE PAGO';
       } else if (ship.status !== 'LLEGÓ A DESTINO' && ship.status !== 'PENDIENTE DE PAGO' && ship.status !== 'FINALIZADO') {
-        ship.status = 'LLEGÓ A DESTINO';
+        if (_puedeMoverEtiqueta('LLEGÓ A DESTINO')) ship.status = 'LLEGÓ A DESTINO';
         return 'EN_DESTINO';
       }
     }
     // Si estaba en NUEVO PEDIDO/EN PROCESO y tiene guía → ENVIADO
     if (autoEstado === null && guiaOk &&
         (ship.status === 'NUEVO PEDIDO' || ship.status === 'EN PROCESO' || ship.status === 'POR ALISTAR' || ship.status === 'ALISTADO')) {
-      ship.status = 'ENVIADO';
+      if (_puedeMoverEtiqueta('ENVIADO')) ship.status = 'ENVIADO';
       return 'ENVIADO';
     }
   } else {
     // Para otros couriers solo FINALIZADO automático
     if (autoEstado === 'FINALIZADO' && ship.status !== 'FINALIZADO') {
-      ship.status = 'FINALIZADO';
+      if (_puedeMoverEtiqueta('FINALIZADO')) ship.status = 'FINALIZADO';
       return 'FINALIZADO';
     }
   }
@@ -568,6 +587,7 @@ function _estadoChip(ship) {
 ══════════════════════════════════════════════ */
 var Tracking = {};
 Tracking.checkDestinoAlerts = _checkDestinoAlerts; // vigilante "llegó a destino" (hook desde render)
+Tracking._puedeMoverEtiqueta = _puedeMoverEtiqueta; // predicado del modo (off/auto/semi) — testeable
 
 /* ── Helper: obtener shipments desde cualquier fuente ─────────────── */
 function _getShipments() {

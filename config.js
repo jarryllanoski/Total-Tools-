@@ -1039,8 +1039,13 @@ function loadCfgUI(){
     const motor=S.config.trackingMotor||'off';
     const sel=$('cfgTrackingMotor'); if(sel) sel.value=motor;
     const box=$('cfgTrackingWebBox'); if(box) box.style.display=(motor==='web')?'block':'none';
-    const te=$('tglTrackingWebEtiqueta');
-    if(te) te.classList.toggle('on', !!S.config.trackingWebCambiaEtiqueta);
+    const em=$('cfgTrackingEtiquetaModo');
+    if(em){
+      const modo=S.config.trackingEtiquetaModo||(S.config.trackingWebCambiaEtiqueta?'auto':'off');
+      em.value=modo;
+      const d=$('cfgTrackingEtiquetaDesc');
+      if(d&&typeof window._etiquetaModoDesc==='function') d.innerHTML=window._etiquetaModoDesc(modo);
+    }
     const tc=$('tglTrackingWebCliente');
     if(tc) tc.classList.toggle('on', !!S.config.trackingWebMostrarCliente);
     const th=$('cfgTrackingWebTransitoH');

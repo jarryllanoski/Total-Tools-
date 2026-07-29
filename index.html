@@ -609,9 +609,14 @@
 
     <!-- Opciones del motor propio (solo visibles cuando está elegido) -->
     <div id="cfgTrackingWebBox" style="display:none;margin-top:10px;padding:11px;background:var(--bg2);border:1px solid var(--bd);border-radius:10px">
-      <div class="tgl-row" style="border:none;padding-top:0">
-        <div style="max-width:74%"><div class="tgl-n">Cambiar etiquetas automáticamente</div><div class="tgl-s">Apagado = <b>modo observación</b>: registra lo que dice Shalom sin mover la etiqueta del pedido. Ideal para validar unas semanas.</div></div>
-        <div class="tgl" id="tglTrackingWebEtiqueta" onclick="toggleTrackingWebEtiqueta()"></div>
+      <div class="fg" style="margin-top:0;margin-bottom:2px">
+        <label class="fl">Cambiar etiquetas automáticamente</label>
+        <select class="fs" id="cfgTrackingEtiquetaModo" onchange="setTrackingEtiquetaModo(this.value)">
+          <option value="off">Apagado — solo observación</option>
+          <option value="auto">Automática — mueve todo</option>
+          <option value="semi">Semiautomática — no finaliza</option>
+        </select>
+        <div class="tgl-s" style="margin-top:5px" id="cfgTrackingEtiquetaDesc"></div>
       </div>
       <div class="tgl-row" style="border:none">
         <div style="max-width:74%"><div class="tgl-n">📱 Mostrar en el link del cliente</div><div class="tgl-s">El cliente ve el estado de Shalom en su link de seguimiento. Apagado = solo tú lo ves en el panel.</div></div>
@@ -1842,16 +1847,25 @@ function setTrackingMotor(v){
   save('config');
   toast(v==='web'?'🖥️ Rastreo con mi servidor activado':(v==='api'?'☁️ Rastreo con API paga activado':'⏸️ Rastreo automático apagado'));
 }
-/* Modo observación vs cambio real de etiquetas (Motor B). */
-function toggleTrackingWebEtiqueta(){
-  const el=document.getElementById('tglTrackingWebEtiqueta'); if(!el) return;
-  el.classList.toggle('on');
-  const on=el.classList.contains('on');
-  S.config=S.config||{};
-  S.config.trackingWebCambiaEtiqueta=on;
-  save('config');
-  toast(on?'🏷️ Cambio de etiquetas ACTIVADO':'👀 Modo observación (no mueve etiquetas)');
+/* Modo de movimiento de etiquetas (agnóstico al motor A/B): off | auto | semi.
+   Se guarda en trackingEtiquetaModo; se mantiene el flag viejo en sync por compat. */
+function _etiquetaModoDesc(v){
+  return v==='auto' ? 'Mueve todo según Shalom, <b>incluido Finalizado</b>.'
+       : v==='semi' ? 'Mueve todo <b>menos Finalizado</b> — ese lo cierras tú a mano.'
+       : 'Registra lo de Shalom <b>sin mover ninguna etiqueta</b> (ideal para validar).';
 }
+function setTrackingEtiquetaModo(v){
+  if(v!=='off'&&v!=='auto'&&v!=='semi') v='off';
+  S.config=S.config||{};
+  S.config.trackingEtiquetaModo=v;
+  S.config.trackingWebCambiaEtiqueta=(v==='auto'); // compat con lectores viejos
+  const d=document.getElementById('cfgTrackingEtiquetaDesc');
+  if(d) d.innerHTML=_etiquetaModoDesc(v);
+  save('config');
+  toast(v==='off'?'👀 Observación (no mueve etiquetas)':v==='auto'?'🏷️ Automática (mueve todo)':'🟡 Semiautomática (no finaliza)');
+}
+window.setTrackingEtiquetaModo=setTrackingEtiquetaModo;
+window._etiquetaModoDesc=_etiquetaModoDesc;
 /* Mostrar el estado de Shalom (Motor B) en el link del cliente. */
 function toggleTrackingWebCliente(){
   const el=document.getElementById('tglTrackingWebCliente'); if(!el) return;
