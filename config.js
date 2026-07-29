@@ -275,6 +275,31 @@ function addLink(){const v=$('fLink').value.trim();if(!v){toast('Ingresa un link
 function removeLink(i){_links.splice(i,1);renderLinks()}
 function renderLinks(){$('linkListForm').innerHTML=_links.map((l,i)=>`<div class="link-item"><span>🔗</span><div class="link-name">${esc(l.n)}</div><a href="${esc(l.u)}" target="_blank" style="color:var(--blue);font-size:12px;text-decoration:none">↗</a><button class="link-del" type="button" onclick="removeLink(${i})">✕</button></div>`).join('')}
 
+/* MONTO / ADELANTO / DEUDA — deuda = max(0, monto − adelanto). El campo `cost`
+   del pedido guarda la DEUDA (lo leen 14 lugares que siguen funcionando igual). */
+function recalcDeuda(){
+  const m=parseFloat(($('fMonto')||{value:''}).value)||0;
+  const a=parseFloat(($('fAdelanto')||{value:''}).value)||0;
+  const d=Math.max(0, m-a);
+  if($('fDeuda')) $('fDeuda').value = d>0 ? String(Math.round(d*100)/100) : '';
+}
+function toggleMontoEdit(){
+  const r=$('montoRow'); if(!r) return;
+  r.style.display = (r.style.display==='none'||!r.style.display) ? 'flex' : 'none';
+}
+// Carga monto/adelanto/deuda al abrir el form. Pedido viejo: deriva monto=cost.
+function _loadMontoFields(s){
+  let monto='', adel='';
+  if(s){
+    monto = (s.monto!=null && s.monto!=='') ? s.monto : (s.cost||'');
+    adel  = (s.adelanto!=null) ? s.adelanto : '';
+  }
+  if($('fMonto')) $('fMonto').value=monto;
+  if($('fAdelanto')) $('fAdelanto').value=adel;
+  if($('montoRow')) $('montoRow').style.display='none';
+  recalcDeuda();
+}
+
 /* FORM */
 let _editId=null;
 function openForm(id){
@@ -293,6 +318,7 @@ function openForm(id){
   $('extraForm').innerHTML=S.extraFields.map(f=>`<div class="fg"><label class="fl">${f}</label><input class="fi xf" data-f="${f}" placeholder="${f}..."></div>`).join('');
   _docs={guia:null,embalado:null,ticket:null};_links=[];
   refreshSlot('guia');refreshSlot('embalado');refreshSlot('ticket');renderLinks();
+  _loadMontoFields(null);   // limpiar monto/adelanto/deuda (pedido nuevo); el edit lo sobreescribe
   ['inGuiaCam','inGuiaGal','inGuiaPdf','inEmbCam','inEmbGal','inEmbPdf','inTicketCam','inTicketGal','inTicketPdf'].forEach(i=>{const e=$(i);if(e)e.value=''});
   if(id){
     const s=S.shipments.find(x=>x.id===id);
@@ -302,7 +328,7 @@ function openForm(id){
     $('fAddr').value=_isEncEdit?(s.ciudadDestino||s.address||''):s.address;
     if($('fEncAgencia'))$('fEncAgencia').value=s.encAgencia||'';
     $('fCourier').value=s.courier;$('fDate').value=s.date;$('fStatus').value=s.status;
-    $('fCost').value=s.cost||'';$('fNotes').value=s.notes||'';
+    $('fNotes').value=s.notes||'';_loadMontoFields(s);
     document.querySelectorAll('.xf').forEach(el=>{el.value=(s.extra&&s.extra[el.dataset.f])||''});
     if(s.docGuia){_docs.guia=s.docGuia;refreshSlot('guia')}
     if(s.docEmbalado){_docs.embalado=s.docEmbalado;refreshSlot('embalado')}
@@ -316,7 +342,7 @@ function openForm(id){
     }
     _links=s.links?JSON.parse(JSON.stringify(s.links)):[];renderLinks();
   }else{
-    ['fName','fPhone','fAddr','fCost','fNotes'].forEach(i=>$(i).value='');if($('fDni'))$('fDni').value='';if($('fEncAgencia'))$('fEncAgencia').value='';
+    ['fName','fPhone','fAddr','fNotes'].forEach(i=>$(i).value='');if($('fDni'))$('fDni').value='';if($('fEncAgencia'))$('fEncAgencia').value='';
     $('fDate').valueAsDate=new Date();
     // Courier por defecto: SHALOM (siempre está en la lista del panel)
     if($('fCourier')){ const _sh=Array.from($('fCourier').options).find(o=>(o.value||'').toUpperCase().includes('SHALOM')); if(_sh) $('fCourier').value=_sh.value; }
@@ -514,7 +540,10 @@ function saveShipment(){
   const dni=($('fDni')||{value:''}).value.trim();
   const _isEncSave=($('fCourier').value||'').toUpperCase().includes('ENCOMIENDA');
   const _encAgencia=_isEncSave?($('fEncAgencia')||{value:''}).value.trim():'';
-  const data={name,phone,dni,address:_isEncSave?'':addr,courier:$('fCourier').value,date:$('fDate').value,status:$('fStatus').value,cost:$('fCost').value,notes:$('fNotes').value.trim(),extra,docGuia:_docs.guia,docEmbalado:_docs.embalado,docTicket:_docs.ticket,links:JSON.parse(JSON.stringify(_links)),sel:false,chkGuia:false,chkEmbalado:false,chkTicket:false};
+  const _monto=($('fMonto')||{value:''}).value.trim();
+  const _adel=($('fAdelanto')||{value:''}).value.trim();
+  const _deuda=Math.max(0,(parseFloat(_monto)||0)-(parseFloat(_adel)||0));
+  const data={name,phone,dni,address:_isEncSave?'':addr,courier:$('fCourier').value,date:$('fDate').value,status:$('fStatus').value,monto:_monto,adelanto:_adel,cost:(_deuda>0?String(_deuda):''),notes:$('fNotes').value.trim(),extra,docGuia:_docs.guia,docEmbalado:_docs.embalado,docTicket:_docs.ticket,links:JSON.parse(JSON.stringify(_links)),sel:false,chkGuia:false,chkEmbalado:false,chkTicket:false};
   if(_isEncSave){data.ciudadDestino=addr;data.encAgencia=_encAgencia;}
   // ★ SHALOM: leer campos guía
   const _sGuia   = ($('fShalomGuia')   ? $('fShalomGuia').value.trim()   : '')||'';
@@ -787,6 +816,8 @@ async function genToken(action){
   const name    = ($('tokName').value||'').trim();
   const phone   = ($('tokPhone').value||'').trim();
   const link    = ($('tokLink').value||'').trim();
+  const monto   = (($('tokMonto')||{}).value||'').trim();
+  const adelanto= (($('tokAdelanto')||{}).value||'').trim();
   const expDays = parseInt($('tokExp').value||'0')||0;
   if(!name && !phone){ toast('⚠️ Escribe el nombre o teléfono del cliente'); return; }
   // Esperar Firebase
@@ -799,6 +830,8 @@ async function genToken(action){
     prefillName:  name,
     prefillPhone: phone||'',
     prefillLink:  link||'',
+    monto:        monto||'',      // el backend los ata al pedido (el cliente no los ve)
+    adelanto:     adelanto||'',
     used:         false,
     expiresAt:    expDays ? new Date(Date.now()+expDays*864e5).toISOString() : null,
   };
@@ -808,6 +841,7 @@ async function genToken(action){
     try{const cfgId=await _snapshotFormConfig();cfgParam=`&cfg=${cfgId}`;}catch(e){console.warn('cfg snapshot:',e);}
     const url = getFormLink()+'?t='+id+cfgParam;
     $('tokName').value=''; $('tokPhone').value=''; $('tokLink').value=''; $('tokExp').value='';
+    if($('tokMonto')) $('tokMonto').value=''; if($('tokAdelanto')) $('tokAdelanto').value='';
     // Pequeño delay para que Firebase indexe el documento
     await new Promise(r=>setTimeout(r,800));
     if(action==='copy'){
@@ -817,7 +851,11 @@ async function genToken(action){
         toast('🔑 Link copiado');
       });
     } else {
-      const msg='📦 Hola '+name+', aquí tu link para registrar tu pedido:\n\n'+url+(link?'\n\n📎 '+link:'');
+      // Mensaje del FORMULARIO (solo el link de registro). Si hay documento
+      // adjunto, va en un bloque SEPARADO y rotulado para que el cliente sepa
+      // cuál es cuál — un solo WhatsApp.
+      const registro='📦 Programa tu envío aquí 👇\n📝 así registramos bien tu pedido y evitamos errores en el envío\n🔗 Es rápido y nos ayuda a brindarte una mejor atención 👍\n\n'+url;
+      const msg=registro+(link?'\n\n─────────\n📎 Aquí tu documento:\n'+link:'');
       if(phone){ window.waOpen(phone, msg); }
       else if(navigator.share){ navigator.share({title:'Pedido - '+name,text:msg}).catch(()=>window.open('https://wa.me/?text='+encodeURIComponent(msg),'_blank')); }
       else { window.open('https://wa.me/?text='+encodeURIComponent(msg),'_blank'); }

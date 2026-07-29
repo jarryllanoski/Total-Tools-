@@ -452,28 +452,17 @@
     <div style="font-size:13px;color:var(--text2);line-height:1.6">Generá un link único por cliente.<br>Una vez que lo usa queda bloqueado automáticamente.</div>
   </div>
 
-  <!-- LINKS RÁPIDOS -->
-  <div class="cfg-sec">
-    <div class="cfg-ttl">⚡ Links rápidos</div>
-    <div style="font-size:11px;color:var(--text2);margin-bottom:12px;line-height:1.5">Sin datos del cliente — genera un link de <b>un solo uso</b>; se bloquea al usarse.</div>
-    <div style="display:flex;gap:8px">
-      <button onclick="copyLink()" style="flex:1;padding:13px 8px;background:var(--bg2);border:1.5px solid var(--bd);border-radius:12px;color:var(--text);font-weight:600;font-size:13px;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:6px">📋 Copiar link</button>
-      <button onclick="openFormLink()" style="flex:1;padding:13px 8px;background:var(--bg2);border:1.5px solid var(--bd);border-radius:12px;color:var(--text2);font-weight:600;font-size:13px;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:6px">↗ Abrir</button>
-    </div>
-    <button onclick="shareWA()" style="width:100%;margin-top:8px;padding:14px;background:rgba(37,211,102,.15);border:1.5px solid rgba(37,211,102,.35);border-radius:12px;color:#25D366;font-weight:700;font-size:14px;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:8px">
-      💬 Compartir por WhatsApp
-    </button>
-  </div>
-
   <!-- LINK PERSONALIZADO -->
   <div class="cfg-sec">
     <div class="cfg-ttl">✨ Link personalizado <span onclick="if(window.Ayuda)Ayuda.abrir('linkPersonalizado')" style="font-size:11px;color:#8b949e;cursor:pointer;font-weight:400;margin-left:6px" title="Ayuda">📖 Ayuda</span></div>
     <div style="font-size:11px;color:var(--text2);margin-bottom:12px;line-height:1.5">Genera un link único con datos del cliente. Se bloquea tras un uso.</div>
-    <div class="fg">
-      <input class="fi" id="tokName" placeholder="Nombre del cliente (ej. Juan Pérez)" maxlength="60" autocomplete="off">
+    <div class="frow">
+      <div class="fg"><input class="fi" id="tokName" placeholder="Nombre del cliente" maxlength="60" autocomplete="off"></div>
+      <div class="fg"><input class="fi" id="tokMonto" type="number" inputmode="decimal" placeholder="Monto S/" min="0" step="0.5" autocomplete="off"></div>
     </div>
-    <div class="fg">
-      <input class="fi phone-norm" id="tokPhone" type="tel" inputmode="numeric" placeholder="Teléfono del cliente (opcional)" autocomplete="off">
+    <div class="frow">
+      <div class="fg"><input class="fi phone-norm" id="tokPhone" type="tel" inputmode="numeric" placeholder="Teléfono (opcional)" autocomplete="off"></div>
+      <div class="fg"><input class="fi" id="tokAdelanto" type="number" inputmode="decimal" placeholder="Adelanto S/" min="0" step="0.5" autocomplete="off"></div>
     </div>
     <div class="fg">
       <input class="fi" id="tokLink" type="url" inputmode="url" placeholder="🔗 Link adjunto (Drive, Mega, etc.) — opcional" autocomplete="off">
@@ -487,6 +476,19 @@
     </select>
     <button onclick="genToken('copy')" style="width:100%;padding:13px;background:var(--bg2);border:1.5px solid var(--bd);border-radius:12px;color:var(--text);font-weight:600;font-size:14px;cursor:pointer;font-family:inherit;margin-bottom:8px">📋 Generar y copiar link</button>
     <button onclick="genToken('share')" style="width:100%;padding:15px;background:var(--blue);border:none;border-radius:12px;color:#fff;font-weight:700;font-size:15px;cursor:pointer;font-family:inherit">🔑 Generar y compartir link</button>
+  </div>
+
+  <!-- LINKS RÁPIDOS -->
+  <div class="cfg-sec">
+    <div class="cfg-ttl">⚡ Links rápidos</div>
+    <div style="font-size:11px;color:var(--text2);margin-bottom:12px;line-height:1.5">Sin datos del cliente — genera un link de <b>un solo uso</b>; se bloquea al usarse.</div>
+    <div style="display:flex;gap:8px">
+      <button onclick="copyLink()" style="flex:1;padding:13px 8px;background:var(--bg2);border:1.5px solid var(--bd);border-radius:12px;color:var(--text);font-weight:600;font-size:13px;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:6px">📋 Copiar link</button>
+      <button onclick="openFormLink()" style="flex:1;padding:13px 8px;background:var(--bg2);border:1.5px solid var(--bd);border-radius:12px;color:var(--text2);font-weight:600;font-size:13px;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:6px">↗ Abrir</button>
+    </div>
+    <button onclick="shareWA()" style="width:100%;margin-top:8px;padding:14px;background:rgba(37,211,102,.15);border:1.5px solid rgba(37,211,102,.35);border-radius:12px;color:#25D366;font-weight:700;font-size:14px;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:8px">
+      💬 Compartir por WhatsApp
+    </button>
   </div>
 
   <!-- LINKS GENERADOS -->
@@ -662,7 +664,11 @@
     </div>
     <div class="frow">
       <div class="fg"><label class="fl">Estado</label><select class="fs" id="fStatus"></select></div>
-      <div class="fg"><label class="fl">Costo S/</label><input class="fi" id="fCost" type="number" placeholder="0.00" min="0" step="0.5"></div>
+      <div class="fg"><label class="fl">Deuda S/ <span onclick="toggleMontoEdit()" style="font-size:10px;color:var(--blue);cursor:pointer;font-weight:400;margin-left:4px" title="Editar monto y adelanto">✏️ Editar</span></label><input class="fi" id="fDeuda" type="number" placeholder="0.00" readonly></div>
+    </div>
+    <div class="frow" id="montoRow" style="display:none">
+      <div class="fg"><label class="fl">Monto S/</label><input class="fi" id="fMonto" type="number" placeholder="0.00" min="0" step="0.5" inputmode="decimal" oninput="recalcDeuda()"></div>
+      <div class="fg"><label class="fl">Adelanto S/</label><input class="fi" id="fAdelanto" type="number" placeholder="0.00" min="0" step="0.5" inputmode="decimal" oninput="recalcDeuda()"></div>
     </div>
     <div class="fg"><label class="fl">Notas</label><input class="fi" id="fNotes" placeholder="Llamar antes..."></div>
     <div id="extraForm"></div>

@@ -153,13 +153,14 @@ async function handleCreate(req, res) {
   }
 
   // Re-validar token para evitar carreras: si ya fue usado entre ?t= y submit
+  let tokData = null;
   if (tokenId) {
     const tokSnap = await db.doc(`${TOK_COL}/${tokenId}`).get();
     if (!tokSnap.exists) {
       res.status(400).json({status: "error", error: "Token inválido"});
       return;
     }
-    const tokData = tokSnap.data();
+    tokData = tokSnap.data();
     if (tokData.used) {
       res.status(400).json({status: "error", error: "Token ya utilizado"});
       return;
@@ -182,6 +183,18 @@ async function handleCreate(req, res) {
     createdAt: order.createdAt || new Date().toISOString(),
     fromForm: true,
   });
+
+  // Monto/adelanto vienen del TOKEN (los puso el operador), NO del cliente →
+  // el cliente no los ve ni los puede alterar. Deuda = max(0, monto-adelanto)
+  // se guarda en `cost` (lo leen tarjeta/dashboard/tracking, etc.).
+  if (tokData && (tokData.monto || tokData.adelanto)) {
+    const monto = Number(tokData.monto) || 0;
+    const adelanto = Number(tokData.adelanto) || 0;
+    const deuda = Math.max(0, monto - adelanto);
+    orderToSave.monto = String(tokData.monto || "");
+    orderToSave.adelanto = String(tokData.adelanto || "");
+    orderToSave.cost = deuda > 0 ? String(deuda) : "";
+  }
 
   // Escritura atómica: pedido + token + señal al panel
   const batch = db.batch();
