@@ -1613,6 +1613,9 @@ function visibleShipments(){
 }
 
 function render(){
+  // Vigilante "llegó a destino" (agnóstico al motor A/B). Avisa por transición
+  // de estado; hook explícito, sin monkey-patch. Idempotente (avisa una vez).
+  if(window.Tracking&&Tracking.checkDestinoAlerts)Tracking.checkDestinoAlerts();
   updateStats(); updateAdvBar();
   const sel=S.shipments.filter(x=>x.sel);
   // Resaltar en azul el botón "seleccionar todo" si hay algún pedido seleccionado

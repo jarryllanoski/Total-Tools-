@@ -226,11 +226,9 @@ function aplicarResultado(ship, raw, source) {
       // Si tiene saldo pendiente → PENDIENTE DE PAGO, sino → LLEGÓ A DESTINO
       if (ship.cost && parseFloat(ship.cost) > 0 && ship.status !== 'PENDIENTE DE PAGO') {
         ship.status = 'PENDIENTE DE PAGO';
-        _mostrarAlertaDestino(ship);
         return 'PENDIENTE DE PAGO';
       } else if (ship.status !== 'LLEGÓ A DESTINO' && ship.status !== 'PENDIENTE DE PAGO' && ship.status !== 'FINALIZADO') {
         ship.status = 'LLEGÓ A DESTINO';
-        _mostrarAlertaDestino(ship);
         return 'EN_DESTINO';
       }
     }
@@ -320,7 +318,6 @@ async function autoTrackingCheck() {
       } else {
         okCount++;
         if (resultado !== 'sin-cambio') changedCount++; // ★ hubo cambio real
-        if (resultado === 'EN_DESTINO') _mostrarAlertaDestino(ship);
       }
     } catch(e) {
       errCount++;
@@ -360,21 +357,100 @@ async function autoTrackingCheck() {
 /* ══════════════════════════════════════════════
    ALERTA DE DESTINO
 ══════════════════════════════════════════════ */
-function _mostrarAlertaDestino(ship) {
-  var div = document.createElement('div');
-  div.style.cssText = 'position:fixed;top:70px;left:50%;transform:translateX(-50%);'+
-    'background:#1c2333;border:2px solid #a78bfa;border-radius:12px;'+
-    'padding:14px 18px;z-index:999;max-width:340px;width:calc(100% - 32px);'+
-    'box-shadow:0 8px 24px rgba(0,0,0,.6)';
-  div.innerHTML = '<div style="font-size:12px;font-weight:800;color:#a78bfa;margin-bottom:6px">📍 PEDIDO LLEGÓ A DESTINO</div>'+
+/* ── Aviso "llegó a destino" — vigilante AGNÓSTICO AL MOTOR ─────────────────
+   Detecta la TRANSICIÓN de un pedido a destino (por status o por trackingStatus)
+   y avisa UNA sola vez, sin importar el motor (A local o B por Firestore). Se
+   dispara desde render() → Tracking.checkDestinoAlerts. El aviso queda FIJO
+   hasta que lo cierres. */
+var _destinoAvisados = null;   // Set de ids ya avisados (persistido en localStorage)
+var _destinoKeyPrevio = false; // ¿existía la clave? (para sembrar en el rollout sin avalancha)
+
+function _loadDestinoAvisados(){
+  if (_destinoAvisados) return;
+  try {
+    var raw = localStorage.getItem('tt_destino_avisados');
+    _destinoKeyPrevio = (raw != null);
+    _destinoAvisados = new Set(raw ? JSON.parse(raw) : []);
+  } catch(e){ _destinoAvisados = new Set(); _destinoKeyPrevio = false; }
+}
+function _saveDestinoAvisados(){
+  try { localStorage.setItem('tt_destino_avisados',
+    JSON.stringify(Array.from(_destinoAvisados).slice(-500))); } catch(e){}
+}
+// ¿El pedido está "en destino"? Agnóstico al motor y al modo (etiqueta u observación).
+function _esDestino(s){
+  if (!s || s.status === 'FINALIZADO') return false;
+  if (s.status === 'LLEGÓ A DESTINO' || s.status === 'PENDIENTE DE PAGO') return true;
+  return detectarEstadoAuto(s.trackingStatus || '') === 'EN_DESTINO';
+}
+// Vigilante: avisa los que ENTRARON a destino y no se habían avisado. En el primer
+// arranque (sin clave previa) solo SIEMBRA en silencio → nada de avisos en masa.
+function _checkDestinoAlerts(){
+  _loadDestinoAvisados();
+  var ships = _getShipments() || [];
+  var nuevos = ships.filter(function(s){ return s && s.id && _esDestino(s) && !_destinoAvisados.has(s.id); });
+  if (!nuevos.length) return;
+  nuevos.forEach(function(s){ _destinoAvisados.add(s.id); });
+  _saveDestinoAvisados();
+  if (!_destinoKeyPrevio){ _destinoKeyPrevio = true; return; } // rollout: solo sembrar
+  if (nuevos.length <= 3){ nuevos.forEach(_mostrarAlertaDestino); }
+  else { _mostrarAlertaResumenDestino(nuevos.length); }
+}
+
+function _destinoStack(){
+  var s = document.getElementById('trkDestinoStack');
+  if (!s){
+    s = document.createElement('div');
+    s.id = 'trkDestinoStack';
+    s.style.cssText = 'position:fixed;top:66px;left:50%;transform:translateX(-50%);'+
+      'z-index:999;display:flex;flex-direction:column;gap:8px;'+
+      'width:calc(100% - 32px);max-width:340px;pointer-events:none';
+    document.body.appendChild(s);
+  }
+  return s;
+}
+function _destinoCard(){
+  var d = document.createElement('div');
+  d.style.cssText = 'background:#1c2333;border:2px solid #a78bfa;border-radius:12px;'+
+    'padding:14px 18px;box-shadow:0 8px 24px rgba(0,0,0,.6);pointer-events:auto';
+  return d;
+}
+function _btn(txt, css){
+  var b = document.createElement('button'); b.textContent = txt; b.style.cssText = css; return b;
+}
+// Aviso individual (fijo hasta cerrar). Construido con DOM + addEventListener →
+// el teléfono no va en un onclick inline (cierra el vector XSS del hallazgo #5).
+function _mostrarAlertaDestino(ship){
+  if (!ship || !ship.id) return;
+  var stack = _destinoStack();
+  if (stack.querySelector('[data-ship="'+ship.id+'"]')) return; // dedup: ya visible
+  var phone = String(ship.phone || '').replace(/\D/g, ''); // solo dígitos
+  var d = _destinoCard(); d.setAttribute('data-ship', ship.id);
+  var head = document.createElement('div');
+  head.innerHTML = '<div style="font-size:12px;font-weight:800;color:#a78bfa;margin-bottom:6px">📍 PEDIDO LLEGÓ A DESTINO</div>'+
     '<div style="font-size:13px;color:#e6edf3;margin-bottom:4px"><b>'+_esc(ship.name)+'</b></div>'+
-    '<div style="font-size:11px;color:#8b949e;margin-bottom:10px">Guía: '+_esc(ship.trackingOrderNumber||'')+'</div>'+
-    '<div style="display:flex;gap:8px">'+
-    '<button onclick="this.closest(\'div[style]\').remove()" style="flex:1;background:#30363d;border:none;border-radius:8px;color:#8b949e;padding:8px;font-size:12px;cursor:pointer;font-family:inherit">Cerrar</button>'+
-    '<button onclick="window.open(\'https://wa.me/51'+_esc(ship.phone)+'\',\'_blank\');this.closest(\'div[style]\').remove()" style="flex:2;background:rgba(167,139,250,.15);border:1px solid rgba(167,139,250,.3);border-radius:8px;color:#a78bfa;padding:8px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">💬 Avisar cliente</button>'+
-    '</div>';
-  document.body.appendChild(div);
-  setTimeout(function(){ if(div.parentNode) div.remove(); }, 15000);
+    '<div style="font-size:11px;color:#8b949e;margin-bottom:10px">Guía: '+_esc(ship.trackingOrderNumber||'')+'</div>';
+  var row = document.createElement('div'); row.style.cssText = 'display:flex;gap:8px';
+  var bClose = _btn('Cerrar', 'flex:1;background:#30363d;border:none;border-radius:8px;color:#8b949e;padding:8px;font-size:12px;cursor:pointer;font-family:inherit');
+  bClose.addEventListener('click', function(){ d.remove(); });
+  var bWa = _btn('💬 Avisar cliente', 'flex:2;background:rgba(167,139,250,.15);border:1px solid rgba(167,139,250,.3);border-radius:8px;color:#a78bfa;padding:8px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit');
+  bWa.addEventListener('click', function(){ if(phone) window.open('https://wa.me/51'+phone, '_blank'); d.remove(); });
+  row.appendChild(bClose); row.appendChild(bWa);
+  d.appendChild(head); d.appendChild(row); stack.appendChild(d);
+}
+// Aviso resumen cuando llegan varios de golpe (fijo hasta cerrar).
+function _mostrarAlertaResumenDestino(n){
+  var stack = _destinoStack();
+  var d = _destinoCard();
+  var head = document.createElement('div');
+  head.innerHTML = '<div style="font-size:12px;font-weight:800;color:#a78bfa;margin-bottom:8px">📍 '+n+' PEDIDOS LLEGARON A DESTINO</div>';
+  var row = document.createElement('div'); row.style.cssText = 'display:flex;gap:8px';
+  var bClose = _btn('Cerrar', 'flex:1;background:#30363d;border:none;border-radius:8px;color:#8b949e;padding:8px;font-size:12px;cursor:pointer;font-family:inherit');
+  bClose.addEventListener('click', function(){ d.remove(); });
+  var bVer = _btn('Ver', 'flex:2;background:rgba(167,139,250,.15);border:1px solid rgba(167,139,250,.3);border-radius:8px;color:#a78bfa;padding:8px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit');
+  bVer.addEventListener('click', function(){ if(typeof window.setFilt==='function') window.setFilt('LLEGÓ A DESTINO'); d.remove(); });
+  row.appendChild(bClose); row.appendChild(bVer);
+  d.appendChild(head); d.appendChild(row); stack.appendChild(d);
 }
 
 /* ══════════════════════════════════════════════
@@ -491,6 +567,7 @@ function _estadoChip(ship) {
    API PÚBLICA: Tracking
 ══════════════════════════════════════════════ */
 var Tracking = {};
+Tracking.checkDestinoAlerts = _checkDestinoAlerts; // vigilante "llegó a destino" (hook desde render)
 
 /* ── Helper: obtener shipments desde cualquier fuente ─────────────── */
 function _getShipments() {
@@ -765,7 +842,6 @@ Tracking.consultarAhora = async function(shipId) {
     if (typeof window.toast === 'function') window.toast('✅ FINALIZADO — Shalom confirma entrega');
   } else if (resultado === 'EN_DESTINO') {
     if (typeof window.toast === 'function') window.toast('📍 Pedido llegó a destino — avisar al cliente');
-    _mostrarAlertaDestino(ship);
   } else {
     if (typeof window.toast === 'function') window.toast('🔄 Estado: ' + (ship.trackingStatus || '—'));
   }
