@@ -66,7 +66,7 @@
   // ── Lectura de los campos del cliente (mismos getters que la boleta) ─
   function getName(){ var v=val('f_name'); return v?v.toUpperCase():''; }
   function getPhone(){ var v=val('f_phone').replace(/\D/g,''); return v?'+51 '+v:''; }
-  function getDni(){ return val('f_dni_recoger')||val('f_dni_dest')||''; }
+  function getDni(){ return val('f_dni')||''; }
   function getCourier(){
     var s=document.getElementById('f_courier'); if(!s||!s.value) return '';
     var o=s.options[s.selectedIndex]; return o?(o.textContent||s.value).trim():s.value;

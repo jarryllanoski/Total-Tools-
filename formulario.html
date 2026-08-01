@@ -638,10 +638,14 @@ function headerHtml(ayudaTipo){
   const bizCity = (CFG&&(CFG.city||CFG.config&&CFG.config.city)) || '';
   // ayudaTipo: 'track' = ayuda de seguimiento, cualquier otro = ayuda del formulario
   const ayudaFn = ayudaTipo==='track' ? 'abrirAyudaTrack()' : 'abrirAyudaForm()';
-  // En el FORMULARIO la dirección ya va en el REMITENTE de la etiqueta viva, así
-  // que aquí se omite (evita duplicarla). En SEGUIMIENTO no hay etiqueta → se muestra.
-  const showCity = bizCity && ayudaTipo==='track';
-  return `<div class="biz-header" style="position:relative"><div class="biz-name">${esc(bizName)}</div>${showCity?`<div class="biz-city">📍 ${esc(bizCity)}</div>`:''}<div onclick="${ayudaFn}" style="position:absolute;top:2px;right:0;display:flex;align-items:center;gap:4px;background:rgba(167,139,250,.12);border:1px solid rgba(167,139,250,.3);color:#a78bfa;border-radius:8px;padding:5px 10px;cursor:pointer;font-size:12px;font-weight:700" title="Ayuda">📖 Ayuda</div></div>`;
+  // En el FORMULARIO la marca y la dirección ya van en el REMITENTE de la etiqueta
+  // viva → aquí se omiten (evita duplicar) y la etiqueta sube. En SEGUIMIENTO no
+  // hay etiqueta → se muestran marca + dirección como siempre.
+  const isTrack = ayudaTipo==='track';
+  const brand = isTrack
+    ? `<div class="biz-name">${esc(bizName)}</div>${bizCity?`<div class="biz-city">📍 ${esc(bizCity)}</div>`:''}`
+    : '';
+  return `<div class="biz-header" style="position:relative${isTrack?'':';min-height:34px'}">${brand}<div onclick="${ayudaFn}" style="position:absolute;top:2px;right:0;display:flex;align-items:center;gap:4px;background:rgba(167,139,250,.12);border:1px solid rgba(167,139,250,.3);color:#a78bfa;border-radius:8px;padding:5px 10px;cursor:pointer;font-size:12px;font-weight:700" title="Ayuda">📖 Ayuda</div></div>`;
 }
 
 /* ─── Ayuda del formulario (autocontenida, pública) ──────────────── */
@@ -851,6 +855,11 @@ function renderForm(){
         <div class="ferr" id="err_phone">Ingresa un número de 9 dígitos</div>
         <div id="knownBadge" style="display:none;margin-top:8px"></div>
       </div>
+      <div class="fg">
+        <input class="fi" id="f_dni" type="text" inputmode="numeric" pattern="[0-9]*"
+          placeholder="🪪 DNI *" maxlength="8" autocomplete="off">
+        <div class="ferr" id="err_dni">Ingresa el DNI (8 dígitos)</div>
+      </div>
       ${extraHtml}
       <button class="btn-main" onclick="wzNext()" style="margin-top:8px">Continuar →</button>
       </div>
@@ -878,10 +887,6 @@ function renderForm(){
         <div class="fg">
           <input class="fi" id="f_ciudad" type="text" placeholder="Ciudad de destino *" autocomplete="off" data-wz-focus>
           <div class="ferr" id="err_ciudad">Ingresa la ciudad de destino</div>
-        </div>
-        <div class="fg" style="margin-bottom:0">
-          <input class="fi" id="f_dni_dest" type="text" inputmode="numeric" placeholder="DNI del destinatario *" maxlength="8" pattern="[0-9]*">
-          <div class="ferr" id="err_dni_dest">Ingresa el DNI (8 dígitos)</div>
         </div>
         <div class="fg" style="margin-top:8px;margin-bottom:0">
           <input class="fi" id="f_agencia" type="text" placeholder="Nombre de la agencia (opcional)" autocomplete="off">
@@ -1194,11 +1199,6 @@ function renderAgencyBox(courierName){
           <button class="clr-btn" onclick="shalomReset()">✕</button></div>
       </div>
       <div class="ferr" id="err_agency" style="margin-top:6px">Selecciona una agencia</div>
-      <div class="fg" style="margin-top:14px;margin-bottom:0">
-        <input class="fi" id="f_dni_recoger" type="text" inputmode="numeric"
-          placeholder="🪪 DNI para recoger *" maxlength="8" pattern="[0-9]*">
-        <div class="ferr" id="err_dni_recoger">Ingresa el DNI (8 dígitos)</div>
-      </div>
     </div>`;
     shalomPrecargar();
     return;
@@ -1219,11 +1219,6 @@ function renderAgencyBox(courierName){
           style="resize:vertical;min-height:70px;font-family:inherit"></textarea>
       </div>
       <div class="ferr" id="err_agency_manual" style="margin-top:2px">Escribe la agencia de destino</div>
-      <div class="fg" style="margin-top:14px;margin-bottom:0">
-        <input class="fi" id="f_dni_recoger" type="text" inputmode="numeric"
-          placeholder="🪪 DNI para recoger *" maxlength="8" pattern="[0-9]*">
-        <div class="ferr" id="err_dni_recoger">Ingresa el DNI (8 dígitos)</div>
-      </div>
     </div>`;
     return;
   }
@@ -1259,11 +1254,6 @@ function renderAgencyBox(courierName){
       ${agState.addr?`<div class="sel-badge">🏢 <span>${esc(agState.addr)}</span><button class="clr-btn" onclick="resetAgencySelection()">✕</button></div>`:''}
     </div>
     <div class="ferr" id="err_agency" style="margin-top:6px">Selecciona una agencia</div>
-    <div class="fg" style="margin-top:14px;margin-bottom:0">
-      <input class="fi" id="f_dni_recoger" type="text" inputmode="numeric"
-        placeholder="🪪 DNI para recoger *" maxlength="8" pattern="[0-9]*">
-      <div class="ferr" id="err_dni_recoger">Ingresa el DNI (8 dígitos)</div>
-    </div>
   </div>`;
 }
 
@@ -1690,21 +1680,18 @@ async function submitOrder(){
   if(!selDateIso)    { $('err_date')&&$('err_date').classList.add('show'); ok=false; }
   else               { $('err_date')&&$('err_date').classList.remove('show'); }
 
-  // Agencia: validate DNI para recoger
-  if(selCourierType==='agencia'){
-    const dni=($('f_dni_recoger')||{value:''}).value.trim();
-    if(!/^\d{8}$/.test(dni)){ $('err_dni_recoger')&&$('err_dni_recoger').classList.add('show'); ok=false; }
-    else                    { $('err_dni_recoger')&&$('err_dni_recoger').classList.remove('show'); }
+  // DNI (paso 1): obligatorio solo si el courier lo requiere (agencia/encomienda).
+  if(selCourierType==='agencia'||selCourierType==='encomienda'){
+    const dni=($('f_dni')||{value:''}).value.trim();
+    if(!/^\d{8}$/.test(dni)){ $('err_dni')&&$('err_dni').classList.add('show'); ok=false; }
+    else                    { $('err_dni')&&$('err_dni').classList.remove('show'); }
   }
 
-  // Encomienda: validate ciudad + DNI destinatario
+  // Encomienda: validate ciudad
   if(selCourierType==='encomienda'){
     const ciudad=($('f_ciudad')||{value:''}).value.trim();
-    const dniDest=($('f_dni_dest')||{value:''}).value.trim();
     if(!ciudad){ $('err_ciudad')&&$('err_ciudad').classList.add('show'); ok=false; }
     else       { $('err_ciudad')&&$('err_ciudad').classList.remove('show'); }
-    if(!/^\d{8}$/.test(dniDest)){ $('err_dni_dest')&&$('err_dni_dest').classList.add('show'); ok=false; }
-    else                        { $('err_dni_dest')&&$('err_dni_dest').classList.remove('show'); }
   }
 
   const extraF=((CFG&&CFG.extraFields)||[]).filter(f=>f&&f.visible!==false);
@@ -1730,9 +1717,10 @@ async function submitOrder(){
   if(!ok) return;
 
   let fullNotes=($('f_notes')||{value:''}).value.trim();
-  const dniRecoger       = selCourierType==='agencia'    ? ($('f_dni_recoger')||{value:''}).value.trim() : '';
+  const _dni             = ($('f_dni')||{value:''}).value.trim();   // DNI único del paso 1
+  const dniRecoger       = selCourierType==='agencia'    ? _dni : '';
   const ciudadDestino    = selCourierType==='encomienda'  ? ($('f_ciudad')||{value:''}).value.trim()      : '';
-  const dniDestinatario  = selCourierType==='encomienda'  ? ($('f_dni_dest')||{value:''}).value.trim()    : '';
+  const dniDestinatario  = selCourierType==='encomienda'  ? _dni : '';
   const encAgencia       = selCourierType==='encomienda'  ? ($('f_agencia') ||{value:''}).value.trim()    : '';
 
   // Dirección final: para agencia usar la dirección de la agencia, para delivery usar la del cliente
@@ -1772,7 +1760,7 @@ async function submitOrder(){
     chkComprobante: false,
     createdAt:      new Date().toISOString(),
     fromForm:       true,
-    dni:            dniRecoger || dniDestinatario || '',
+    dni:            _dni || dniRecoger || dniDestinatario || '',
   };
 
   const btn=$('confirmBtn');
@@ -2474,6 +2462,10 @@ function wzValidate(step){
     var phone=($('f_phone')||{value:''}).value.trim();
     if(_wzErr('f_name','err_name',!name)) ok=false;
     if(_wzErr('f_phone','err_phone',!/^\d{9}$/.test(phone))) ok=false;
+    // DNI: aquí solo se valida FORMATO (si escribió algo, 8 dígitos). La
+    // OBLIGATORIEDAD depende del courier → se valida en el paso 2.
+    var dni1=($('f_dni')||{value:''}).value.trim();
+    if(_wzErr('f_dni','err_dni', !!dni1 && !/^\d{8}$/.test(dni1))) ok=false;
     var extraF=((CFG&&CFG.extraFields)||[]).filter(function(f){return f&&f.visible!==false;});
     extraF.forEach(function(f){
       var fname=typeof f==='string'?f:(f.name||''); var isReq=typeof f==='object'&&!!f.required;
@@ -2484,19 +2476,29 @@ function wzValidate(step){
     });
   } else if(step===2){
     if(!selCourierName){ $('err_courier')&&$('err_courier').classList.add('show'); ok=false; }
-    else { $('err_courier')&&$('err_courier').classList.remove('show'); }
+    else {
+      $('err_courier')&&$('err_courier').classList.remove('show');
+      // El DNI vive en el paso 1 pero solo es obligatorio si el courier lo pide
+      // (agencia/encomienda). Ya elegido el courier: si falta, regresamos al
+      // paso 1 a completarlo (delivery/retiro no lo exigen).
+      if(selCourierType==='agencia'||selCourierType==='encomienda'){
+        var d2=($('f_dni')||{value:''}).value.trim();
+        if(!/^\d{8}$/.test(d2)){
+          ok=false; _wzErr('f_dni','err_dni',true);
+          wzShow(1);
+          setTimeout(function(){ try{ var e=$('f_dni'); if(e){ e.focus(); e.scrollIntoView({block:'center',behavior:'smooth'}); } }catch(_){} },60);
+        } else { _wzErr('f_dni','err_dni',false); }
+      }
+    }
   } else if(step===3){
     if(selCourierType==='agencia'){
       var man=$('agcManualInput');
       if(man){ if(!man.value.trim()){ $('err_agency_manual')&&$('err_agency_manual').classList.add('show'); ok=false; } else { $('err_agency_manual')&&$('err_agency_manual').classList.remove('show'); } }
       else if(!agState.addr){ $('err_agency')&&$('err_agency').classList.add('show'); ok=false; }
       else { $('err_agency')&&$('err_agency').classList.remove('show'); }
-      var dni=($('f_dni_recoger')||{value:''}).value.trim();
-      if(_wzErr('f_dni_recoger','err_dni_recoger',!/^\d{8}$/.test(dni))) ok=false;
     } else if(selCourierType==='encomienda'){
-      var ci=($('f_ciudad')||{value:''}).value.trim(), dd=($('f_dni_dest')||{value:''}).value.trim();
+      var ci=($('f_ciudad')||{value:''}).value.trim();
       if(_wzErr('f_ciudad','err_ciudad',!ci)) ok=false;
-      if(_wzErr('f_dni_dest','err_dni_dest',!/^\d{8}$/.test(dd))) ok=false;
     } else if(selCourierType==='delivery'){
       var addr=_addrMode==='manual'?($('addrManualInput')||{value:''}).value.trim():_deliveryAddr;
       if(!addr){ $('err_deliveryAddr')&&$('err_deliveryAddr').classList.add('show'); ok=false; }
@@ -2562,7 +2564,7 @@ function wzInit(){
     _wzInjectCss();
     _wzStep=1; window._selCourierType=''; window._ttFrozen=false;
     // Enter avanza en los campos de texto del paso 1 (avance "mixto")
-    ['f_name','f_phone'].forEach(function(id){
+    ['f_name','f_phone','f_dni'].forEach(function(id){
       var el=$(id); if(el) el.addEventListener('keydown',function(ev){ if(ev.key==='Enter'){ ev.preventDefault(); wzNext(); } });
     });
     // Auto-avance al elegir courier (elección clara → siguiente paso). INMEDIATO
