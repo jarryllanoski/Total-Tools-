@@ -588,7 +588,7 @@ function exportExcel(){
     'N° Orden':          s.id||'',
     'Nombre':            s.name||'',
     'Teléfono':          s.phone||'',
-    'DNI':               s.dniDestinatario||s.dniRecoger||'',
+    'DNI':               s.dni||s.dniDestinatario||s.dniRecoger||'',
     'Dirección':         s.address||'',
     'Ciudad destino':    s.ciudadDestino||'',
     'Referencia':        s.referencia||'',

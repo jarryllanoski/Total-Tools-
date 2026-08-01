@@ -1612,8 +1612,13 @@ function _construirWaMsg(order, trackCode, trackToken){
   const trackUrl = `${location.origin}${location.pathname}?seg=${trackToken}`;
 
   const refLine  = order.referencia    ? `\n📌 *Referencia:* ${order.referencia}` : '';
-  const dniLine  = order.dniRecoger    ? `\n🪪 *DNI para recoger:* ${order.dniRecoger}` : '';
-  const encLine  = order.ciudadDestino ? `\n📦 *Ciudad destino:* ${order.ciudadDestino}\n🪪 *DNI destinatario:* ${order.dniDestinatario}` : '';
+  // DNI: fuente única = order.dni (llega en todos los couriers). La etiqueta
+  // solo cambia el matiz según el tipo de envío.
+  const _dniLbl  = selCourierType==='agencia'    ? 'DNI para recoger'
+                 : selCourierType==='encomienda'  ? 'DNI destinatario'
+                 :                                   'DNI';
+  const dniLine  = order.dni ? `\n🪪 *${_dniLbl}:* ${order.dni}` : '';
+  const encLine  = order.ciudadDestino ? `\n📦 *Ciudad destino:* ${order.ciudadDestino}` : '';
   const notesLine= order.notes ? `\n📝 *Notas:* ${order.notes}` : '';
   const dirLabel = selCourierType==='agencia'
     ? `\n🏢 *Agencia:* ${order.address||'—'}`
@@ -2080,6 +2085,7 @@ function renderTrackResult(ship, code){
         ${ship.dniDestinatario?`<div class="tk-row"><span class="tk-row-lbl">DNI destinatario</span><span class="tk-row-val">${esc(ship.dniDestinatario)}</span></div>`:''}
         ${ship.encAgencia?`<div class="tk-row"><span class="tk-row-lbl">Agencia</span><span class="tk-row-val">${esc(ship.encAgencia)}</span></div>`:''}
         ${ship.dniRecoger?`<div class="tk-row"><span class="tk-row-lbl">DNI para recoger</span><span class="tk-row-val">${esc(ship.dniRecoger)}</span></div>`:''}
+        ${(!ship.dniRecoger&&!ship.dniDestinatario&&ship.dni)?`<div class="tk-row"><span class="tk-row-lbl">DNI</span><span class="tk-row-val">${esc(ship.dni)}</span></div>`:''}
         ${ship.notes?`<div class="tk-row"><span class="tk-row-lbl">Notas</span><span class="tk-row-val">${esc(ship.notes)}</span></div>`:''}
         ${extraRows}
       </div>
