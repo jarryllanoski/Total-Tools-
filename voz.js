@@ -275,8 +275,23 @@
     }
   }
 
+  // Motivo por el que el dictado no está disponible (navegador). Se explica
+  // claro en vez de fallar en silencio. La Web Speech API solo va en Chrome/Edge
+  // de escritorio; Brave la desactiva por privacidad y Firefox no la soporta.
+  function _motivoSinVoz() {
+    if (!(window.SpeechRecognition || window.webkitSpeechRecognition)) {
+      return '⚠️ Este navegador no soporta dictado. Usa Chrome o Edge.';
+    }
+    if (navigator.brave) {
+      return '🦁 Brave desactiva el dictado por privacidad. Abre el panel en Chrome o Edge.';
+    }
+    return null;
+  }
+
   function toggle() {
     if (escuchando) { try { rec && rec.stop(); } catch (e) {} return; }
+    const motivo = _motivoSinVoz();
+    if (motivo) { _toast(motivo); return; }
     rec = getRec();
     if (!rec) { _toast('⚠️ Tu navegador no soporta reconocimiento de voz'); return; }
     escuchando = true;
@@ -286,7 +301,14 @@
       _toast('🎤 ' + txt);
       try { interpretar(txt); } catch (e) { decir('Ocurrió un error'); }
     };
-    rec.onerror = (ev) => { if (ev.error !== 'no-speech') _toast('⚠️ Voz: ' + ev.error); };
+    rec.onerror = (ev) => {
+      if (ev.error === 'no-speech') return;
+      if (ev.error === 'network' || ev.error === 'service-not-allowed') {
+        _toast('⚠️ El dictado no está disponible en este navegador. Usa Chrome o Edge.');
+      } else if (ev.error === 'not-allowed') {
+        _toast('🎤 Permite el micrófono para dictar.');
+      } else { _toast('⚠️ Voz: ' + ev.error); }
+    };
     rec.onend = () => { escuchando = false; setBtn(false); };
     try { rec.start(); } catch (e) { escuchando = false; setBtn(false); }
   }

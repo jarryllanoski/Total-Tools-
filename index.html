@@ -676,8 +676,12 @@
     <div id="shalomGuiaBlock" style="display:none;background:rgba(56,139,253,.06);border:1px solid rgba(56,139,253,.15);border-radius:10px;padding:12px;margin-bottom:11px">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
         <span style="font-size:10px;font-weight:700;color:#388bfd;letter-spacing:.8px;text-transform:uppercase">🚌 Guía Shalom (opcional)</span>
-        <button type="button" id="shalomMicBtn" onclick="shalomVozStart()" title="Dictar guía y código por voz" style="display:none;background:none;border:none;padding:2px 4px;cursor:pointer;font-size:15px;line-height:1;color:#8b949e">🎤</button>
+        <span style="display:flex;align-items:center;gap:8px">
+          <button type="button" id="shalomScanBtn" onclick="shalomScanGuia()" title="Escanear ticket Shalom para llenar la guía" style="background:none;border:none;padding:2px 4px;cursor:pointer;font-size:15px;line-height:1;color:#8b949e">📷</button>
+          <button type="button" id="shalomMicBtn" onclick="shalomVozStart()" title="Dictar guía y código por voz" style="display:none;background:none;border:none;padding:2px 4px;cursor:pointer;font-size:15px;line-height:1;color:#8b949e">🎤</button>
+        </span>
       </div>
+      <input type="file" id="shalomTicketFile" accept="image/*" capture="environment" style="display:none" onchange="shalomTicketFoto(this.files&&this.files[0]);this.value=''">
       <div class="frow">
         <div class="fg"><label class="fl">Número de guía</label><input class="fi" id="fShalomGuia" placeholder="Ej: 82037653" style="font-family:monospace" inputmode="numeric" oninput="if(typeof _updateShalomMic==='function')_updateShalomMic()"></div>
         <div class="fg"><label class="fl">Código</label><input class="fi" id="fShalomCodigo" placeholder="TT9C" style="font-family:monospace;text-transform:uppercase" oninput="this.value=this.value.toUpperCase()" maxlength="8"></div>
@@ -1961,6 +1965,14 @@ var _SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition || n
 var _shalomRec = null;          // instancia activa
 var _shalomVozStage = null;     // 'guia' | 'codigo' | null
 
+// Motivo por el que el dictado no está disponible (para explicarlo claro en vez
+// de fallar callado). Solo Chrome/Edge de escritorio; Brave lo desactiva.
+function _motivoSinVozShalom(){
+  if(!_SpeechRec) return '⚠️ Este navegador no soporta dictado. Usa Chrome o Edge.';
+  if(navigator.brave) return '🦁 Brave desactiva el dictado por privacidad. Abre el panel en Chrome o Edge.';
+  return null;
+}
+
 function _updateShalomMic(){
   var btn = document.getElementById('shalomMicBtn');
   if(!btn) return;
@@ -1983,9 +1995,16 @@ function _vozADigitos(txt){
 /* Código: alfanumérico → mayúsculas sin espacios (mejor esfuerzo).
    Convierte también números dictados en palabra ("nueve" → 9). */
 function _vozACodigo(txt){
-  var mapa={cero:'0',uno:'1',una:'1',dos:'2',tres:'3',cuatro:'4',cinco:'5',seis:'6',siete:'7',ocho:'8',nueve:'9'};
-  var t=(txt||'').toLowerCase().replace(/[a-záéíóúñü]+/g,function(w){ return (mapa[w]!==undefined)? mapa[w] : w; });
-  return t.toUpperCase().replace(/[^A-Z0-9]/g,'');
+  // Números en palabra + alfabeto fonético español (ej. "tres ka te te" → "3KTT").
+  // Mejor esfuerzo y corregible a mano — dictar letras nunca es 100% fiable.
+  var mapa={
+    cero:'0',uno:'1',una:'1',dos:'2',tres:'3',cuatro:'4',cinco:'5',seis:'6',siete:'7',ocho:'8',nueve:'9',
+    a:'A',be:'B',ve:'V',ce:'C',de:'D',e:'E',efe:'F',ge:'G',hache:'H',i:'I',jota:'J',ka:'K',ele:'L',
+    eme:'M',ene:'N',o:'O',pe:'P',cu:'Q',ere:'R',erre:'R',ese:'S',te:'T',u:'U',uve:'V',equis:'X',ye:'Y',zeta:'Z',ceta:'Z'
+  };
+  var t=(txt||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+  var out=t.replace(/[a-z]+/g,function(w){ return (mapa[w]!==undefined)? mapa[w] : w; });
+  return out.toUpperCase().replace(/[^A-Z0-9]/g,'');
 }
 
 function _shalomMicVisual(on){
@@ -2002,9 +2021,10 @@ function _shalomVozStop(){
 }
 
 function shalomVozStart(){
-  if(!_SpeechRec){ toast('🎤 Este navegador no soporta dictado por voz'); return; }
   // si ya está escuchando, el toque detiene
   if(_shalomRec){ _shalomVozStop(); return; }
+  var motivo=_motivoSinVozShalom();
+  if(motivo){ toast(motivo); return; }
   var gEl=document.getElementById('fShalomGuia');
   var cEl=document.getElementById('fShalomCodigo');
   if(!gEl||!cEl) return;
@@ -2054,7 +2074,10 @@ function _shalomVozBeginStage(){
     }
   };
   rec.onerror=function(e){
-    if(e && (e.error==='not-allowed'||e.error==='service-not-allowed')){ toast('🎤 Permite el micrófono para dictar'); }
+    if(e){
+      if(e.error==='network'||e.error==='service-not-allowed'){ toast('⚠️ El dictado no está disponible en este navegador. Usa Chrome o Edge.'); }
+      else if(e.error==='not-allowed'){ toast('🎤 Permite el micrófono para dictar'); }
+    }
     _shalomVozStop();
   };
   rec.onend=function(){
@@ -2726,12 +2749,50 @@ let _pinEntry='', _pinCallback=null;
 /* Funciones de configuración movidas a config.js */
 
 /* QR SCANNER */
-let _qrStream=null,_qrAF=null,_qrCanvas=null,_qrCtx=null;
-function openQR(){if(!('BarcodeDetector' in window)){if(window.jsQR){startQR();return}const s=document.createElement('script');s.src='https://cdnjs.cloudflare.com/ajax/libs/jsQR/1.4.0/jsQR.min.js';s.onload=startQR;s.onerror=()=>toast('⚠️ Necesitas conexión para el escáner');document.head.appendChild(s);return}startQR()}
-async function startQR(){$('qrOverlay').classList.add('open');$('qrFound').style.display='none';try{_qrStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}});const v=$('qrVideo');v.srcObject=_qrStream;v.play();_qrCanvas=document.createElement('canvas');_qrCtx=_qrCanvas.getContext('2d');v.addEventListener('loadedmetadata',()=>{_qrCanvas.width=v.videoWidth;_qrCanvas.height=v.videoHeight;scanLoop()})}catch(e){closeQR();toast('⚠️ No se pudo acceder a la cámara')}}
+let _qrStream=null,_qrAF=null,_qrCanvas=null,_qrCtx=null,_qrTarget=null;
+function openQR(target){_qrTarget=target||null;if(!('BarcodeDetector' in window)){if(window.jsQR){startQR();return}const s=document.createElement('script');s.src='https://cdnjs.cloudflare.com/ajax/libs/jsQR/1.4.0/jsQR.min.js';s.onload=startQR;s.onerror=()=>toast('⚠️ Necesitas conexión para el escáner');document.head.appendChild(s);return}startQR()}
+async function startQR(){$('qrOverlay').classList.add('open');$('qrFound').style.display='none';try{_qrStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}});const v=$('qrVideo');v.srcObject=_qrStream;v.play();_qrCanvas=document.createElement('canvas');_qrCtx=_qrCanvas.getContext('2d');v.addEventListener('loadedmetadata',()=>{_qrCanvas.width=v.videoWidth;_qrCanvas.height=v.videoHeight;scanLoop()})}catch(e){var _wasFill=(_qrTarget==='shalomFill');closeQR();if(_wasFill){var _ff=document.getElementById('shalomTicketFile');if(_ff){toast('📷 Sin cámara — sube una foto del ticket');_ff.click();return;}}toast('⚠️ No se pudo acceder a la cámara')}}
 async function scanLoop(){const v=$('qrVideo');if(!v.srcObject)return;_qrCtx.drawImage(v,0,0,_qrCanvas.width,_qrCanvas.height);let res=null;if('BarcodeDetector' in window){try{const bd=new BarcodeDetector({formats:['qr_code']});const c=await bd.detect(_qrCanvas);if(c.length)res=c[0].rawValue}catch(e){}}if(!res&&window.jsQR){const img=_qrCtx.getImageData(0,0,_qrCanvas.width,_qrCanvas.height);const c=jsQR(img.data,img.width,img.height);if(c)res=c.data}if(res){handleQR(res);return}_qrAF=requestAnimationFrame(scanLoop)}
-function handleQR(raw){if(raw&&raw.includes('/document/')){const _parts=raw.split('/document/');const _qrId=parseInt(_parts[0]);if(!isNaN(_qrId)){const _ord=String(_qrId-3473503);const _found=S.shipments.find(s=>(s.trackingOrderNumber===_ord)||(s.shalomGuia===_ord));const _fEl=$('qrFound');_fEl.textContent='✅ Guía: '+_ord;_fEl.style.display='block';setTimeout(()=>{closeQR();$('fSearch').value=_ord;_filt='';renderChips();render();if(_found){setTimeout(()=>{document.querySelectorAll('.card').forEach(c=>{if(c.innerHTML.includes(_ord)){c.style.background='rgba(56,139,253,.15)';setTimeout(()=>c.style.background='',1500)}})},200);toast('✅ '+_found.name);}else{toast('⚠️ Guía no encontrada: '+_ord);}},800);return;}}let phone=raw.replace(/\D/g,'');if(phone.startsWith('51')&&phone.length===11)phone=phone.slice(2);if(phone.length!==9){toast('QR no reconocido');_qrAF=requestAnimationFrame(scanLoop);return}const f=$('qrFound');f.textContent=`✅ ${phone}`;f.style.display='block';const m=S.shipments.find(s=>s.phone===phone);setTimeout(()=>{closeQR();$('fSearch').value=phone;_filt='';renderChips();render();if(m){setTimeout(()=>{document.querySelectorAll('.card').forEach(c=>{if(c.innerHTML.includes(phone)){c.style.background='rgba(56,139,253,.15)';setTimeout(()=>c.style.background='',1500)}})},200);toast(`✅ ${m.name}`)}else{toast(`⚠️ No encontrado: ${phone}`)}},800)}
-function closeQR(){if(_qrAF)cancelAnimationFrame(_qrAF);if(_qrStream)_qrStream.getTracks().forEach(t=>t.stop());_qrStream=null;_qrAF=null;$('qrVideo').srcObject=null;$('qrOverlay').classList.remove('open')}
+function handleQR(raw){if(_qrTarget==='shalomFill'){const _f=$('qrFound');if(_shalomFillFromQR(raw)){if(_f){_f.textContent='✅ Guía leída';_f.style.display='block';}setTimeout(closeQR,600);}else{toast('⚠️ No pude leer la guía del ticket');_qrAF=requestAnimationFrame(scanLoop);}return;}if(raw&&raw.includes('/document/')){const _parts=raw.split('/document/');const _qrId=parseInt(_parts[0]);if(!isNaN(_qrId)){const _ord=String(_qrId-3473503);const _found=S.shipments.find(s=>(s.trackingOrderNumber===_ord)||(s.shalomGuia===_ord));const _fEl=$('qrFound');_fEl.textContent='✅ Guía: '+_ord;_fEl.style.display='block';setTimeout(()=>{closeQR();$('fSearch').value=_ord;_filt='';renderChips();render();if(_found){setTimeout(()=>{document.querySelectorAll('.card').forEach(c=>{if(c.innerHTML.includes(_ord)){c.style.background='rgba(56,139,253,.15)';setTimeout(()=>c.style.background='',1500)}})},200);toast('✅ '+_found.name);}else{toast('⚠️ Guía no encontrada: '+_ord);}},800);return;}}let phone=raw.replace(/\D/g,'');if(phone.startsWith('51')&&phone.length===11)phone=phone.slice(2);if(phone.length!==9){toast('QR no reconocido');_qrAF=requestAnimationFrame(scanLoop);return}const f=$('qrFound');f.textContent=`✅ ${phone}`;f.style.display='block';const m=S.shipments.find(s=>s.phone===phone);setTimeout(()=>{closeQR();$('fSearch').value=phone;_filt='';renderChips();render();if(m){setTimeout(()=>{document.querySelectorAll('.card').forEach(c=>{if(c.innerHTML.includes(phone)){c.style.background='rgba(56,139,253,.15)';setTimeout(()=>c.style.background='',1500)}})},200);toast(`✅ ${m.name}`)}else{toast(`⚠️ No encontrado: ${phone}`)}},800)}
+function closeQR(){if(_qrAF)cancelAnimationFrame(_qrAF);if(_qrStream)_qrStream.getTracks().forEach(t=>t.stop());_qrStream=null;_qrAF=null;_qrTarget=null;$('qrVideo').srcObject=null;$('qrOverlay').classList.remove('open')}
+
+/* ── Escanear ticket Shalom → autollena la GUÍA (el QR trae la guía, no el
+   código; el código se escribe/dicta). Reusa el parser de handleQR y jsQR.  */
+function _shalomFillFromQR(raw){
+  var g='';
+  if(raw && raw.indexOf('/document/')>=0){ var _id=parseInt(raw.split('/document/')[0]); if(!isNaN(_id)) g=String(_id-3473503); }
+  if(!g){ var dd=(raw||'').replace(/\D/g,''); if(dd.length>=6&&dd.length<=12) g=dd; }
+  if(!g) return false;
+  var fg=$('fShalomGuia'); if(fg){ fg.value=g; if(typeof _updateShalomMic==='function')_updateShalomMic(); }
+  toast('✅ Guía escaneada: '+g+' — ahora escribe el código');
+  var fc=$('fShalomCodigo'); if(fc) setTimeout(function(){try{fc.focus();}catch(e){}},120);
+  return true;
+}
+function shalomScanGuia(){
+  if(navigator.mediaDevices&&navigator.mediaDevices.getUserMedia){ openQR('shalomFill'); }
+  else { var f=$('shalomTicketFile'); if(f) f.click(); }
+}
+function shalomTicketFoto(file){
+  if(!file) return;
+  var run=function(){
+    var img=new Image();
+    img.onload=function(){
+      try{
+        var cv=document.createElement('canvas'); cv.width=img.naturalWidth; cv.height=img.naturalHeight;
+        var cx=cv.getContext('2d'); cx.drawImage(img,0,0);
+        var d=cx.getImageData(0,0,cv.width,cv.height);
+        var code=window.jsQR?jsQR(d.data,d.width,d.height):null;
+        if(code&&code.data){ if(!_shalomFillFromQR(code.data)) toast('⚠️ No pude leer la guía del ticket. Escríbela a mano.'); }
+        else toast('⚠️ No encontré un QR en la foto. Escribe la guía a mano.');
+      }catch(e){ toast('⚠️ No se pudo leer la foto'); }
+      finally{ try{URL.revokeObjectURL(img.src);}catch(e){} }
+    };
+    img.onerror=function(){ toast('⚠️ No se pudo abrir la foto'); };
+    img.src=URL.createObjectURL(file);
+  };
+  if(window.jsQR) run();
+  else { var s=document.createElement('script'); s.src='https://cdnjs.cloudflare.com/ajax/libs/jsQR/1.4.0/jsQR.min.js'; s.onload=run; s.onerror=function(){toast('⚠️ Necesitas conexión para leer la foto');}; document.head.appendChild(s); }
+}
 
 function copyCardLink(id){
   const base=typeof getFormLink==='function'?getFormLink():window.location.origin+window.location.pathname.replace(/\/[^\/]*$/,'/formulario.html');
@@ -2770,7 +2831,7 @@ render();
 <script src="respaldo.js?v=1"></script>
 <script src="ayuda.js?v=1"></script>
 <script src="dashboard.js?v=1"></script>
-<script src="voz.js?v=1"></script>
+<script src="voz.js?v=2"></script>
 <script src="cotizacion.js?v=1"></script>
 <script>
 updateShareLink();
