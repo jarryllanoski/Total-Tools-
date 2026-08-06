@@ -1510,9 +1510,19 @@ function renderStatsAsSuppliers(){
 
 function openAllLabels(){
   const all=allStatuses();
+  const _fmtSoles=n=>'S/ '+(Math.round((n||0)*100)/100).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
   $('allLabelsList').innerHTML=[
     `<button class="sopt" style="background:rgba(56,139,253,.1);border-color:rgba(56,139,253,.4);color:var(--blue)" onclick="setFilt('');closeOverlay('allLabelsOverlay')">📋 TODOS</button>`,
-    ...all.map(st=>`<button class="sopt ${stSoptClass(st)}" onclick="setFilt('${st}');closeOverlay('allLabelsOverlay')">${stIcon(st)} ${st}<span style="float:right;font-size:11px;opacity:.6">${S.shipments.filter(x=>x.status===st).length}</span></button>`)
+    ...all.map(st=>{
+      const items=S.shipments.filter(x=>x.status===st);
+      const cnt=items.length;
+      const deuda=items.reduce((a,x)=>a+(parseFloat(x.cost)||0),0);
+      // Finalizado = ya cobrado → "Pagado". Activos → lo que te deben (Σ deuda).
+      const monto = st==='FINALIZADO'
+        ? `<span style="float:right;font-size:11px;font-weight:700;color:#22c55e;margin-right:12px">✓ Pagado</span>`
+        : `<span style="float:right;font-size:11px;font-weight:700;color:${deuda>0?'#f59e0b':'var(--text2)'};margin-right:12px">${_fmtSoles(deuda)}</span>`;
+      return `<button class="sopt ${stSoptClass(st)}" onclick="setFilt('${st}');closeOverlay('allLabelsOverlay')">${stIcon(st)} ${st}<span style="float:right;font-size:11px;opacity:.6">${cnt}</span>${monto}</button>`;
+    })
   ].join('');
   openOverlay('allLabelsOverlay');
 }

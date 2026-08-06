@@ -68,7 +68,7 @@ function _injectOverlay(){
 function _esc(str){
   return String(str||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
-function _money(n){ return 'S/ '+Number(n||0).toFixed(2); }
+function _money(n){ return 'S/ '+Number(n||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}); }
 function _pct(n,total){ return total>0?Math.round(n/total*100):0; }
 function _monthKey(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'); }
 function _weekStart(){
@@ -111,20 +111,48 @@ function _compute(){
   var prevMon  = _monthKey(prevDate);
   var weekSt   = _weekStart();
 
-  var total=0, ingresoTotal=0, ingresoMes=0, ingresoPrevMes=0;
-  var conCosto=0, sinCosto=0, finalizados=0, pendPago=0;
+  var total=0;
+  var conCosto=0, sinCosto=0, finalizados=0, pendPago=0, conMonto=0;
+  // ── Contabilidad (estándar): Facturado = Cobrado + Por cobrar ──────────
+  // monto = venta; adelanto = pagado a cuenta; cost = deuda (max(0,monto-adel)).
+  // Finalizado = cobrado por completo. Pedidos viejos sin monto: cost = venta.
+  var facturado=0, facturadoMes=0, facturadoPrevMes=0;
+  var cobrado=0,   cobradoMes=0,   cobradoPrevMes=0;
+  var porCobrar=0, conDeuda=0, cxcListo=0, cxcPorVencer=0, cxcFuturo=0;
   var hoy=0, semana=0, mes=0;
   var statusMap={}, courierMap={}, clientMap={}, provMap={};
 
   all.forEach(function(s){
     total++;
-    var cost = parseFloat(s.cost)||0;
-    ingresoTotal += cost;
-    if(cost>0) conCosto++; else sinCosto++;
+    var deuda = parseFloat(s.cost)||0;                 // lo que aún se debe
+    var monto = parseFloat(s.monto); if(!(monto>0)) monto = deuda; // viejos: cost=venta
+    var adel  = parseFloat(s.adelanto)||0;
+    var esFin = (s.status==='FINALIZADO');
+    if(monto>0) conMonto++;
+    if(deuda>0) conCosto++; else sinCosto++;
 
     var fecha = (s.date||'').slice(0,10);
-    if(fecha && fecha.slice(0,7)===thisMon)  ingresoMes     += cost;
-    if(fecha && fecha.slice(0,7)===prevMon)  ingresoPrevMes += cost;
+    var enMes = fecha && fecha.slice(0,7)===thisMon;
+    var enPrev= fecha && fecha.slice(0,7)===prevMon;
+
+    // Facturado (venta)
+    facturado += monto;
+    if(enMes)  facturadoMes     += monto;
+    if(enPrev) facturadoPrevMes += monto;
+
+    // Cobrado (efectivo recibido): finalizado = venta completa; activo = adelanto
+    var cobradoOrden = esFin ? monto : adel;
+    cobrado += cobradoOrden;
+    if(enMes)  cobradoMes     += cobradoOrden;
+    if(enPrev) cobradoPrevMes += cobradoOrden;
+
+    // Por cobrar (CxC): solo activos con deuda. Aging por etapa.
+    if(!esFin && deuda>0){
+      porCobrar += deuda; conDeuda++;
+      if(s.status==='PENDIENTE DE PAGO')                          cxcListo += deuda;
+      else if(s.status==='ENVIADO'||s.status==='LLEGÓ A DESTINO') cxcPorVencer += deuda;
+      else                                                        cxcFuturo += deuda;
+    }
 
     // Actividad temporal — usa createdAt si existe, si no date
     var refD = s.createdAt ? new Date(s.createdAt) : (fecha ? new Date(fecha+'T12:00:00') : null);
@@ -160,8 +188,12 @@ function _compute(){
   function sortDesc(map){ return Object.keys(map).map(function(k){return{key:k,count:map[k]};}).sort(function(a,b){return b.count-a.count;}); }
 
   return {
-    total, ingresoTotal, ingresoMes, ingresoPrevMes,
-    ticketProm: conCosto>0 ? ingresoTotal/conCosto : 0,
+    total,
+    facturado, facturadoMes, facturadoPrevMes,
+    cobrado, cobradoMes, cobradoPrevMes,
+    porCobrar, conDeuda, cxcListo, cxcPorVencer, cxcFuturo,
+    pctCobranza: facturado>0 ? (cobrado/facturado*100) : 0,
+    ticketProm: conMonto>0 ? facturado/conMonto : 0,
     conCosto, sinCosto, finalizados, pendPago,
     hoy, semana, mes,
     statusList:  sortDesc(statusMap),
@@ -173,9 +205,9 @@ function _compute(){
 
 /* ── Render HTML ─────────────────────────────────────────────────── */
 function _render(d){
-  var mesDiff = d.ingresoMes - d.ingresoPrevMes;
-  var mesDiffTxt = (mesDiff>=0?'+':'')+mesDiff.toFixed(2);
-  var mesDiffColor = mesDiff>=0?'#3fb950':'#f85149';
+  var facMesDiff = d.facturadoMes - d.facturadoPrevMes;
+  var facDiffTxt = (facMesDiff>=0?'+':'')+_money(facMesDiff);
+  var facDiffColor = facMesDiff>=0?'#3fb950':'#f85149';
 
   var maxSt   = d.statusList.length  ? d.statusList[0].count  : 1;
   var maxCo   = d.courierList.length ? d.courierList[0].count : 1;
@@ -192,14 +224,28 @@ function _render(d){
     '<button class="dash-close" onclick="DashBoard.cerrar()">✕ Cerrar</button>'+
   '</div>';
 
-  /* RESUMEN FINANCIERO */
+  /* RESUMEN FINANCIERO (contable): Facturado = Cobrado + Por cobrar */
   html += '<div class="dash-sec">'+
     '<div class="dash-sec-ttl">Resumen financiero</div>'+
     '<div class="dash-grid2">'+
-      '<div class="dash-kpi"><div class="dash-kpi-n c-green">'+_money(d.ingresoTotal)+'</div><div class="dash-kpi-l">Ingresos totales</div></div>'+
-      '<div class="dash-kpi"><div class="dash-kpi-n c-blue">'+_money(d.ingresoMes)+'</div><div class="dash-kpi-l">Este mes &nbsp;<span style="color:'+mesDiffColor+';font-size:9px">'+mesDiffTxt+'</span></div></div>'+
-      '<div class="dash-kpi"><div class="dash-kpi-n c-orange">'+_money(d.ticketProm)+'</div><div class="dash-kpi-l">Ticket promedio</div></div>'+
-      '<div class="dash-kpi"><div class="dash-kpi-n '+(d.sinCosto?'c-red':'c-green')+'">'+d.sinCosto+'</div><div class="dash-kpi-l">Sin costo asignado</div></div>'+
+      '<div class="dash-kpi"><div class="dash-kpi-n c-blue">'+_money(d.facturado)+'</div><div class="dash-kpi-l">Facturado (ventas)</div></div>'+
+      '<div class="dash-kpi"><div class="dash-kpi-n c-green">'+_money(d.cobrado)+'</div><div class="dash-kpi-l">Cobrado</div></div>'+
+      '<div class="dash-kpi"><div class="dash-kpi-n c-orange">'+_money(d.porCobrar)+'</div><div class="dash-kpi-l">Por cobrar</div></div>'+
+      '<div class="dash-kpi"><div class="dash-kpi-n">'+Math.round(d.pctCobranza)+'%</div><div class="dash-kpi-l">% Cobranza</div></div>'+
+    '</div>'+
+    '<div style="font-size:10.5px;color:var(--text2);margin-top:8px;line-height:1.6">'+
+      'Este mes — Facturado: <b style="color:#e6edf3">'+_money(d.facturadoMes)+'</b> <span style="color:'+facDiffColor+'">'+facDiffTxt+'</span> · Cobrado: <b style="color:#e6edf3">'+_money(d.cobradoMes)+'</b> · Ticket prom.: <b style="color:#e6edf3">'+_money(d.ticketProm)+'</b>'+
+    '</div>'+
+  '</div>';
+
+  /* CUENTAS POR COBRAR (antigüedad / aging) */
+  html += '<div class="dash-sec">'+
+    '<div class="dash-sec-ttl">Cuentas por cobrar</div>'+
+    '<div class="dash-grid2">'+
+      '<div class="dash-kpi"><div class="dash-kpi-n c-red">'+_money(d.cxcListo)+'</div><div class="dash-kpi-l">Cobrar ya (pend. de pago)</div></div>'+
+      '<div class="dash-kpi"><div class="dash-kpi-n c-orange">'+_money(d.cxcPorVencer)+'</div><div class="dash-kpi-l">En camino</div></div>'+
+      '<div class="dash-kpi"><div class="dash-kpi-n">'+_money(d.cxcFuturo)+'</div><div class="dash-kpi-l">En preparación</div></div>'+
+      '<div class="dash-kpi"><div class="dash-kpi-n">'+d.conDeuda+'</div><div class="dash-kpi-l">Pedidos con deuda</div></div>'+
     '</div>'+
   '</div>';
 
