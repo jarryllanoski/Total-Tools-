@@ -663,18 +663,13 @@
       <div class="fg"><label class="fl">Courier</label><select class="fs" id="fCourier"></select></div>
       <div class="fg"><label class="fl">Fecha</label><input class="fi" id="fDate" type="date"></div>
     </div>
-    <div class="fg"><label class="fl">Estado</label><select class="fs" id="fStatus"></select></div>
-    <div class="docs-accordion" style="margin-bottom:11px">
-      <div class="docs-accordion-hdr" onclick="toggleDeuda()">
-        <span style="display:flex;align-items:center;gap:8px"><span class="docs-accordion-ttl">💰 Deuda</span><span id="fDeudaDisplay" style="font-size:14px;font-weight:700;color:var(--text2)">S/ 0</span></span>
-        <span class="docs-accordion-arrow" id="deudaArrow">▾</span>
-      </div>
-      <div class="docs-accordion-body" id="deudaBody">
-        <div class="frow" style="margin-bottom:0">
-          <div class="fg"><label class="fl">Monto S/</label><input class="fi" id="fMonto" type="number" placeholder="0.00" min="0" step="0.5" inputmode="decimal" oninput="recalcDeuda()"></div>
-          <div class="fg"><label class="fl">Adelanto S/</label><input class="fi" id="fAdelanto" type="number" placeholder="0.00" min="0" step="0.5" inputmode="decimal" oninput="recalcDeuda()"></div>
-        </div>
-      </div>
+    <div class="frow">
+      <div class="fg"><label class="fl">Estado</label><select class="fs" id="fStatus"></select></div>
+      <div class="fg" onclick="toggleDeuda()" style="cursor:pointer"><label class="fl">💰 Deuda S/ <span style="font-size:9px;color:var(--text2);font-weight:400">(tocar para editar)</span></label><div id="fDeudaDisplay" class="fi" style="display:flex;align-items:center">S/ 0.00</div></div>
+    </div>
+    <div class="frow" id="deudaBody" style="display:none">
+      <div class="fg"><label class="fl">Monto S/</label><input class="fi" id="fMonto" type="number" placeholder="0.00" min="0" step="0.5" inputmode="decimal" oninput="recalcDeuda()"></div>
+      <div class="fg"><label class="fl">Adelanto S/</label><input class="fi" id="fAdelanto" type="number" placeholder="0.00" min="0" step="0.5" inputmode="decimal" oninput="recalcDeuda()"></div>
     </div>
     <div class="fg"><label class="fl">Notas</label><input class="fi" id="fNotes" placeholder="Llamar antes..."></div>
     <div id="extraForm"></div>
@@ -2897,7 +2892,7 @@ render();
 </script>
 <!-- ★ SHALOM tracking — cargado al final -->
 <script src="storage.js?v=2"></script>
-<script src="config.js?v=5"></script>
+<script src="config.js?v=6"></script>
 <script src="print.js?v=5"></script>
 <script src="notify.js?v=3"></script>
 <script src="tracking.js?v=2"></script>

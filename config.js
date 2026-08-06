@@ -282,17 +282,16 @@ function recalcDeuda(){
   const a=parseFloat(($('fAdelanto')||{value:''}).value)||0;
   const d=Math.max(0, m-a);
   const el=$('fDeudaDisplay'); if(!el) return;
-  const fmt=n=>'S/ '+(Math.round(n*100)/100);
-  if(m<=0){ el.innerHTML=fmt(0); el.style.color='var(--text2)'; }
-  else if(d<=0){ el.innerHTML='<s style="opacity:.65">'+fmt(m)+'</s> <span style="color:#22c55e;font-weight:800">✓ Pagado</span>'; el.style.color=''; }
-  else { el.innerHTML=fmt(d); el.style.color='#f59e0b'; }
+  const fmt=n=>'S/ '+(Math.round(n*100)/100).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+  el.style.color='';   // texto plano, sin color
+  // Pagado (monto>0 y deuda=0) → monto tachado. Debe / sin monto → texto normal.
+  if(m>0 && d<=0){ el.innerHTML='<s>'+fmt(m)+'</s>'; }
+  else{ el.textContent=fmt(d); }
 }
-// Deuda como acordeón (igual patrón que Documentos del envío).
+// Deuda: toca para desplegar/ocultar Monto/Adelanto (fila de abajo).
 function toggleDeuda(){
-  const body=$('deudaBody'), arrow=$('deudaArrow'); if(!body) return;
-  const open=body.classList.contains('open');
-  body.classList.toggle('open', !open);
-  if(arrow) arrow.classList.toggle('open', !open);
+  const body=$('deudaBody'); if(!body) return;
+  body.style.display=(body.style.display==='none'||!body.style.display)?'flex':'none';
 }
 // Carga monto/adelanto/deuda al abrir el form. Pedido viejo: deriva monto=cost.
 function _loadMontoFields(s){
@@ -303,9 +302,7 @@ function _loadMontoFields(s){
   }
   if($('fMonto')) $('fMonto').value=monto;
   if($('fAdelanto')) $('fAdelanto').value=adel;
-  const body=$('deudaBody'), arrow=$('deudaArrow');
-  if(body) body.classList.remove('open');
-  if(arrow) arrow.classList.remove('open');
+  const body=$('deudaBody'); if(body) body.style.display='none';   // colapsado al abrir
   recalcDeuda();
 }
 /* ── "Sucio": ¿el formulario cambió respecto a como se abrió? Snapshot de los
