@@ -941,11 +941,11 @@ function renderForm(){
         <textarea class="fi" id="f_notes" rows="2" placeholder="Notas u observaciones (opcional)"></textarea>
       </div>
 
+      <div id="submitErrBox" class="error-box" style="display:none;margin-top:4px"></div>
       <div class="wz-nav">
         <button class="wz-back" onclick="wzBack()">← Atrás</button>
+        <button class="btn-main" id="confirmBtn" onclick="submitOrder()">Confirmar pedido →</button>
       </div>
-      <div id="submitErrBox" class="error-box" style="display:none;margin-top:4px"></div>
-      <button class="btn-main" id="confirmBtn" onclick="submitOrder()" style="margin-top:8px">Confirmar pedido →</button>
       </div>
     </div>
     ${brandFooterHtml()}
@@ -1683,8 +1683,8 @@ async function submitOrder(){
   if(!selDateIso)    { $('err_date')&&$('err_date').classList.add('show'); ok=false; }
   else               { $('err_date')&&$('err_date').classList.remove('show'); }
 
-  // DNI (paso 1): obligatorio solo si el courier lo requiere (agencia/encomienda).
-  if(selCourierType==='agencia'||selCourierType==='encomienda'){
+  // DNI (paso 1): obligatorio para todos (8 dígitos) — red de seguridad.
+  {
     const dni=($('f_dni')||{value:''}).value.trim();
     if(!/^\d{8}$/.test(dni)){ $('err_dni')&&$('err_dni').classList.add('show'); ok=false; }
     else                    { $('err_dni')&&$('err_dni').classList.remove('show'); }
@@ -2466,10 +2466,9 @@ function wzValidate(step){
     var phone=($('f_phone')||{value:''}).value.trim();
     if(_wzErr('f_name','err_name',!name)) ok=false;
     if(_wzErr('f_phone','err_phone',!/^\d{9}$/.test(phone))) ok=false;
-    // DNI: aquí solo se valida FORMATO (si escribió algo, 8 dígitos). La
-    // OBLIGATORIEDAD depende del courier → se valida en el paso 2.
+    // DNI OBLIGATORIO (8 dígitos) para todos — coincide con el "*" del campo.
     var dni1=($('f_dni')||{value:''}).value.trim();
-    if(_wzErr('f_dni','err_dni', !!dni1 && !/^\d{8}$/.test(dni1))) ok=false;
+    if(_wzErr('f_dni','err_dni', !/^\d{8}$/.test(dni1))) ok=false;
     var extraF=((CFG&&CFG.extraFields)||[]).filter(function(f){return f&&f.visible!==false;});
     extraF.forEach(function(f){
       var fname=typeof f==='string'?f:(f.name||''); var isReq=typeof f==='object'&&!!f.required;
@@ -2480,20 +2479,7 @@ function wzValidate(step){
     });
   } else if(step===2){
     if(!selCourierName){ $('err_courier')&&$('err_courier').classList.add('show'); ok=false; }
-    else {
-      $('err_courier')&&$('err_courier').classList.remove('show');
-      // El DNI vive en el paso 1 pero solo es obligatorio si el courier lo pide
-      // (agencia/encomienda). Ya elegido el courier: si falta, regresamos al
-      // paso 1 a completarlo (delivery/retiro no lo exigen).
-      if(selCourierType==='agencia'||selCourierType==='encomienda'){
-        var d2=($('f_dni')||{value:''}).value.trim();
-        if(!/^\d{8}$/.test(d2)){
-          ok=false; _wzErr('f_dni','err_dni',true);
-          wzShow(1);
-          setTimeout(function(){ try{ var e=$('f_dni'); if(e){ e.focus(); e.scrollIntoView({block:'center',behavior:'smooth'}); } }catch(_){} },60);
-        } else { _wzErr('f_dni','err_dni',false); }
-      }
-    }
+    else { $('err_courier')&&$('err_courier').classList.remove('show'); }
   } else if(step===3){
     if(selCourierType==='agencia'){
       var man=$('agcManualInput');
