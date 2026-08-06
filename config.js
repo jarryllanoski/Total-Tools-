@@ -281,11 +281,18 @@ function recalcDeuda(){
   const m=parseFloat(($('fMonto')||{value:''}).value)||0;
   const a=parseFloat(($('fAdelanto')||{value:''}).value)||0;
   const d=Math.max(0, m-a);
-  if($('fDeuda')) $('fDeuda').value = d>0 ? String(Math.round(d*100)/100) : '';
+  const el=$('fDeudaDisplay'); if(!el) return;
+  const fmt=n=>'S/ '+(Math.round(n*100)/100);
+  if(m<=0){ el.innerHTML=fmt(0); el.style.color='var(--text2)'; }
+  else if(d<=0){ el.innerHTML='<s style="opacity:.65">'+fmt(m)+'</s> <span style="color:#22c55e;font-weight:800">✓ Pagado</span>'; el.style.color=''; }
+  else { el.innerHTML=fmt(d); el.style.color='#f59e0b'; }
 }
-function toggleMontoEdit(){
-  const r=$('montoRow'); if(!r) return;
-  r.style.display = (r.style.display==='none'||!r.style.display) ? 'flex' : 'none';
+// Deuda como acordeón (igual patrón que Documentos del envío).
+function toggleDeuda(){
+  const body=$('deudaBody'), arrow=$('deudaArrow'); if(!body) return;
+  const open=body.classList.contains('open');
+  body.classList.toggle('open', !open);
+  if(arrow) arrow.classList.toggle('open', !open);
 }
 // Carga monto/adelanto/deuda al abrir el form. Pedido viejo: deriva monto=cost.
 function _loadMontoFields(s){
@@ -296,9 +303,26 @@ function _loadMontoFields(s){
   }
   if($('fMonto')) $('fMonto').value=monto;
   if($('fAdelanto')) $('fAdelanto').value=adel;
-  if($('montoRow')) $('montoRow').style.display='none';
+  const body=$('deudaBody'), arrow=$('deudaArrow');
+  if(body) body.classList.remove('open');
+  if(arrow) arrow.classList.remove('open');
   recalcDeuda();
 }
+/* ── "Sucio": ¿el formulario cambió respecto a como se abrió? Snapshot de los
+   campos clave. Sirve para no cerrar el modal al clic-fuera si hay cambios. */
+window._formSnap = '';
+function _formSnapshot(){
+  const ids=['fName','fPhone','fDni','fAddr','fEncAgencia','fCourier','fDate',
+    'fStatus','fNotes','fMonto','fAdelanto','fShalomGuia','fShalomCodigo'];
+  let out=ids.map(i=>{const e=$(i);return e?(e.value||''):'';}).join('');
+  document.querySelectorAll('.xf').forEach(el=>{ out+=''+(el.value||''); });
+  out+=''+((_docs&&(_docs.guia||_docs.embalado||_docs.ticket))?'D':'')
+      +''+((_links&&_links.length)?_links.length:'');
+  return out;
+}
+window._formSnapshotDirty=function(){
+  return typeof _formSnapshot==='function' && _formSnapshot()!==window._formSnap;
+};
 
 /* FORM */
 let _editId=null;
@@ -311,6 +335,7 @@ function openForm(id){
   _editId=id;$('formTitle').textContent=id?'Editar Envío':'Nuevo Envío';
   if($('fPaste')) $('fPaste').value='';   // limpiar el pegado al abrir
   if(typeof _pasteClearToggle==='function') _pasteClearToggle();
+  _clienteMatch=null; if($('clienteHint')){ $('clienteHint').style.display='none'; $('clienteHint').innerHTML=''; }
   // Panel de gestión: SIEMPRE todos los couriers disponibles (independiente
   // de qué esté activo en el formulario público del cliente).
   $('fCourier').innerHTML = (S.couriers||[]).map(c=>`<option>${c}</option>`).join('');
@@ -380,6 +405,65 @@ function openForm(id){
   // Caja "Pegar pedido de WhatsApp": solo en pedido NUEVO (no al editar)
   if($('fPasteBox')) $('fPasteBox').style.display = id ? 'none' : 'block';
   openOverlay('formOverlay');
+  // Snapshot del estado inicial (para saber si luego se ensució).
+  window._formSnap = (typeof _formSnapshot==='function') ? _formSnapshot() : '';
+}
+
+/* ── RELLENAR CLIENTE RECURRENTE (por teléfono o DNI, solo en Nuevo Envío) ──
+   Opción A: se deriva del historial de pedidos en memoria (S.shipments), sin
+   colección nueva ni costo. Rellena solo campos de cliente vacíos; NO toca
+   fecha, estado, monto ni notas. */
+var _clienteMatch=null, _cliTimer=null;
+function _norm9(s){ let v=(s||'').replace(/\D/g,''); if(v.startsWith('51')&&v.length>9) v=v.slice(2); return v.slice(-9); }
+function _clienteBuscar(){
+  if(_editId) return null;                 // solo en Nuevo Envío
+  const ph=_norm9(($('fPhone')||{value:''}).value);
+  const dni=(($('fDni')||{value:''}).value||'').replace(/\D/g,'');
+  const keyPh  = ph.length===9  ? ph  : '';
+  const keyDni = dni.length===8 ? dni : '';
+  if(!keyPh && !keyDni) return null;
+  const cands=(S.shipments||[]).filter(function(x){
+    const xph=_norm9(x.phone), xdni=(x.dni||'').replace(/\D/g,'');
+    return (keyPh&&xph===keyPh) || (keyDni&&xdni===keyDni);
+  });
+  if(!cands.length) return null;
+  // Más reciente (mejor dato de dirección). No se copia la fecha al rellenar.
+  cands.sort(function(a,b){ return String(b.createdAt||b.date||'').localeCompare(String(a.createdAt||a.date||'')); });
+  return cands[0];
+}
+function _clienteHintUpdate(){
+  clearTimeout(_cliTimer);
+  _cliTimer=setTimeout(function(){
+    const box=$('clienteHint'); if(!box) return;
+    const m=_clienteBuscar(); _clienteMatch=m;
+    if(!m){ box.style.display='none'; box.innerHTML=''; return; }
+    box.innerHTML='';
+    const btn=document.createElement('button');
+    btn.type='button';
+    btn.style.cssText='width:100%;text-align:left;background:rgba(34,197,94,.10);border:1px solid rgba(34,197,94,.35);border-radius:9px;padding:9px 11px;color:#22c55e;font-weight:700;font-size:12.5px;cursor:pointer;font-family:inherit';
+    btn.textContent='🌟 Cliente conocido: '+(m.name||'—')+' — toca para rellenar sus datos';
+    btn.onclick=_clienteRellenar;
+    box.appendChild(btn);
+    box.style.display='block';
+  }, 250);
+}
+function _clienteRellenar(){
+  const m=_clienteMatch; if(!m) return;
+  const setIfEmpty=function(id,val){ const e=$(id); if(e && !e.value.trim() && val) e.value=String(val); };
+  setIfEmpty('fName', m.name);
+  setIfEmpty('fPhone', _norm9(m.phone));
+  setIfEmpty('fDni', (m.dni||'').replace(/\D/g,''));
+  const isEnc=(m.courier||'').toUpperCase().includes('ENCOMIENDA');
+  setIfEmpty('fAddr', isEnc?(m.ciudadDestino||m.address||''):(m.address||''));
+  setIfEmpty('fEncAgencia', m.encAgencia||'');
+  // Courier habitual (dispara el cambio de bloque agencia/encomienda).
+  if(m.courier && $('fCourier')){
+    const opt=Array.from($('fCourier').options).find(o=>(o.value||'').toUpperCase()===String(m.courier).toUpperCase());
+    if(opt){ $('fCourier').value=opt.value; $('fCourier').dispatchEvent(new Event('change')); }
+  }
+  // NO se toca: fecha, estado, monto/adelanto/deuda, notas, guía/código.
+  if(typeof toast==='function') toast('✅ Datos de '+(m.name||'cliente')+' rellenados');
+  const box=$('clienteHint'); if(box){ box.style.display='none'; }
 }
 
 /* ── PEGAR PEDIDO DE WHATSAPP → autocompletar campos ──────────────── */
