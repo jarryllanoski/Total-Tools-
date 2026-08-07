@@ -665,7 +665,7 @@
     </div>
     <div class="frow">
       <div class="fg"><label class="fl">Estado</label><select class="fs" id="fStatus"></select></div>
-      <div class="fg" onclick="toggleDeuda()" style="cursor:pointer"><label class="fl">💰 Deuda S/ <span style="font-size:9px;color:var(--text2);font-weight:400">(tocar para editar)</span></label><div id="fDeudaDisplay" class="fi" style="display:flex;align-items:center">S/ 0.00</div></div>
+      <div class="fg" onclick="toggleDeuda()" style="cursor:pointer"><label class="fl">💰 Deuda S/</label><div class="fi" style="display:flex;align-items:center;justify-content:space-between;gap:8px"><span id="fDeudaDisplay">S/ 0.00</span><span class="docs-accordion-arrow" id="deudaArrow" style="font-size:12px;flex-shrink:0">▾</span></div></div>
     </div>
     <div class="frow" id="deudaBody" style="display:none">
       <div class="fg"><label class="fl">Monto S/</label><input class="fi" id="fMonto" type="number" placeholder="0.00" min="0" step="0.5" inputmode="decimal" oninput="recalcDeuda()"></div>
@@ -2892,7 +2892,7 @@ render();
 </script>
 <!-- ★ SHALOM tracking — cargado al final -->
 <script src="storage.js?v=2"></script>
-<script src="config.js?v=6"></script>
+<script src="config.js?v=7"></script>
 <script src="print.js?v=5"></script>
 <script src="notify.js?v=3"></script>
 <script src="tracking.js?v=2"></script>

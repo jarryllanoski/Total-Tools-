@@ -291,7 +291,9 @@ function recalcDeuda(){
 // Deuda: toca para desplegar/ocultar Monto/Adelanto (fila de abajo).
 function toggleDeuda(){
   const body=$('deudaBody'); if(!body) return;
-  body.style.display=(body.style.display==='none'||!body.style.display)?'flex':'none';
+  const abrir=(body.style.display==='none'||!body.style.display);
+  body.style.display=abrir?'flex':'none';
+  const ar=$('deudaArrow'); if(ar) ar.classList.toggle('open', abrir);
 }
 // Carga monto/adelanto/deuda al abrir el form. Pedido viejo: deriva monto=cost.
 function _loadMontoFields(s){
@@ -303,6 +305,7 @@ function _loadMontoFields(s){
   if($('fMonto')) $('fMonto').value=monto;
   if($('fAdelanto')) $('fAdelanto').value=adel;
   const body=$('deudaBody'); if(body) body.style.display='none';   // colapsado al abrir
+  const ar=$('deudaArrow'); if(ar) ar.classList.remove('open');
   recalcDeuda();
 }
 /* ── "Sucio": ¿el formulario cambió respecto a como se abrió? Snapshot de los
