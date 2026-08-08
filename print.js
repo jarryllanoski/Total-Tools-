@@ -390,8 +390,8 @@ function _htmlEtiqueta(list, bultos, bizName, bizPhone, bizCity, fecha, qrUrl){
             <span class="codigo">#${esc(_codigoEnvio(s))}</span>
           </div>
           <div class="card-thanks">
-            <span class="card-thanks-txt">Gracias por su preferencia — ${esc(bizName)}</span>
-            <span class="card-thanks-time">${new Date().toLocaleString('es-PE',{weekday:'short',day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'})}</span>
+            <span class="card-thanks-txt">Gracias por tu preferencia</span>
+            <span class="card-thanks-time">${new Date().toLocaleDateString('es-PE',{day:'2-digit',month:'2-digit',year:'numeric'})} · ${new Date().toLocaleTimeString('es-PE',{hour:'numeric',minute:'2-digit',hour12:true})}</span>
           </div>
         </div>`);
     }
@@ -449,9 +449,12 @@ function _htmlEtiqueta(list, bultos, bizName, bizPhone, bizCity, fecha, qrUrl){
   .fecha   { font-size:clamp(7.5pt,1.4vw,9pt); color:#333; font-weight:700; }
   .codigo  { font-size:clamp(10pt,2.2vw,13pt); font-weight:900; color:#000; letter-spacing:2px; }
 
-  .card-thanks { display:flex; justify-content:space-between; align-items:center; margin-top:2mm; padding-top:1.5mm; border-top:1px dashed #aaa; }
-  .card-thanks-txt  { font-size:clamp(9pt,1.8vw,11pt); color:#000; font-weight:700; }
-  .card-thanks-time { font-size:clamp(8pt,1.5vw,10pt); color:#000; font-weight:700; }
+  /* Cierre de cortesía: centrado, discreto (jerarquía correcta — no compite con
+     nombre/DNI/destino). Agradecimiento en versalitas espaciadas; fecha·hora
+     en su propia línea, más chica y gris. */
+  .card-thanks { display:flex; flex-direction:column; align-items:center; text-align:center; gap:0.8mm; margin-top:2.5mm; padding-top:1.8mm; border-top:1px dashed #aaa; }
+  .card-thanks-txt  { font-size:clamp(7.5pt,1.4vw,9pt); color:#555; font-weight:600; text-transform:uppercase; letter-spacing:2px; }
+  .card-thanks-time { font-size:clamp(6.5pt,1.1vw,8pt); color:#888; font-weight:500; letter-spacing:.5px; }
 
   @media print {
     body { padding:2mm; }
