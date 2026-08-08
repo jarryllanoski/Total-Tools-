@@ -331,6 +331,24 @@ window.PrintModule = {
   }
 };
 
+/* Código de envío para la etiqueta.
+   · Pedidos ANTIGUOS (antes de 2026-08-08): se mantienen con los últimos 4
+     dígitos del id (como siempre) — NO se tocan.
+   · Pedidos de HOY en adelante: código alfanumérico (letras+números) estilo
+     Shalom, derivado del id en base36. Determinístico: mismo pedido → mismo
+     código (reimprimir da igual), sin guardar nada nuevo en la base. */
+var _CODIGO_CUTOFF = '2026-08-08';
+function _codigoEnvio(s){
+  if(!s || !s.id) return '???';
+  var esNuevo = ((s.createdAt||'').slice(0,10) >= _CODIGO_CUTOFF);
+  var idNum = String(s.id).replace(/\D/g,'');
+  if(esNuevo && idNum){
+    var c = parseInt(idNum.slice(-12), 10).toString(36).toUpperCase();
+    return c.slice(-4);            // 4 caracteres A-Z0-9
+  }
+  return String(s.id).slice(-4).toUpperCase();   // antiguos: como antes
+}
+
 /* ── FORMATO 1: ETIQUETA ─────────────────────────────────────────── */
 function _htmlEtiqueta(list, bultos, bizName, bizPhone, bizCity, fecha, qrUrl){
   const cards = [];
@@ -369,7 +387,7 @@ function _htmlEtiqueta(list, bultos, bizName, bizPhone, bizCity, fecha, qrUrl){
           <div class="card-footer">
             <span class="courier">${esc(s.courier||'—')}</span>
             <span class="fecha">${esc(s.date||'—')}</span>
-            <span class="codigo">#${esc(s.id?s.id.slice(-4).toUpperCase():'???')}</span>
+            <span class="codigo">#${esc(_codigoEnvio(s))}</span>
           </div>
           <div class="card-thanks">
             <span class="card-thanks-txt">Gracias por su preferencia — ${esc(bizName)}</span>
@@ -416,7 +434,7 @@ function _htmlEtiqueta(list, bultos, bizName, bizPhone, bizCity, fecha, qrUrl){
   .dest-label { font-size:clamp(6.5pt,1.2vw,8pt); font-weight:700; text-transform:uppercase; letter-spacing:1px; color:#555; margin-bottom:1mm; display:block; }
   .dest-name  { font-size:clamp(13pt,3vw,17pt); font-weight:900; line-height:1.15; margin-bottom:2mm; color:#000; text-transform:uppercase; }
   .dest-phone { font-size:clamp(10pt,2.2vw,13pt); font-weight:700; color:#000; margin-bottom:1.5mm; }
-  .dest-addr  { font-size:clamp(8pt,1.6vw,10pt); color:#000; margin-bottom:1.5mm; line-height:1.5; font-weight:400; }
+  .dest-addr  { font-size:clamp(8pt,1.6vw,10pt); color:#000; margin-bottom:1.5mm; line-height:1.5; font-weight:700; }
   .dest-ref   { font-size:clamp(8pt,1.5vw,9.5pt); color:#000; margin-bottom:1mm; font-weight:700; display:block; }
   .dest-dni   { font-size:clamp(12pt,2.4vw,15pt); color:#000; margin-bottom:2mm; font-weight:900; display:block; letter-spacing:1px; }
   .agencia    { font-size:clamp(8pt,1.5vw,9.5pt); color:#000; margin-bottom:1mm; font-weight:700; display:block; }
@@ -432,8 +450,8 @@ function _htmlEtiqueta(list, bultos, bizName, bizPhone, bizCity, fecha, qrUrl){
   .codigo  { font-size:clamp(10pt,2.2vw,13pt); font-weight:900; color:#000; letter-spacing:2px; }
 
   .card-thanks { display:flex; justify-content:space-between; align-items:center; margin-top:2mm; padding-top:1.5mm; border-top:1px dashed #aaa; }
-  .card-thanks-txt  { font-size:clamp(6pt,1vw,7.5pt); color:#555; font-style:italic; }
-  .card-thanks-time { font-size:clamp(6pt,1vw,7pt); color:#777; }
+  .card-thanks-txt  { font-size:clamp(9pt,1.8vw,11pt); color:#000; font-weight:700; }
+  .card-thanks-time { font-size:clamp(8pt,1.5vw,10pt); color:#000; font-weight:700; }
 
   @media print {
     body { padding:2mm; }
