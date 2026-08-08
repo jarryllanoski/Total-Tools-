@@ -474,8 +474,8 @@
       <option value="7">Vence en 7 días</option>
       <option value="30">Vence en 30 días</option>
     </select>
-    <button onclick="genToken('copy')" style="width:100%;padding:13px;background:var(--bg2);border:1.5px solid var(--bd);border-radius:12px;color:var(--text);font-weight:600;font-size:14px;cursor:pointer;font-family:inherit;margin-bottom:8px">📋 Generar y copiar link</button>
-    <button onclick="genToken('share')" style="width:100%;padding:15px;background:var(--blue);border:none;border-radius:12px;color:#fff;font-weight:700;font-size:15px;cursor:pointer;font-family:inherit">🔑 Generar y compartir link</button>
+    <button onclick="genToken('copy', this)" style="width:100%;padding:13px;background:var(--bg2);border:1.5px solid var(--bd);border-radius:12px;color:var(--text);font-weight:600;font-size:14px;cursor:pointer;font-family:inherit;margin-bottom:8px">📋 Generar y copiar link</button>
+    <button onclick="genToken('share', this)" style="width:100%;padding:15px;background:var(--blue);border:none;border-radius:12px;color:#fff;font-weight:700;font-size:15px;cursor:pointer;font-family:inherit">🔑 Generar y compartir link</button>
   </div>
 
   <!-- LINKS RÁPIDOS -->
@@ -483,10 +483,10 @@
     <div class="cfg-ttl">⚡ Links rápidos</div>
     <div style="font-size:11px;color:var(--text2);margin-bottom:12px;line-height:1.5">Sin datos del cliente — genera un link de <b>un solo uso</b>; se bloquea al usarse.</div>
     <div style="display:flex;gap:8px">
-      <button onclick="copyLink()" style="flex:1;padding:13px 8px;background:var(--bg2);border:1.5px solid var(--bd);border-radius:12px;color:var(--text);font-weight:600;font-size:13px;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:6px">📋 Copiar link</button>
-      <button onclick="openFormLink()" style="flex:1;padding:13px 8px;background:var(--bg2);border:1.5px solid var(--bd);border-radius:12px;color:var(--text2);font-weight:600;font-size:13px;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:6px">↗ Abrir</button>
+      <button onclick="copyLink(this)" style="flex:1;padding:13px 8px;background:var(--bg2);border:1.5px solid var(--bd);border-radius:12px;color:var(--text);font-weight:600;font-size:13px;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:6px">📋 Copiar link</button>
+      <button onclick="openFormLink(this)" style="flex:1;padding:13px 8px;background:var(--bg2);border:1.5px solid var(--bd);border-radius:12px;color:var(--text2);font-weight:600;font-size:13px;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:6px">↗ Abrir</button>
     </div>
-    <button onclick="shareWA()" style="width:100%;margin-top:8px;padding:14px;background:rgba(37,211,102,.15);border:1.5px solid rgba(37,211,102,.35);border-radius:12px;color:#25D366;font-weight:700;font-size:14px;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:8px">
+    <button onclick="shareWA(this)" style="width:100%;margin-top:8px;padding:14px;background:rgba(37,211,102,.15);border:1.5px solid rgba(37,211,102,.35);border-radius:12px;color:#25D366;font-weight:700;font-size:14px;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:8px">
       💬 Compartir por WhatsApp
     </button>
   </div>
@@ -2892,7 +2892,7 @@ render();
 </script>
 <!-- ★ SHALOM tracking — cargado al final -->
 <script src="storage.js?v=2"></script>
-<script src="config.js?v=7"></script>
+<script src="config.js?v=8"></script>
 <script src="print.js?v=5"></script>
 <script src="notify.js?v=3"></script>
 <script src="tracking.js?v=2"></script>

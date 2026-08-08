@@ -790,7 +790,19 @@ async function _snapshotFormConfig(){
    llevar ?t= el formulario va directo a crear pedido (no se desvía al
    seguimiento del último pedido de este dispositivo). Tras registrarse, la
    Cloud Function lo marca usado → reabrir muestra "Link ya utilizado".      */
-async function genQuickToken(action){
+// Guardia + spinner para generar links: evita doble-clic → tokens duplicados y
+// da feedback (círculo que gira, igual que el botón "Consultar" de Shalom).
+// Reutilizable y a prueba de fallos (restaura el botón siempre en finally).
+let _genBusy=false;
+async function _genGuard(btn, fn){
+  if(_genBusy) return;                 // ya se está generando → ignora clics extra
+  _genBusy=true;
+  var orig=null;
+  if(btn){ orig=btn.innerHTML; btn.disabled=true; btn.innerHTML='<span class="trk-spin-inline"></span> Generando…'; }
+  try{ await fn(); }
+  finally{ _genBusy=false; if(btn){ btn.disabled=false; btn.innerHTML=orig; } }
+}
+async function _genQuickDo(action){
   // Abrir la ventana YA (en el gesto) para que móvil no bloquee el popup tras el await.
   let win=null;
   if(action==='open'||action==='wa') win=window.open('','_blank');
@@ -828,9 +840,10 @@ async function genQuickToken(action){
     if(typeof loadTokenList==='function') loadTokenList(true); // aparece en "Links generados"
   }catch(e){ if(win)win.close(); toast('⚠️ Error: '+e.message); }
 }
-function copyLink(){ return genQuickToken('copy'); }
-function openFormLink(){ return genQuickToken('open'); }
-function shareWA(){ return genQuickToken('wa'); }
+function genQuickToken(action, btn){ return _genGuard(btn, ()=>_genQuickDo(action)); }
+function copyLink(btn){ return genQuickToken('copy', btn); }
+function openFormLink(btn){ return genQuickToken('open', btn); }
+function shareWA(btn){ return genQuickToken('wa', btn); }
 function shareTG(){ window.open(`https://t.me/share/url?url=${encodeURIComponent(getFormLink())}`); }
 
 /* ── TOKENS: SISTEMA COMPLETO ─────────────────────────────────────── */
@@ -896,7 +909,7 @@ function _genTokId(){
   return r;
 }
 
-async function genToken(action){
+async function _genTokenDo(action){
   const name    = ($('tokName').value||'').trim();
   const phone   = ($('tokPhone').value||'').trim();
   const link    = ($('tokLink').value||'').trim();
@@ -947,6 +960,12 @@ async function genToken(action){
     }
     await loadTokenList(true); // acabo de generar un link → forzar refresco
   } catch(e){ toast('⚠️ Error: '+e.message); }
+}
+function genToken(action, btn){
+  // Validación ANTES del spinner (para no bloquear el botón por un dato faltante).
+  const name=($('tokName').value||'').trim(), phone=($('tokPhone').value||'').trim();
+  if(!name && !phone){ if(typeof toast==='function') toast('⚠️ Escribe el nombre o teléfono del cliente'); return; }
+  return _genGuard(btn, ()=>_genTokenDo(action));
 }
 
 let _tokLastFetch = 0;        // ts del último fetch exitoso
