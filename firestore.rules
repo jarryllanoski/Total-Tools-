@@ -4,24 +4,35 @@ rules_version = '2';
 // Total Tools — Reglas de seguridad de Firestore
 // ----------------------------------------------------------------------------
 // PRINCIPIO:
-//   • El PANEL (index.html) ya envía el token de Firebase Auth en cada llamada
-//     (Authorization: Bearer ...). Por eso exigimos request.auth != null.
-//   • El PÚBLICO (formulario / seguimiento) ya NO toca Firestore directo:
-//     todo pasa por la Cloud Function "formApi", que usa el Admin SDK y
-//     IGNORA estas reglas (acceso de servidor). Por eso aquí el público
-//     queda completamente cerrado.
-// RESULTADO:
-//   • Solo quien inició sesión en el panel puede leer/escribir datos.
-//   • Nadie puede leer/editar/borrar con la API key suelta.
-//   • El formulario público sigue funcionando porque va por la función.
+//   • El PANEL (index.html) inicia sesión con Firebase Auth y envía el token
+//     (Authorization: Bearer ...) en cada llamada.
+//   • Antes exigíamos solo "request.auth != null" → CUALQUIER usuario logueado
+//     entraba. Ahora exigimos que el correo esté en la LISTA DE ADMINS de abajo,
+//     así aunque alguien se registre por su cuenta NO accede a tus datos.
+//   • El PÚBLICO (formulario / seguimiento) NO toca Firestore directo: pasa por
+//     la Cloud Function "formApi" (Admin SDK), que ignora estas reglas. Por eso
+//     aquí el público queda completamente cerrado.
+// MANTENIMIENTO:
+//   • Para agregar/quitar un administrador, edita la lista ADMINS de abajo y
+//     vuelve a desplegar: firebase deploy --only firestore:rules
 // ============================================================================
 
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Solo usuarios autenticados (tu login del panel) acceden a TODO "panel/**"
+    // ── Lista blanca de correos de administrador ──────────────────────────
+    // ⚠️ CONFIRMA que este es EXACTAMENTE el correo con el que entras al panel.
+    //    Si te equivocas, te bloquearías a ti mismo. Puedes poner varios.
+    function esAdmin() {
+      return request.auth != null
+        && request.auth.token.email in [
+          'jarryllanoski@gmail.com'
+        ];
+    }
+
+    // Solo administradores acceden a "panel/**" (todos tus pedidos, tokens, config)
     match /panel/{document=**} {
-      allow read, write: if request.auth != null;
+      allow read, write: if esAdmin();
     }
 
     // Cualquier otra ruta: cerrada por defecto
