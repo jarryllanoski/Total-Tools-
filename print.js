@@ -390,8 +390,8 @@ function _htmlEtiqueta(list, bultos, bizName, bizPhone, bizCity, fecha, qrUrl){
             <span class="codigo">#${esc(_codigoEnvio(s))}</span>
           </div>
           <div class="card-thanks">
-            <span class="card-thanks-txt">Gracias por tu preferencia</span>
             <span class="card-thanks-time">${new Date().toLocaleDateString('es-PE',{day:'2-digit',month:'2-digit',year:'numeric'})} · ${new Date().toLocaleTimeString('es-PE',{hour:'numeric',minute:'2-digit',hour12:true})}</span>
+            <span class="card-thanks-txt">Gracias por tu preferencia</span>
           </div>
         </div>`);
     }
@@ -452,7 +452,7 @@ function _htmlEtiqueta(list, bultos, bizName, bizPhone, bizCity, fecha, qrUrl){
   /* Cierre de cortesía: centrado, discreto (jerarquía correcta — no compite con
      nombre/DNI/destino). Agradecimiento en versalitas espaciadas; fecha·hora
      en su propia línea, más chica y gris. */
-  .card-thanks { display:flex; flex-direction:column; align-items:flex-start; text-align:left; gap:0.8mm; margin-top:2.5mm; padding-top:1.8mm; border-top:1px dashed #aaa; }
+  .card-thanks { display:flex; flex-direction:column; align-items:center; text-align:center; gap:0.8mm; margin-top:2.5mm; padding-top:1.8mm; border-top:1px dashed #aaa; }
   .card-thanks-txt  { font-size:clamp(7.5pt,1.4vw,9pt); color:#555; font-weight:600; text-transform:uppercase; letter-spacing:2px; }
   .card-thanks-time { font-size:clamp(6.5pt,1.1vw,8pt); color:#888; font-weight:500; letter-spacing:.5px; }
 
