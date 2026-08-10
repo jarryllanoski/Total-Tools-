@@ -26,7 +26,7 @@ service cloud.firestore {
     function esAdmin() {
       return request.auth != null
         && request.auth.token.email in [
-          'jarryllanoski@gmail.com'
+          'admin@totaltools.com'
         ];
     }
 
