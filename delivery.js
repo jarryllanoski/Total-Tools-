@@ -20,6 +20,7 @@ var _fotoBase64    = null;
 var _signCtx       = null;
 var _signing       = false;
 var _drivers       = [];
+var _selectedDrv   = null; // motorizado elegido en el modal (aún sin guardar)
 var _tapCount      = 0;
 var _tapTimer      = null;
 
@@ -183,10 +184,7 @@ function _html(){
           '<div class="fg"><label class="fl">Nombre</label><input id="dlvDrvName" class="fi" placeholder="Nombre..."></div>'+
           '<div class="fg"><label class="fl">Teléfono</label><input id="dlvDrvPhone" class="fi phone-norm" placeholder="Opcional" inputmode="numeric"></div>'+
         '</div>'+
-        '<button type="button" onclick="DeliveryModule._addDrv()" style="width:100%;margin-top:9px;padding:9px;background:var(--blue);border:none;border-radius:8px;color:#fff;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">+ Agregar</button>'+
       '</div>'+
-      // LISTA de motorizados guardados (tocar para asignar)
-      '<div id="dlvDrvList" style="display:flex;flex-direction:column;gap:7px;margin-bottom:14px;max-height:200px;overflow-y:auto"></div>'+
       // LINK INDRIVER — patrón "Agregar link" (input + Add + chip con ↗/✕)
       '<div style="font-size:10px;font-weight:700;color:#8b949e;letter-spacing:.8px;text-transform:uppercase;margin-bottom:7px">🔗 Link inDriver (opcional)</div>'+
       '<div class="link-row">'+
@@ -194,7 +192,22 @@ function _html(){
         '<button class="link-add" type="button" onclick="DeliveryModule._addRuta()">+ Add</button>'+
       '</div>'+
       '<div class="link-list" id="dlvRutaList" style="margin-bottom:14px"></div>'+
-      '<button onclick="DeliveryModule._closeDrv()" style="width:100%;padding:11px;background:#1c2333;border:1px solid #30363d;border-radius:10px;color:#8b949e;font-size:13px;cursor:pointer;font-family:inherit">Cerrar</button>'+
+      // MOTORIZADOS GUARDADOS — acordeón colapsable (como Documentos del envío);
+      // se abre solo si quieres reusar uno. Cabecera muestra el elegido.
+      '<div class="docs-accordion" style="margin-bottom:14px">'+
+        '<div class="docs-accordion-hdr" onclick="DeliveryModule._toggleDrvList()">'+
+          '<span class="docs-accordion-ttl">🛵 Motorizados guardados<span id="dlvDrvChosen" style="text-transform:none;font-weight:600;color:#a371f7;margin-left:6px"></span></span>'+
+          '<span class="docs-accordion-arrow" id="dlvDrvArrow">▾</span>'+
+        '</div>'+
+        '<div class="docs-accordion-body" id="dlvDrvBody">'+
+          '<div id="dlvDrvList" style="display:flex;flex-direction:column;gap:7px;max-height:200px;overflow-y:auto"></div>'+
+        '</div>'+
+      '</div>'+
+      // GUARDAR Y CERRAR (primario) + Cerrar (cancelar) — mismo par que el panel
+      '<div style="display:flex;gap:9px">'+
+        '<button onclick="DeliveryModule._closeDrv()" style="flex:1;padding:12px;background:#1c2333;border:1px solid #30363d;border-radius:10px;color:#8b949e;font-size:13px;cursor:pointer;font-family:inherit">Cerrar</button>'+
+        '<button onclick="DeliveryModule._guardar()" style="flex:2;padding:12px;background:var(--blue);border:none;border-radius:10px;color:#fff;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">💾 Guardar y cerrar</button>'+
+      '</div>'+
     '</div>';
   od.addEventListener('click',function(e){if(e.target===od)DeliveryModule._closeDrv();});
   document.body.appendChild(od);
@@ -328,14 +341,16 @@ function _renderHist(){
 }
 
 /* ── Driver ──────────────────────────────────────────────────────── */
-DeliveryModule._openDrv=function(id){
-  _currentShipId=id; _loadDrivers();
-  var ship=((global.S&&global.S.shipments)||[]).find(function(x){return x.id===id;});
-  var cur=ship?(ship._dlvDriver||''):'';
+// Pinta la lista de motorizados guardados; resalta el SELECCIONADO (_selectedDrv).
+function _renderDrvList(){
   var list=document.getElementById('dlvDrvList');
-  if(list) list.innerHTML=_drivers.length
+  var curName=_selectedDrv?_selectedDrv.name:'';
+  var chosen=document.getElementById('dlvDrvChosen');
+  if(chosen) chosen.textContent=curName?('· '+curName):'';
+  if(!list) return;
+  list.innerHTML=_drivers.length
     ?_drivers.map(function(d){
-        var sel=cur===d.name;
+        var sel=curName===d.name;
         return '<div style="display:flex;align-items:center;gap:8px;padding:10px 12px;background:'+(sel?'rgba(163,113,247,.15)':'#1c2333')+';border:1px solid '+(sel?'rgba(163,113,247,.4)':'#30363d')+';border-radius:9px;cursor:pointer" onclick="DeliveryModule._selDrv(\''+d.name.replace(/'/g,"\\'")+'\',\''+( d.phone||'').replace(/'/g,"\\'")+'\')">'+
           '<span style="font-size:15px">🛵</span>'+
           '<div style="flex:1"><div style="font-size:13px;font-weight:600">'+_esc(d.name)+'</div>'+(d.phone?'<div style="font-size:11px;color:#8b949e">📞 '+_esc(d.phone)+'</div>':'')+  '</div>'+
@@ -343,7 +358,20 @@ DeliveryModule._openDrv=function(id){
           '<button onclick="event.stopPropagation();DeliveryModule._delDrv(\''+d.name.replace(/'/g,"\\'")+'\' )" style="background:none;border:none;color:#f78166;cursor:pointer;font-size:14px;padding:0 4px">✕</button>'+
         '</div>';
       }).join('')
-    :'<div style="text-align:center;padding:16px;color:#8b949e;font-size:12px">Sin motorizados. Agrega uno abajo.</div>';
+    :'<div style="text-align:center;padding:16px;color:#8b949e;font-size:12px">Sin motorizados. Escribe uno arriba.</div>';
+}
+DeliveryModule._openDrv=function(id){
+  _currentShipId=id; _loadDrivers();
+  var ship=((global.S&&global.S.shipments)||[]).find(function(x){return x.id===id;});
+  // Selección inicial = el motorizado ya asignado al pedido (si lo hay).
+  _selectedDrv=ship&&ship._dlvDriver?{name:ship._dlvDriver,phone:ship._dlvDriverPhone||''}:null;
+  _renderDrvList();
+  // Acordeón de motorizados colapsado por defecto (se usa solo si se necesita).
+  var _db=document.getElementById('dlvDrvBody'); if(_db) _db.classList.remove('open');
+  var _da=document.getElementById('dlvDrvArrow'); if(_da) _da.classList.remove('open');
+  // Limpiar campos "Nuevo motorizado" al abrir
+  var _dn=document.getElementById('dlvDrvName'); if(_dn) _dn.value='';
+  var _dp=document.getElementById('dlvDrvPhone'); if(_dp) _dp.value='';
   // Input vacío; el link inDriver guardado se muestra como chip (patrón Agregar link)
   var _rl=document.getElementById('dlvRutaLink'); if(_rl) _rl.value='';
   var _rlist=document.getElementById('dlvRutaList');
@@ -355,35 +383,54 @@ DeliveryModule._openDrv=function(id){
   }
   document.getElementById('dlvDrvOv').classList.add('open');
 };
-DeliveryModule._addDrv=function(){
-  var n=(document.getElementById('dlvDrvName')||{value:''}).value.trim();
-  var ph=(document.getElementById('dlvDrvPhone')||{value:''}).value.trim();
-  if(!n){if(typeof global.toast==='function')global.toast('⚠️ Escribe el nombre');return;}
-  if(!_drivers.find(function(d){return d.name===n;})){_drivers.push({name:n,phone:ph});_saveDrivers();}
-  document.getElementById('dlvDrvName').value='';
-  document.getElementById('dlvDrvPhone').value='';
-  DeliveryModule._openDrv(_currentShipId);
+// Tocar un motorizado = SOLO seleccionarlo (resaltar). Se guarda con "Guardar y
+// cerrar". Si escribes un nombre nuevo arriba, ese manda sobre esta selección.
+DeliveryModule._selDrv=function(name,phone){
+  _selectedDrv={name:name,phone:phone||''};
+  var _dn=document.getElementById('dlvDrvName'); if(_dn) _dn.value=''; // el elegido es de la lista
+  var _dp=document.getElementById('dlvDrvPhone'); if(_dp) _dp.value='';
+  _renderDrvList();
 };
 DeliveryModule._delDrv=function(name){
   _drivers=_drivers.filter(function(d){return d.name!==name;});_saveDrivers();
-  DeliveryModule._openDrv(_currentShipId);
+  if(_selectedDrv&&_selectedDrv.name===name)_selectedDrv=null;
+  _renderDrvList();
 };
-DeliveryModule._selDrv=function(name,phone){
+// GUARDAR Y CERRAR — mismo contrato que saveShipment del panel: captura lo
+// pendiente, asigna, guarda incremental a Firestore, re-renderiza y cierra.
+DeliveryModule._guardar=function(){
   var ship=((global.S&&global.S.shipments)||[]).find(function(x){return x.id===_currentShipId;});
-  if(ship){
-    ship._dlvDriver=name;ship._dlvDriverPhone=phone||'';
-    // Link pendiente en el input (aún sin + Add) → se guarda al asignar.
-    // NO se borra por input vacío: el link se quita con el ✕ del chip.
-    var raw=(document.getElementById('dlvRutaLink')||{value:''}).value.trim();
-    if(raw){var n=_normLink(raw);if(n)ship._dlvRutaLink=n;}
-    // Guardado incremental REAL a Firestore (window.save es const, no existe
-    // en window → era no-op). Reusa _fbSaveShipmentNow (1 pedido, con reintentos).
-    if(typeof global._fbSaveShipmentNow==='function')global._fbSaveShipmentNow(ship);
+  if(!ship){DeliveryModule._closeDrv();return;}
+  // Resolver motorizado: nombre nuevo escrito MANDA; si no, el seleccionado.
+  var newName=(document.getElementById('dlvDrvName')||{value:''}).value.trim();
+  var newPhone=(document.getElementById('dlvDrvPhone')||{value:''}).value.trim();
+  var drvName='',drvPhone='';
+  if(newName){
+    drvName=newName;drvPhone=newPhone;
+    if(!_drivers.find(function(d){return d.name===newName;})){_drivers.push({name:newName,phone:newPhone});_saveDrivers();}
+  }else if(_selectedDrv){
+    drvName=_selectedDrv.name;drvPhone=_selectedDrv.phone||'';
   }
+  if(drvName){ship._dlvDriver=drvName;ship._dlvDriverPhone=drvPhone;}
+  // Link pendiente en el input (aún sin +Add) → se guarda igual (como el panel).
+  var raw=(document.getElementById('dlvRutaLink')||{value:''}).value.trim();
+  if(raw){var nl=_normLink(raw);if(nl)ship._dlvRutaLink=nl;}
+  // Guardado incremental REAL a Firestore (mismo que el panel principal).
+  if(typeof global._fbSaveShipmentNow==='function')global._fbSaveShipmentNow(ship);
+  if(typeof global.render==='function')global.render();
   DeliveryModule._closeDrv();_render();
-  if(typeof global.toast==='function')global.toast('🛵 '+name+' asignado');
+  if(typeof global.toast==='function')global.toast(drvName?('🛵 '+drvName+' guardado'):'✅ Guardado');
 };
 DeliveryModule._closeDrv=function(){document.getElementById('dlvDrvOv').classList.remove('open');};
+// Acordeón de motorizados guardados (mismo comportamiento que Documentos del envío)
+DeliveryModule._toggleDrvList=function(){
+  var body=document.getElementById('dlvDrvBody');
+  var arrow=document.getElementById('dlvDrvArrow');
+  if(!body||!arrow) return;
+  var isOpen=body.classList.contains('open');
+  body.classList.toggle('open',!isOpen);
+  arrow.classList.toggle('open',!isOpen);
+};
 
 /* ── Reordenar parada (mover orden de entrega) ───────────────────── */
 // Normaliza _dlvOrden a 0..n-1 en el nuevo orden y guarda SOLO los que cambian.
