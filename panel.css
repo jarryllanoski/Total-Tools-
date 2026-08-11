@@ -194,6 +194,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);max
 .doc-tap.fg{border:2px solid var(--green)}
 .doc-tap.fe{border:2px solid var(--blue)}
 .doc-tap.ft{border:2px solid var(--purple)}
+.doc-tap.doc-drag{border:2px dashed var(--blue);background:rgba(56,139,253,.10)}
 .doc-empty{width:100%;height:100%;min-height:110px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;background:var(--bg3);padding:10px}
 .doc-full{width:100%;height:100%;min-height:110px;position:relative}
 .doc-full img{width:100%;height:100%;object-fit:cover;display:block}
@@ -205,6 +206,8 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);max
 .doc-del{background:rgba(247,129,102,.15);color:var(--red);border:1px solid rgba(247,129,102,.2)}
 .doc-add{width:100%;padding:8px;border-radius:7px;background:rgba(56,139,253,.12);border:1px solid rgba(56,139,253,.25);color:var(--blue);font-size:12px;font-weight:700;cursor:pointer;font-family:'DM Sans',sans-serif;margin-bottom:4px}
 .doc-sw{position:relative}
+.doc-paste{position:absolute;top:4px;left:4px;z-index:6;width:22px;height:22px;display:flex;align-items:center;justify-content:center;font-size:12px;background:var(--bg2);border:1px solid var(--bd);border-radius:6px;cursor:pointer;opacity:.85;line-height:1}
+.doc-paste:hover{opacity:1;background:rgba(56,139,253,.15)}
 .doc-menu{position:absolute;bottom:0;left:0;right:0;background:var(--bg2);border:1px solid var(--bd);border-radius:0 0 9px 9px;display:none;flex-direction:column;z-index:10}
 .doc-menu.open{display:flex}
 .doc-mi{padding:10px 12px;font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--bd)}

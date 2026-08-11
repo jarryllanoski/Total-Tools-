@@ -215,23 +215,48 @@ document.addEventListener('click',e=>{if(!e.target.closest('.doc-sw')&&!e.target
 
 /* DOC SLOTS */
 let _docs={guia:null,embalado:null,ticket:null};
-function loadDoc(input,slot){
-  const file=input.files[0];if(!file)return;
+// Núcleo reutilizable: valida, lee y guarda el archivo en un slot. Lo usan
+// loadDoc (input), dropDoc (arrastrar) y pasteDoc (portapapeles).
+function _procesarDoc(file,slot){
+  if(!file)return;
   if(file.size>8*1024*1024){toast('⚠️ Máximo 8MB');return}
   const r=new FileReader();
   r.onload=e=>{
     _docs[slot]={d:e.target.result,n:file.name,t:file.type};
     refreshSlot(slot);
-    // Mensajes y auto-cambio de estado
-    if(slot==='guia'){
-      toast('🚚 Guía subida ✓');
-    } else if(slot==='embalado'){
-      toast('📦 Foto de embalado subida ✓');
-    } else {
-      toast('🧾 Documento subido ✓');
-    }
+    if(slot==='guia'){ toast('🚚 Guía subida ✓'); }
+    else if(slot==='embalado'){ toast('📦 Foto de embalado subida ✓'); }
+    else { toast('🧾 Documento subido ✓'); }
   };
   r.readAsDataURL(file);
+}
+function loadDoc(input,slot){ _procesarDoc(input.files[0],slot); }
+// Arrastrar y soltar sobre el slot.
+function dragDoc(e,on){ e.preventDefault(); const t=e.currentTarget; if(t)t.classList.toggle('doc-drag',!!on); }
+function dropDoc(e,slot){
+  e.preventDefault();
+  const t=e.currentTarget; if(t)t.classList.remove('doc-drag');
+  const f=e.dataTransfer&&e.dataTransfer.files&&e.dataTransfer.files[0];
+  if(f)_procesarDoc(f,slot); else toast('⚠️ Suelta un archivo válido');
+}
+// Pegar imagen del portapapeles (icono 📋). Sin Ctrl+V.
+async function pasteDoc(slot){
+  if(!navigator.clipboard||!navigator.clipboard.read){ toast('⚠️ Tu navegador no permite pegar aquí'); return; }
+  try{
+    const items=await navigator.clipboard.read();
+    for(const it of items){
+      const type=it.types.find(t=>t.startsWith('image/'));
+      if(type){
+        const blob=await it.getType(type);
+        const ext=(type.split('/')[1]||'png').replace('jpeg','jpg');
+        _procesarDoc(new File([blob],'pegado_'+slot+'.'+ext,{type}),slot);
+        return;
+      }
+    }
+    toast('⚠️ No hay imagen en el portapapeles');
+  }catch(err){
+    toast('⚠️ No se pudo pegar (permiso denegado)');
+  }
 }
 function refreshSlot(slot){
   const doc=_docs[slot],Slot=cap(slot);

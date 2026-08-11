@@ -699,7 +699,8 @@
         <!-- SLOT BOLETA / FACTURA (documento del cliente) -->
         <div class="doc-slot">
           <div class="doc-sw">
-            <div class="doc-tap" id="lblTicket"><div id="prevTicket"><div class="doc-empty"><div style="font-size:28px">🧾</div><div style="font-size:11px;font-weight:700">Boleta / Factura</div></div></div></div>
+            <div class="doc-tap" id="lblTicket" ondragover="dragDoc(event,1)" ondragleave="dragDoc(event,0)" ondrop="dropDoc(event,'ticket')"><div id="prevTicket"><div class="doc-empty"><div style="font-size:28px">🧾</div><div style="font-size:11px;font-weight:700">Boleta / Factura</div></div></div></div>
+            <div class="doc-paste" title="Pegar del portapapeles" onclick="pasteDoc('ticket')">📋</div>
             <div class="doc-menu" id="menuTicket">
               <div class="doc-mi" onclick="trigInp('inTicketCam','ticket')">📷 Tomar foto</div>
               <div class="doc-mi" onclick="trigInp('inTicketGal','ticket')">🖼️ Galería</div>
@@ -719,7 +720,8 @@
         <!-- SLOT EMBALADO -->
         <div class="doc-slot">
           <div class="doc-sw">
-            <div class="doc-tap" id="lblEmbalado"><div id="prevEmbalado"><div class="doc-empty"><div style="font-size:28px">📦</div><div style="font-size:11px;font-weight:700">Embalado</div></div></div></div>
+            <div class="doc-tap" id="lblEmbalado" ondragover="dragDoc(event,1)" ondragleave="dragDoc(event,0)" ondrop="dropDoc(event,'embalado')"><div id="prevEmbalado"><div class="doc-empty"><div style="font-size:28px">📦</div><div style="font-size:11px;font-weight:700">Embalado</div></div></div></div>
+            <div class="doc-paste" title="Pegar del portapapeles" onclick="pasteDoc('embalado')">📋</div>
             <div class="doc-menu" id="menuEmbalado">
               <div class="doc-mi" onclick="trigInp('inEmbCam','embalado')">📷 Tomar foto</div>
               <div class="doc-mi" onclick="trigInp('inEmbGal','embalado')">🖼️ Galería</div>
@@ -739,7 +741,8 @@
         <!-- SLOT GUÍA / TICKET (documento de la agencia) -->
         <div class="doc-slot">
           <div class="doc-sw">
-            <div class="doc-tap" id="lblGuia"><div id="prevGuia"><div class="doc-empty"><div style="font-size:28px">🚚</div><div style="font-size:11px;font-weight:700">Guía / Ticket</div></div></div></div>
+            <div class="doc-tap" id="lblGuia" ondragover="dragDoc(event,1)" ondragleave="dragDoc(event,0)" ondrop="dropDoc(event,'guia')"><div id="prevGuia"><div class="doc-empty"><div style="font-size:28px">🚚</div><div style="font-size:11px;font-weight:700">Guía / Ticket</div></div></div></div>
+            <div class="doc-paste" title="Pegar del portapapeles" onclick="pasteDoc('guia')">📋</div>
             <div class="doc-menu" id="menuGuia">
               <div class="doc-mi" onclick="trigInp('inGuiaCam','guia')">📷 Tomar foto</div>
               <div class="doc-mi" onclick="trigInp('inGuiaGal','guia')">🖼️ Galería</div>
@@ -2892,7 +2895,7 @@ render();
 </script>
 <!-- ★ SHALOM tracking — cargado al final -->
 <script src="storage.js?v=2"></script>
-<script src="config.js?v=8"></script>
+<script src="config.js?v=9"></script>
 <script src="print.js?v=9"></script>
 <script src="notify.js?v=3"></script>
 <script src="tracking.js?v=2"></script>
