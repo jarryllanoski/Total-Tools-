@@ -1721,8 +1721,12 @@ function _courierIcon(name){
 // courier, NO imprime nada y guía con un aviso (evita el "imprime todo" que
 // confundía y también el no-op silencioso). Reusa PrintModule.openList.
 function printGroup(courier){
-  const sel=visibleShipments().filter(s=>s.courier===courier && s.sel);
+  let sel=visibleShipments().filter(s=>s.courier===courier && s.sel);
   if(!sel.length){ if(window.toast) toast('Selecciona pedidos de '+courier+' para imprimir 🖨️'); return; }
+  // DELIVERY: imprimir las etiquetas en el MISMO orden que la ruta (fuente única).
+  if(courier&&courier.toUpperCase().includes('DELIVERY')&&window.DeliveryModule&&DeliveryModule.sortForRoute){
+    sel=DeliveryModule.sortForRoute(sel);
+  }
   if(window.PrintModule) PrintModule.openList(sel.map(s=>s.id));
   else if(window.toast) toast('Impresión no disponible');
 }
@@ -2900,7 +2904,7 @@ render();
 <script src="notify.js?v=3"></script>
 <script src="tracking.js?v=2"></script>
 <script src="floatpanel.js?v=2"></script>
-<script src="delivery.js?v=2"></script>
+<script src="delivery.js?v=3"></script>
 <script src="qrtracking.js?v=2"></script>
 <script src="ticket.js?v=1"></script>
 <script src="agencias-extractor.js?v=1"></script>

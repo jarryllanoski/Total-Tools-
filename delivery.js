@@ -28,9 +28,32 @@ function _saveDrivers(){ try{ localStorage.setItem('tt_drivers',JSON.stringify(_
 function _esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 function _escAttr(s){ return String(s||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/'/g,'&#39;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
+function _isDelivery(s){ return s.courier&&s.courier.toUpperCase().includes('DELIVERY'); }
 function _getShips(){
   return ((global.S&&global.S.shipments)||[]).filter(function(s){
-    return s.courier&&s.courier.toUpperCase().includes('DELIVERY')&&s.status!=='FINALIZADO';
+    return _isDelivery(s)&&s.status!=='FINALIZADO';
+  });
+}
+// DELIVERY ya finalizados (para el historial de motorizados).
+function _getFinalized(){
+  return ((global.S&&global.S.shipments)||[]).filter(function(s){
+    return _isDelivery(s)&&s.status==='FINALIZADO';
+  });
+}
+/* Orden de la ruta = MISMO orden que las etiquetas:
+   - Base: igual que el panel/etiquetas → más reciente primero (por fecha).
+   - Si el usuario reordenó (campo numérico _dlvOrden), ese orden manda; los
+     que no tengan orden manual quedan al final en el orden base (sort estable).
+   Es la ÚNICA fuente de verdad: la usan la ruta Y la impresión de etiquetas. */
+function _orderShips(list){
+  var base=(list||[]).slice().sort(function(a,b){
+    return String(b.date||'').localeCompare(String(a.date||''));
+  });
+  if(!base.some(function(s){return typeof s._dlvOrden==='number';})) return base;
+  return base.sort(function(a,b){
+    var oa=(typeof a._dlvOrden==='number')?a._dlvOrden:Infinity;
+    var ob=(typeof b._dlvOrden==='number')?b._dlvOrden:Infinity;
+    return oa-ob; // empates (Infinity) conservan el orden base (sort estable)
   });
 }
 
@@ -79,6 +102,14 @@ function _css(){
     '.dlvc-status{font-size:11px;font-weight:700;padding:3px 9px;border-radius:20px;background:rgba(245,158,11,.12);color:#f59e0b}'+
     '.dlvc-status.done{background:rgba(46,160,67,.15);color:var(--green)}'+
     '.dlvc-edit{display:flex;align-items:center;gap:5px;padding:6px 12px;border-radius:8px;border:1px solid #30363d;background:#1c2333;color:#c9d1d9;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap}'+
+    /* Reordenar parada (mover orden de entrega) */
+    '.dlvc-foot-r{display:flex;align-items:center;gap:6px}'+
+    '.dlvc-ord{width:28px;height:28px;display:flex;align-items:center;justify-content:center;border-radius:7px;border:1px solid #30363d;background:#1c2333;color:#c9d1d9;font-size:12px;cursor:pointer;font-family:inherit;line-height:1}'+
+    '.dlvc-ord:disabled{opacity:.3;cursor:default}'+
+    /* Historial de motorizados (acordeón, mismas clases .docs-accordion-* del panel) */
+    '#dlvHist{margin-top:12px}'+
+    '.dlvh-item{display:flex;gap:8px;padding:9px 4px;border-bottom:1px solid #21262d}'+
+    '.dlvh-item:last-child{border-bottom:none}'+
     '#dlvConfOv,#dlvDrvOv{display:none;position:fixed;inset:0;background:rgba(0,0,0,.88);z-index:900;align-items:flex-end;justify-content:center}'+
     '#dlvConfOv.open,#dlvDrvOv.open{display:flex}'+
     '.dlv-sheet{background:#161b22;border-radius:16px 16px 0 0;padding:18px;width:100%;max-width:480px;border:1px solid #30363d;animation:dlvUp .2s ease;max-height:88vh;overflow-y:auto}'+
@@ -100,7 +131,17 @@ function _html(){
       '<div id="dlvSub" style="font-size:10px;color:#8b949e;margin-top:1px"></div></div>'+
       '<button onclick="DeliveryModule.cerrar()" style="background:rgba(247,129,102,.15);border:1px solid rgba(247,129,102,.3);color:#f78166;border-radius:8px;width:32px;height:32px;font-size:15px;cursor:pointer">✕</button>'+
     '</div>'+
-    '<div id="dlvBody"><div id="dlvStats" style="display:flex;gap:12px;margin-bottom:12px;background:#1c2333;border-radius:10px;padding:10px 14px"></div><div id="dlvList"></div></div>';
+    '<div id="dlvBody"><div id="dlvStats" style="display:flex;gap:12px;margin-bottom:12px;background:#1c2333;border-radius:10px;padding:10px 14px"></div><div id="dlvList"></div>'+
+      // HISTORIAL de motorizados — solo pedidos FINALIZADOS, se despliega igual
+      // que "Documentos del envío" (reusa .docs-accordion-* del panel).
+      '<div id="dlvHist" class="docs-accordion">'+
+        '<div class="docs-accordion-hdr" onclick="DeliveryModule._toggleHist()">'+
+          '<span class="docs-accordion-ttl">🛵 Historial de motorizados <span id="dlvHistCnt" style="opacity:.7"></span></span>'+
+          '<span class="docs-accordion-arrow" id="dlvHistArrow">▾</span>'+
+        '</div>'+
+        '<div class="docs-accordion-body" id="dlvHistBody"></div>'+
+      '</div>'+
+    '</div>';
   document.body.appendChild(p);
 
   // Overlay confirmar entrega
@@ -135,16 +176,7 @@ function _html(){
     '<div class="dlv-sheet">'+
       '<div style="width:36px;height:4px;background:#30363d;border-radius:2px;margin:0 auto 14px"></div>'+
       '<div style="font-family:Syne,sans-serif;font-weight:800;font-size:16px;margin-bottom:12px">🛵 Asignar motorizado</div>'+
-      // LINK INDRIVER — patrón "Agregar link" (input + Add + chip con ↗/✕)
-      '<div style="font-size:10px;font-weight:700;color:#8b949e;letter-spacing:.8px;text-transform:uppercase;margin-bottom:7px">🔗 Link inDriver (opcional)</div>'+
-      '<div class="link-row">'+
-        '<input id="dlvRutaLink" class="fi" placeholder="https://… link del viaje inDriver" inputmode="url" style="flex:1">'+
-        '<button class="link-add" type="button" onclick="DeliveryModule._addRuta()">+ Add</button>'+
-      '</div>'+
-      '<div class="link-list" id="dlvRutaList" style="margin-bottom:14px"></div>'+
-      // LISTA de motorizados guardados (tocar para asignar)
-      '<div id="dlvDrvList" style="display:flex;flex-direction:column;gap:7px;margin-bottom:12px;max-height:200px;overflow-y:auto"></div>'+
-      // NUEVO MOTORIZADO — bloque estilo "Guía Shalom" (recuadro + 2 campos etiquetados)
+      // NUEVO MOTORIZADO — PRIMERO y anclado arriba (campos siempre visibles aquí)
       '<div style="background:rgba(163,113,247,.06);border:1px solid rgba(163,113,247,.22);border-radius:10px;padding:12px;margin-bottom:12px">'+
         '<div style="font-size:10px;font-weight:700;color:#a371f7;letter-spacing:.8px;text-transform:uppercase;margin-bottom:10px">🛵 Nuevo motorizado</div>'+
         '<div class="frow">'+
@@ -153,6 +185,15 @@ function _html(){
         '</div>'+
         '<button type="button" onclick="DeliveryModule._addDrv()" style="width:100%;margin-top:9px;padding:9px;background:var(--blue);border:none;border-radius:8px;color:#fff;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">+ Agregar</button>'+
       '</div>'+
+      // LISTA de motorizados guardados (tocar para asignar)
+      '<div id="dlvDrvList" style="display:flex;flex-direction:column;gap:7px;margin-bottom:14px;max-height:200px;overflow-y:auto"></div>'+
+      // LINK INDRIVER — patrón "Agregar link" (input + Add + chip con ↗/✕)
+      '<div style="font-size:10px;font-weight:700;color:#8b949e;letter-spacing:.8px;text-transform:uppercase;margin-bottom:7px">🔗 Link inDriver (opcional)</div>'+
+      '<div class="link-row">'+
+        '<input id="dlvRutaLink" class="fi" placeholder="https://… link del viaje inDriver" inputmode="url" style="flex:1">'+
+        '<button class="link-add" type="button" onclick="DeliveryModule._addRuta()">+ Add</button>'+
+      '</div>'+
+      '<div class="link-list" id="dlvRutaList" style="margin-bottom:14px"></div>'+
       '<button onclick="DeliveryModule._closeDrv()" style="width:100%;padding:11px;background:#1c2333;border:1px solid #30363d;border-radius:10px;color:#8b949e;font-size:13px;cursor:pointer;font-family:inherit">Cerrar</button>'+
     '</div>';
   od.addEventListener('click',function(e){if(e.target===od)DeliveryModule._closeDrv();});
@@ -161,7 +202,7 @@ function _html(){
 
 /* ── Render ──────────────────────────────────────────────────────── */
 function _render(){
-  var ships=_getShips();
+  var ships=_orderShips(_getShips()); // mismo orden que las etiquetas (+ reorden manual)
   var pend=ships.filter(function(s){return !s._dlvDone;}).length;
   var done=ships.length-pend;
 
@@ -239,12 +280,48 @@ function _render(){
           (hasGps?'<button class="dlvc-pin" onclick="DeliveryModule._openMaps(\''+s.id+'\')" title="Ubicación GPS (usar mi ubicación)">📍</button>':'')+
         '</div>'+
         (linksHtml?'<div class="dlvc-links">'+linksHtml+'</div>':'')+
-        (!isDone?drvBox:'')+
+        // Recuadro de motorizado SOLO si hay uno asignado; si no, basta el botón Editar.
+        (!isDone && drv ?drvBox:'')+
       '</div>'+
-      // PARTE BAJA: estado del pedido + botón editar (siempre visible)
+      // PARTE BAJA: estado + reordenar (▲▼) + botón editar (siempre visible)
       '<div class="dlvc-foot">'+
         '<span class="dlvc-status'+(isDone?' done':'')+'">'+_esc(isDone?'ENTREGADO':(s.status||'—'))+'</span>'+
-        '<button class="dlvc-edit" onclick="DeliveryModule._openDrv(\''+s.id+'\')" title="Editar motorizado / inDriver">✏️ Editar</button>'+
+        '<div class="dlvc-foot-r">'+
+          '<button class="dlvc-ord" onclick="DeliveryModule._move(\''+s.id+'\',-1)" title="Subir parada"'+(i===0?' disabled':'')+'>▲</button>'+
+          '<button class="dlvc-ord" onclick="DeliveryModule._move(\''+s.id+'\',1)" title="Bajar parada"'+(i===ships.length-1?' disabled':'')+'>▼</button>'+
+          '<button class="dlvc-edit" onclick="DeliveryModule._openDrv(\''+s.id+'\')" title="Editar motorizado / inDriver">✏️ Editar</button>'+
+        '</div>'+
+      '</div>'+
+    '</div>';
+  }).join('');
+
+  _renderHist();
+}
+
+/* ── Historial de motorizados (solo FINALIZADOS) ─────────────────── */
+function _renderHist(){
+  var fin=_getFinalized().slice().sort(function(a,b){
+    return String(b._dlvFecha||b.date||'').localeCompare(String(a._dlvFecha||a.date||''));
+  });
+  var cnt=document.getElementById('dlvHistCnt');
+  if(cnt) cnt.textContent='('+fin.length+')';
+  var body=document.getElementById('dlvHistBody');
+  if(!body) return;
+  if(!fin.length){
+    body.innerHTML='<div style="text-align:center;padding:14px;color:#8b949e;font-size:12px">Aún no hay entregas finalizadas.</div>';
+    return;
+  }
+  body.innerHTML=fin.map(function(s){
+    var drv=s._dlvDriver||'—';
+    var rec=s._dlvReceptor||'';
+    var fecha='';
+    if(s._dlvFecha){ try{ fecha=new Date(s._dlvFecha).toLocaleString('es-PE',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}); }catch(e){ fecha=String(s._dlvFecha).slice(0,16); } }
+    return '<div class="dlvh-item">'+
+      '<span style="font-size:15px">🛵</span>'+
+      '<div style="flex:1;min-width:0">'+
+        '<div style="font-size:12.5px;font-weight:700;color:#e6edf3">'+_esc(s.name)+'</div>'+
+        '<div style="font-size:11px;color:#8b949e">Motorizado: <b style="color:#c9d1d9">'+_esc(drv)+'</b>'+(rec?' · Recibió: '+_esc(rec):'')+'</div>'+
+        (fecha?'<div style="font-size:10px;color:#6e7681">📅 '+_esc(fecha)+'</div>':'')+
       '</div>'+
     '</div>';
   }).join('');
@@ -307,6 +384,37 @@ DeliveryModule._selDrv=function(name,phone){
   if(typeof global.toast==='function')global.toast('🛵 '+name+' asignado');
 };
 DeliveryModule._closeDrv=function(){document.getElementById('dlvDrvOv').classList.remove('open');};
+
+/* ── Reordenar parada (mover orden de entrega) ───────────────────── */
+// Normaliza _dlvOrden a 0..n-1 en el nuevo orden y guarda SOLO los que cambian.
+// Es la fuente de verdad compartida con la impresión de etiquetas.
+DeliveryModule._move=function(id,dir){
+  var arr=_orderShips(_getShips());
+  var i=-1; for(var k=0;k<arr.length;k++){ if(arr[k].id===id){ i=k; break; } }
+  if(i<0) return;
+  var j=i+dir; if(j<0||j>=arr.length) return;
+  var tmp=arr[i]; arr[i]=arr[j]; arr[j]=tmp;
+  arr.forEach(function(s,idx){
+    if(s._dlvOrden!==idx){
+      s._dlvOrden=idx;
+      if(typeof global._fbSaveShipmentNow==='function')global._fbSaveShipmentNow(s);
+    }
+  });
+  _render();
+};
+
+/* ── Historial (acordeón, mismo comportamiento que Documentos del envío) ── */
+DeliveryModule._toggleHist=function(){
+  var body=document.getElementById('dlvHistBody');
+  var arrow=document.getElementById('dlvHistArrow');
+  if(!body||!arrow) return;
+  var isOpen=body.classList.contains('open');
+  body.classList.toggle('open',!isOpen);
+  arrow.classList.toggle('open',!isOpen);
+};
+
+// Orden de ruta expuesto para que la impresión de etiquetas DELIVERY coincida.
+DeliveryModule.sortForRoute=function(list){ return _orderShips(list||[]); };
 
 /* ── Link de ruta del motorizado (por pedido) ────────────────────── */
 function _normLink(u){
