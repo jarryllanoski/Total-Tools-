@@ -402,7 +402,11 @@ function _htmlEtiqueta(list, bultos, bizName, bizPhone, bizCity, fecha, qrUrl){
 <title>Etiquetas — ${esc(bizName)}</title>
 <style>
   * { margin:0; padding:0; box-sizing:border-box; }
-  html, body { width:100%; font-family:'Arial',sans-serif; background:#fff; color:#000; }
+  /* Reproducir colores EXACTOS al imprimir: sin esto el navegador "economiza"
+     y aclara/elimina los grises claros (la fecha·hora se veía en pantalla pero
+     no salía en papel). */
+  html, body { width:100%; font-family:'Arial',sans-serif; background:#fff; color:#000;
+    -webkit-print-color-adjust:exact; print-color-adjust:exact; }
   body { padding:4mm; }
 
   .header { text-align:center; margin-bottom:4mm; padding-bottom:3mm; border-bottom:2px solid #000; }
@@ -454,7 +458,7 @@ function _htmlEtiqueta(list, bultos, bizName, bizPhone, bizCity, fecha, qrUrl){
      en su propia línea, más chica y gris. */
   .card-thanks { display:flex; flex-direction:column; align-items:center; text-align:center; gap:0.8mm; margin-top:2.5mm; padding-top:1.8mm; border-top:1px dashed #aaa; }
   .card-thanks-txt  { font-size:clamp(7.5pt,1.4vw,9pt); color:#555; font-weight:600; text-transform:uppercase; letter-spacing:2px; }
-  .card-thanks-time { font-size:clamp(6.5pt,1.1vw,8pt); color:#888; font-weight:500; letter-spacing:.5px; }
+  .card-thanks-time { font-size:clamp(7pt,1.1vw,8pt); color:#333; font-weight:600; letter-spacing:.5px; }
 
   @media print {
     body { padding:2mm; }
@@ -506,6 +510,7 @@ function _htmlLista(list, bultos, bizName, bizPhone, bizCity, fecha, qrUrl){
 <title>Lista — ${esc(bizName)}</title>
 <style>
   * { margin:0; padding:0; box-sizing:border-box; }
+  html, body { -webkit-print-color-adjust:exact; print-color-adjust:exact; }
   body { font-family: Arial, sans-serif; font-size:9pt; background:#fff; padding:10mm; }
   .header { margin-bottom:6mm; }
   .header h1 { font-size:14pt; font-weight:900; letter-spacing:1px; margin-bottom:1mm; }
