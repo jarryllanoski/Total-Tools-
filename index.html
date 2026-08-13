@@ -382,7 +382,7 @@
   window._fbReady=true;
 })();
 </script>
-<link rel="stylesheet" href="panel.css?v=2">
+<link rel="stylesheet" href="panel.css?v=3">
 </head>
 <body>
 
@@ -437,6 +437,7 @@
       <button class="tb-btn" onclick="onTrackBtn()" title="Tracking Shalom de los seleccionados · sin selección refresca">🔄</button>
       <button class="tb-btn pri" onclick="openForm(null)">➕</button>
       <button class="tb-btn danger" onclick="onTrashBtnTap()" title="Doble toque para abrir papelera">🗑️</button>
+      <button class="tb-btn qrind" id="qrMoveInd" onclick="qrMoveIndTap()" title="Modo escaneo activo — toca para salir" style="display:none">📷 <span id="qrMoveIndLbl"></span></button>
     </div>
   </div>
   <div id="cardsArea"></div>
@@ -1692,7 +1693,7 @@ function render(){
   // Vigilante "llegó a destino" (agnóstico al motor A/B). Avisa por transición
   // de estado; hook explícito, sin monkey-patch. Idempotente (avisa una vez).
   if(window.Tracking&&Tracking.checkDestinoAlerts)Tracking.checkDestinoAlerts();
-  updateStats(); updateAdvBar();
+  updateStats(); updateAdvBar(); _qrMoveIndicator();
   const sel=S.shipments.filter(x=>x.sel);
   // Resaltar en azul el botón "seleccionar todo" si hay algún pedido seleccionado
   const _selBtn=$('selAllBtn'); if(_selBtn) _selBtn.classList.toggle('sel-on', sel.length>0);
@@ -2882,6 +2883,13 @@ function qrMoveToggle(){
   });
 }
 function _qrMoveStop(){ _qrMove.on=false; _qrMove.status=''; _qrMove.last=null; render(); }
+// Indicador persistente en la barra (junto al 🗑️): visible solo en modo escaneo.
+function _qrMoveIndicator(){
+  const el=$('qrMoveInd'); if(!el) return;
+  if(_qrMove.on){ el.style.display='flex'; const l=$('qrMoveIndLbl'); if(l) l.textContent=_qrMove.status; }
+  else el.style.display='none';
+}
+function qrMoveIndTap(){ if(!_qrMove.on) return; _qrMoveStop(); toast('Escaneo desactivado'); }
 
 // Escaneo en modo mover: identifica el pedido, valida "solo avanzar", mueve y guarda.
 function _qrMoveOnScan(raw){
