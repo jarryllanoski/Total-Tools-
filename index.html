@@ -1646,13 +1646,13 @@ function renderChips(){
 }
 function setFilt(v){
   // Cambiar a otro estado apaga el modo "cambiar etiqueta por QR".
-  if(_qrMove.on && v!==_qrMove.status){ _qrMove.on=false; _qrMove.status=''; _qrMove.last=null; }
+  if(_qrMove.on && v!==_qrMove.status){ _qrMoveClearTimer(); _qrMove.on=false; _qrMove.status=''; _qrMove.last=null; }
   _filt=v;renderChips();render();
 }
 
 function openChipSort(label){
   // Abrir el sheet de OTRO estado también apaga el modo (evita confusión).
-  if(_qrMove.on && label!==_qrMove.status){ _qrMove.on=false; _qrMove.status=''; _qrMove.last=null; }
+  if(_qrMove.on && label!==_qrMove.status){ _qrMoveClearTimer(); _qrMove.on=false; _qrMove.status=''; _qrMove.last=null; }
   _filt=label; renderChips(); render();
   _qrMoveSetupSheet(label);
   const cur=_chipSort[label]||'courier_date';
@@ -1726,10 +1726,10 @@ function render(){
     else if(sort==='cost')         data=[...data].sort((a,b)=>parseFloat(a.cost||0)-parseFloat(b.cost||0));
     else if(sort==='cost_desc')    data=[...data].sort((a,b)=>parseFloat(b.cost||0)-parseFloat(a.cost||0));
   }
-  // Modo escaneo: el último pedido movido sube arriba para verlo con su "↩ Revertir".
+  // Modo escaneo: tras mover, la lista muestra SOLO ese pedido (más limpio).
+  // Al salir del modo o revertir (last=null) vuelve la lista completa.
   if(_qrMove.on && _qrMove.last){
-    const _mi=data.findIndex(x=>x.id===_qrMove.last.id);
-    if(_mi>0){ const _it=data.splice(_mi,1)[0]; data.unshift(_it); }
+    data = data.filter(x=>x.id===_qrMove.last.id);
   }
   const groups={};
   data.forEach(x=>{if(!groups[x.courier])groups[x.courier]=[];groups[x.courier].push(x)});
@@ -2851,6 +2851,13 @@ function closeQR(){if(_qrAF)cancelAnimationFrame(_qrAF);if(_qrStream)_qrStream.g
 const _qrMove = { on:false, status:'', last:null }; // last:{id,prev}
 const _QRMOVE_TOPE = 'ALISTADO';
 let _qrMoveSheetLabel = '';
+let _qrMoveTimer = null;
+// Auto-apagado por inactividad (1 min). Se rearma en cada escaneo y al activar.
+function _qrMoveArmTimer(){
+  _qrMoveClearTimer();
+  _qrMoveTimer=setTimeout(function(){ if(_qrMove.on){ _qrMoveStop(); if(window.toast) toast('⏱️ Escaneo apagado por inactividad'); } },60000);
+}
+function _qrMoveClearTimer(){ if(_qrMoveTimer){ clearTimeout(_qrMoveTimer); _qrMoveTimer=null; } }
 
 function _qrMoveEligible(label){
   const all=allStatuses();
@@ -2882,12 +2889,13 @@ function qrMoveToggle(){
   if(_qrMove.on && _qrMove.status===label){ _qrMoveStop(); _qrMoveRefreshBtn(label); toast('Escaneo desactivado'); return; }
   openPin(()=>{
     _qrMove.on=true; _qrMove.status=label; _qrMove.last=null;
+    _qrMoveArmTimer();
     _filt=label; renderChips(); render();
     closeOverlay('chipSortOverlay');
     toast('📷 Escaneo activo → '+label+'. Toca 📷 para escanear.');
   });
 }
-function _qrMoveStop(){ _qrMove.on=false; _qrMove.status=''; _qrMove.last=null; render(); }
+function _qrMoveStop(){ _qrMoveClearTimer(); _qrMove.on=false; _qrMove.status=''; _qrMove.last=null; render(); }
 // Indicador persistente en la barra (junto al 🗑️): visible solo en modo escaneo.
 function _qrMoveIndicator(){
   const el=$('qrMoveInd'); if(!el) return;
@@ -2899,6 +2907,7 @@ function qrMoveIndTap(){ if(!_qrMove.on) return; _qrMoveStop(); toast('Escaneo d
 // Escaneo en modo mover: identifica el pedido, valida "solo avanzar", mueve y guarda.
 function _qrMoveOnScan(raw){
   closeQR(); // uno por uno
+  _qrMoveArmTimer(); // hubo actividad: reinicia el minuto de inactividad
   const parts=String(raw).split('#');
   let phone=parts[0].replace(/\D/g,''); if(phone.startsWith('51')&&phone.length===11)phone=phone.slice(2);
   const code=(parts[1]||'').trim().toUpperCase();
