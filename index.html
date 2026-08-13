@@ -671,7 +671,7 @@
       <div class="fg"><label class="fl">Monto S/</label><input class="fi" id="fMonto" type="number" placeholder="0.00" min="0" step="0.5" inputmode="decimal" oninput="recalcDeuda()"></div>
       <div class="fg"><label class="fl">Adelanto S/</label><input class="fi" id="fAdelanto" type="number" placeholder="0.00" min="0" step="0.5" inputmode="decimal" oninput="recalcDeuda()"></div>
     </div>
-    <div class="fg"><label class="fl">Notas</label><input class="fi" id="fNotes" placeholder="Llamar antes..."></div>
+    <div class="fg"><label class="fl">Notas</label><input class="fi" id="fNotes" maxlength="600" placeholder="Llamar antes..."></div>
     <div id="extraForm"></div>
     <!-- ★ SHALOM: bloque guía -->
     <div id="shalomGuiaBlock" style="display:none;background:rgba(56,139,253,.06);border:1px solid rgba(56,139,253,.15);border-radius:10px;padding:12px;margin-bottom:11px">
@@ -2900,7 +2900,7 @@ render();
 <!-- ★ SHALOM tracking — cargado al final -->
 <script src="storage.js?v=2"></script>
 <script src="config.js?v=9"></script>
-<script src="print.js?v=10"></script>
+<script src="print.js?v=11"></script>
 <script src="notify.js?v=3"></script>
 <script src="tracking.js?v=2"></script>
 <script src="floatpanel.js?v=2"></script>

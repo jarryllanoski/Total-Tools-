@@ -356,7 +356,11 @@ function _htmlEtiqueta(list, bultos, bizName, bizPhone, bizCity, fecha, qrUrl){
     for(let b=0; b<bultos; b++){
       const bLabel = bultos>1 ? ` (${b+1}/${bultos})` : '';
       const addr = s.address || s.ciudadDestino || '—';
-      const notes = s.notes ? `<div class="notes">📝 ${esc(s.notes)}</div>` : '';
+      // Nota recortada SOLO para la etiqueta (para que no la deforme). La nota
+      // completa se conserva en el pedido, tracking y panel.
+      const _noteFull = s.notes ? String(s.notes) : '';
+      const _noteShort = _noteFull.length > 140 ? _noteFull.slice(0,140).trim()+'…' : _noteFull;
+      const notes = _noteFull ? `<div class="notes">📝 ${esc(_noteShort)}</div>` : '';
       const agencia = s.courier&&s.courier.toUpperCase().includes('SHALOM') && s.address
         ? `<div class="agencia">🏢 ${esc(s.address)}</div>` : '';
       cards.push(`

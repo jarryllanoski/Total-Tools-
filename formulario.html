@@ -919,7 +919,8 @@ function renderForm(){
       </div>
 
       <div class="fg" style="margin-top:16px">
-        <textarea class="fi" id="f_notes" rows="2" placeholder="Notas u observaciones (opcional)"></textarea>
+        <textarea class="fi" id="f_notes" rows="2" maxlength="600" placeholder="Notas u observaciones (opcional)" oninput="_notesCount()"></textarea>
+        <div id="f_notes_count" style="text-align:right;font-size:11px;color:var(--muted,#8b949e);margin-top:3px">0 / 600</div>
       </div>
 
       <div id="submitErrBox" class="error-box" style="display:none;margin-top:4px"></div>
@@ -957,6 +958,17 @@ function normPeruPhone(s){
   var v=String(s==null?'':s).replace(/\D/g,'');
   if(v.startsWith('51')&&v.length>9) v=v.slice(2);
   return v.slice(0,9);
+}
+
+/* Contador vivo de Notas. Tope 600 = mismo límite que el servidor (formApi),
+   así el cliente NUNCA envía algo que el servidor recorte en silencio. */
+var NOTES_MAX=600;
+function _notesCount(){
+  var t=document.getElementById('f_notes'); var c=document.getElementById('f_notes_count');
+  if(!t||!c) return;
+  var n=t.value.length;
+  c.textContent=n+' / '+NOTES_MAX;
+  c.style.color=(n>=NOTES_MAX)?'#f59e0b':(n>=NOTES_MAX*0.9?'#e3b341':'var(--muted,#8b949e)');
 }
 (function(){
   function _norm(el){ if(el && el.classList && el.classList.contains('phone-norm')) el.value=normPeruPhone(el.value); }
@@ -2562,6 +2574,7 @@ window.abrirAyudaTrack      = abrirAyudaTrack;
 window.mostrarOtrasOpciones = mostrarOtrasOpciones;
 window.onAgencyManual       = onAgencyManual;
 window.toggleShalomHelp     = toggleShalomHelp;
+window._notesCount          = _notesCount;
 
 })();
 </script>
