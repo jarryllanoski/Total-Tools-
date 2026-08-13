@@ -348,6 +348,14 @@ function _codigoEnvio(s){
   }
   return String(s.id).slice(-4).toUpperCase();   // antiguos: como antes
 }
+// Exponer el código para que el escáner (index.html) identifique el pedido exacto.
+window.PrintModule.codigoEnvio = _codigoEnvio;
+// Valor del QR de la etiqueta: número (viejos) o "número#código" (hoy en adelante,
+// mismo corte que el código impreso). Deja escanear 1-a-1 sin ambigüedad.
+function _qrValor(s){
+  var nuevo = ((s.createdAt||'').slice(0,10) >= _CODIGO_CUTOFF);
+  return nuevo ? (String(s.phone||'')+'#'+_codigoEnvio(s)) : String(s.phone||'');
+}
 
 /* ── FORMATO 1: ETIQUETA ─────────────────────────────────────────── */
 function _htmlEtiqueta(list, bultos, bizName, bizPhone, bizCity, fecha, qrUrl){
@@ -373,7 +381,7 @@ function _htmlEtiqueta(list, bultos, bizName, bizPhone, bizCity, fecha, qrUrl){
               ${bizCity?`<div class="rem-sub">${esc(bizCity)}</div>`:''}
             </div>
             <div class="qr-box">
-              <img src="${qrUrl(s.phone)}" alt="QR" width="90" height="90">
+              <img src="${qrUrl(_qrValor(s))}" alt="QR" width="90" height="90">
               <div class="qr-label">${esc(s.phone)}</div>
             </div>
           </div>
@@ -502,7 +510,7 @@ function _htmlLista(list, bultos, bizName, bizPhone, bizCity, fecha, qrUrl){
       </td>
       <td>${s.notes?`<div class="row-sub">${esc(s.notes)}</div>`:''}</td>
       <td class="center">
-        <img src="${qrUrl(s.phone)}" width="60" height="60" alt="">
+        <img src="${qrUrl(_qrValor(s))}" width="60" height="60" alt="">
         ${bultosLabel}
       </td>
       <td class="center check-col">☐</td>

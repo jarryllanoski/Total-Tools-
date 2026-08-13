@@ -931,7 +931,33 @@
         <span>💰 Mayor costo primero</span><span style="font-size:10px;opacity:.7"></span>
       </button>
     </div>
+    <!-- CAMBIO DE ETIQUETA POR QR — acordeón (solo hasta ALISTADO). Se muestra/oculta en openChipSort -->
+    <div class="docs-accordion" id="qrMoveAcc" style="margin:4px 0 12px;display:none">
+      <div class="docs-accordion-hdr" onclick="toggleQrMoveAcc()">
+        <span class="docs-accordion-ttl">📷 Cambiar etiqueta por QR</span>
+        <span class="docs-accordion-arrow" id="qrMoveArrow">▾</span>
+      </div>
+      <div class="docs-accordion-body" id="qrMoveBody">
+        <div style="font-size:11px;color:var(--text2);line-height:1.6;margin-bottom:10px">Escanea el QR de cada etiqueta para mover ese pedido a <b id="qrMoveTargetLbl"></b>. Solo avanza, uno por uno.
+          <span onclick="if(window.Ayuda)Ayuda.abrir('cambioEtiquetaQR')" style="color:#8b949e;cursor:pointer;font-weight:600;margin-left:4px" title="Ayuda">📖 Ayuda</span>
+        </div>
+        <button class="btn-pri" id="qrMoveActBtn" onclick="qrMoveToggle()">Activar (pide clave)</button>
+      </div>
+    </div>
     <button class="btn-sec" onclick="closeOverlay('chipSortOverlay')">Cerrar</button>
+  </div>
+</div>
+
+<!-- CONFIRMAR REVERTIR (mismo patrón que borrar) -->
+<div class="overlay" id="qrRevertOverlay">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-title">↩ ¿Revertir?</div>
+    <div style="font-size:13px;color:var(--text2);margin-bottom:18px" id="qrRevertMsg"></div>
+    <div class="confirm-btns">
+      <button class="cbtn-no" onclick="closeOverlay('qrRevertOverlay')">Cancelar</button>
+      <button class="cbtn-yes" onclick="qrMoveRevertConfirm()">Sí, revertir</button>
+    </div>
   </div>
 </div>
 
@@ -1612,10 +1638,17 @@ function renderChips(){
     >${stIcon(v)} ${v}${sortIcon?` <span style="font-size:9px">${sortIcon}</span>`:''}</div>`;
   }).join('');
 }
-function setFilt(v){_filt=v;renderChips();render()}
+function setFilt(v){
+  // Cambiar a otro estado apaga el modo "cambiar etiqueta por QR".
+  if(_qrMove.on && v!==_qrMove.status){ _qrMove.on=false; _qrMove.status=''; _qrMove.last=null; }
+  _filt=v;renderChips();render();
+}
 
 function openChipSort(label){
+  // Abrir el sheet de OTRO estado también apaga el modo (evita confusión).
+  if(_qrMove.on && label!==_qrMove.status){ _qrMove.on=false; _qrMove.status=''; _qrMove.last=null; }
   _filt=label; renderChips(); render();
+  _qrMoveSetupSheet(label);
   const cur=_chipSort[label]||'courier_date';
   $('chipSortTitle').textContent=`${stIcon(label)} ${label}`;
   ['courier_date','date','name','cost','cost_desc'].forEach(id=>{
@@ -1686,6 +1719,11 @@ function render(){
     else if(sort==='name')         data=[...data].sort((a,b)=>a.name.localeCompare(b.name));
     else if(sort==='cost')         data=[...data].sort((a,b)=>parseFloat(a.cost||0)-parseFloat(b.cost||0));
     else if(sort==='cost_desc')    data=[...data].sort((a,b)=>parseFloat(b.cost||0)-parseFloat(a.cost||0));
+  }
+  // Modo escaneo: el último pedido movido sube arriba para verlo con su "↩ Revertir".
+  if(_qrMove.on && _qrMove.last){
+    const _mi=data.findIndex(x=>x.id===_qrMove.last.id);
+    if(_mi>0){ const _it=data.splice(_mi,1)[0]; data.unshift(_it); }
   }
   const groups={};
   data.forEach(x=>{if(!groups[x.courier])groups[x.courier]=[];groups[x.courier].push(x)});
@@ -1789,6 +1827,7 @@ function cardHTML(s){
       <button class="btn-edit" onclick="openForm('${s.id}')">✏️</button>
       <button class="btn-del" onclick="openDel('${s.id}')">🗑️</button>
     </div>
+    ${(_qrMove.on && _qrMove.last && _qrMove.last.id===s.id)?`<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:8px;padding:8px 10px;background:rgba(163,113,247,.10);border:1px solid rgba(163,113,247,.30);border-radius:9px;font-size:12px;color:var(--text)"><span>🔄 ${escH(_qrMove.last.prev)} → <b>${escH(s.status)}</b></span><button onclick="qrMoveRevertAsk('${s.id}')" style="background:rgba(247,129,102,.15);border:1px solid rgba(247,129,102,.3);color:var(--red);border-radius:7px;padding:5px 10px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">↩ Revertir</button></div>`:''}
   </div>`;
 }
 
@@ -2785,8 +2824,114 @@ let _qrStream=null,_qrAF=null,_qrCanvas=null,_qrCtx=null;
 function openQR(){if(!('BarcodeDetector' in window)){if(window.jsQR){startQR();return}const s=document.createElement('script');s.src='https://cdnjs.cloudflare.com/ajax/libs/jsQR/1.4.0/jsQR.min.js';s.onload=startQR;s.onerror=()=>toast('⚠️ Necesitas conexión para el escáner');document.head.appendChild(s);return}startQR()}
 async function startQR(){$('qrOverlay').classList.add('open');$('qrFound').style.display='none';try{_qrStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}});const v=$('qrVideo');v.srcObject=_qrStream;v.play();_qrCanvas=document.createElement('canvas');_qrCtx=_qrCanvas.getContext('2d');v.addEventListener('loadedmetadata',()=>{_qrCanvas.width=v.videoWidth;_qrCanvas.height=v.videoHeight;scanLoop()})}catch(e){closeQR();toast('⚠️ No se pudo acceder a la cámara')}}
 async function scanLoop(){const v=$('qrVideo');if(!v.srcObject)return;_qrCtx.drawImage(v,0,0,_qrCanvas.width,_qrCanvas.height);let res=null;if('BarcodeDetector' in window){try{const bd=new BarcodeDetector({formats:['qr_code']});const c=await bd.detect(_qrCanvas);if(c.length)res=c[0].rawValue}catch(e){}}if(!res&&window.jsQR){const img=_qrCtx.getImageData(0,0,_qrCanvas.width,_qrCanvas.height);const c=jsQR(img.data,img.width,img.height);if(c)res=c.data}if(res){handleQR(res);return}_qrAF=requestAnimationFrame(scanLoop)}
-function handleQR(raw){if(raw&&raw.includes('/document/')){const _parts=raw.split('/document/');const _qrId=parseInt(_parts[0]);if(!isNaN(_qrId)){const _ord=String(_qrId-3473503);const _found=S.shipments.find(s=>(s.trackingOrderNumber===_ord)||(s.shalomGuia===_ord));const _fEl=$('qrFound');_fEl.textContent='✅ Guía: '+_ord;_fEl.style.display='block';setTimeout(()=>{closeQR();$('fSearch').value=_ord;_filt='';renderChips();render();if(_found){setTimeout(()=>{document.querySelectorAll('.card').forEach(c=>{if(c.innerHTML.includes(_ord)){c.style.background='rgba(56,139,253,.15)';setTimeout(()=>c.style.background='',1500)}})},200);toast('✅ '+_found.name);}else{toast('⚠️ Guía no encontrada: '+_ord);}},800);return;}}let phone=raw.replace(/\D/g,'');if(phone.startsWith('51')&&phone.length===11)phone=phone.slice(2);if(phone.length!==9){toast('QR no reconocido');_qrAF=requestAnimationFrame(scanLoop);return}const f=$('qrFound');f.textContent=`✅ ${phone}`;f.style.display='block';const m=S.shipments.find(s=>s.phone===phone);setTimeout(()=>{closeQR();$('fSearch').value=phone;_filt='';renderChips();render();if(m){setTimeout(()=>{document.querySelectorAll('.card').forEach(c=>{if(c.innerHTML.includes(phone)){c.style.background='rgba(56,139,253,.15)';setTimeout(()=>c.style.background='',1500)}})},200);toast(`✅ ${m.name}`)}else{toast(`⚠️ No encontrado: ${phone}`)}},800)}
+function handleQR(raw){
+  // Modo "cambiar etiqueta por QR": el escaneo mueve el pedido, no busca.
+  if(_qrMove.on){ _qrMoveOnScan(raw); return; }
+  // QR de Shalom (guía) — igual que siempre
+  if(raw&&raw.includes('/document/')){const _parts=raw.split('/document/');const _qrId=parseInt(_parts[0]);if(!isNaN(_qrId)){const _ord=String(_qrId-3473503);const _found=S.shipments.find(s=>(s.trackingOrderNumber===_ord)||(s.shalomGuia===_ord));const _fEl=$('qrFound');_fEl.textContent='✅ Guía: '+_ord;_fEl.style.display='block';setTimeout(()=>{closeQR();$('fSearch').value=_ord;_filt='';renderChips();render();if(_found){setTimeout(()=>{document.querySelectorAll('.card').forEach(c=>{if(c.innerHTML.includes(_ord)){c.style.background='rgba(56,139,253,.15)';setTimeout(()=>c.style.background='',1500)}})},200);toast('✅ '+_found.name);}else{toast('⚠️ Guía no encontrada: '+_ord);}},800);return;}}
+  // Nuestra etiqueta: "número" (viejo) o "número#código" (nuevo). Solo usamos el número para buscar.
+  let phone=String(raw).split('#')[0].replace(/\D/g,'');if(phone.startsWith('51')&&phone.length===11)phone=phone.slice(2);if(phone.length!==9){toast('QR no reconocido');_qrAF=requestAnimationFrame(scanLoop);return}const f=$('qrFound');f.textContent=`✅ ${phone}`;f.style.display='block';const m=S.shipments.find(s=>s.phone===phone);setTimeout(()=>{closeQR();$('fSearch').value=phone;_filt='';renderChips();render();if(m){setTimeout(()=>{document.querySelectorAll('.card').forEach(c=>{if(c.innerHTML.includes(phone)){c.style.background='rgba(56,139,253,.15)';setTimeout(()=>c.style.background='',1500)}})},200);toast(`✅ ${m.name}`)}else{toast(`⚠️ No encontrado: ${phone}`)}},800)}
 function closeQR(){if(_qrAF)cancelAnimationFrame(_qrAF);if(_qrStream)_qrStream.getTracks().forEach(t=>t.stop());_qrStream=null;_qrAF=null;$('qrVideo').srcObject=null;$('qrOverlay').classList.remove('open')}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   CAMBIO DE ETIQUETA POR QR — módulo autocontenido.
+   • Se activa desde el acordeón del sheet "ordenar esta vista" (solo estados
+     hasta ALISTADO) con la clave de cambio de etiqueta (openPin).
+   • Escanear mueve el pedido al estado activo. SOLO AVANZA. Uno por uno.
+   • QR nuevo = número#código (exacto). QR viejo = número (por coincidencia).
+   • Bajo la tarjeta movida aparece "de → a" + Revertir (efímero, solo la última).
+   No toca la búsqueda normal ni el render fuera del modo.
+   ═══════════════════════════════════════════════════════════════════════ */
+const _qrMove = { on:false, status:'', last:null }; // last:{id,prev}
+const _QRMOVE_TOPE = 'ALISTADO';
+let _qrMoveSheetLabel = '';
+
+function _qrMoveEligible(label){
+  const all=allStatuses();
+  const li=all.indexOf(label), mi=all.indexOf(_QRMOVE_TOPE);
+  return mi>=0 && li>=0 && li<=mi; // hasta ALISTADO; si no existe, desactivado
+}
+function _qrMoveSetupSheet(label){
+  _qrMoveSheetLabel=label;
+  const acc=$('qrMoveAcc'); if(!acc) return;
+  if(!_qrMoveEligible(label)){ acc.style.display='none'; return; }
+  acc.style.display='block';
+  $('qrMoveBody').classList.remove('open'); $('qrMoveArrow').classList.remove('open');
+  const t=$('qrMoveTargetLbl'); if(t) t.textContent=label;
+  _qrMoveRefreshBtn(label);
+}
+function _qrMoveRefreshBtn(label){
+  const btn=$('qrMoveActBtn'); if(!btn) return;
+  const active=_qrMove.on && _qrMove.status===label;
+  btn.textContent=active?('● Escaneando → '+label+' · Desactivar'):'Activar (pide clave)';
+}
+function toggleQrMoveAcc(){
+  const b=$('qrMoveBody'), a=$('qrMoveArrow'); if(!b||!a) return;
+  const open=b.classList.contains('open');
+  b.classList.toggle('open',!open); a.classList.toggle('open',!open);
+}
+function qrMoveToggle(){
+  const label=_qrMoveSheetLabel;
+  if(!label || !_qrMoveEligible(label)) return;
+  if(_qrMove.on && _qrMove.status===label){ _qrMoveStop(); _qrMoveRefreshBtn(label); toast('Escaneo desactivado'); return; }
+  openPin(()=>{
+    _qrMove.on=true; _qrMove.status=label; _qrMove.last=null;
+    _filt=label; renderChips(); render();
+    closeOverlay('chipSortOverlay');
+    toast('📷 Escaneo activo → '+label+'. Toca 📷 para escanear.');
+  });
+}
+function _qrMoveStop(){ _qrMove.on=false; _qrMove.status=''; _qrMove.last=null; render(); }
+
+// Escaneo en modo mover: identifica el pedido, valida "solo avanzar", mueve y guarda.
+function _qrMoveOnScan(raw){
+  closeQR(); // uno por uno
+  const parts=String(raw).split('#');
+  let phone=parts[0].replace(/\D/g,''); if(phone.startsWith('51')&&phone.length===11)phone=phone.slice(2);
+  const code=(parts[1]||'').trim().toUpperCase();
+  if(phone.length!==9){ toast('QR no reconocido'); return; }
+  const all=allStatuses(); const target=_qrMove.status; const ti=all.indexOf(target);
+  if(ti<0){ toast('⚠️ Estado no válido'); return; }
+  let match=null;
+  if(code && window.PrintModule && PrintModule.codigoEnvio){
+    match=S.shipments.find(s=>s.phone===phone && String(PrintModule.codigoEnvio(s)).toUpperCase()===code);
+    if(!match){ toast('⚠️ '+phone+' #'+code+' no encontrado'); return; }
+  } else {
+    // Viejo (sin código): candidatos con ese número que PUEDEN avanzar a este estado.
+    const cand=S.shipments.filter(s=>s.phone===phone && all.indexOf(s.status)>=0 && all.indexOf(s.status)<ti);
+    if(cand.length===1) match=cand[0];
+    else if(cand.length>1){ toast('⚠️ Varios pedidos con '+phone+' — usa etiqueta nueva'); return; }
+    else { const any=S.shipments.find(s=>s.phone===phone); toast(any?('⚠️ '+any.name+' ya está en '+any.status):('⚠️ '+phone+' no encontrado')); return; }
+  }
+  const ci=all.indexOf(match.status);
+  if(ci<0){ toast('⚠️ Estado desconocido'); return; }
+  if(ci===ti){ toast('✅ '+match.name+' ya está en '+target); return; }
+  if(ci>ti){ toast('⚠️ No se puede retroceder: '+match.name+' está en '+match.status); return; }
+  const prev=match.status; match.status=target;
+  if(window._fbSaveShipmentNow) window._fbSaveShipmentNow(match); else save(match.id);
+  _qrMove.last={ id:match.id, prev:prev };
+  render();
+  toast('🔄 '+match.name+': '+prev+' → '+target);
+}
+
+// Revertir (con confirmación, como borrar). Solo la última movida.
+let _qrRevertId=null;
+function qrMoveRevertAsk(id){
+  if(!_qrMove.last || _qrMove.last.id!==id) return;
+  const s=S.shipments.find(x=>x.id===id); if(!s) return;
+  _qrRevertId=id;
+  $('qrRevertMsg').innerHTML=`"${escH(s.name)}" volverá a <b>${escH(_qrMove.last.prev)}</b>.`;
+  openOverlay('qrRevertOverlay');
+}
+function qrMoveRevertConfirm(){
+  const id=_qrRevertId;
+  if(!_qrMove.last || _qrMove.last.id!==id){ closeOverlay('qrRevertOverlay'); return; }
+  const s=S.shipments.find(x=>x.id===id); const prev=_qrMove.last.prev;
+  if(s){ s.status=prev; if(window._fbSaveShipmentNow) window._fbSaveShipmentNow(s); else save(id); }
+  _qrMove.last=null; _qrRevertId=null;
+  render(); closeOverlay('qrRevertOverlay');
+  toast('↩ Revertido a '+prev);
+}
 
 /* ── Escanear ticket Shalom por CÁMARA/FOTO → OCR → autollena orden + código ──
    El QR de Shalom no sigue un formato constante, así que leemos el TEXTO
@@ -2900,7 +3045,7 @@ render();
 <!-- ★ SHALOM tracking — cargado al final -->
 <script src="storage.js?v=2"></script>
 <script src="config.js?v=9"></script>
-<script src="print.js?v=11"></script>
+<script src="print.js?v=12"></script>
 <script src="notify.js?v=3"></script>
 <script src="tracking.js?v=2"></script>
 <script src="floatpanel.js?v=2"></script>
@@ -2909,7 +3054,7 @@ render();
 <script src="ticket.js?v=1"></script>
 <script src="agencias-extractor.js?v=1"></script>
 <script src="respaldo.js?v=1"></script>
-<script src="ayuda.js?v=1"></script>
+<script src="ayuda.js?v=2"></script>
 <script src="dashboard.js?v=2"></script>
 <script src="voz.js?v=2"></script>
 <script src="cotizacion.js?v=1"></script>

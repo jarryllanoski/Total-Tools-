@@ -189,6 +189,29 @@
       ]
     },
 
+    cambioEtiquetaQR: {
+      titulo: 'Cambiar etiqueta por QR',
+      icono: '📷',
+      pasos: [
+        'Sirve para mover muchos pedidos al mismo estado escaneando el QR de su etiqueta.',
+        'Doble toque en el chip del estado (hasta <b>ALISTADO</b>) → abre "ordenar esta vista" → despliega <b>📷 Cambiar etiqueta por QR</b> → <b>Activar</b> (pide tu clave de cambio de etiqueta).',
+        'Toca el botón 📷 y apunta al QR de la etiqueta. Cada escaneo mueve ese pedido al estado activo.',
+        'Debajo de la tarjeta movida aparece <b>de → a</b> con <b>↩ Revertir</b> (pide confirmación).',
+        'Se escanea de uno en uno: la cámara se cierra tras cada lectura.',
+        'Al cambiar de chip, el modo se apaga solo.'
+      ],
+      faq: [
+        {q:'¿Puede cambiar el pedido equivocado?', a:'No. Las etiquetas nuevas llevan número + código en el QR, así que identifican un pedido exacto. En etiquetas viejas (solo número), si hay varios pedidos con ese número no cambia ninguno y avisa.'},
+        {q:'¿Puede retroceder un estado?', a:'No. Solo AVANZA. Por eso los ENVIADO/FINALIZADO no se tocan por este medio.'},
+        {q:'¿Funciona sin internet?', a:'Sí para leer y mover. Solo la impresión del QR usa internet.'},
+        {q:'¿Sirve con etiquetas viejas?', a:'Sí: se buscan por número. Las nuevas (con código) son exactas.'}
+      ],
+      tips: [
+        'Disponible solo en los estados hasta ALISTADO; de ahí en adelante se cambia a mano.',
+        'El botón Revertir solo está mientras estás en modo escaneo; el movimiento sí queda guardado.'
+      ]
+    },
+
     compartir: {
       titulo: 'Compartir',
       icono: '🔗',
