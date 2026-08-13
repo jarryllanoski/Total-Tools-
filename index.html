@@ -939,7 +939,12 @@
         <span class="docs-accordion-arrow" id="qrMoveArrow">▾</span>
       </div>
       <div class="docs-accordion-body" id="qrMoveBody">
-        <div style="font-size:11px;color:var(--text2);line-height:1.6;margin-bottom:10px">Escanea el QR de cada etiqueta para mover ese pedido a <b id="qrMoveTargetLbl"></b>. Solo avanza, uno por uno.
+        <div style="font-size:11px;color:var(--text2);line-height:1.7;margin-bottom:10px">
+          <b style="color:var(--text)">¿Qué hace?</b> Al activar, escaneas el QR de cada etiqueta con la cámara (📷) y ese pedido se mueve a <b id="qrMoveTargetLbl"></b>.<br>
+          • Solo <b>avanza</b> de estado (nunca retrocede).<br>
+          • De <b>uno en uno</b>: la cámara se cierra tras cada escaneo.<br>
+          • Debajo de la tarjeta movida aparece <b>de → a</b> con <b>↩ Revertir</b>.<br>
+          • Al cambiar de etiqueta, el modo se apaga solo.
           <span onclick="if(window.Ayuda)Ayuda.abrir('cambioEtiquetaQR')" style="color:#8b949e;cursor:pointer;font-weight:600;margin-left:4px" title="Ayuda">📖 Ayuda</span>
         </div>
         <button class="btn-pri" id="qrMoveActBtn" onclick="qrMoveToggle()">Activar (pide clave)</button>
