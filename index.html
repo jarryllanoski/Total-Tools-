@@ -382,7 +382,7 @@
   window._fbReady=true;
 })();
 </script>
-<link rel="stylesheet" href="panel.css?v=3">
+<link rel="stylesheet" href="panel.css?v=4">
 </head>
 <body>
 
@@ -437,7 +437,7 @@
       <button class="tb-btn" onclick="onTrackBtn()" title="Tracking Shalom de los seleccionados · sin selección refresca">🔄</button>
       <button class="tb-btn pri" onclick="openForm(null)">➕</button>
       <button class="tb-btn danger" onclick="onTrashBtnTap()" title="Doble toque para abrir papelera">🗑️</button>
-      <button class="tb-btn qrind" id="qrMoveInd" onclick="qrMoveIndTap()" title="Modo escaneo activo — toca para salir" style="display:none">📷 <span id="qrMoveIndLbl"></span></button>
+      <button class="tb-btn qrind" id="qrMoveInd" onclick="qrMoveIndTap()" title="Modo escaneo activo — toca para salir" style="display:none"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="4.5" width="10" height="10" rx="2.5"/><circle cx="7.5" cy="9.5" r="2.3"/><path d="M15 9.5H21M21 9.5l-2.6-2.6M21 9.5l-2.6 2.6"/></svg></button>
     </div>
   </div>
   <div id="cardsArea"></div>
@@ -2891,7 +2891,7 @@ function _qrMoveStop(){ _qrMove.on=false; _qrMove.status=''; _qrMove.last=null; 
 // Indicador persistente en la barra (junto al 🗑️): visible solo en modo escaneo.
 function _qrMoveIndicator(){
   const el=$('qrMoveInd'); if(!el) return;
-  if(_qrMove.on){ el.style.display='flex'; const l=$('qrMoveIndLbl'); if(l) l.textContent=_qrMove.status; }
+  if(_qrMove.on){ el.style.display='flex'; el.title='Escaneo activo → '+_qrMove.status+' · toca para salir'; }
   else el.style.display='none';
 }
 function qrMoveIndTap(){ if(!_qrMove.on) return; _qrMoveStop(); toast('Escaneo desactivado'); }
