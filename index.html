@@ -140,7 +140,8 @@
     };
   }
   function slimSupplier(sup){
-    return{...sup,cotiz:sup.cotiz?{t:sup.cotiz.t,n:sup.cotiz.n,d:'[img]'}:null};
+    // Conserva las URLs de Storage; solo recorta base64 (reusa _slimDoc).
+    return{...sup,cotiz:_slimDoc(sup.cotiz)};
   }
 
   // ★ Mejora 3: copia del estado adelgazada SOLO para el respaldo localStorage.
@@ -2657,15 +2658,28 @@ function openCotizMenu(){
 function loadCotiz(input){
   const file=input.files[0]; if(!file) return;
   if(file.size>10*1024*1024){toast('⚠️ Máximo 10MB');return}
-  const r=new FileReader();
-  r.onload=e=>{
-    const sup=S.suppliers.find(x=>x.id===_suppId); if(!sup) return;
-    sup.cotiz={d:e.target.result,n:file.name,t:file.type};
-    save('supp:'+sup.id); renderCotizArea(sup);
-    toast('✅ Cotización subida');
-  };
-  r.readAsDataURL(file);
+  const sup=S.suppliers.find(x=>x.id===_suppId); if(!sup){input.value='';return}
   input.value='';
+  // ★ Subir a Firebase Storage (URL que sincroniza en todos los dispositivos).
+  //   Antes se guardaba solo base64 → slimSupplier lo volvía [img] → no se veía
+  //   en otros equipos. Fallback a base64 si Storage falla.
+  if(window.StorageModule && StorageModule.uploadFile){
+    toast('⏳ Subiendo cotización...');
+    StorageModule.uploadFile(file, sup.id, 'cotiz').then(function(docObj){
+      sup.cotiz=docObj; save('supp:'+sup.id); renderCotizArea(sup);
+      toast('✅ Cotización subida');
+    }).catch(function(e){
+      console.warn('[Cotiz] Storage falló, usando base64:',e&&e.message);
+      _loadCotizBase64(file,sup);
+    });
+    return;
+  }
+  _loadCotizBase64(file,sup);
+}
+function _loadCotizBase64(file,sup){
+  const r=new FileReader();
+  r.onload=e=>{ sup.cotiz={d:e.target.result,n:file.name,t:file.type}; save('supp:'+sup.id); renderCotizArea(sup); toast('✅ Cotización subida'); };
+  r.readAsDataURL(file);
 }
 
 function delCotiz(suppId){
@@ -3073,12 +3087,12 @@ render();
 </script>
 <!-- ★ SHALOM tracking — cargado al final -->
 <script src="storage.js?v=2"></script>
-<script src="config.js?v=9"></script>
+<script src="config.js?v=10"></script>
 <script src="print.js?v=12"></script>
 <script src="notify.js?v=3"></script>
 <script src="tracking.js?v=2"></script>
 <script src="floatpanel.js?v=2"></script>
-<script src="delivery.js?v=4"></script>
+<script src="delivery.js?v=5"></script>
 <script src="qrtracking.js?v=2"></script>
 <script src="ticket.js?v=1"></script>
 <script src="agencias-extractor.js?v=1"></script>

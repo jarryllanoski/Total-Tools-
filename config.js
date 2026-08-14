@@ -215,19 +215,33 @@ document.addEventListener('click',e=>{if(!e.target.closest('.doc-sw')&&!e.target
 
 /* DOC SLOTS */
 let _docs={guia:null,embalado:null,ticket:null};
-// Núcleo reutilizable: valida, lee y guarda el archivo en un slot. Lo usan
-// loadDoc (input), dropDoc (arrastrar) y pasteDoc (portapapeles).
+// Núcleo reutilizable: valida y guarda el archivo en un slot. Lo usan loadDoc
+// (input), dropDoc (arrastrar) y pasteDoc (portapapeles).
+// ★ Pedido EXISTENTE + Storage disponible → sube a Firebase Storage (URL que
+//   sincroniza en todos los dispositivos), igual que cámara/galería. Pedido
+//   NUEVO → base64 (storage.js lo migra a Storage al guardar). Así pegar y
+//   arrastrar dejan de guardarse solo como base64 (que se recorta a [img]).
+function _docToast(slot){ toast(slot==='guia'?'🚚 Guía subida ✓':slot==='embalado'?'📦 Foto de embalado subida ✓':'🧾 Documento subido ✓'); }
 function _procesarDoc(file,slot){
   if(!file)return;
   if(file.size>8*1024*1024){toast('⚠️ Máximo 8MB');return}
+  var shipId=(typeof _editId!=='undefined')?_editId:null;
+  if(shipId && window.StorageModule && StorageModule.uploadFile){
+    toast('⏳ Subiendo documento...');
+    StorageModule.uploadFile(file,shipId,slot).then(function(docObj){
+      _docs[slot]=docObj; refreshSlot(slot); _docToast(slot);
+      if(typeof autoEstadoPorDoc==='function') autoEstadoPorDoc(shipId,slot);
+    }).catch(function(e){
+      console.warn('[Doc] Storage falló, usando base64:',e&&e.message);
+      _procesarDocBase64(file,slot);
+    });
+    return;
+  }
+  _procesarDocBase64(file,slot);
+}
+function _procesarDocBase64(file,slot){
   const r=new FileReader();
-  r.onload=e=>{
-    _docs[slot]={d:e.target.result,n:file.name,t:file.type};
-    refreshSlot(slot);
-    if(slot==='guia'){ toast('🚚 Guía subida ✓'); }
-    else if(slot==='embalado'){ toast('📦 Foto de embalado subida ✓'); }
-    else { toast('🧾 Documento subido ✓'); }
-  };
+  r.onload=e=>{ _docs[slot]={d:e.target.result,n:file.name,t:file.type}; refreshSlot(slot); _docToast(slot); };
   r.readAsDataURL(file);
 }
 function loadDoc(input,slot){ _procesarDoc(input.files[0],slot); }

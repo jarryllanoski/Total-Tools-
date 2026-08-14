@@ -573,19 +573,22 @@ DeliveryModule._confirmar=async function(){
   // igual se registra la entrega (la foto/firma son complementarias).
   var SM=global.StorageModule;
   if(SM&&SM.uploadFile&&SM.base64ToFile){
+    // Reintentos ante red intermitente (2s, 4s) para no perder foto/firma.
+    var _subir=async function(b64,name,type,slot){
+      var file=SM.base64ToFile(b64,name,type);
+      for(var i=0;i<3;i++){
+        try{ return (await SM.uploadFile(file,ship.id,slot)).d; }
+        catch(e){ if(i<2) await new Promise(function(r){setTimeout(r,2000*(i+1));}); }
+      }
+      return null;
+    };
     if(_fotoBase64){
-      try{
-        var ff=SM.base64ToFile(_fotoBase64,'delivery-foto.jpg','image/jpeg');
-        var upF=await SM.uploadFile(ff,ship.id,'delivery-foto');
-        ship._dlvFoto=upF.d;
-      }catch(e){ if(typeof global.toast==='function')global.toast('⚠️ No se pudo subir la foto — se guardó sin ella'); }
+      var uF=await _subir(_fotoBase64,'delivery-foto.jpg','image/jpeg','delivery-foto');
+      if(uF) ship._dlvFoto=uF; else if(typeof global.toast==='function')global.toast('⚠️ No se pudo subir la foto — se guardó sin ella');
     }
     if(firmaB64){
-      try{
-        var fs=SM.base64ToFile(firmaB64,'delivery-firma.png','image/png');
-        var upS=await SM.uploadFile(fs,ship.id,'delivery-firma');
-        ship._dlvFirma=upS.d;
-      }catch(e){ /* firma opcional: seguir */ }
+      var uS=await _subir(firmaB64,'delivery-firma.png','image/png','delivery-firma');
+      if(uS) ship._dlvFirma=uS; // firma opcional: si falla, seguir
     }
   }
 
