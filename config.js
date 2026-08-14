@@ -417,6 +417,9 @@ function openForm(id){
     const b = $('shalomGuiaBlock');
     const isShalom = c.includes('SHALOM');
     if(b) b.style.display = isShalom ? 'block' : 'none';
+    // DELIVERY: bloque motorizado (mismo criterio por courier que Shalom)
+    const dbk = $('dlvDriverBlock');
+    if(dbk) dbk.style.display = c.includes('DELIVERY') ? 'block' : 'none';
     const isEnc = c.includes('ENCOMIENDA');
     const addrLbl = document.getElementById('fAddrLabel');
     const encGrp  = document.getElementById('fEncAgenciaGroup');
@@ -433,10 +436,16 @@ function openForm(id){
     if(s){
       if($('fShalomGuia'))   $('fShalomGuia').value   = s.trackingOrderNumber||s.shalomGuia||'';
       if($('fShalomCodigo')) $('fShalomCodigo').value = s.trackingOrderCode||s.shalomCodigo||'';
+      if($('fDlvDriver'))      $('fDlvDriver').value      = s._dlvDriver||'';
+      if($('fDlvDriverPhone')) $('fDlvDriverPhone').value = s._dlvDriverPhone||'';
+      if($('fDlvRutaLink'))    $('fDlvRutaLink').value    = s._dlvRutaLink||'';
     }
   } else {
     if($('fShalomGuia'))   $('fShalomGuia').value   = '';
     if($('fShalomCodigo')) $('fShalomCodigo').value = '';
+    if($('fDlvDriver'))      $('fDlvDriver').value      = '';
+    if($('fDlvDriverPhone')) $('fDlvDriverPhone').value = '';
+    if($('fDlvRutaLink'))    $('fDlvRutaLink').value    = '';
   }
   _showShalomBlock();
   if($('fPaste')) $('fPaste').value='';
@@ -673,6 +682,17 @@ function saveShipment(){
   const _sCodigo = ($('fShalomCodigo') ? $('fShalomCodigo').value.trim() : '')||'';
   if(_sGuia)  { data.trackingOrderNumber=_sGuia;   data.shalomGuia=_sGuia; }
   if(_sCodigo){ data.trackingOrderCode  =_sCodigo; data.shalomCodigo=_sCodigo; }
+  // ★ DELIVERY: motorizado (nombre, teléfono) + link inDriver. Solo se tocan si el
+  //   courier es DELIVERY (no ensucia otros pedidos); null al vaciar, para que
+  //   "quitar" también se propague a la nube.
+  if($('fDlvDriver') && ($('fCourier').value||'').toUpperCase().includes('DELIVERY')){
+    const _dDrv  = ($('fDlvDriver')||{value:''}).value.trim();
+    const _dTel  = ($('fDlvDriverPhone')||{value:''}).value.trim();
+    const _dLink = ($('fDlvRutaLink')||{value:''}).value.trim();
+    data._dlvDriver      = _dDrv || null;
+    data._dlvDriverPhone = _dTel || null;
+    data._dlvRutaLink    = _dLink ? (/^https?:\/\//i.test(_dLink) ? _dLink : (/^[a-z][a-z0-9+.-]*:/i.test(_dLink) ? null : 'https://'+_dLink)) : null;
+  }
   if(_editId){const idx=S.shipments.findIndex(x=>x.id===_editId);
     // Preservar campos tracking al editar
     const prev=S.shipments[idx];
@@ -686,6 +706,7 @@ function saveShipment(){
     // Guardar inmediatamente en Firebase (sin esperar debounce)
     if(window._fbSaveShipmentNow) window._fbSaveShipmentNow(S.shipments[idx]);
     save(_editId);closeOverlay('formOverlay');render(); // ★ incremental: solo este pedido
+    if(window.DeliveryModule&&DeliveryModule.refrescar)DeliveryModule.refrescar(); // ruta al día si está abierta
     toast('✅ Actualizado');}
   else{
     data.id='id_'+Date.now();data.createdAt=new Date().toISOString();data._localTs=Date.now();S.shipments.push(data);

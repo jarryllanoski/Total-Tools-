@@ -19,13 +19,9 @@ var _currentShipId = null;
 var _fotoBase64    = null;
 var _signCtx       = null;
 var _signing       = false;
-var _drivers       = [];
-var _selectedDrv   = null; // motorizado elegido en el modal (aún sin guardar)
 var _tapCount      = 0;
 var _tapTimer      = null;
 
-function _loadDrivers(){ try{ _drivers=JSON.parse(localStorage.getItem('tt_drivers')||'[]'); }catch(e){ _drivers=[]; } }
-function _saveDrivers(){ try{ localStorage.setItem('tt_drivers',JSON.stringify(_drivers)); }catch(e){} }
 function _esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 function _escAttr(s){ return String(s||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/'/g,'&#39;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
@@ -33,12 +29,6 @@ function _isDelivery(s){ return s.courier&&s.courier.toUpperCase().includes('DEL
 function _getShips(){
   return ((global.S&&global.S.shipments)||[]).filter(function(s){
     return _isDelivery(s)&&s.status!=='FINALIZADO';
-  });
-}
-// DELIVERY ya finalizados (para el historial de motorizados).
-function _getFinalized(){
-  return ((global.S&&global.S.shipments)||[]).filter(function(s){
-    return _isDelivery(s)&&s.status==='FINALIZADO';
   });
 }
 /* Orden de la ruta = MISMO orden que las etiquetas:
@@ -68,7 +58,9 @@ function _css(){
   if(document.getElementById('dlvCSS')) return;
   var st=document.createElement('style'); st.id='dlvCSS';
   st.textContent=
-    '#dlvPanel{display:none;position:fixed;top:0;right:0;bottom:0;z-index:800;background:#161b22;border-left:1px solid #30363d;flex-direction:column;box-shadow:-6px 0 24px rgba(0,0,0,.6)}'+
+    /* z-index 300 = DEBAJO de los modales del panel (.overlay es 400): así el
+       modal de edición se abre ENCIMA y al cerrarlo vuelves a la ruta intacta. */
+    '#dlvPanel{display:none;position:fixed;top:0;right:0;bottom:0;z-index:300;background:#161b22;border-left:1px solid #30363d;flex-direction:column;box-shadow:-6px 0 24px rgba(0,0,0,.6)}'+
     '#dlvPanel.open{display:flex}'+
     '@media(min-width:600px){#dlvPanel{width:380px}}'+
     '@media(max-width:599px){#dlvPanel{width:100%;border-left:none}}'+
@@ -107,12 +99,8 @@ function _css(){
     '.dlvc-foot-r{display:flex;align-items:center;gap:6px}'+
     '.dlvc-ord{width:28px;height:28px;display:flex;align-items:center;justify-content:center;border-radius:7px;border:1px solid #30363d;background:#1c2333;color:#c9d1d9;font-size:12px;cursor:pointer;font-family:inherit;line-height:1}'+
     '.dlvc-ord:disabled{opacity:.3;cursor:default}'+
-    /* Historial de motorizados (acordeón, mismas clases .docs-accordion-* del panel) */
-    '#dlvHist{margin-top:12px}'+
-    '.dlvh-item{display:flex;gap:8px;padding:9px 4px;border-bottom:1px solid #21262d}'+
-    '.dlvh-item:last-child{border-bottom:none}'+
-    '#dlvConfOv,#dlvDrvOv{display:none;position:fixed;inset:0;background:rgba(0,0,0,.88);z-index:900;align-items:flex-end;justify-content:center}'+
-    '#dlvConfOv.open,#dlvDrvOv.open{display:flex}'+
+    '#dlvConfOv{display:none;position:fixed;inset:0;background:rgba(0,0,0,.88);z-index:900;align-items:flex-end;justify-content:center}'+
+    '#dlvConfOv.open{display:flex}'+
     '.dlv-sheet{background:#161b22;border-radius:16px 16px 0 0;padding:18px;width:100%;max-width:480px;border:1px solid #30363d;animation:dlvUp .2s ease;max-height:88vh;overflow-y:auto}'+
     '@keyframes dlvUp{from{transform:translateY(100%)}to{transform:translateY(0)}}'+
     '#dlvSign{width:100%;height:130px;background:#0d1117;border:1px solid #30363d;border-radius:10px;touch-action:none;cursor:crosshair;display:block}'+
@@ -132,17 +120,7 @@ function _html(){
       '<div id="dlvSub" style="font-size:10px;color:#8b949e;margin-top:1px"></div></div>'+
       '<button onclick="DeliveryModule.cerrar()" style="background:rgba(247,129,102,.15);border:1px solid rgba(247,129,102,.3);color:#f78166;border-radius:8px;width:32px;height:32px;font-size:15px;cursor:pointer">✕</button>'+
     '</div>'+
-    '<div id="dlvBody"><div id="dlvStats" style="display:flex;gap:12px;margin-bottom:12px;background:#1c2333;border-radius:10px;padding:10px 14px"></div><div id="dlvList"></div>'+
-      // HISTORIAL de motorizados — solo pedidos FINALIZADOS, se despliega igual
-      // que "Documentos del envío" (reusa .docs-accordion-* del panel).
-      '<div id="dlvHist" class="docs-accordion">'+
-        '<div class="docs-accordion-hdr" onclick="DeliveryModule._toggleHist()">'+
-          '<span class="docs-accordion-ttl">🛵 Historial de motorizados <span id="dlvHistCnt" style="opacity:.7"></span></span>'+
-          '<span class="docs-accordion-arrow" id="dlvHistArrow">▾</span>'+
-        '</div>'+
-        '<div class="docs-accordion-body" id="dlvHistBody"></div>'+
-      '</div>'+
-    '</div>';
+    '<div id="dlvBody"><div id="dlvStats" style="display:flex;gap:12px;margin-bottom:12px;background:#1c2333;border-radius:10px;padding:10px 14px"></div><div id="dlvList"></div></div>';
   document.body.appendChild(p);
 
   // Overlay confirmar entrega
@@ -170,47 +148,8 @@ function _html(){
     '</div>';
   oc.addEventListener('click',function(e){if(e.target===oc)DeliveryModule._closeConf();});
   document.body.appendChild(oc);
-
-  // Overlay driver
-  var od=document.createElement('div'); od.id='dlvDrvOv';
-  od.innerHTML=
-    '<div class="dlv-sheet">'+
-      '<div style="width:36px;height:4px;background:#30363d;border-radius:2px;margin:0 auto 14px"></div>'+
-      '<div style="font-family:Syne,sans-serif;font-weight:800;font-size:16px;margin-bottom:12px">🛵 Asignar motorizado</div>'+
-      // NUEVO MOTORIZADO — PRIMERO y anclado arriba (campos siempre visibles aquí)
-      '<div style="background:rgba(163,113,247,.06);border:1px solid rgba(163,113,247,.22);border-radius:10px;padding:12px;margin-bottom:12px">'+
-        '<div style="font-size:10px;font-weight:700;color:#a371f7;letter-spacing:.8px;text-transform:uppercase;margin-bottom:10px">🛵 Nuevo motorizado</div>'+
-        '<div class="frow">'+
-          '<div class="fg"><label class="fl">Nombre</label><input id="dlvDrvName" class="fi" placeholder="Nombre..."></div>'+
-          '<div class="fg"><label class="fl">Teléfono</label><input id="dlvDrvPhone" class="fi phone-norm" placeholder="Opcional" inputmode="numeric"></div>'+
-        '</div>'+
-      '</div>'+
-      // LINK INDRIVER — patrón "Agregar link" (input + Add + chip con ↗/✕)
-      '<div style="font-size:10px;font-weight:700;color:#8b949e;letter-spacing:.8px;text-transform:uppercase;margin-bottom:7px">🔗 Link inDriver (opcional)</div>'+
-      '<div class="link-row">'+
-        '<input id="dlvRutaLink" class="fi" placeholder="https://… link del viaje inDriver" inputmode="url" style="flex:1">'+
-        '<button class="link-add" type="button" onclick="DeliveryModule._addRuta()">+ Add</button>'+
-      '</div>'+
-      '<div class="link-list" id="dlvRutaList" style="margin-bottom:14px"></div>'+
-      // MOTORIZADOS GUARDADOS — acordeón colapsable (como Documentos del envío);
-      // se abre solo si quieres reusar uno. Cabecera muestra el elegido.
-      '<div class="docs-accordion" style="margin-bottom:14px">'+
-        '<div class="docs-accordion-hdr" onclick="DeliveryModule._toggleDrvList()">'+
-          '<span class="docs-accordion-ttl">🛵 Motorizados guardados<span id="dlvDrvChosen" style="text-transform:none;font-weight:600;color:#a371f7;margin-left:6px"></span></span>'+
-          '<span class="docs-accordion-arrow" id="dlvDrvArrow">▾</span>'+
-        '</div>'+
-        '<div class="docs-accordion-body" id="dlvDrvBody">'+
-          '<div id="dlvDrvList" style="display:flex;flex-direction:column;gap:7px;max-height:200px;overflow-y:auto"></div>'+
-        '</div>'+
-      '</div>'+
-      // GUARDAR Y CERRAR (primario) + Cerrar (cancelar) — mismo par que el panel
-      '<div style="display:flex;gap:9px">'+
-        '<button onclick="DeliveryModule._closeDrv()" style="flex:1;padding:12px;background:#1c2333;border:1px solid #30363d;border-radius:10px;color:#8b949e;font-size:13px;cursor:pointer;font-family:inherit">Cerrar</button>'+
-        '<button onclick="DeliveryModule._guardar()" style="flex:2;padding:12px;background:var(--blue);border:none;border-radius:10px;color:#fff;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">💾 Guardar y cerrar</button>'+
-      '</div>'+
-    '</div>';
-  od.addEventListener('click',function(e){if(e.target===od)DeliveryModule._closeDrv();});
-  document.body.appendChild(od);
+  // El motorizado (nombre, teléfono, link inDriver) se edita en el MODAL DE
+  // EDICIÓN del panel principal — aquí ya no hay un modal propio duplicado.
 }
 
 /* ── Render ──────────────────────────────────────────────────────── */
@@ -302,134 +241,19 @@ function _render(){
         '<div class="dlvc-foot-r">'+
           '<button class="dlvc-ord" onclick="DeliveryModule._move(\''+s.id+'\',-1)" title="Subir parada"'+(i===0?' disabled':'')+'>▲</button>'+
           '<button class="dlvc-ord" onclick="DeliveryModule._move(\''+s.id+'\',1)" title="Bajar parada"'+(i===ships.length-1?' disabled':'')+'>▼</button>'+
-          '<button class="dlvc-edit" onclick="DeliveryModule._openDrv(\''+s.id+'\')" title="Editar motorizado / inDriver">✏️ Editar</button>'+
+          '<button class="dlvc-edit" onclick="DeliveryModule.editar(\''+s.id+'\')" title="Editar pedido">✏️ Editar</button>'+
         '</div>'+
       '</div>'+
     '</div>';
   }).join('');
-
-  _renderHist();
 }
 
-/* ── Historial de motorizados (solo FINALIZADOS) ─────────────────── */
-function _renderHist(){
-  var fin=_getFinalized().slice().sort(function(a,b){
-    return String(b._dlvFecha||b.date||'').localeCompare(String(a._dlvFecha||a.date||''));
-  });
-  var cnt=document.getElementById('dlvHistCnt');
-  if(cnt) cnt.textContent='('+fin.length+')';
-  var body=document.getElementById('dlvHistBody');
-  if(!body) return;
-  if(!fin.length){
-    body.innerHTML='<div style="text-align:center;padding:14px;color:#8b949e;font-size:12px">Aún no hay entregas finalizadas.</div>';
-    return;
-  }
-  body.innerHTML=fin.map(function(s){
-    var drv=s._dlvDriver||'—';
-    var rec=s._dlvReceptor||'';
-    var fecha='';
-    if(s._dlvFecha){ try{ fecha=new Date(s._dlvFecha).toLocaleString('es-PE',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}); }catch(e){ fecha=String(s._dlvFecha).slice(0,16); } }
-    return '<div class="dlvh-item">'+
-      '<span style="font-size:15px">🛵</span>'+
-      '<div style="flex:1;min-width:0">'+
-        '<div style="font-size:12.5px;font-weight:700;color:#e6edf3">'+_esc(s.name)+'</div>'+
-        '<div style="font-size:11px;color:#8b949e">Motorizado: <b style="color:#c9d1d9">'+_esc(drv)+'</b>'+(rec?' · Recibió: '+_esc(rec):'')+'</div>'+
-        (fecha?'<div style="font-size:10px;color:#6e7681">📅 '+_esc(fecha)+'</div>':'')+
-      '</div>'+
-    '</div>';
-  }).join('');
-}
-
-/* ── Driver ──────────────────────────────────────────────────────── */
-// Pinta la lista de motorizados guardados; resalta el SELECCIONADO (_selectedDrv).
-function _renderDrvList(){
-  var list=document.getElementById('dlvDrvList');
-  var curName=_selectedDrv?_selectedDrv.name:'';
-  var chosen=document.getElementById('dlvDrvChosen');
-  if(chosen) chosen.textContent=curName?('· '+curName):'';
-  if(!list) return;
-  list.innerHTML=_drivers.length
-    ?_drivers.map(function(d){
-        var sel=curName===d.name;
-        return '<div style="display:flex;align-items:center;gap:8px;padding:10px 12px;background:'+(sel?'rgba(163,113,247,.15)':'#1c2333')+';border:1px solid '+(sel?'rgba(163,113,247,.4)':'#30363d')+';border-radius:9px;cursor:pointer" onclick="DeliveryModule._selDrv(\''+d.name.replace(/'/g,"\\'")+'\',\''+( d.phone||'').replace(/'/g,"\\'")+'\')">'+
-          '<span style="font-size:15px">🛵</span>'+
-          '<div style="flex:1"><div style="font-size:13px;font-weight:600">'+_esc(d.name)+'</div>'+(d.phone?'<div style="font-size:11px;color:#8b949e">📞 '+_esc(d.phone)+'</div>':'')+  '</div>'+
-          (sel?'<span style="color:var(--green)">✓</span>':'')+
-          '<button onclick="event.stopPropagation();DeliveryModule._delDrv(\''+d.name.replace(/'/g,"\\'")+'\' )" style="background:none;border:none;color:#f78166;cursor:pointer;font-size:14px;padding:0 4px">✕</button>'+
-        '</div>';
-      }).join('')
-    :'<div style="text-align:center;padding:16px;color:#8b949e;font-size:12px">Sin motorizados. Escribe uno arriba.</div>';
-}
-DeliveryModule._openDrv=function(id){
-  _currentShipId=id; _loadDrivers();
-  var ship=((global.S&&global.S.shipments)||[]).find(function(x){return x.id===id;});
-  // Selección inicial = el motorizado ya asignado al pedido (si lo hay).
-  _selectedDrv=ship&&ship._dlvDriver?{name:ship._dlvDriver,phone:ship._dlvDriverPhone||''}:null;
-  _renderDrvList();
-  // Acordeón de motorizados colapsado por defecto (se usa solo si se necesita).
-  var _db=document.getElementById('dlvDrvBody'); if(_db) _db.classList.remove('open');
-  var _da=document.getElementById('dlvDrvArrow'); if(_da) _da.classList.remove('open');
-  // Limpiar campos "Nuevo motorizado" al abrir
-  var _dn=document.getElementById('dlvDrvName'); if(_dn) _dn.value='';
-  var _dp=document.getElementById('dlvDrvPhone'); if(_dp) _dp.value='';
-  // Input vacío; el link inDriver guardado se muestra como chip (patrón Agregar link)
-  var _rl=document.getElementById('dlvRutaLink'); if(_rl) _rl.value='';
-  var _rlist=document.getElementById('dlvRutaList');
-  if(_rlist){
-    var link=ship&&ship._dlvRutaLink?String(ship._dlvRutaLink):'';
-    _rlist.innerHTML=link
-      ?'<div class="link-item"><span>🔗</span><div class="link-name">'+_esc(link.length>34?link.slice(0,34)+'…':link)+'</div><a href="'+_escAttr(link)+'" target="_blank" rel="noopener" style="color:var(--blue);font-size:12px;text-decoration:none">↗</a><button class="link-del" type="button" onclick="DeliveryModule._removeRuta()">✕</button></div>'
-      :'';
-  }
-  document.getElementById('dlvDrvOv').classList.add('open');
-};
-// Tocar un motorizado = SOLO seleccionarlo (resaltar). Se guarda con "Guardar y
-// cerrar". Si escribes un nombre nuevo arriba, ese manda sobre esta selección.
-DeliveryModule._selDrv=function(name,phone){
-  _selectedDrv={name:name,phone:phone||''};
-  var _dn=document.getElementById('dlvDrvName'); if(_dn) _dn.value=''; // el elegido es de la lista
-  var _dp=document.getElementById('dlvDrvPhone'); if(_dp) _dp.value='';
-  _renderDrvList();
-};
-DeliveryModule._delDrv=function(name){
-  _drivers=_drivers.filter(function(d){return d.name!==name;});_saveDrivers();
-  if(_selectedDrv&&_selectedDrv.name===name)_selectedDrv=null;
-  _renderDrvList();
-};
-// GUARDAR Y CERRAR — mismo contrato que saveShipment del panel: captura lo
-// pendiente, asigna, guarda incremental a Firestore, re-renderiza y cierra.
-DeliveryModule._guardar=function(){
-  var ship=((global.S&&global.S.shipments)||[]).find(function(x){return x.id===_currentShipId;});
-  if(!ship){DeliveryModule._closeDrv();return;}
-  // Resolver motorizado: nombre nuevo escrito MANDA; si no, el seleccionado.
-  var newName=(document.getElementById('dlvDrvName')||{value:''}).value.trim();
-  var newPhone=(document.getElementById('dlvDrvPhone')||{value:''}).value.trim();
-  var drvName='',drvPhone='';
-  if(newName){
-    drvName=newName;drvPhone=newPhone;
-    if(!_drivers.find(function(d){return d.name===newName;})){_drivers.push({name:newName,phone:newPhone});_saveDrivers();}
-  }else if(_selectedDrv){
-    drvName=_selectedDrv.name;drvPhone=_selectedDrv.phone||'';
-  }
-  if(drvName){ship._dlvDriver=drvName;ship._dlvDriverPhone=drvPhone;}
-  // Link pendiente en el input (aún sin +Add) → se guarda igual (como el panel).
-  var raw=(document.getElementById('dlvRutaLink')||{value:''}).value.trim();
-  if(raw){var nl=_normLink(raw);if(nl)ship._dlvRutaLink=nl;}
-  // Guardado incremental REAL a Firestore (mismo que el panel principal).
-  if(typeof global._fbSaveShipmentNow==='function')global._fbSaveShipmentNow(ship);
-  if(typeof global.render==='function')global.render();
-  DeliveryModule._closeDrv();_render();
-  if(typeof global.toast==='function')global.toast(drvName?('🛵 '+drvName+' guardado'):'✅ Guardado');
-};
-DeliveryModule._closeDrv=function(){document.getElementById('dlvDrvOv').classList.remove('open');};
-// Acordeón de motorizados guardados (mismo comportamiento que Documentos del envío)
-DeliveryModule._toggleDrvList=function(){
-  var body=document.getElementById('dlvDrvBody');
-  var arrow=document.getElementById('dlvDrvArrow');
-  if(!body||!arrow) return;
-  var isOpen=body.classList.contains('open');
-  body.classList.toggle('open',!isOpen);
-  arrow.classList.toggle('open',!isOpen);
+/* ── Editar pedido — reusa el modal de edición del panel principal ──
+   Ahí se editan motorizado (nombre, teléfono) y link inDriver, junto al resto
+   del pedido. El panel queda debajo (z-index 300) y vuelve intacto al cerrar. */
+DeliveryModule.editar=function(id){
+  if(typeof global.openForm==='function') global.openForm(id);
+  else if(typeof global.toast==='function') global.toast('Abre el pedido desde el panel');
 };
 
 /* ── Reordenar parada (mover orden de entrega) ───────────────────── */
@@ -450,52 +274,9 @@ DeliveryModule._move=function(id,dir){
   _render();
 };
 
-/* ── Historial (acordeón, mismo comportamiento que Documentos del envío) ── */
-DeliveryModule._toggleHist=function(){
-  var body=document.getElementById('dlvHistBody');
-  var arrow=document.getElementById('dlvHistArrow');
-  if(!body||!arrow) return;
-  var isOpen=body.classList.contains('open');
-  body.classList.toggle('open',!isOpen);
-  arrow.classList.toggle('open',!isOpen);
-};
-
 // Orden de ruta expuesto para que la impresión de etiquetas DELIVERY coincida.
 DeliveryModule.sortForRoute=function(list){ return _orderShips(list||[]); };
 
-/* ── Link de ruta del motorizado (por pedido) ────────────────────── */
-function _normLink(u){
-  u=String(u||'').trim();
-  if(!u) return '';
-  if(/^javascript:/i.test(u)) return '';
-  if(/^https?:\/\//i.test(u)) return u;
-  if(/^[a-z][a-z0-9+.-]*:/i.test(u)) return ''; // otros esquemas rechazados
-  return 'https://'+u;
-}
-/* + Add: guarda el link inDriver del pedido y lo muestra como chip (patrón Agregar link). */
-DeliveryModule._addRuta=function(){
-  var ship=((global.S&&global.S.shipments)||[]).find(function(x){return x.id===_currentShipId;});
-  if(!ship)return;
-  var raw=(document.getElementById('dlvRutaLink')||{value:''}).value.trim();
-  if(!raw){ if(typeof global.toast==='function')global.toast('Ingresa un link'); return; }
-  var n=_normLink(raw);
-  if(!n){ if(typeof global.toast==='function')global.toast('⚠️ Link inválido'); return; }
-  ship._dlvRutaLink=n;
-  if(typeof global._fbSaveShipmentNow==='function')global._fbSaveShipmentNow(ship);
-  DeliveryModule._openDrv(_currentShipId); // re-render chip + limpia input
-  _render();                                // refresca la tarjeta
-  if(typeof global.toast==='function')global.toast('🔗 Link inDriver agregado');
-};
-/* ✕ del chip: quita el link inDriver del pedido. */
-DeliveryModule._removeRuta=function(){
-  var ship=((global.S&&global.S.shipments)||[]).find(function(x){return x.id===_currentShipId;});
-  if(!ship)return;
-  ship._dlvRutaLink=null; // null, no delete: propaga el "quitar" con updateMask
-  if(typeof global._fbSaveShipmentNow==='function')global._fbSaveShipmentNow(ship);
-  DeliveryModule._openDrv(_currentShipId);
-  _render();
-  if(typeof global.toast==='function')global.toast('Link quitado');
-};
 /* Abrir la dirección en Google Maps (por id, para no meter la URL en el HTML). */
 DeliveryModule._openMaps=function(id){
   var ship=((global.S&&global.S.shipments)||[]).find(function(x){return x.id===id;});
@@ -616,7 +397,6 @@ function _initTap(){
 
 /* ── API pública ─────────────────────────────────────────────────── */
 DeliveryModule.abrir=function(){
-  _loadDrivers();
   var panel=document.getElementById('dlvPanel');
   if(!panel)return;
   panel.classList.add('open');
@@ -626,9 +406,14 @@ DeliveryModule.cerrar=function(){
   var panel=document.getElementById('dlvPanel');
   if(panel)panel.classList.remove('open');
 };
+// Refrescar la ruta desde fuera (p. ej. tras guardar en el modal de edición).
+DeliveryModule.refrescar=function(){
+  var panel=document.getElementById('dlvPanel');
+  if(panel&&panel.classList.contains('open')) _render();
+};
 DeliveryModule.init=function(){
-  _css();_html();_loadDrivers();_initTap();
-  console.log('[DeliveryModule] v3 listo');
+  _css();_html();_initTap();
+  console.log('[DeliveryModule] v4 listo');
 };
 
 global.DeliveryModule=DeliveryModule;
