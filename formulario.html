@@ -970,6 +970,19 @@ function _notesCount(){
   c.textContent=n+' / '+NOTES_MAX;
   c.style.color=(n>=NOTES_MAX)?'#f59e0b':(n>=NOTES_MAX*0.9?'#e3b341':'var(--muted,#8b949e)');
 }
+
+/* Código de seguimiento — MISMA fórmula que la etiqueta (print.js _codigoEnvio):
+   pedidos de 2026-08-08 en adelante → 6 dígitos; antiguos → 4 dígitos. Así el
+   código del WhatsApp, del seguimiento y de la etiqueta son idénticos. Un pedido
+   recién creado (sin createdAt aún) se trata como nuevo (es de hoy). */
+var _CODIGO_CUTOFF='2026-08-08';
+function codigoSeg(id, createdAt){
+  var idNum=String(id||'').replace(/\D/g,'');
+  var fecha=(createdAt||'').slice(0,10);
+  var nuevo=fecha ? (fecha>=_CODIGO_CUTOFF) : true;
+  if(nuevo && idNum) return idNum.slice(-6);          // 6 dígitos
+  return String(id||'').slice(-4).toUpperCase();       // antiguos: 4 dígitos
+}
 (function(){
   function _norm(el){ if(el && el.classList && el.classList.contains('phone-norm')) el.value=normPeruPhone(el.value); }
   document.addEventListener('input', function(e){ _norm(e.target); }, true);
@@ -1727,7 +1740,6 @@ async function submitOrder(){
 
   const now      = Date.now();
   const orderId  = `id_${now}`;
-  const trackCode= orderId.slice(-4).toUpperCase();
 
   const order = {
     id:             orderId,
@@ -1779,7 +1791,7 @@ async function submitOrder(){
     localStorage.setItem('dpanel_order_'+wsId, JSON.stringify({
       trackToken: resp.trackToken, orderId: resp.orderId, name: order.name
     }));
-    showInlineConfirmed(order, resp.trackCode, resp.trackToken);
+    showInlineConfirmed(order, codigoSeg(order.id, order.createdAt), resp.trackToken);
   }catch(e){
     showOverlay(false);
     if(btn){ btn.disabled=false; btn.textContent='Confirmar pedido →'; }
@@ -2003,7 +2015,7 @@ function _shalomTrackingBlock(ship){
 
 function renderTrackResult(ship, code){
   const meta   = STATUS_META[ship.status]||{color:'#6b7280',emoji:'🏷️',step:0};
-  const tc     = (ship.id||'').slice(-4).toUpperCase();
+  const tc     = codigoSeg(ship.id, ship.createdAt);
 
   // Bloque de seguimiento Shalom (línea de tiempo propia del courier). El estado
   // grande (badge) ya comunica el avance para todos, así que no hay barra genérica.

@@ -332,21 +332,19 @@ window.PrintModule = {
 };
 
 /* Código de envío para la etiqueta.
-   · Pedidos ANTIGUOS (antes de 2026-08-08): se mantienen con los últimos 4
-     dígitos del id (como siempre) — NO se tocan.
-   · Pedidos de HOY en adelante: código alfanumérico (letras+números) estilo
-     Shalom, derivado del id en base36. Determinístico: mismo pedido → mismo
-     código (reimprimir da igual), sin guardar nada nuevo en la base. */
+   · Pedidos ANTIGUOS (antes de 2026-08-08): últimos 4 dígitos del id — NO se tocan.
+   · Pedidos de 2026-08-08 en adelante: 6 dígitos (más únicos que 4 y más legibles
+     que un alfanumérico). Determinístico: mismo pedido → mismo código (reimprimir
+     da igual), sin guardar nada nuevo en la base. */
 var _CODIGO_CUTOFF = '2026-08-08';
 function _codigoEnvio(s){
   if(!s || !s.id) return '???';
   var esNuevo = ((s.createdAt||'').slice(0,10) >= _CODIGO_CUTOFF);
   var idNum = String(s.id).replace(/\D/g,'');
   if(esNuevo && idNum){
-    var c = parseInt(idNum.slice(-12), 10).toString(36).toUpperCase();
-    return c.slice(-4);            // 4 caracteres A-Z0-9
+    return idNum.slice(-6);                       // 6 dígitos (desde el corte)
   }
-  return String(s.id).slice(-4).toUpperCase();   // antiguos: como antes
+  return String(s.id).slice(-4).toUpperCase();    // antiguos: 4 dígitos
 }
 // Exponer el código para que el escáner (index.html) identifique el pedido exacto.
 window.PrintModule.codigoEnvio = _codigoEnvio;
@@ -468,7 +466,7 @@ function _htmlEtiqueta(list, bultos, bizName, bizPhone, bizCity, fecha, qrUrl){
   /* Cierre de cortesía: centrado, discreto (jerarquía correcta — no compite con
      nombre/DNI/destino). Agradecimiento en versalitas espaciadas; fecha·hora
      en su propia línea, más chica y gris. */
-  .card-thanks { display:flex; flex-direction:column; align-items:center; text-align:center; gap:0.8mm; margin-top:2.5mm; padding-top:1.8mm; border-top:1px dashed #aaa; }
+  .card-thanks { display:flex; flex-direction:column; align-items:center; text-align:center; gap:0.8mm; margin-top:2.5mm; padding-top:1.8mm; border-top:1px dashed #333; }
   .card-thanks-txt  { font-size:clamp(7.5pt,1.4vw,9pt); color:#555; font-weight:600; text-transform:uppercase; letter-spacing:2px; }
   .card-thanks-time { font-size:clamp(7pt,1.1vw,8pt); color:#333; font-weight:600; letter-spacing:.5px; }
 
