@@ -1646,13 +1646,13 @@ function renderChips(){
 }
 function setFilt(v){
   // Cambiar a otro estado apaga el modo "cambiar etiqueta por QR".
-  if(_qrMove.on && v!==_qrMove.status){ _qrMoveClearTimer(); _qrMove.on=false; _qrMove.status=''; _qrMove.last=null; }
+  if(_qrMove.on && v!==_qrMove.status){ _qrMoveClearTimer(); _qrMove.on=false; _qrMove.status=''; _qrMove.last=null; _qrMove.shown=null; }
   _filt=v;renderChips();render();
 }
 
 function openChipSort(label){
   // Abrir el sheet de OTRO estado también apaga el modo (evita confusión).
-  if(_qrMove.on && label!==_qrMove.status){ _qrMoveClearTimer(); _qrMove.on=false; _qrMove.status=''; _qrMove.last=null; }
+  if(_qrMove.on && label!==_qrMove.status){ _qrMoveClearTimer(); _qrMove.on=false; _qrMove.status=''; _qrMove.last=null; _qrMove.shown=null; }
   _filt=label; renderChips(); render();
   _qrMoveSetupSheet(label);
   const cur=_chipSort[label]||'courier_date';
@@ -1726,10 +1726,10 @@ function render(){
     else if(sort==='cost')         data=[...data].sort((a,b)=>parseFloat(a.cost||0)-parseFloat(b.cost||0));
     else if(sort==='cost_desc')    data=[...data].sort((a,b)=>parseFloat(b.cost||0)-parseFloat(a.cost||0));
   }
-  // Modo escaneo: tras mover, la lista muestra SOLO ese pedido (más limpio).
-  // Al salir del modo o revertir (last=null) vuelve la lista completa.
-  if(_qrMove.on && _qrMove.last){
-    data = data.filter(x=>x.id===_qrMove.last.id);
+  // Modo escaneo: tras escanear, la lista muestra SOLO ese pedido (movido o ya-en-estado).
+  // Al salir del modo o revertir (shown=null) vuelve la lista completa.
+  if(_qrMove.on && _qrMove.shown){
+    data = data.filter(x=>x.id===_qrMove.shown);
   }
   const groups={};
   data.forEach(x=>{if(!groups[x.courier])groups[x.courier]=[];groups[x.courier].push(x)});
@@ -2848,7 +2848,7 @@ function closeQR(){if(_qrAF)cancelAnimationFrame(_qrAF);if(_qrStream)_qrStream.g
    • Bajo la tarjeta movida aparece "de → a" + Revertir (efímero, solo la última).
    No toca la búsqueda normal ni el render fuera del modo.
    ═══════════════════════════════════════════════════════════════════════ */
-const _qrMove = { on:false, status:'', last:null }; // last:{id,prev}
+const _qrMove = { on:false, status:'', last:null, shown:null }; // last:{id,prev} (con tira) · shown:id (solo mostrar)
 const _QRMOVE_TOPE = 'ALISTADO';
 let _qrMoveSheetLabel = '';
 let _qrMoveTimer = null;
@@ -2888,14 +2888,14 @@ function qrMoveToggle(){
   if(!label || !_qrMoveEligible(label)) return;
   if(_qrMove.on && _qrMove.status===label){ _qrMoveStop(); _qrMoveRefreshBtn(label); toast('Escaneo desactivado'); return; }
   openPin(()=>{
-    _qrMove.on=true; _qrMove.status=label; _qrMove.last=null;
+    _qrMove.on=true; _qrMove.status=label; _qrMove.last=null; _qrMove.shown=null;
     _qrMoveArmTimer();
     _filt=label; renderChips(); render();
     closeOverlay('chipSortOverlay');
     toast('📷 Escaneo activo → '+label+'. Toca 📷 para escanear.');
   });
 }
-function _qrMoveStop(){ _qrMoveClearTimer(); _qrMove.on=false; _qrMove.status=''; _qrMove.last=null; render(); }
+function _qrMoveStop(){ _qrMoveClearTimer(); _qrMove.on=false; _qrMove.status=''; _qrMove.last=null; _qrMove.shown=null; render(); }
 // Indicador persistente en la barra (junto al 🗑️): visible solo en modo escaneo.
 function _qrMoveIndicator(){
   const el=$('qrMoveInd'); if(!el) return;
@@ -2923,15 +2923,22 @@ function _qrMoveOnScan(raw){
     const cand=S.shipments.filter(s=>s.phone===phone && all.indexOf(s.status)>=0 && all.indexOf(s.status)<ti);
     if(cand.length===1) match=cand[0];
     else if(cand.length>1){ toast('⚠️ Varios pedidos con '+phone+' — usa etiqueta nueva'); return; }
-    else { const any=S.shipments.find(s=>s.phone===phone); toast(any?('⚠️ '+any.name+' ya está en '+any.status):('⚠️ '+phone+' no encontrado')); return; }
+    else {
+      // 0 candidatos que avancen. Si ya hay uno EXACTAMENTE en este estado → mostrarlo limpio.
+      const same=S.shipments.filter(s=>s.phone===phone && all.indexOf(s.status)===ti);
+      if(same.length===1){ _qrMove.last=null; _qrMove.shown=same[0].id; render(); return; }
+      const any=S.shipments.find(s=>s.phone===phone);
+      toast(any?('⚠️ '+any.name+' está en '+any.status):('⚠️ '+phone+' no encontrado')); return;
+    }
   }
   const ci=all.indexOf(match.status);
   if(ci<0){ toast('⚠️ Estado desconocido'); return; }
-  if(ci===ti){ toast('✅ '+match.name+' ya está en '+target); return; }
+  // Ya está en ese estado: sin aviso ni tira, solo mostrar ese pedido (como una búsqueda).
+  if(ci===ti){ _qrMove.last=null; _qrMove.shown=match.id; render(); return; }
   if(ci>ti){ toast('⚠️ No se puede retroceder: '+match.name+' está en '+match.status); return; }
   const prev=match.status; match.status=target;
   if(window._fbSaveShipmentNow) window._fbSaveShipmentNow(match); else save(match.id);
-  _qrMove.last={ id:match.id, prev:prev };
+  _qrMove.last={ id:match.id, prev:prev }; _qrMove.shown=match.id;
   render();
   toast('🔄 '+match.name+': '+prev+' → '+target);
 }
@@ -2950,7 +2957,7 @@ function qrMoveRevertConfirm(){
   if(!_qrMove.last || _qrMove.last.id!==id){ closeOverlay('qrRevertOverlay'); return; }
   const s=S.shipments.find(x=>x.id===id); const prev=_qrMove.last.prev;
   if(s){ s.status=prev; if(window._fbSaveShipmentNow) window._fbSaveShipmentNow(s); else save(id); }
-  _qrMove.last=null; _qrRevertId=null;
+  _qrMove.last=null; _qrMove.shown=null; _qrRevertId=null;
   render(); closeOverlay('qrRevertOverlay');
   toast('↩ Revertido a '+prev);
 }
