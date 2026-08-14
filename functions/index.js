@@ -329,6 +329,7 @@ async function handleTrack(req, res) {
     // Entrega/motorizado (internos — no autorizados para el cliente):
     "_dlvFoto", "_dlvFirma", "_dlvReceptor", "_dlvDriver",
     "_dlvDriverPhone", "_dlvRutaLink", "_dlvDone", "_dlvFecha",
+    "_dlvOrden", "_dlvAsignadoTs",
     "cotizItems", "extraccion",
     "trackingWebRawStatus", "trackingWebEstadoNormalizado",
     "trackingWebEtiquetaSugerida", "trackingWebCoincide",

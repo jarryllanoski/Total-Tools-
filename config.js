@@ -692,6 +692,16 @@ function saveShipment(){
     data._dlvDriver      = _dDrv || null;
     data._dlvDriverPhone = _dTel || null;
     data._dlvRutaLink    = _dLink ? (/^https?:\/\//i.test(_dLink) ? _dLink : (/^[a-z][a-z0-9+.-]*:/i.test(_dLink) ? null : 'https://'+_dLink)) : null;
+    // Sello del momento en que se asignó/cambió el motorizado o el link: la ruta
+    // pone arriba al último asignado. Solo se actualiza si algo cambió.
+    const _prevD = _editId ? (S.shipments.find(x=>x.id===_editId)||{}) : {};
+    const _cambio = (data._dlvDriver!==(_prevD._dlvDriver||null)) ||
+                    (data._dlvRutaLink!==(_prevD._dlvRutaLink||null));
+    if(data._dlvDriver || data._dlvRutaLink){
+      data._dlvAsignadoTs = _cambio ? Date.now() : (_prevD._dlvAsignadoTs || Date.now());
+    } else {
+      data._dlvAsignadoTs = null;   // sin motorizado → vuelve al orden por fecha
+    }
   }
   if(_editId){const idx=S.shipments.findIndex(x=>x.id===_editId);
     // Preservar campos tracking al editar

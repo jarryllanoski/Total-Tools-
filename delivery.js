@@ -21,6 +21,7 @@ var _signCtx       = null;
 var _signing       = false;
 var _tapCount      = 0;
 var _tapTimer      = null;
+var _movingId      = null; // parada "tomada" para cambiarla de posición
 
 function _esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 function _escAttr(s){ return String(s||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/'/g,'&#39;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
@@ -31,14 +32,16 @@ function _getShips(){
     return _isDelivery(s)&&s.status!=='FINALIZADO';
   });
 }
-/* Orden de la ruta = MISMO orden que las etiquetas:
-   - Base: igual que el panel/etiquetas → más reciente primero (por fecha).
-   - Si el usuario reordenó (campo numérico _dlvOrden), ese orden manda; los
-     que no tengan orden manual quedan al final en el orden base (sort estable).
-   Es la ÚNICA fuente de verdad: la usan la ruta Y la impresión de etiquetas. */
+/* Orden de la ruta (misma fuente para la ruta Y la impresión de etiquetas):
+   1) Lo movido a mano manda (_dlvOrden, queda fijado).
+   2) Si no, el ÚLTIMO al que se le puso motorizado/inDriver va arriba
+      (_dlvAsignadoTs desc).
+   3) El resto (sin motorizado), por fecha más reciente — como siempre. */
 function _orderShips(list){
   var base=(list||[]).slice().sort(function(a,b){
-    return String(b.date||'').localeCompare(String(a.date||''));
+    var ta=+a._dlvAsignadoTs||0, tb=+b._dlvAsignadoTs||0;
+    if(ta!==tb) return tb-ta;                                  // asignado reciente arriba
+    return String(b.date||'').localeCompare(String(a.date||'')); // luego por fecha
   });
   if(!base.some(function(s){return typeof s._dlvOrden==='number';})) return base;
   return base.sort(function(a,b){
@@ -66,39 +69,19 @@ function _css(){
     '@media(max-width:599px){#dlvPanel{width:100%;border-left:none}}'+
     '#dlvHdr{background:#1c2333;padding:12px 16px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #30363d;flex-shrink:0}'+
     '#dlvBody{flex:1;overflow-y:auto;padding:12px 14px;-webkit-overflow-scrolling:touch}'+
-    '.dlvc{background:#0d1117;border:1px solid #30363d;border-radius:11px;margin-bottom:9px;overflow:hidden}'+
-    /* ENCABEZADO en columna: fila superior (num+nombre+entregar) + meta (tel·fecha·monto) */
-    '.dlvc-hdr{display:flex;flex-direction:column;gap:7px;padding:10px 12px;border-bottom:1px solid #30363d}'+
-    '.dlvc-hdr-top{display:flex;align-items:center;gap:8px}'+
-    '.dlvc-num{width:24px;height:24px;border-radius:50%;background:var(--blue);color:#fff;font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0}'+
-    '.dlvc-name{flex:1;font-size:13px;font-weight:700;color:#e6edf3;line-height:1.3;min-width:0}'+
-    '.dlvc-entr{padding:6px 11px;border-radius:8px;border:none;background:linear-gradient(135deg,var(--green),#1a7f37);color:#fff;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap}'+
-    '.dlvc-headmeta{display:flex;align-items:center;gap:5px 10px;flex-wrap:wrap;padding-left:32px}'+
-    '.dlvc-headmeta span{font-size:11px;color:#8b949e}'+
-    '.dlvc-phone{color:var(--blue)!important;font-weight:700;cursor:pointer;-webkit-tap-highlight-color:transparent}'+
-    '.dlvc-body{padding:10px 12px}'+
-    /* Chips de link (reusa .link-chip del panel) */
-    '.dlvc-links{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px}'+
-    /* Dirección: color normal, clickable a Maps, con pin solo si hay GPS */
-    '.dlvc-addr-row{display:flex;align-items:flex-start;gap:6px;margin-bottom:8px}'+
-    '.dlvc-addr{flex:1;font-size:12px;color:#c9d1d9;line-height:1.5;cursor:pointer;-webkit-tap-highlight-color:transparent}'+
-    '.dlvc-pin{flex-shrink:0;background:rgba(56,139,253,.12);border:1px solid rgba(56,139,253,.3);border-radius:7px;color:var(--blue);font-size:13px;line-height:1;padding:4px 7px;cursor:pointer;font-family:inherit}'+
-    /* Bloque MOTORIZADO / INDRIVER — estilo recuadro como Guía Shalom (solo lectura) */
-    '.dlvc-drvbox{background:rgba(163,113,247,.06);border:1px solid rgba(163,113,247,.22);border-radius:9px;padding:9px 10px;margin-bottom:8px}'+
-    '.dlvc-drvbox-ttl{font-size:9.5px;font-weight:700;color:#a371f7;letter-spacing:.7px;text-transform:uppercase;margin-bottom:5px}'+
-    '.dlvc-drvbox-row{display:flex;align-items:center;gap:8px}'+
-    '.dlvc-drvbox-info{flex:1;min-width:0}'+
-    '.dlvc-drvbox-name{font-size:12.5px;font-weight:700;color:#e6edf3;line-height:1.3}'+
-    '.dlvc-drvbox-empty{font-size:11.5px;color:#6e7681;font-style:italic}'+
-    /* PARTE BAJA: estado del pedido + botón editar */
-    '.dlvc-foot{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 12px;border-top:1px solid #30363d}'+
-    '.dlvc-status{font-size:11px;font-weight:700;padding:3px 9px;border-radius:20px;background:rgba(245,158,11,.12);color:#f59e0b}'+
-    '.dlvc-status.done{background:rgba(46,160,67,.15);color:var(--green)}'+
-    '.dlvc-edit{display:flex;align-items:center;gap:5px;padding:6px 12px;border-radius:8px;border:1px solid #30363d;background:#1c2333;color:#c9d1d9;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap}'+
-    /* Reordenar parada (mover orden de entrega) */
-    '.dlvc-foot-r{display:flex;align-items:center;gap:6px}'+
-    '.dlvc-ord{width:28px;height:28px;display:flex;align-items:center;justify-content:center;border-radius:7px;border:1px solid #30363d;background:#1c2333;color:#c9d1d9;font-size:12px;cursor:pointer;font-family:inherit;line-height:1}'+
-    '.dlvc-ord:disabled{opacity:.3;cursor:default}'+
+    /* La tarjeta reusa .card/.cname/.card-meta/.card-addr/.card-actions/.btn-st/
+       .btn-edit del panel principal. Aquí solo lo exclusivo de la ruta. */
+    '.dlv-card{background:#0d1117;border:1px solid #30363d;border-radius:11px;margin-bottom:9px}'+
+    '.dlv-card.dlv-moving{border-color:var(--blue);box-shadow:0 0 0 2px rgba(56,139,253,.25)}'+
+    '.dlv-num{width:24px;height:24px;border-radius:50%;background:var(--blue);color:#fff;font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;cursor:pointer;-webkit-tap-highlight-color:transparent}'+
+    '.dlv-num.on{background:#fff;color:var(--blue);box-shadow:0 0 0 2px var(--blue)}'+
+    '.dlv-entr{padding:6px 11px;border-radius:8px;border:none;background:linear-gradient(135deg,var(--green),#1a7f37);color:#fff;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap}'+
+    '.dlv-pin{flex-shrink:0;background:rgba(56,139,253,.12);border:1px solid rgba(56,139,253,.3);border-radius:7px;color:var(--blue);font-size:13px;line-height:1;padding:4px 7px;cursor:pointer;font-family:inherit}'+
+    /* Modo mover: franjas "Colocar aquí" entre tarjetas */
+    '.dlv-drop{margin:6px 0;padding:10px;border:1.5px dashed rgba(56,139,253,.55);border-radius:9px;background:rgba(56,139,253,.07);color:var(--blue);font-size:12px;font-weight:700;text-align:center;cursor:pointer}'+
+    '.dlv-drop:active{background:rgba(56,139,253,.18)}'+
+    '.dlv-movebar{background:rgba(56,139,253,.12);border:1px solid rgba(56,139,253,.35);border-radius:9px;padding:9px 12px;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:12px;color:var(--blue);font-weight:700}'+
+    '.dlv-movebar button{background:none;border:none;color:#8b949e;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit}'+
     '#dlvConfOv{display:none;position:fixed;inset:0;background:rgba(0,0,0,.88);z-index:900;align-items:flex-end;justify-content:center}'+
     '#dlvConfOv.open{display:flex}'+
     '.dlv-sheet{background:#161b22;border-radius:16px 16px 0 0;padding:18px;width:100%;max-width:480px;border:1px solid #30363d;animation:dlvUp .2s ease;max-height:88vh;overflow-y:auto}'+
@@ -175,77 +158,76 @@ function _render(){
     return;
   }
 
-  list.innerHTML=ships.map(function(s,i){
-    var drv=s._dlvDriver||'';
-    var drvPhone=s._dlvDriverPhone||'';
-    var rutaLink=s._dlvRutaLink||'';
+  // Si la parada tomada ya no está en la lista (se entregó, etc.), salir del modo.
+  if(_movingId && !ships.some(function(x){return x.id===_movingId;})) _movingId=null;
+
+  // Zona "Colocar aquí" del modo mover (solo cuando hay una parada tomada).
+  function _dropZone(pos){
+    if(!_movingId) return '';
+    return '<div class="dlv-drop" onclick="DeliveryModule.soltarEn('+pos+')">⬇ Colocar aquí</div>';
+  }
+
+  var html='';
+  if(_movingId){
+    var mv=ships.filter(function(x){return x.id===_movingId;})[0];
+    html+='<div class="dlv-movebar"><span>↕️ Moviendo: '+_esc(mv?mv.name:'')+'</span>'+
+          '<button onclick="DeliveryModule.cancelarMover()">Cancelar</button></div>';
+  }
+  ships.forEach(function(s,i){
+    html+=_dropZone(i);
+
     var isDone=!!s._dlvDone;
+    var moving=(_movingId===s.id);
     var addr=[s.address,s.referencia].filter(Boolean).join(' · ')||'—';
     var hasGps=!!s.gpsCoords;
 
-    // Chips de link del cliente (apisale, etc.) — abren en pestaña nueva como en el panel
+    // Chips de link del cliente (apisale, etc.) — mismo chip que el panel
     var linksHtml=(s.links||[]).map(function(l){
       return '<a href="'+_escAttr(l.u)+'" target="_blank" rel="noopener" class="link-chip" style="text-decoration:none">🔗 '+_esc(l.n||'Link')+'</a>';
     }).join('');
 
-    // Bloque MOTORIZADO / INDRIVER (solo lectura, estilo recuadro como Guía Shalom).
-    // Nombre · número(tap→llamar/WA) + chip inDriver al costado. Se edita en ✏️ Editar.
-    var drvNum=drvPhone
-      ?' <span class="dlvc-phone" style="font-size:11.5px" onclick="DeliveryModule._phoneActions(\''+_esc(drvPhone)+'\')">· '+_esc(drvPhone)+'</span>'
-      :'';
-    var indriverChip=rutaLink
-      ?'<a href="'+_escAttr(rutaLink)+'" target="_blank" rel="noopener" class="link-chip" style="text-decoration:none;flex-shrink:0">🔗 inDriver</a>'
-      :'';
-    var drvBox=
-      '<div class="dlvc-drvbox">'+
-        '<div class="dlvc-drvbox-ttl">🛵 Motorizado / inDriver</div>'+
-        '<div class="dlvc-drvbox-row">'+
-          '<div class="dlvc-drvbox-info">'+
-            (drv
-              ?'<span class="dlvc-drvbox-name">'+_esc(drv)+'</span>'+drvNum
-              :'<span class="dlvc-drvbox-empty">Sin asignar — toca ✏️ Editar</span>')+
-          '</div>'+
-          indriverChip+
-        '</div>'+
-      '</div>';
+    // Bloque MOTORIZADO: la MISMA función que pinta la tarjeta del panel principal
+    // (fuente única) → se ve idéntico en los dos lados.
+    var drvBox=(!isDone && typeof global.dlvDriverBlock==='function') ? global.dlvDriverBlock(s) : '';
 
-    return '<div class="dlvc">'+
-      // ENCABEZADO: fila superior (num+nombre+entregar) + meta (tel·fecha·monto) debajo del nombre
-      '<div class="dlvc-hdr">'+
-        '<div class="dlvc-hdr-top">'+
-          '<div class="dlvc-num" style="background:'+(isDone?'var(--green)':'var(--blue)')+'">'+(isDone?'✓':(i+1))+'</div>'+
-          '<div class="dlvc-name">'+_esc(s.name)+'</div>'+
-          (!isDone
-            ?'<button class="dlvc-entr" onclick="DeliveryModule._openConf(\''+s.id+'\')">📦 Entregar</button>'
-            :'<span style="font-size:11px;color:var(--green);font-weight:700;white-space:nowrap">✅ Listo</span>')+
-        '</div>'+
-        '<div class="dlvc-headmeta">'+
-          '<span class="dlvc-phone" onclick="DeliveryModule._phoneActions(\''+_esc(s.phone||'')+'\')">📞 '+_esc(s.phone||'—')+'</span>'+
-          (s.date?'<span>📅 '+_esc(s.date)+'</span>':'')+
-          (s.cost?'<span>S/ '+_esc(s.cost)+'</span>':'')+
-        '</div>'+
+    // Estado: mismo botón/colores del panel (stClass/stIcon) — sin texto cortado.
+    var stCls=(typeof global.stClass==='function')?global.stClass(s.status):'';
+    var stIco=(typeof global.stIcon==='function')?global.stIcon(s.status):'🏷️';
+    var estadoHtml=isDone
+      ? '<button class="btn-st st-ent" style="cursor:default">✅ ENTREGADO</button>'
+      : '<button class="btn-st '+stCls+'" style="cursor:default">'+stIco+' '+_esc(s.status||'—')+'</button>';
+
+    html+='<div class="card dlv-card'+(moving?' dlv-moving':'')+'">'+
+      // Cabecera: número de parada (toca para mover) + nombre + Entregar
+      '<div class="card-top">'+
+        '<div class="dlv-num'+(moving?' on':'')+'" onclick="DeliveryModule.tomar(\''+s.id+'\')" title="Tocar para cambiar de posición">'+(isDone?'✓':(i+1))+'</div>'+
+        '<div class="cname">'+_esc(s.name)+'</div>'+
+        (!isDone
+          ?'<button class="dlv-entr" onclick="DeliveryModule._openConf(\''+s.id+'\')">📦 Entregar</button>'
+          :'<span style="font-size:11px;color:var(--green);font-weight:700;white-space:nowrap">✅ Listo</span>')+
       '</div>'+
-      // CUERPO: dirección, link y bloque motorizado
-      '<div class="dlvc-body">'+
-        '<div class="dlvc-addr-row">'+
-          '<span class="dlvc-addr" onclick="DeliveryModule._openMaps(\''+s.id+'\')">🏠 '+_esc(addr)+'</span>'+
-          (hasGps?'<button class="dlvc-pin" onclick="DeliveryModule._openMaps(\''+s.id+'\')" title="Ubicación GPS (usar mi ubicación)">📍</button>':'')+
-        '</div>'+
-        (linksHtml?'<div class="dlvc-links">'+linksHtml+'</div>':'')+
-        // Recuadro de motorizado SOLO si hay uno asignado; si no, basta el botón Editar.
-        (!isDone && drv ?drvBox:'')+
+      // Meta: teléfono · fecha · monto (mismas clases del panel)
+      '<div class="card-meta">'+
+        '<span class="meta" style="cursor:pointer" onclick="DeliveryModule._phoneActions(\''+_esc(s.phone||'')+'\')">📞 '+_esc(s.phone||'—')+'</span>'+
+        (s.date?'<span class="meta" style="color:var(--text2)">📅 '+_esc(s.date)+'</span>':'')+
+        (s.cost?'<span class="meta" style="color:var(--text2)">💰 S/ '+_esc(s.cost)+'</span>':'')+
       '</div>'+
-      // PARTE BAJA: estado + reordenar (▲▼) + botón editar (siempre visible)
-      '<div class="dlvc-foot">'+
-        '<span class="dlvc-status'+(isDone?' done':'')+'">'+_esc(isDone?'ENTREGADO':(s.status||'—'))+'</span>'+
-        '<div class="dlvc-foot-r">'+
-          '<button class="dlvc-ord" onclick="DeliveryModule._move(\''+s.id+'\',-1)" title="Subir parada"'+(i===0?' disabled':'')+'>▲</button>'+
-          '<button class="dlvc-ord" onclick="DeliveryModule._move(\''+s.id+'\',1)" title="Bajar parada"'+(i===ships.length-1?' disabled':'')+'>▼</button>'+
-          '<button class="dlvc-edit" onclick="DeliveryModule.editar(\''+s.id+'\')" title="Editar pedido">✏️ Editar</button>'+
-        '</div>'+
+      // Dirección (toca → Maps) + pin si hay GPS
+      '<div style="display:flex;align-items:flex-start;gap:6px">'+
+        '<div class="card-addr" style="flex:1;cursor:pointer" onclick="DeliveryModule._openMaps(\''+s.id+'\')">🏠 '+_esc(addr)+'</div>'+
+        (hasGps?'<button class="dlv-pin" onclick="DeliveryModule._openMaps(\''+s.id+'\')" title="Ubicación GPS">📍</button>':'')+
+      '</div>'+
+      (linksHtml?'<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:7px">'+linksHtml+'</div>':'')+
+      drvBox+
+      // Acciones: estado + editar (mismas clases del panel)
+      '<div class="card-actions">'+
+        estadoHtml+
+        '<button class="btn-edit" onclick="DeliveryModule.editar(\''+s.id+'\')" title="Editar pedido">✏️</button>'+
       '</div>'+
     '</div>';
-  }).join('');
+  });
+  html+=_dropZone(ships.length);
+  list.innerHTML=html;
 }
 
 /* ── Editar pedido — reusa el modal de edición del panel principal ──
@@ -256,22 +238,33 @@ DeliveryModule.editar=function(id){
   else if(typeof global.toast==='function') global.toast('Abre el pedido desde el panel');
 };
 
-/* ── Reordenar parada (mover orden de entrega) ───────────────────── */
-// Normaliza _dlvOrden a 0..n-1 en el nuevo orden y guarda SOLO los que cambian.
-// Es la fuente de verdad compartida con la impresión de etiquetas.
-DeliveryModule._move=function(id,dir){
+/* ── Reordenar: tocar el número → tocar "Colocar aquí" ───────────── */
+// Sin gestos (no pelea con el scroll) y funciona igual con listas largas.
+// Normaliza _dlvOrden a 0..n-1 y guarda SOLO los que cambian; es la fuente de
+// verdad compartida con la impresión de etiquetas.
+DeliveryModule.tomar=function(id){
+  _movingId=(_movingId===id)?null:id;   // volver a tocar el número = cancelar
+  _render();
+};
+DeliveryModule.cancelarMover=function(){ _movingId=null; _render(); };
+DeliveryModule.soltarEn=function(pos){
+  if(!_movingId) return;
   var arr=_orderShips(_getShips());
-  var i=-1; for(var k=0;k<arr.length;k++){ if(arr[k].id===id){ i=k; break; } }
-  if(i<0) return;
-  var j=i+dir; if(j<0||j>=arr.length) return;
-  var tmp=arr[i]; arr[i]=arr[j]; arr[j]=tmp;
+  var from=-1; for(var k=0;k<arr.length;k++){ if(arr[k].id===_movingId){ from=k; break; } }
+  if(from<0){ _movingId=null; _render(); return; }
+  var it=arr.splice(from,1)[0];
+  var to=(pos>from)?pos-1:pos;          // ajustar índice tras sacar el elemento
+  if(to<0) to=0; if(to>arr.length) to=arr.length;
+  arr.splice(to,0,it);
   arr.forEach(function(s,idx){
     if(s._dlvOrden!==idx){
       s._dlvOrden=idx;
       if(typeof global._fbSaveShipmentNow==='function')global._fbSaveShipmentNow(s);
     }
   });
+  _movingId=null;
   _render();
+  if(typeof global.toast==='function')global.toast('✅ Parada '+(to+1));
 };
 
 // Orden de ruta expuesto para que la impresión de etiquetas DELIVERY coincida.
