@@ -87,7 +87,17 @@ Alertas.calcular = function(){
 /* ── Estado del sistema (latido que escribe el backend) ──────────────
    Viaja dentro de panel/config, que el panel ya descarga en cada poll → se
    lee sin una sola lectura extra. */
-function _salud(){ return (global.S && global.S.salud) || null; }
+// El latido llega por lectura directa a demanda (1 lectura), no por el poll
+// pesado del panel. Se refresca al abrir el centro y cada 10 min en segundo
+// plano, para que el icono se ponga rojo aunque no estés mirando.
+var _saludCache = null;
+function _salud(){ return _saludCache || (global.S && global.S.salud) || null; }
+Alertas.cargarSalud = async function(){
+  if (typeof global._fbLeerSalud !== 'function') return null;
+  var s = await global._fbLeerSalud();
+  if (s) { _saludCache = s; Alertas.refrescar(); }
+  return s;
+};
 
 function _haceCuanto(iso){
   var t = Date.parse(iso || '');
@@ -287,7 +297,9 @@ function _sistemaHtml(){
   '</div>';
 }
 
-Alertas.abrir = function(){
+// sinTraer=true → solo repinta (no vuelve a leer el latido). Evita el bucle
+// abrir→leer→abrir que dispararía lecturas sin fin.
+Alertas.abrir = function(sinTraer){
   _montarPanel();
   var a = Alertas.calcular();
   var body = document.getElementById('alertasBody');
@@ -302,6 +314,13 @@ Alertas.abrir = function(){
     body.innerHTML = atencion + _sistemaHtml() + _eventosHtml();
   }
   global.openOverlay('alertasOverlay');
+  // Traer el latido fresco (1 lectura) y repintar UNA vez, sin volver a leer.
+  if (!sinTraer) {
+    Alertas.cargarSalud().then(function(s){
+      var ov = document.getElementById('alertasOverlay');
+      if (s && ov && ov.classList.contains('open')) Alertas.abrir(true);
+    }).catch(function(){});
+  }
 };
 
 /* Botones del bloque de sistema — reusan las funciones del panel. */
@@ -317,8 +336,8 @@ Alertas.reprogramar = async function(btn){
   if (btn) { btn.disabled = true; btn.textContent = '⏳…'; }
   var r = await global.reprogramarColaShalom();
   if (r && r.ok && global.toast) global.toast('✅ Cola: ' + r.enCola + ' pedidos');
-  Alertas.abrir();
-  Alertas.refrescar();
+  await Alertas.cargarSalud();   // latido fresco tras reprogramar
+  Alertas.abrir(true);
 };
 
 // Tocar una alerta → abrir ese pedido.
@@ -341,6 +360,10 @@ Alertas.guardarDias = function(v){
 /* ── Init ────────────────────────────────────────────────────────── */
 Alertas.init = function(){
   _css(); _montarIcono(); _montarPanel(); Alertas.refrescar();
+  // Latido en segundo plano: 1 lectura al arrancar y cada 10 min (≈144/día,
+  // insignificante) para que el icono avise si el seguimiento se cayó.
+  setTimeout(function(){ Alertas.cargarSalud(); }, 3000);
+  setInterval(function(){ Alertas.cargarSalud(); }, 600000);
 };
 
 global.Alertas = Alertas;

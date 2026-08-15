@@ -124,6 +124,14 @@
     return all;
   }
   window._fsList = fsList; // ★ exponer globalmente para tokens
+  // Latido de salud a demanda: UNA lectura del doc de config, sin arrastrar la
+  // recarga completa de pedidos. El poll normal solo recarga cuando cambia `ts`
+  // (que el backend NO toca al escribir el latido) — y hacer que lo tocara
+  // obligaría a releer los ~700 pedidos cada 30 min, justo lo que se optimizó.
+  window._fbLeerSalud = async () => {
+    try{ const cfg = await fsGet(cfgPath()); return (cfg && cfg.salud) || null; }
+    catch(e){ return null; }
+  };
   // ── Strip images for cloud (too heavy) ───────────────────────────────
   function _slimDoc(doc){
     if(!doc) return null;
@@ -3167,7 +3175,7 @@ render();
 <script src="respaldo.js?v=1"></script>
 <script src="ayuda.js?v=2"></script>
 <script src="dashboard.js?v=2"></script>
-<script src="alertas.js?v=2"></script>
+<script src="alertas.js?v=3"></script>
 <script src="voz.js?v=2"></script>
 <script src="cotizacion.js?v=1"></script>
 <script>
