@@ -401,6 +401,7 @@ function safeTrackField(v) {
 // Ruta: panel/rateLimits/items/{fn_ip_window} — cubierta por rules actuales
 const RATE_LIMITS = {
   agenciasShalom: {windowMs: 60000, max: 100},
+  agenciasOlva: {windowMs: 60000, max: 100},
   shalomTracking: {windowMs: 60000, max: 150},
   shalomTicket: {windowMs: 60000, max: 50},
   formApi_create: {windowMs: 60000, max: 10},
@@ -514,6 +515,108 @@ exports.shalomListar = onRequest(
         res.status(e && e.status ? e.status : 502).json({
           error: "No se pudo obtener el listado de agencias.",
           motivo: motivo,
+        });
+      }
+    },
+);
+
+// ── FUNCIONES OLVA ───────────────────────────────────────────────────────
+// Mismo patron que Shalom (proxy servidor → JSON local → buscador vivo), pero
+// SIN clave: el endpoint del sitio de Olva es publico y abierto.
+// ──────────────────────────────────────────────────────────────────────────
+const OLVA_STORES_URL =
+  "https://www.olvacourier.com/wp-admin/admin-ajax.php?action=get_olva_stores";
+
+/**
+ * Trae el catalogo COMPLETO de agencias Olva (publico, sin clave).
+ * Desenvuelve el sobre estandar de WordPress AJAX: {success, data}, donde
+ * `data` puede venir como array directo o anidado en `data.data` (asi lo
+ * maneja el propio script.js de Olva).
+ * @return {Promise<Array>} lista de agencias crudas
+ */
+async function olvaFetchAll() {
+  const r = await fetch(OLVA_STORES_URL, {signal: AbortSignal.timeout(90000)});
+  if (!r.ok) {
+    const err = new Error(`Olva ${r.status}`);
+    err.status = r.status;
+    throw err;
+  }
+  const body = await r.json();
+  if (!body || body.success !== true) {
+    throw new Error((body && body.data && body.data.message) ||
+      "Respuesta invalida de Olva");
+  }
+  const stores = body.data;
+  if (stores && Array.isArray(stores.data)) return stores.data;
+  if (Array.isArray(stores)) return stores;
+  return [];
+}
+
+// ── olvaListar ──────────────────────────────────────────────────────────
+// GET → listado completo de agencias Olva. Caller: agencias-extractor.js.
+exports.olvaListar = onRequest(
+    {region: "us-central1", timeoutSeconds: 120, memory: "512MiB"},
+    async (req, res) => {
+      setCORS(req, res);
+      if (req.method === "OPTIONS") {
+        res.status(204).send(""); return;
+      }
+      try {
+        const lista = await olvaFetchAll();
+        res.set("Cache-Control", "no-store");
+        res.status(200).json({data: lista});
+      } catch (e) {
+        console.error("olvaListar error:", e);
+        const esTimeout = e && (e.name === "TimeoutError" ||
+          e.name === "AbortError");
+        const motivo = esTimeout ?
+          "Olva tardo demasiado en responder (mas de 90 s)." :
+          (e && e.status ?
+            "Olva respondio " + e.status :
+            "No se pudo conectar con Olva: " +
+              String((e && e.message) || e).slice(0, 120));
+        res.status(e && e.status ? e.status : 502).json({
+          error: "No se pudo obtener el listado de agencias.",
+          motivo: motivo,
+        });
+      }
+    },
+);
+
+// ── agenciasOlva ────────────────────────────────────────────────────────
+// GET ?q=TEXTO → filtra en memoria (el endpoint de Olva no soporta busqueda
+// server-side, asi que se filtra aqui sobre el catalogo completo).
+// GET          → listado completo.
+// Caller: formulario.html — buscador publico de agencias (fallback en vivo).
+exports.agenciasOlva = onRequest(
+    {region: "us-central1", timeoutSeconds: 60},
+    async (req, res) => {
+      setCORS(req, res);
+      if (req.method === "OPTIONS") {
+        res.status(204).send(""); return;
+      }
+      if (!(await checkRateLimit("agenciasOlva", req))) {
+        res.status(429).json({
+          error: true,
+          message: "Demasiadas solicitudes. Intenta nuevamente en un minuto.",
+        });
+        return;
+      }
+      try {
+        const q = (req.query.q || "").trim().slice(0, 100).toLowerCase();
+        let lista = await olvaFetchAll();
+        if (q) {
+          lista = lista.filter((a) => [
+            a.nombres, a.direccion, a.department, a.province, a.district,
+          ].some((f) => String(f || "").toLowerCase().includes(q)));
+        }
+        res.set("Cache-Control", "no-store");
+        res.json({resultados: lista});
+      } catch (e) {
+        console.error("agenciasOlva error:", e);
+        res.status(e.status || 500).json({
+          error: true,
+          message: "No se pudo cargar agencias. Intenta nuevamente.",
         });
       }
     },

@@ -1,46 +1,31 @@
 /**
- * agencias-extractor.js — Extractor de agencias Shalom (sección Config)
+ * agencias-extractor.js — Extractor de agencias (sección Config)
  * =====================================================================
- * Agrega un bloque en Config (#page-configurar) que:
- *   1. Llama a la Cloud Function "shalomListar" (la API key va segura en el servidor).
- *   2. Trae TODAS las agencias desde GET /api/listar.
- *   3. Las convierte al formato que usa tu búsqueda local (nombre, distrito,
- *      provincia, departamento, direccion, telefono, horario...).
+ * Agrega en Config (#page-configurar) un bloque POR CADA courier con
+ * catálogo propio (hoy: Shalom y Olva, en ese orden). Cada bloque:
+ *   1. Llama a su Cloud Function (la key/URL va segura en el servidor).
+ *   2. Trae TODAS las agencias.
+ *   3. Las convierte al MISMO formato que usa la búsqueda del formulario
+ *      (nombre, distrito, provincia, departamento, direccion, telefono,
+ *      horario...) — un solo esquema, sin importar el courier de origen.
  *   4. Muestra cuántas agencias se extrajeron.
- *   5. Te deja descargar "agencias-shalom.json" para subir a la carpeta data/.
+ *   5. Te deja descargar el JSON para subir a la carpeta data/.
+ *
+ * Agregar un courier nuevo = un objeto más en COURIERS. Nada más.
  *
  * Reglas respetadas:
  *   - Módulo independiente. Solo agregar <script src="agencias-extractor.js"></script>
  *   - SIN MutationObserver.
  *   - No toca ninguna otra funcionalidad.
- *
- * Requiere desplegar la función shalomListar (igual que shalomTicket).
  */
 (function (global) {
   'use strict';
 
-  var CFG = {
-    // Cloud Function que esconde la API key (mismo patrón que el ticket)
-    FUNCTION_URL: 'https://us-central1-total-tools-24ce8.cloudfunctions.net/shalomListar',
-    OUT_FILE: 'agencias-shalom.json'
-  };
+  function _txt(s) { return String(s == null ? '' : s).trim(); }
 
-  var _ultimoJSON = null;
-
-  function _toast(m) { if (typeof global.toast === 'function') global.toast(m); }
-  function _txt(s)   { return String(s == null ? '' : s).trim(); }
-
-  function _setEstado(html, color) {
-    var el = document.getElementById('agExtractorEstado');
-    if (!el) return;
-    el.style.display = 'block';
-    el.style.color = color || '#8b949e';
-    el.innerHTML = html;
-  }
-
-  /* Mapea agencia cruda de Shalom al formato que espera la búsqueda local.
+  /* Mapea agencia cruda de Shalom al esquema común.
      Acepta nombres crudos (lugar_over, zona, hora_atencion) o ya adaptados. */
-  function _mapAgencia(raw) {
+  function _mapShalom(raw) {
     return {
       ter_id:       _txt(raw.ter_id || raw.id),
       nombre:       _txt(raw.nombre || raw.lugar_over || raw.nombre_agencia),
@@ -57,21 +42,82 @@
     };
   }
 
+  /* Mapea agencia cruda de Olva (department/province/district/lat/lng/horario
+     por día) al MISMO esquema común que Shalom, para que la búsqueda del
+     formulario funcione idéntico sin importar el courier. */
+  var _DIAS_HORARIO = ['monday','tuesday','wednesday','thursday','friday'];
+  function _mapOlva(raw) {
+    var h = raw.horario;
+    var horario = '';
+    if (h && typeof h === 'object') {
+      var lv = _DIAS_HORARIO.map(function (d) { return h[d]; })
+        .find(function (d) { return d && d.open && d.close; });
+      if (lv) horario = 'L-V ' + lv.open + '-' + lv.close;
+      var sab = h.saturday;
+      if (sab && sab.open && sab.close) horario += (horario ? ' · ' : '') + 'S ' + sab.open + '-' + sab.close;
+    }
+    var lat = parseFloat(raw.lat), lng = parseFloat(raw.lng);
+    return {
+      ter_id:       _txt(raw.id || raw.ID),
+      nombre:       _txt(raw.nombres),
+      departamento: _txt(raw.department),
+      provincia:    _txt(raw.province),
+      distrito:     _txt(raw.district),
+      direccion:    _txt(raw.direccion),
+      referencia:   '',
+      telefono:     _txt(raw.telefono || raw.phone),
+      horario:      horario,
+      horarioDom:   '',
+      latitud:      (isFinite(lat) && lat) ? String(lat) : '',
+      longitud:     (isFinite(lng) && lng) ? String(lng) : ''
+    };
+  }
+
+  /* Un objeto por courier con catálogo propio. Orden = orden en pantalla. */
+  var COURIERS = [
+    {
+      key: 'shalom', label: 'Shalom',
+      functionUrl: 'https://us-central1-total-tools-24ce8.cloudfunctions.net/shalomListar',
+      outFile: 'agencias-shalom.json',
+      mapper: _mapShalom
+    },
+    {
+      key: 'olva', label: 'Olva',
+      functionUrl: 'https://us-central1-total-tools-24ce8.cloudfunctions.net/olvaListar',
+      outFile: 'agencias-olva.json',
+      mapper: _mapOlva
+    }
+  ];
+
+  var _ultimoJSON = {}; // por courier.key
+
+  function _toast(m) { if (typeof global.toast === 'function') global.toast(m); }
+
+  function _setEstado(key, html, color) {
+    var el = document.getElementById('agExtractorEstado_' + key);
+    if (!el) return;
+    el.style.display = 'block';
+    el.style.color = color || '#8b949e';
+    el.innerHTML = html;
+  }
+
   var AgenciasExtractor = {};
 
-  AgenciasExtractor.extraer = async function () {
-    var btn = document.getElementById('agExtractorBtn');
+  AgenciasExtractor.extraer = async function (key) {
+    var c = COURIERS.find(function (x) { return x.key === key; });
+    if (!c) return;
+    var btn = document.getElementById('agExtractorBtn_' + key);
     if (btn) { btn.disabled = true; btn.textContent = '⏳ Extrayendo...'; }
-    _setEstado('⏳ Consultando todas las agencias de Shalom...', '#8b949e');
-    var dl = document.getElementById('agExtractorDl');
+    _setEstado(key, '⏳ Consultando todas las agencias de ' + c.label + '...', '#8b949e');
+    var dl = document.getElementById('agExtractorDl_' + key);
     if (dl) dl.style.display = 'none';
-    _ultimoJSON = null;
+    _ultimoJSON[key] = null;
 
     try {
       // Leer SIEMPRE el cuerpo: la función devuelve el motivo real del fallo
-      // (corte por tiempo, respuesta de Shalom con su código, o red). Antes se
-      // perdía y solo quedaba un "HTTP 500" sin causa.
-      var r = await fetch(CFG.FUNCTION_URL);
+      // (corte por tiempo, respuesta upstream con su código, o red). Sin esto
+      // solo se ve un "HTTP 500" sin causa.
+      var r = await fetch(c.functionUrl);
       var data = null;
       try { data = await r.json(); } catch (e) { data = null; }
       if (!r.ok) {
@@ -83,74 +129,81 @@
                   (Array.isArray(data) ? data : []);
       if (!Array.isArray(lista)) lista = [];
 
-      var agencias = lista.map(_mapAgencia).filter(function (a) { return a.nombre; });
+      var agencias = lista.map(c.mapper).filter(function (a) { return a.nombre; });
 
       if (!agencias.length) {
-        _setEstado('⚠️ La función respondió pero sin agencias. Revisa el endpoint /api/listar.', '#f59e0b');
+        _setEstado(key, '⚠️ La función respondió pero sin agencias. Revisa el endpoint de origen.', '#f59e0b');
         return;
       }
 
-      _ultimoJSON = {
+      _ultimoJSON[key] = {
         meta: { total: agencias.length, generado: new Date().toISOString() },
         agencias: agencias
       };
 
-      _setEstado(
+      _setEstado(key,
         '✅ <b style="color:#22c55e">' + agencias.length + ' agencias</b> extraídas correctamente.<br>' +
         '<span style="font-size:11px;color:#8b949e">Descarga el archivo y súbelo a la carpeta <b>data/</b> de tu repo (reemplaza el actual).</span>',
         '#e6edf3'
       );
       if (dl) dl.style.display = 'block';
-      _toast('✅ ' + agencias.length + ' agencias extraídas');
+      _toast('✅ ' + agencias.length + ' agencias de ' + c.label + ' extraídas');
 
     } catch (e) {
-      _setEstado('❌ No se pudo extraer<br><span style="font-size:11.5px">' +
+      _setEstado(key, '❌ No se pudo extraer<br><span style="font-size:11.5px">' +
                  String(e.message || 'error') + '</span>' +
-                 '<br><span style="font-size:11px;color:#8b949e">Si dice que Shalom tardó o respondió con error, es de su lado — reintenta en unos minutos.</span>', '#f87171');
-      console.warn('[AgenciasExtractor]', e);
+                 '<br><span style="font-size:11px;color:#8b949e">Si dice que tardó o respondió con error, es del lado de ' + c.label + ' — reintenta en unos minutos.</span>', '#f87171');
+      console.warn('[AgenciasExtractor]', key, e);
     } finally {
       if (btn) { btn.disabled = false; btn.textContent = '📥 Extraer agencias'; }
     }
   };
 
-  AgenciasExtractor.descargar = function () {
-    if (!_ultimoJSON) { _toast('Primero extrae las agencias'); return; }
-    var blob = new Blob([JSON.stringify(_ultimoJSON, null, 2)], { type: 'application/json' });
+  AgenciasExtractor.descargar = function (key) {
+    var c = COURIERS.find(function (x) { return x.key === key; });
+    if (!c) return;
+    if (!_ultimoJSON[key]) { _toast('Primero extrae las agencias'); return; }
+    var blob = new Blob([JSON.stringify(_ultimoJSON[key], null, 2)], { type: 'application/json' });
     var url = URL.createObjectURL(blob);
     var a = document.createElement('a');
     a.href = url;
-    a.download = CFG.OUT_FILE;
+    a.download = c.outFile;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     setTimeout(function () { URL.revokeObjectURL(url); }, 1500);
   };
 
-  /* ── Inyectar el bloque en la sección Config ─────────────────────── */
+  /* ── Inyectar un bloque por courier en la sección Config ──────────── */
+  function _seccionHtml(c) {
+    return (
+      '<div class="cfg-ttl">🏢 Agencias ' + c.label + ' (offline)</div>' +
+      '<div style="font-size:11px;color:#8b949e;line-height:1.5;margin-bottom:10px">' +
+        'Extrae todas las agencias de ' + c.label + ' para buscarlas sin gastar API en cada búsqueda.</div>' +
+      '<button id="agExtractorBtn_' + c.key + '" type="button" onclick="AgenciasExtractor.extraer(\'' + c.key + '\')" ' +
+        'style="width:100%;padding:11px;border-radius:9px;cursor:pointer;font-family:inherit;' +
+        'font-size:13px;font-weight:700;background:rgba(163,113,247,.15);' +
+        'border:1px solid rgba(163,113,247,.35);color:#a78bfa">📥 Extraer agencias</button>' +
+      '<div id="agExtractorEstado_' + c.key + '" style="display:none;margin-top:10px;font-size:12px;line-height:1.5"></div>' +
+      '<button id="agExtractorDl_' + c.key + '" type="button" onclick="AgenciasExtractor.descargar(\'' + c.key + '\')" ' +
+        'style="display:none;width:100%;margin-top:8px;padding:11px;border-radius:9px;cursor:pointer;' +
+        'font-family:inherit;font-size:13px;font-weight:700;background:rgba(34,197,94,.15);' +
+        'border:1px solid rgba(34,197,94,.35);color:#22c55e">💾 Descargar ' + c.outFile + '</button>'
+    );
+  }
+
   function _injectUI() {
     var page = document.getElementById('page-configurar');
     if (!page) return false;
     if (document.getElementById('agExtractorSec')) return true;
 
-    var sec = document.createElement('div');
-    sec.className = 'cfg-sec';
-    sec.id = 'agExtractorSec';
-    sec.innerHTML =
-      '<div class="cfg-ttl">🏢 Agencias Shalom (offline)</div>' +
-      '<div style="font-size:11px;color:#8b949e;line-height:1.5;margin-bottom:10px">' +
-        'Extrae todas las agencias de Shalom para buscarlas sin gastar API en cada búsqueda. ' +
-        'La key va segura en el servidor.</div>' +
-      '<button id="agExtractorBtn" type="button" onclick="AgenciasExtractor.extraer()" ' +
-        'style="width:100%;padding:11px;border-radius:9px;cursor:pointer;font-family:inherit;' +
-        'font-size:13px;font-weight:700;background:rgba(163,113,247,.15);' +
-        'border:1px solid rgba(163,113,247,.35);color:#a78bfa">📥 Extraer agencias</button>' +
-      '<div id="agExtractorEstado" style="display:none;margin-top:10px;font-size:12px;line-height:1.5"></div>' +
-      '<button id="agExtractorDl" type="button" onclick="AgenciasExtractor.descargar()" ' +
-        'style="display:none;width:100%;margin-top:8px;padding:11px;border-radius:9px;cursor:pointer;' +
-        'font-family:inherit;font-size:13px;font-weight:700;background:rgba(34,197,94,.15);' +
-        'border:1px solid rgba(34,197,94,.35);color:#22c55e">💾 Descargar agencias-shalom.json</button>';
-
-    page.appendChild(sec);
+    COURIERS.forEach(function (c) {
+      var sec = document.createElement('div');
+      sec.className = 'cfg-sec';
+      sec.id = c === COURIERS[0] ? 'agExtractorSec' : 'agExtractorSec_' + c.key;
+      sec.innerHTML = _seccionHtml(c);
+      page.appendChild(sec);
+    });
     return true;
   }
 
@@ -158,7 +211,7 @@
     var intentos = 0;
     (function intenta() {
       if (_injectUI()) {
-        console.log('[AgenciasExtractor] Listo — botón en Config');
+        console.log('[AgenciasExtractor] Listo — botones en Config (' + COURIERS.map(function (c) { return c.label; }).join(', ') + ')');
         return;
       }
       if (intentos++ < 30) setTimeout(intenta, 200);

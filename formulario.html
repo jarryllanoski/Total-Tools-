@@ -1181,17 +1181,21 @@ function collectExtra(){
 function renderAgencyBox(courierName){
   const agBox = $('agencyBox');
   if(!agBox) return;
-  // ★ SHALOM: usar buscador dinámico de la API
-  if((courierName||'').toUpperCase().includes('SHALOM')){
+  // ★ Couriers con catálogo propio (Shalom, Olva): un solo buscador dinámico,
+  //   la fuente de datos cambia según el courier (AGENCY_SOURCES). Agregar un
+  //   courier nuevo con catálogo = una entrada más ahí, nada se duplica aquí.
+  const agKey = _agSourceKey(courierName);
+  if(agKey){
+    const cfg = AGENCY_SOURCES[agKey];
     agBox.innerHTML = `<div class="agc-box">
-      <span class="agc-lbl">Elige tu sede Shalom *</span>
-      <button type="button" id="shalomCercaBtn" onclick="shalomCerca()" style="width:100%;display:flex;align-items:center;justify-content:center;gap:8px;background:rgba(79,142,247,.12);border:1px solid rgba(79,142,247,.3);border-radius:10px;color:var(--blue);padding:11px;font-size:13.5px;font-weight:700;cursor:pointer;font-family:inherit;margin:6px 0 10px">📍 Ver sedes cerca de mí</button>
+      <span class="agc-lbl">Elige tu sede ${esc(cfg.label)} *</span>
+      <button type="button" id="shalomCercaBtn" onclick="agCerca('${agKey}')" style="width:100%;display:flex;align-items:center;justify-content:center;gap:8px;background:rgba(79,142,247,.12);border:1px solid rgba(79,142,247,.3);border-radius:10px;color:var(--blue);padding:11px;font-size:13.5px;font-weight:700;cursor:pointer;font-family:inherit;margin:6px 0 10px">📍 Ver sedes cerca de mí</button>
       <div style="position:relative;margin-bottom:10px">
         <span style="position:absolute;left:14px;top:50%;transform:translateY(-50%);font-size:15px;opacity:.65;pointer-events:none">🔍</span>
         <input class="fi" id="shalomAgInput" autocomplete="off" data-wz-focus
           style="padding-left:42px"
           placeholder="Escribe tu ciudad o distrito…"
-          oninput="shalomOnInput(this.value)">
+          oninput="agOnInput('${agKey}', this.value)">
         <div id="shalomSpin" style="display:none;position:absolute;right:14px;top:50%;
           transform:translateY(-50%);width:16px;height:16px;border:2px solid #1e1e30;
           border-top-color:var(--blue);border-radius:50%;animation:spin .7s linear infinite"></div>
@@ -1200,17 +1204,16 @@ function renderAgencyBox(courierName){
         border-radius:12px;overflow:hidden;max-height:260px;overflow-y:auto;margin-bottom:8px"></div>
       <div id="shalomSelBadge" style="display:none">
         <div class="sel-badge">🏢 <span id="shalomSelTxt"></span>
-          <button class="clr-btn" onclick="shalomReset()">✕</button></div>
+          <button class="clr-btn" onclick="agReset('${agKey}')">✕</button></div>
       </div>
       <div class="ferr" id="err_agency" style="margin-top:6px">Selecciona una agencia</div>
     </div>`;
-    shalomPrecargar();
+    agPrecargar(agKey);
     return;
   }
-  // ★ OLVA (y cualquier agencia sin base de datos): entrada manual
+  // ★ Agencias sin catálogo propio: entrada manual
   const data  = getAgencyData(courierName);
-  const esOlva = (courierName||'').toUpperCase().includes('OLVA');
-  if(esOlva || !data){
+  if(!data){
     agBox.innerHTML=`<div class="agc-box">
       <span class="agc-lbl">🏢 Escribe la agencia de ${esc(courierName)}</span>
       <div style="font-size:12px;color:var(--text2);margin-bottom:10px;line-height:1.5">
@@ -2101,51 +2104,76 @@ function nuevoRegistro(){
 }
 
 
-/* ─── SHALOM API BUSCADOR ──────────────────────────────────────── */
-// ★ Usar Firebase Functions URL (con CORS correcto)
-// El endpoint Cloud Run puede tener problemas de CORS
-const _SHALOM_FUNC_PRIMARY  = 'https://us-central1-total-tools-24ce8.cloudfunctions.net/agenciasShalom';
-const _SHALOM_FUNC_FALLBACK = 'https://agenciashalom-d14ivygyra-uc.a.run.app';
-const _SHALOM_FUNC = _SHALOM_FUNC_PRIMARY;
-let _shalomTimer = null;
+/* ─── BUSCADOR DE AGENCIAS (Shalom, Olva, …) ─────────────────────────
+   Una sola fuente de datos por courier: JSON local (rápido, sin red) →
+   caché de localStorage (24h) → Cloud Function en vivo (respaldo). El mismo
+   widget/lógica sirve para cualquier courier que esté en este mapa; agregar
+   uno nuevo = una entrada más, sin tocar el resto del buscador. */
+const AGENCY_SOURCES = {
+  SHALOM: {
+    label: 'Shalom',
+    jsonPath: './data/agencias-shalom.json',
+    apiUrl: 'https://us-central1-total-tools-24ce8.cloudfunctions.net/agenciasShalom',
+    cacheKey: 'shalom'
+  },
+  OLVA: {
+    label: 'Olva',
+    jsonPath: './data/agencias-olva.json',
+    apiUrl: 'https://us-central1-total-tools-24ce8.cloudfunctions.net/agenciasOlva',
+    cacheKey: 'olva'
+  }
+};
+function _agSourceKey(courierName){
+  const u=(courierName||'').toUpperCase();
+  if(u.includes('SHALOM')) return 'SHALOM';
+  if(u.includes('OLVA'))   return 'OLVA';
+  return null;
+}
+let _agTimer = null;
+window._agData  = window._agData  || {}; // por courier: catálogo normalizado
+window._agCache = window._agCache || {}; // por courier: últimos resultados mostrados
+window._agSel   = window._agSel   || {}; // por courier: agencia elegida (objeto completo)
 
-async function shalomPrecargar(){
-  if(window._shalomData && window._shalomData.length) return;
+async function agPrecargar(key){
+  const cfg = AGENCY_SOURCES[key]; if(!cfg) return;
+  if(window._agData[key] && window._agData[key].length) return;
+  const cacheK = 'ag_agencias_cache_' + cfg.cacheKey;
+  const timeK  = 'ag_agencias_time_'  + cfg.cacheKey;
   // 1. Intentar cache localStorage (24h)
   try{
-    const cached = localStorage.getItem('shalom_agencias_cache');
-    const cachedTime = parseInt(localStorage.getItem('shalom_agencias_time')||'0');
+    const cached = localStorage.getItem(cacheK);
+    const cachedTime = parseInt(localStorage.getItem(timeK)||'0');
     if(cached && (Date.now()-cachedTime) < 86400000){
-      window._shalomData = JSON.parse(cached);
+      window._agData[key] = JSON.parse(cached);
       return;
     }
   }catch(ce){}
-  // 2. Intentar JSON local ./data/agencias-shalom.json
+  // 2. Intentar JSON local ./data/agencias-<courier>.json
   try{
-    const rLocal = await fetch('./data/agencias-shalom.json');
+    const rLocal = await fetch(cfg.jsonPath);
     if(rLocal.ok){
       const jLocal = await rLocal.json();
       const listaLocal = jLocal.agencias || jLocal.data || jLocal || [];
       if(Array.isArray(listaLocal) && listaLocal.length > 0){
-        window._shalomData = listaLocal;
+        window._agData[key] = listaLocal;
         try{
-          localStorage.setItem('shalom_agencias_cache', JSON.stringify(listaLocal));
-          localStorage.setItem('shalom_agencias_time', String(Date.now()));
+          localStorage.setItem(cacheK, JSON.stringify(listaLocal));
+          localStorage.setItem(timeK, String(Date.now()));
         }catch(se){}
         return;
       }
     }
-  }catch(le){ console.warn('[Shalom] JSON local no disponible:', le.message); }
-  // 3. Fallback: Cloud Run agenciasShalom
+  }catch(le){ console.warn('['+cfg.label+'] JSON local no disponible:', le.message); }
+  // 3. Fallback: Cloud Function en vivo
   try{
-    const r = await fetch(_SHALOM_FUNC);
+    const r = await fetch(cfg.apiUrl);
     if(!r.ok) return;
     const j = await r.json();
     const lista = j.resultados || j.agencias || j.data || j || [];
     if(Array.isArray(lista) && lista.length){
-      window._shalomData = lista;
-      localStorage.setItem('shalom_agencias_cache', JSON.stringify(lista));
-      localStorage.setItem('shalom_agencias_time', String(Date.now()));
+      window._agData[key] = lista;
+      localStorage.setItem(cacheK, JSON.stringify(lista));
+      localStorage.setItem(timeK, String(Date.now()));
     }
   }catch(e){}
 }
@@ -2159,12 +2187,12 @@ function toggleShalomHelp(){
   if(btn) btn.style.background = visible ? 'rgba(56,139,253,.15)' : 'rgba(56,139,253,.3)';
 }
 
-function shalomOnInput(val){
+function agOnInput(key, val){
   agState.addr = '';
   _cercaToken++; // el cliente escribió: invalida cualquier "cerca de mí" en curso
   const badge = $('shalomSelBadge');
   if(badge) badge.style.display='none';
-  clearTimeout(_shalomTimer);
+  clearTimeout(_agTimer);
   if(!val || val.length < 2){
     const drop = $('shalomDrop');
     if(drop) drop.style.display='none';
@@ -2174,7 +2202,7 @@ function shalomOnInput(val){
   }
   const spin = $('shalomSpin');
   if(spin) spin.style.display='block';
-  _shalomTimer = setTimeout(()=> shalomBuscar(val), 350);
+  _agTimer = setTimeout(()=> agBuscar(key, val), 350);
 }
 
 // Distancia en km entre dos coordenadas (haversine, client-side).
@@ -2207,7 +2235,7 @@ function _cercaBtnBuscando(on){
     btn.innerHTML='📍 Ver sedes cerca de mí';
   }
 }
-async function shalomCerca(){
+async function agCerca(key){
   if(_cercaEnCurso) return;                 // doble-toque: ya hay uno en curso
   _cercaEnCurso=true;
   var myToken=++_cercaToken;                 // token de ESTA petición
@@ -2215,42 +2243,44 @@ async function shalomCerca(){
   var drop=$('shalomDrop');
   if(drop){ drop.style.display='none'; drop.innerHTML=''; } // sin mensaje abajo
   // Datos aún no cargados → cargarlos primero (evita "Sin resultados" falso).
-  if(!(window._shalomData && window._shalomData.length)){
-    try{ await shalomPrecargar(); }catch(e){}
+  if(!(window._agData[key] && window._agData[key].length)){
+    try{ await agPrecargar(key); }catch(e){}
   }
   // Si mientras cargaba el cliente escribió u otra acción tomó el relevo → abortar.
   if(myToken!==_cercaToken){ _cercaEnCurso=false; _cercaBtnBuscando(false); return; }
-  if(!(window._shalomData && window._shalomData.length)){ _cercaEnCurso=false; _cercaSoloBuscador(); return; }
+  if(!(window._agData[key] && window._agData[key].length)){ _cercaEnCurso=false; _cercaSoloBuscador(); return; }
   _obtenerUbicacion(function(pos){
     _cercaEnCurso=false; _cercaBtnBuscando(false);
     if(myToken!==_cercaToken) return;        // carrera: el cliente ya escribió → ignorar
     var la=pos.coords.latitude, lo=pos.coords.longitude;
-    var lista=(window._shalomData||[]).map(function(ag){
+    var lista=(window._agData[key]||[]).map(function(ag){
       var alat=parseFloat(ag.latitud), alon=parseFloat(ag.longitud);
       if(!isFinite(alat)||!isFinite(alon)||(alat===0&&alon===0)) return null;
       var c=Object.assign({}, ag); c._distKm=_haversineKm(la,lo,alat,alon); return c;
     }).filter(Boolean).sort(function(a,b){return a._distKm-b._distKm;}).slice(0,6);
     if(!lista.length){ _cercaSoloBuscador(); return; }   // sin coordenadas → solo buscador
-    shalomMostrar(lista, 'Sedes más cercanas a tu ubicación');
+    agMostrar(key, lista, 'Sedes más cercanas a tu ubicación');
   }, function(){
     _cercaEnCurso=false; _cercaBtnBuscando(false);
     if(myToken!==_cercaToken) return;
     _cercaSoloBuscador();                     // cualquier fallo/negación → solo buscador
   });
 }
-async function shalomBuscar(q){
+async function agBuscar(key, q){
+  const cfg = AGENCY_SOURCES[key]; if(!cfg) return;
   const drop = $('shalomDrop');
   const spin = $('shalomSpin');
   try{
     let resultados = [];
     let aviso = '';
     // 1. Buscar en cache local
-    if(window._shalomData && window._shalomData.length){
+    const dataset = window._agData[key];
+    if(dataset && dataset.length){
       const _nrm = s => String(s==null?'':s).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
       const qu = _nrm(q);
       const _claveM = [];  // coincide por nombre/ubicación (prioritario)
       const _dirM   = [];  // coincide solo por dirección (relleno)
-      window._shalomData.forEach((ag,idx)=>{
+      dataset.forEach((ag,idx)=>{
         const clave = _nrm([ag.lugar_over||ag.nombre, ag.zona||ag.distrito, ag.provincia, ag.departamento].join(' '));
         const extra = _nrm(ag.direccion);
         let score;
@@ -2279,7 +2309,7 @@ async function shalomBuscar(q){
     }
     // 2. Si no hay resultados, consultar API
     if(!resultados.length){
-      const r = await fetch(_SHALOM_FUNC + '?q=' + encodeURIComponent(q));
+      const r = await fetch(cfg.apiUrl + '?q=' + encodeURIComponent(q));
       if(r.ok){
         const j = await r.json();
         const lista = j.resultados || j.agencias || j.data || j || [];
@@ -2287,23 +2317,23 @@ async function shalomBuscar(q){
       }
     }
     if(spin) spin.style.display='none';
-    shalomMostrar(resultados, aviso);
+    agMostrar(key, resultados, aviso);
   }catch(e){
     if(spin) spin.style.display='none';
     if(drop){
       drop.innerHTML='<div style="padding:12px 14px"><div style="font-size:12px;color:var(--red);margin-bottom:8px">⚠️ No se pudo cargar agencias</div>'+
-        '<button onclick="shalomBuscar(document.getElementById(\'shalomAgInput\').value)" '+
+        '<button onclick="agBuscar(\''+key+'\', document.getElementById(\'shalomAgInput\').value)" '+
         'style="background:rgba(79,142,247,.15);border:1px solid rgba(79,142,247,.3);border-radius:8px;'+
         'color:var(--blue);padding:6px 12px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;width:100%;margin-bottom:8px">'+
         '🔄 Reintentar</button>'+
         '<div style="font-size:11px;color:var(--text2);margin-bottom:6px">O escribe la agencia manualmente:</div>'+
-        '<input class="fi" style="font-size:13px" placeholder="Ej: Agencia Lima Centro" oninput="shalomManual(this.value)"></div>';
+        '<input class="fi" style="font-size:13px" placeholder="Ej: Agencia Lima Centro" oninput="agManual(\''+key+'\', this.value)"></div>';
       drop.style.display='block';
     }
   }
 }
 
-function shalomMostrar(agencias, aviso){
+function agMostrar(key, agencias, aviso){
   const drop = $('shalomDrop');
   if(!drop) return;
   if(!agencias.length){
@@ -2316,7 +2346,7 @@ function shalomMostrar(agencias, aviso){
     drop.style.display='block';
     return;
   }
-  window._shalomCache = agencias;
+  window._agCache[key] = agencias;
   // Encabezado IMPERATIVO: "toca, no escribas". Pero NO tiene sentido mostrarlo
   // mientras el cliente ESCRIBE (se contradice). Solo aparece cuando la lista
   // llega sin tecleo: "cerca de mí" o lista inicial (buscador vacío).
@@ -2330,12 +2360,12 @@ function shalomMostrar(agencias, aviso){
     const dir    = ag.direccion||'';
     const geo    = [ag.zona||ag.distrito, ag.provincia, ag.departamento].filter(Boolean).join(' · ');
     const tel    = ag.telefono||'';
-    const hor    = ag.hora_atencion||'';
+    const hor    = ag.horario||ag.hora_atencion||'';
     const distTxt = (ag._distKm!=null && isFinite(ag._distKm))
       ? (ag._distKm<1 ? Math.round(ag._distKm*1000)+' m' : ag._distKm.toFixed(1)+' km')
       : '';
     // Chevron › a la derecha → la tarjeta se ve como algo que se TOCA (botón), no como info.
-    return `<div onclick="shalomSel(${i})" class="agc-item" style="border-radius:0;margin:0;border:none;border-bottom:1px solid var(--bd);display:flex;align-items:center;gap:8px">
+    return `<div onclick="agSel('${key}', ${i})" class="agc-item" style="border-radius:0;margin:0;border:none;border-bottom:1px solid var(--bd);display:flex;align-items:center;gap:8px">
       <div style="flex:1;min-width:0">
         <div style="font-weight:700;font-size:13px">${esc(nombre)}</div>
         ${distTxt?`<div style="font-size:11px;color:var(--green);font-weight:700;margin-top:2px">📏 a ${distTxt}</div>`:''}
@@ -2350,8 +2380,8 @@ function shalomMostrar(agencias, aviso){
   drop.style.display='block';
 }
 
-function shalomSel(i){
-  const ag = (window._shalomCache||[])[i];
+function agSel(key, i){
+  const ag = (window._agCache[key]||[])[i];
   if(!ag) return;
   // Guardar en agState.addr para que submitOrder lo tome
   const nombre = ag.lugar_over||ag.nombre||'';
@@ -2359,7 +2389,7 @@ function shalomSel(i){
   const geo    = [ag.zona||ag.distrito, ag.provincia, ag.departamento].filter(Boolean).join(', ');
   agState.addr = [nombre, dir, geo].filter(Boolean).join(' - ');
   // Guardar objeto completo para los campos extra
-  window._shalomAgencia = {
+  window._agSel[key] = {
     nombre, direccion: dir,
     distrito: ag.zona||ag.distrito||'',
     provincia: ag.provincia||'',
@@ -2380,14 +2410,14 @@ function shalomSel(i){
   $('err_agency')&&$('err_agency').classList.remove('show');
 }
 
-function shalomManual(val){
+function agManual(key, val){
   agState.addr = val.trim();
-  window._shalomAgencia = val.trim() ? {nombre:val.trim(),direccion:'',distrito:'',provincia:'',departamento:'',telefono:'',id:''} : null;
+  window._agSel[key] = val.trim() ? {nombre:val.trim(),direccion:'',distrito:'',provincia:'',departamento:'',telefono:'',id:''} : null;
 }
 
-function shalomReset(){
+function agReset(key){
   agState.addr = '';
-  window._shalomAgencia = null;
+  window._agSel[key] = null;
   const inp = $('shalomAgInput');
   if(inp) inp.value = '';
   const drop = $('shalomDrop');
@@ -2396,13 +2426,12 @@ function shalomReset(){
   if(badge) badge.style.display='none';
 }
 
-window.shalomOnInput = shalomOnInput;
-window.shalomSel     = shalomSel;
-window.shalomManual  = shalomManual;
-window.shalomReset   = shalomReset;
-// ★ Alias para compatibilidad con botón Reintentar
-window.shalomBuscar  = shalomBuscar;
-window.shalomCerca   = shalomCerca;
+window.agOnInput = agOnInput;
+window.agSel     = agSel;
+window.agManual  = agManual;
+window.agReset   = agReset;
+window.agBuscar  = agBuscar;
+window.agCerca   = agCerca;
 
 /* ─── ASISTENTE PASO A PASO (solo presentación) ──────────────────────
    El formulario se muestra por pasos para que sea más rápido de llenar y
