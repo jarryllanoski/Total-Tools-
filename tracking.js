@@ -407,37 +407,43 @@ function _checkDestinoAlerts(){
   nuevos.forEach(function(s){ _destinoAvisados.add(s.id); });
   _saveDestinoAvisados();
   if (!_destinoKeyPrevio){ _destinoKeyPrevio = true; return; } // rollout: solo sembrar
+  // Pocos → tiras hacia abajo. Bastantes → resumen que, al tocar "Ver", se
+  // despliega en las tiras de ESOS pedidos apiladas una sobre otra.
   if (nuevos.length <= 3){ nuevos.forEach(_mostrarAlertaDestino); }
-  else { _mostrarAlertaResumenDestino(nuevos.length); }
+  else { _mostrarAlertaResumenDestino(nuevos); }
 }
 
+// La pila vive DENTRO de la página, justo encima de los 4 cuadros de cantidades.
+// Antes flotaba fija sobre la pantalla (position:fixed) y TAPABA el contenido;
+// en el flujo normal lo empuja hacia abajo, así nunca oculta nada.
 function _destinoStack(){
   var s = document.getElementById('trkDestinoStack');
   if (!s){
     s = document.createElement('div');
     s.id = 'trkDestinoStack';
-    s.style.cssText = 'position:fixed;top:66px;left:50%;transform:translateX(-50%);'+
-      'z-index:999;display:flex;flex-direction:column;gap:8px;'+
-      'width:calc(100% - 32px);max-width:340px;pointer-events:none';
-    document.body.appendChild(s);
+    // Mismo ancho de siempre (no se toca el tamaño de la tarjeta).
+    s.style.cssText = 'display:flex;flex-direction:column;gap:8px;'+
+      'width:100%;max-width:340px;margin:0 auto 12px';
+    var stats = document.getElementById('statsArea');
+    if (stats && stats.parentNode) stats.parentNode.insertBefore(s, stats);
+    else document.body.appendChild(s);   // respaldo si aún no existe
   }
   return s;
 }
 function _destinoCard(){
   var d = document.createElement('div');
   d.style.cssText = 'background:#1c2333;border:2px solid #a78bfa;border-radius:12px;'+
-    'padding:14px 18px;box-shadow:0 8px 24px rgba(0,0,0,.6);pointer-events:auto';
+    'padding:14px 18px;box-shadow:0 8px 24px rgba(0,0,0,.6)';
   return d;
 }
 function _btn(txt, css){
   var b = document.createElement('button'); b.textContent = txt; b.style.cssText = css; return b;
 }
-// Aviso individual (fijo hasta cerrar). Construido con DOM + addEventListener →
-// el teléfono no va en un onclick inline (cierra el vector XSS del hallazgo #5).
-function _mostrarAlertaDestino(ship){
-  if (!ship || !ship.id) return;
-  var stack = _destinoStack();
-  if (stack.querySelector('[data-ship="'+ship.id+'"]')) return; // dedup: ya visible
+
+// Construye la tira de UN pedido (no la inserta). Misma tarjeta de siempre.
+// DOM + addEventListener → el teléfono no va en un onclick inline (cierra el
+// vector XSS del hallazgo #5).
+function _tiraDestino(ship){
   var phone = String(ship.phone || '').replace(/\D/g, ''); // solo dígitos
   var d = _destinoCard(); d.setAttribute('data-ship', ship.id);
   var head = document.createElement('div');
@@ -446,26 +452,83 @@ function _mostrarAlertaDestino(ship){
     '<div style="font-size:11px;color:#8b949e;margin-bottom:10px">Guía: '+_esc(ship.trackingOrderNumber||'')+'</div>';
   var row = document.createElement('div'); row.style.cssText = 'display:flex;gap:8px';
   var bClose = _btn('Cerrar', 'flex:1;background:#30363d;border:none;border-radius:8px;color:#8b949e;padding:8px;font-size:12px;cursor:pointer;font-family:inherit');
-  bClose.addEventListener('click', function(){ d.remove(); });
+  bClose.addEventListener('click', function(){ _quitarTira(d); });
   var bWa = _btn('💬 Avisar cliente', 'flex:2;background:rgba(167,139,250,.15);border:1px solid rgba(167,139,250,.3);border-radius:8px;color:#a78bfa;padding:8px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit');
-  bWa.addEventListener('click', function(){ if(phone) window.open('https://wa.me/51'+phone, '_blank'); d.remove(); });
+  bWa.addEventListener('click', function(){
+    if (phone) window.open('https://wa.me/51'+phone, '_blank');
+    _quitarTira(d);
+  });
   row.appendChild(bClose); row.appendChild(bWa);
-  d.appendChild(head); d.appendChild(row); stack.appendChild(d);
+  d.appendChild(head); d.appendChild(row);
+  return d;
 }
+
+// Quita una tira y, si estaba en un mazo, reordena para que la siguiente pase
+// al frente. Si el mazo queda vacío, se elimina (sin huecos en blanco).
+function _quitarTira(card){
+  var mazo = card.parentNode && card.parentNode.classList &&
+             card.parentNode.classList.contains('trk-mazo') ? card.parentNode : null;
+  card.remove();
+  if (mazo){
+    if (!mazo.children.length) mazo.remove();
+    else _ordenarMazo(mazo);
+  }
+}
+
+// Mazo: la primera tira se ve entera y las siguientes asoman por debajo.
+function _ordenarMazo(mazo){
+  var n = mazo.children.length;
+  for (var i = 0; i < n; i++){
+    var c = mazo.children[i];
+    c.style.position  = 'relative';
+    c.style.zIndex    = String(n - i);   // la de arriba, al frente
+    c.style.marginTop = i === 0 ? '0' : '-62px';
+  }
+}
+
+// Aviso individual (fijo hasta cerrar).
+function _mostrarAlertaDestino(ship){
+  if (!ship || !ship.id) return;
+  var stack = _destinoStack();
+  if (stack.querySelector('[data-ship="'+ship.id+'"]')) return; // dedup: ya visible
+  stack.appendChild(_tiraDestino(ship));
+}
+
 // Aviso resumen cuando llegan varios de golpe (fijo hasta cerrar).
-function _mostrarAlertaResumenDestino(n){
+// "Ver" ya no filtra y descarta el aviso: despliega las tiras de ESOS pedidos
+// APILADAS una sobre otra, para avisar cliente por cliente desde ahí mismo.
+function _mostrarAlertaResumenDestino(ships){
   var stack = _destinoStack();
   var d = _destinoCard();
   var head = document.createElement('div');
-  head.innerHTML = '<div style="font-size:12px;font-weight:800;color:#a78bfa;margin-bottom:8px">📍 '+n+' PEDIDOS LLEGARON A DESTINO</div>';
+  head.innerHTML = '<div style="font-size:12px;font-weight:800;color:#a78bfa;margin-bottom:8px">📍 '+ships.length+' PEDIDOS LLEGARON A DESTINO</div>';
   var row = document.createElement('div'); row.style.cssText = 'display:flex;gap:8px';
   var bClose = _btn('Cerrar', 'flex:1;background:#30363d;border:none;border-radius:8px;color:#8b949e;padding:8px;font-size:12px;cursor:pointer;font-family:inherit');
   bClose.addEventListener('click', function(){ d.remove(); });
   var bVer = _btn('Ver', 'flex:2;background:rgba(167,139,250,.15);border:1px solid rgba(167,139,250,.3);border-radius:8px;color:#a78bfa;padding:8px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit');
-  bVer.addEventListener('click', function(){ if(typeof window.setFilt==='function') window.setFilt('LLEGÓ A DESTINO'); d.remove(); });
+  bVer.addEventListener('click', function(){
+    d.remove();                 // el resumen se reemplaza por las tiras
+    _desplegarMazo(ships);
+  });
   row.appendChild(bClose); row.appendChild(bVer);
   d.appendChild(head); d.appendChild(row); stack.appendChild(d);
 }
+
+// Despliega las tiras apiladas una sobre otra.
+function _desplegarMazo(ships){
+  var stack = _destinoStack();
+  var mazo = document.createElement('div');
+  mazo.className = 'trk-mazo';
+  (ships || []).forEach(function(ship){
+    if (!ship || !ship.id) return;
+    if (stack.querySelector('[data-ship="'+ship.id+'"]')) return; // ya visible
+    mazo.appendChild(_tiraDestino(ship));
+  });
+  if (!mazo.children.length) return;
+  _ordenarMazo(mazo);
+  stack.appendChild(mazo);
+}
+
 
 /* ══════════════════════════════════════════════
    CSS
