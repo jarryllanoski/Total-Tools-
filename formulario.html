@@ -181,6 +181,13 @@ textarea.fi{resize:vertical;line-height:1.5}
 .addr-opt.active .addr-opt-lbl{color:var(--blue)}
 .addr-result{background:var(--card2);border:1px solid var(--blue);border-radius:10px;padding:10px 12px;font-size:13px;color:var(--text);margin-bottom:8px;display:none;line-height:1.5}
 .addr-result.show{display:block}
+/* Botón de ayuda: rellena el cuadro de dirección, no lo reemplaza */
+.addr-gps-btn{width:100%;display:flex;align-items:center;justify-content:center;gap:8px;background:rgba(79,142,247,.12);border:1px solid rgba(79,142,247,.3);border-radius:10px;color:var(--blue);padding:11px;font-size:13.5px;font-weight:700;cursor:pointer;font-family:inherit;margin-bottom:8px}
+.addr-gps-btn:disabled{cursor:progress}
+/* Chip: coordenadas adjuntas, quitables por el cliente */
+.addr-pin-chip{display:flex;align-items:center;gap:8px;background:rgba(34,197,94,.10);border:1px solid rgba(34,197,94,.3);border-radius:9px;padding:8px 10px;margin-top:8px;font-size:12px;color:var(--green);font-weight:600}
+.addr-pin-chip a{color:var(--blue);text-decoration:none;font-weight:700}
+.addr-pin-chip button{margin-left:auto;background:none;border:none;color:var(--text2);font-size:15px;cursor:pointer;font-family:inherit;line-height:1;padding:0 2px}
 </style>
 </head>
 <body>
@@ -460,8 +467,6 @@ window.selDate = function(iso, lbl) {
 let agState        = {dept:'',prov:'',dist:'',addr:''};
 let trackRefreshId = null;
 let currentToken   = '';
-let _deliveryAddr  = '';
-let _addrMode      = '';
 let _phoneTimer    = null;
 let _knownClient   = null;
 let _prefillName   = '';
@@ -750,8 +755,7 @@ function renderForm(){
     phone: ((CFG&&(CFG.config&&CFG.config.phone||CFG.phone))||'').toString().trim(),
     city:  (CFG&&(CFG.city||CFG.config&&CFG.config.city))||''
   };
-  _knownClient=null; _deliveryAddr=''; _addrMode=''; _gpsLat=null; _gpsLon=null;
-  _showRef(false); _manualNote('');   // estado inicial: Referencia oculta
+  _knownClient=null; _gpsLat=null; _gpsLon=null;
   const extraF   = ((CFG&&CFG.extraFields)||[]).filter(f=>f&&f.visible!==false);
   // Couriers: usar config de Firebase o defaults de tu app
   const couriers = (CFG&&CFG.couriers)||['SHALOM','OLVA COURIER','MARVISUR','DELIVERY','RETIRO EN TIENDA','OTRAS AGENCIAS'];
@@ -866,35 +870,21 @@ function renderForm(){
         </div>
       </div>
 
+      <!-- DIRECCIÓN DE ENTREGA — UNA SOLA VERDAD.
+           El textarea ES la dirección. El botón de ubicación lo RELLENA (no lo
+           reemplaza) y adjunta las coordenadas como un chip que el cliente
+           puede quitar: corregir el texto ya nunca borra el pin exacto. -->
       <div id="deliveryAddrBox" style="display:none;margin-top:4px">
         <div class="section-ttl">📍 ¿A dónde enviamos tu pedido?</div>
         <div id="addrShortcut" style="display:none"></div>
-        <div id="addrOpts" class="addr-opts">
-          <div class="addr-opt" id="addrOptGps" onclick="setAddrMode('gps')">
-            <div class="addr-opt-icon">📍</div>
-            <div class="addr-opt-body">
-              <div class="addr-opt-lbl">Usar mi ubicación actual</div>
-              <div class="addr-opt-desc">Detectamos dónde estás ahora con el GPS de tu celular.</div>
-            </div>
-          </div>
-          <div class="addr-opt" id="addrOptManual" onclick="setAddrMode('manual')">
-            <div class="addr-opt-icon">✏️</div>
-            <div class="addr-opt-body">
-              <div class="addr-opt-lbl">Escribir otra dirección</div>
-              <div class="addr-opt-desc">Escribe tú mismo la dirección de entrega.</div>
-            </div>
-          </div>
-        </div>
-        <div id="addrGpsPanel" style="display:none">
-          <div id="addrGpsResult" class="addr-result"></div>
-        </div>
-        <div id="addrManualPanel" style="display:none">
-          <div id="addrManualNote" style="display:none;margin-bottom:8px"></div>
-          <textarea class="fi" id="addrManualInput" rows="2"
-            placeholder="Escribe la dirección completa *" autocomplete="street-address"></textarea>
-        </div>
+        <button type="button" id="addrGpsBtn" class="addr-gps-btn" onclick="usarMiUbicacion()">📍 Usar mi ubicación</button>
+        <div id="addrGpsMsg" style="display:none;margin-bottom:8px"></div>
+        <textarea class="fi" id="addrManualInput" rows="2" data-wz-focus
+          placeholder="Escribe la dirección completa *" autocomplete="street-address"
+          oninput="onDireccionInput()"></textarea>
+        <div id="addrPinChip" style="display:none"></div>
         <div class="ferr" id="err_deliveryAddr" style="margin-top:4px">Ingresa la dirección de entrega</div>
-        <div class="fg" id="refField" style="margin-top:10px;margin-bottom:0;display:none">
+        <div class="fg" id="refField" style="margin-top:10px;margin-bottom:0">
           <input class="fi" id="f_ref" type="text"
             placeholder="Referencia (ej: frente al mercado, casa azul...)">
         </div>
@@ -1053,7 +1043,7 @@ function onCourierChange(name){
   // (boleta / narrador), que así no dependen de la visibilidad de los campos.
   window._selCourierType = name ? selCourierType : '';
   $('err_courier')&&$('err_courier').classList.remove('show');
-  _deliveryAddr=''; _addrMode='';
+  _gpsLat=null; _gpsLon=null;
   const agBox=$('agencyBox');
   const addrBox=$('deliveryAddrBox');
   const encBox=$('encomiendaBox');
@@ -1095,76 +1085,37 @@ function onCourierChange(name){
   }
 }
 
+/* Atajo del cliente recurrente: NO es otro modo — solo rellena el mismo
+   cuadro de dirección. Por eso no hay estado "known" ni pantalla de
+   confirmación que haya que deshacer. */
 function _updateKnownAddrShortcut(){
   const shortcut=$('addrShortcut');
-  const opts=$('addrOpts');
   if(!shortcut) return;
   if(_knownClient&&_knownClient.address&&selCourierType==='delivery'){
-    // Dirección anterior resumida (no todo el texto largo)
-    const full = _knownClient.address;
-    const short = full.length>70 ? full.slice(0,70)+'…' : full;
+    const full=_knownClient.address;
+    const short=full.length>70?full.slice(0,70)+'…':full;
     shortcut.style.display='block';
     shortcut.innerHTML=`
-      <div class="addr-opt" id="knownAddrOpt" onclick="useKnownAddress()" style="align-items:flex-start">
+      <div class="addr-opt" onclick="usarDireccionDeSiempre()" style="align-items:flex-start">
         <div class="addr-opt-icon">📍</div>
         <div class="addr-opt-body">
           <div class="addr-opt-lbl">Usar mi dirección de siempre</div>
           <div class="addr-opt-desc" style="color:var(--text2)">${esc(short)}</div>
         </div>
-      </div>
-      <div onclick="mostrarOtrasOpciones()" id="otrasOpcLink" style="text-align:center;margin:10px 0 4px;color:var(--blue);font-size:13px;font-weight:600;cursor:pointer;text-decoration:underline">Usar otra dirección</div>`;
-    if(opts) opts.style.display='none';
+      </div>`;
   } else {
     shortcut.style.display='none';
-    if(opts) opts.style.display='';
+    shortcut.innerHTML='';
   }
 }
 
-// Cuando el cliente con dirección anterior quiere usar otra: revela GPS/manual
-function mostrarOtrasOpciones(){
-  // Limpiar cualquier selección previa de la dirección de siempre
-  _deliveryAddr=''; _addrMode='';
-  const confirmed=$('addrConfirmed');
-  if(confirmed) confirmed.remove();
-  // Ocultar el bloque de "dirección de siempre" y mostrar GPS/manual
-  const shortcut=$('addrShortcut');
-  if(shortcut) shortcut.style.display='none';
-  const opts=$('addrOpts');
-  if(opts) opts.style.display='flex';
-  _showRef(false); _manualNote('');   // aún sin modo elegido → Referencia oculta
-}
-
-function useKnownAddress(){
+function usarDireccionDeSiempre(){
   if(!_knownClient||!_knownClient.address) return;
-  _deliveryAddr=_knownClient.address;
-  _addrMode='known';
-  // Ocultar TODO lo demás y mostrar solo la confirmación
-  const shortcut=$('addrShortcut');
-  if(shortcut) shortcut.style.display='none';
-  const opts=$('addrOpts');
-  if(opts) opts.style.display='none';
-  ['addrGpsPanel','addrManualPanel'].forEach(id=>{const e=$(id);if(e)e.style.display='none';});
-  let confirmed=$('addrConfirmed');
-  if(!confirmed){
-    confirmed=document.createElement('div');
-    confirmed.id='addrConfirmed';
-    const errDiv=$('err_deliveryAddr');
-    const addrBox=$('deliveryAddrBox');
-    if(addrBox&&errDiv) addrBox.insertBefore(confirmed,errDiv);
-  }
-  confirmed.innerHTML=`<div class="addr-result show" style="display:block">📍 ${esc(_deliveryAddr.length>90?_deliveryAddr.slice(0,90)+'…':_deliveryAddr)}</div><button class="btn-sec" style="margin-top:6px;padding:10px;font-size:13px" onclick="changeAddress()">✏️ Cambiar dirección</button>`;
-  _showRef(true);   // dirección de siempre confirmada → mostrar Referencia
-  $('err_deliveryAddr')&&$('err_deliveryAddr').classList.remove('show');
+  const ta=$('addrManualInput');
+  if(ta){ ta.value=_knownClient.address; try{ ta.focus(); }catch(e){} }
+  onDireccionInput();
 }
 
-function changeAddress(){
-  _deliveryAddr=''; _addrMode='';
-  const confirmed=$('addrConfirmed');
-  if(confirmed) confirmed.remove();
-  _showRef(false); _manualNote('');   // sin dirección → ocultar Referencia y nota
-  // Volver a mostrar el estado inicial (dirección de siempre + opciones)
-  _updateKnownAddrShortcut();
-}
 
 function collectExtra(){
   const extra={};
@@ -1350,56 +1301,41 @@ function resetAgency(){
   agState={dept:'',prov:'',dist:'',addr:''};
 }
 
-/* ─── DELIVERY ADDRESS ──────────────────────────────────────────── */
-/* Fuente ÚNICA de la dirección de delivery (misma lógica que usa el pedido):
-   manual → textarea; gps/known → _deliveryAddr. La usan submitOrder y la boleta
-   → nunca se raspa el texto del cuadro GPS (que trae botones/errores). */
+/* ─── DIRECCIÓN DE ENTREGA — UNA SOLA VERDAD ─────────────────────────
+   El textarea #addrManualInput ES la dirección: no hay "modos" ni copias.
+   · El botón de ubicación RELLENA ese mismo cuadro (si está vacío) y adjunta
+     las coordenadas; el texto del cliente siempre manda.
+   · Las coordenadas viven aparte y SOBREVIVEN a la edición del texto — antes
+     se borraban al corregir, que es justo cuando el cliente está precisando
+     su dirección. Se muestran como un chip que él puede quitar.
+   La usan submitOrder, el validador del asistente y la etiqueta viva. */
 function getDeliveryAddr(){
-  return _addrMode==='manual'
-    ? ($('addrManualInput')||{value:''}).value.trim()
-    : (_deliveryAddr||'').trim();
+  return ($('addrManualInput')||{value:''}).value.trim();
 }
 window.getDeliveryAddr = getDeliveryAddr;
-/* Referencia: aparece recién cuando ya hay una dirección elegida. */
-function _showRef(show){ const e=$('refField'); if(e) e.style.display=show?'block':'none'; }
-/* Nota guía sobre el cuadro manual (cuando el GPS falla de forma permanente). */
-function _manualNote(html){ const e=$('addrManualNote'); if(e){ e.style.display=html?'block':'none'; e.innerHTML=html||''; } }
 
-function setAddrMode(mode){
-  _addrMode=mode;
-  _deliveryAddr='';
-  _gpsLat=null; _gpsLon=null;
-
-  // Actualizar botones — solo mostrar el NO activo como opción
-  const optGps=$('addrOptGps');
-  const optManual=$('addrOptManual');
-  const panelGps=$('addrGpsPanel');
-  const panelManual=$('addrManualPanel');
-
-  if(mode==='gps'){
-    if(optGps) optGps.classList.add('active');
-    if(optManual) optManual.classList.remove('active');
-    if(panelGps) panelGps.style.display='block';
-    if(panelManual) panelManual.style.display='none';
-  } else {
-    if(optManual) optManual.classList.add('active');
-    if(optGps) optGps.classList.remove('active');
-    if(panelManual) panelManual.style.display='block';
-    if(panelGps) panelGps.style.display='none';
-  }
-  // ★ Mantener SIEMPRE visibles ambas opciones para que el usuario pueda cambiar
-  const addrOpts=$('addrOpts');
-  if(addrOpts) addrOpts.style.display='flex';
-
-  const result=$('addrGpsResult');
-  if(result){ result.classList.remove('show'); result.innerHTML=''; }
-  const ta=$('addrManualInput');
-  if(ta) ta.value='';
-  _manualNote('');                 // limpiar nota guía al cambiar de modo
-  _showRef(mode==='manual');       // manual: Referencia visible; gps: espera al éxito
-  $('err_deliveryAddr')&&$('err_deliveryAddr').classList.remove('show');
-  if(mode==='gps') getGPS();
+/* Chip de coordenadas adjuntas (refleja _gpsLat/_gpsLon). */
+function _pinChip(){
+  const el=$('addrPinChip'); if(!el) return;
+  if(_gpsLat&&_gpsLon){
+    el.style.display='block';
+    el.innerHTML='<div class="addr-pin-chip"><span>📍 Ubicación exacta adjunta</span>'+
+      '<a href="https://maps.google.com/?q='+_gpsLat+','+_gpsLon+'" target="_blank" rel="noopener">Ver mapa</a>'+
+      '<button type="button" onclick="quitarPin()" title="Quitar ubicación">✕</button></div>';
+  } else { el.style.display='none'; el.innerHTML=''; }
 }
+function quitarPin(){ _gpsLat=null; _gpsLon=null; _pinChip(); }
+
+/* Al escribir: si ya hay texto, se limpia el error. Único punto de validación. */
+function onDireccionInput(){
+  if(getDeliveryAddr()) $('err_deliveryAddr')&&$('err_deliveryAddr').classList.remove('show');
+}
+
+function _gpsBtn(html, ocupado){
+  const b=$('addrGpsBtn'); if(!b) return;
+  b.disabled=!!ocupado; b.innerHTML=html; b.style.opacity=ocupado?'.75':'';
+}
+function _gpsMsg(html){ const e=$('addrGpsMsg'); if(e){ e.style.display=html?'block':'none'; e.innerHTML=html||''; } }
 
 function _parseNominatimAddr(d){
   const a=d.address||{};
@@ -1450,71 +1386,40 @@ function _obtenerUbicacion(onOk, onErr){
     }).catch(function(){ pedir(); });
   } else { pedir(); }
 }
-function _gpsMostrar(html){ const r=$('addrGpsResult'); if(r){ r.classList.add('show'); r.innerHTML=html; } }
-function _gpsManualLink(){ return '<button onclick="setAddrMode(\'manual\')" style="background:none;border:none;font-size:12px;color:var(--blue);cursor:pointer;font-family:inherit;padding:0;margin-top:8px;text-decoration:underline">✏️ Escribir dirección manual →</button>'; }
-function _gpsRetryBtn(){ return '<button onclick="getGPS()" style="background:none;border:none;font-size:12px;color:var(--blue);cursor:pointer;font-family:inherit;padding:0;margin-top:8px;margin-right:14px;text-decoration:underline">🔄 Reintentar</button>'; }
 function _gpsCopiarLink(btn){ try{ if(navigator.clipboard) navigator.clipboard.writeText(location.href); if(btn){ var o=btn.textContent; btn.textContent='✓ Copiado'; setTimeout(function(){ btn.textContent=o; },1500); } }catch(e){} }
-// Éxito: idéntico al comportamiento anterior (reverse-geocode + UI + campos).
-async function _gpsOnSuccess(pos){
-  const result=$('addrGpsResult');
-  const {latitude:lat,longitude:lon}=pos.coords;
-  let addrText='';
-  try{
-    const r=await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json&accept-language=es`);
-    const d=await r.json();
-    addrText=_parseNominatimAddr(d)||`${lat.toFixed(5)}, ${lon.toFixed(5)}`;
-  }catch(e){
-    addrText=`${lat.toFixed(5)}, ${lon.toFixed(5)}`;
-  }
-  _deliveryAddr=addrText;
-  _addrMode='gps';
-  _gpsLat=lat; _gpsLon=lon;
-  const addrOptsEl=$('addrOpts');
-  if(addrOptsEl) addrOptsEl.style.display='none';
-  const mapsUrl=`https://maps.google.com/?q=${lat},${lon}`;
-  if(result){
-    result.classList.add('show');
-    result.innerHTML=`<div style="display:flex;align-items:flex-start;gap:8px">
-      <span style="font-size:18px;flex-shrink:0">📍</span>
-      <div style="flex:1">
-        <div style="font-size:14px;font-weight:600;color:var(--text);line-height:1.4">${esc(addrText)}</div>
-        <div style="margin-top:8px;display:flex;gap:12px;align-items:center;flex-wrap:wrap">
-          <a href="${mapsUrl}" target="_blank" rel="noopener" style="font-size:12px;color:var(--blue);text-decoration:none">🗺️ Ver en Google Maps</a>
-          <button onclick="setAddrMode('manual')" style="background:none;border:none;font-size:12px;color:var(--text2);cursor:pointer;font-family:inherit;padding:0;text-decoration:underline">✏️ Usar otra dirección</button>
-        </div>
-      </div>
-    </div>`;
-  }
-  _showRef(true);   // ya hay dirección → mostrar Referencia
-  $('err_deliveryAddr')&&$('err_deliveryAddr').classList.remove('show');
-}
-function getGPS(){
-  _gpsMostrar('<span style="color:var(--text2)">📡 Buscando tu ubicación…</span><br>'+_gpsManualLink());
-  var enApp=_gpsWebviewInApp();
-  _obtenerUbicacion(_gpsOnSuccess, function(codigo){
-    var banner = enApp
-      ? '<div style="background:rgba(234,179,8,.1);border:1px solid rgba(234,179,8,.3);border-radius:8px;padding:8px 10px;margin-bottom:8px;font-size:12px;color:var(--text);line-height:1.5">📲 Para usar tu ubicación, abre este enlace en <b>Chrome/Safari</b> (menú ⋮ → "Abrir en el navegador"). <button onclick="_gpsCopiarLink(this)" style="background:none;border:none;color:var(--blue);cursor:pointer;font-family:inherit;font-size:12px;text-decoration:underline;padding:0">Copiar enlace</button></div>'
-      : '';
-    // Fallas PERMANENTES (denegado / no soporta / inseguro): el GPS no se puede
-    // recuperar → pasamos a MANUAL automáticamente para que el cliente no quede
-    // atascado, con una nota (y el aviso de abrir en navegador si es webview).
-    var permanente = (codigo==='denegado'||codigo==='no_soporta'||codigo==='inseguro');
-    if(permanente){
-      setAddrMode('manual');   // muestra el cuadro manual + Referencia; limpia la nota
-      _manualNote(banner+'<div style="color:var(--text2);font-size:13px;line-height:1.5">⚠️ No pudimos usar tu ubicación automáticamente. Escribe la dirección de entrega abajo 👇</div>');
-    } else {
-      // Transitoria (timeout / no disponible): mantener Reintentar + opción manual.
-      _gpsMostrar(banner+'<div style="color:var(--text2);font-size:13px;line-height:1.5;margin-bottom:4px">⚠️ No se pudo obtener tu ubicación. Reintenta o escribe la dirección.</div>'+_gpsRetryBtn()+_gpsManualLink());
+
+/* Botón "Usar mi ubicación": adjunta el pin y, si el cuadro está vacío, lo
+   rellena con la dirección legible. Nunca pisa lo que el cliente escribió. */
+function usarMiUbicacion(){
+  _gpsBtn('<span class="geo-pin">📍</span> Buscando tu ubicación…', true);
+  _gpsMsg('');
+  _obtenerUbicacion(async function(pos){
+    const lat=pos.coords.latitude, lon=pos.coords.longitude;
+    let addrText='';
+    try{
+      const r=await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json&accept-language=es`);
+      addrText=_parseNominatimAddr(await r.json())||'';
+    }catch(e){}
+    _gpsLat=lat; _gpsLon=lon;
+    const ta=$('addrManualInput');
+    if(ta){
+      if(!ta.value.trim() && addrText) ta.value=addrText;  // el texto del cliente manda
+      try{ ta.focus(); }catch(e){}
     }
+    _pinChip();
+    _gpsBtn('📍 Actualizar mi ubicación', false);
+    _gpsMsg(addrText ? '' : '<div style="color:var(--text2);font-size:12.5px;line-height:1.5">Adjuntamos tu ubicación exacta. Escribe tu dirección para que el repartidor te ubique mejor.</div>');
+    onDireccionInput();
+  }, function(codigo){
+    _gpsBtn('📍 Usar mi ubicación', false);
+    var banner = _gpsWebviewInApp()
+      ? '<div style="background:rgba(234,179,8,.1);border:1px solid rgba(234,179,8,.3);border-radius:8px;padding:8px 10px;margin-bottom:6px;font-size:12px;color:var(--text);line-height:1.5">📲 Para usar tu ubicación, abre este enlace en <b>Chrome/Safari</b> (menú ⋮ → "Abrir en el navegador"). <button onclick="_gpsCopiarLink(this)" style="background:none;border:none;color:var(--blue);cursor:pointer;font-family:inherit;font-size:12px;text-decoration:underline;padding:0">Copiar enlace</button></div>'
+      : '';
+    _gpsMsg(banner+'<div style="color:var(--text2);font-size:12.5px;line-height:1.5">⚠️ No pudimos obtener tu ubicación. Escribe tu dirección abajo 👇</div>');
+    const ta=$('addrManualInput'); if(ta){ try{ ta.focus(); }catch(e){} }
   });
 }
 
-function editGpsAddr(){
-  const ta=$('addrManualInput');
-  if(ta) ta.value=_deliveryAddr;
-  _deliveryAddr=''; _gpsLat=null; _gpsLon=null;
-  setAddrMode('manual');
-}
 
 /* ─── DATE CHIPS ────────────────────────────────────────────────── */
 function buildDatesChips(dispatch){
@@ -2044,7 +1949,7 @@ function clearOrderAndReset(){
   history.replaceState(null,'',`${location.pathname}`);
   selCourierName=''; selCourierType=''; selDateIso=''; selDateLbl='';
   agState={dept:'',prov:'',dist:'',addr:''};
-  _deliveryAddr=''; _addrMode=''; _knownClient=null; _gpsLat=null; _gpsLon=null;
+  _knownClient=null; _gpsLat=null; _gpsLon=null;
   renderForm();
 }
 
@@ -2054,7 +1959,7 @@ function nuevoRegistro(){
   history.replaceState(null,'',`${location.pathname}`);
   selCourierName=''; selCourierType=''; selDateIso=''; selDateLbl='';
   agState={dept:'',prov:'',dist:'',addr:''};
-  _deliveryAddr=''; _addrMode=''; _knownClient=null; _gpsLat=null; _gpsLon=null;
+  _knownClient=null; _gpsLat=null; _gpsLon=null;
   renderForm();
 }
 
@@ -2451,7 +2356,7 @@ function wzValidate(step){
       var ci=($('f_ciudad')||{value:''}).value.trim();
       if(_wzErr('f_ciudad','err_ciudad',!ci)) ok=false;
     } else if(selCourierType==='delivery'){
-      var addr=_addrMode==='manual'?($('addrManualInput')||{value:''}).value.trim():_deliveryAddr;
+      var addr=getDeliveryAddr();   // misma fuente que submitOrder y la etiqueta
       if(!addr){ $('err_deliveryAddr')&&$('err_deliveryAddr').classList.add('show'); ok=false; }
       else { $('err_deliveryAddr')&&$('err_deliveryAddr').classList.remove('show'); }
     }
@@ -2541,8 +2446,6 @@ window.wzShow               = wzShow;
 window.onPhoneInput         = onPhoneInput;
 window.onCourierChange      = onCourierChange;
 window.pickCourier          = pickCourier;
-window.useKnownAddress      = useKnownAddress;
-window.changeAddress        = changeAddress;
 window.resetAgencySelection = resetAgencySelection;
 window.selDate              = selDate;
 window.onDept               = onDept;
@@ -2550,10 +2453,12 @@ window.onProv               = onProv;
 window.onDist               = onDist;
 window.selAgency            = selAgency;
 window.resetAgencySelection = resetAgencySelection;
-window.setAddrMode          = setAddrMode;
-window.getGPS               = getGPS;
 window._gpsCopiarLink       = _gpsCopiarLink;
-window.editGpsAddr          = editGpsAddr;
+// Dirección de entrega — una sola verdad (el textarea)
+window.usarMiUbicacion      = usarMiUbicacion;
+window.usarDireccionDeSiempre = usarDireccionDeSiempre;
+window.onDireccionInput     = onDireccionInput;
+window.quitarPin            = quitarPin;
 window.submitOrder          = submitOrder;
 window.buscarPedido         = buscarPedido;
 window.goToTracking         = goToTracking;
@@ -2563,7 +2468,6 @@ window.checkToken           = checkToken;
 // ★ Funciones que faltaban exponer (por eso sus onclick no funcionaban)
 window.abrirAyudaForm       = abrirAyudaForm;
 window.abrirAyudaTrack      = abrirAyudaTrack;
-window.mostrarOtrasOpciones = mostrarOtrasOpciones;
 window.onAgencyManual       = onAgencyManual;
 window.toggleShalomHelp     = toggleShalomHelp;
 window._notesCount          = _notesCount;
