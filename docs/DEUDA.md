@@ -37,6 +37,12 @@ de ids: **8 ms en lote contra 6 483 ms llamando `save(id)` en bucle.**
 
 **Falsa alarma.** Sí existe, en `config.js:482`.
 
+### ✅ 23 · Faltaban cabeceras en algunos archivos
+
+**Falsa alarma también.** Los 19 `.js` tienen ya cabecera descriptiva. Los dos
+que marcó la revisión (`cotizacion.js`, `voz.js`) fueron fallos del propio
+patrón de búsqueda, no del código.
+
 ---
 
 ## Pendientes — pérdida silenciosa de escrituras
@@ -187,19 +193,23 @@ El centro de alertas cubre negocio (retrasados, sin guía, sin cerrar). **Ningun
 alerta observa si tus cambios llegan a Firestore.** La clase de fallo más cara
 es la única sin cobertura.
 
-### ⬜ 21 · El CI tiene una lista escrita a mano
+### ✅ 21 · El CI tenía una lista escrita a mano
 
-`ci.yml` revisa los `.js` uno por uno con una lista que ya se desfasó: **no
-incluye `alertas.js` ni `cotizacion.js`** — 1 161 líneas que nadie verifica. Un
-`*.js` lo arregla.
+Se cambió por un comodín, que no se puede desfasar. Y se añadieron tres
+comprobaciones que no existían:
 
-Y aun arreglado, `node --check` solo confirma que el archivo se puede leer.
-**Ninguno de los fallos de este documento lo habría detectado.**
+- **El JavaScript en línea de los `.html`** — ~4 674 líneas (2 398 en
+  `index.html`, 2 276 en `formulario.html`) que ninguna comprobación miraba.
+- **Que todo `<script src>` apunte a un archivo que existe.**
+- **Que ningún `window.X` apunte a un `const`/`let` sin exportar** — la
+  comprobación que hace imposible repetir el § 12. Verificada contra el commit
+  anterior al arreglo: lo caza y nombra los cuatro archivos afectados.
 
-### ⬜ 22 · El `?v=N` depende de que te acuerdes
+### ✅ 22 · El `?v=N` dependía de que te acordaras
 
-Si cambias un `.js` y no subes su número, tus clientes siguen con la versión
-vieja en caché y tú crees que desplegaste.
+El CI compara ahora contra el commit base: si un `.js` de la raíz cambia y su
+`?v=` sigue igual, la comprobación falla. El ancla `src="` evita que
+`tracking.js` case dentro de `qrtracking.js`.
 
 ---
 
