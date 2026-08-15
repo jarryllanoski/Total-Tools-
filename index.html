@@ -2948,6 +2948,15 @@ function _qrMoveIndicator(){
 }
 function qrMoveIndTap(){ if(!_qrMove.on) return; _qrMoveStop(); toast('Escaneo desactivado'); }
 
+// Escaneo rechazado: NO deja ningún pedido en pantalla como si fuera el resultado
+// (limpia la tarjeta del escaneo anterior) y avisa por qué. Único punto de salida
+// para todos los casos que no mueven ni muestran.
+function _qrMoveFallo(msg){
+  _qrMove.last=null; _qrMove.shown=null;
+  render();
+  toast(msg);
+}
+
 // Escaneo en modo mover: identifica el pedido, valida "solo avanzar", mueve y guarda.
 function _qrMoveOnScan(raw){
   closeQR(); // uno por uno
@@ -2955,31 +2964,31 @@ function _qrMoveOnScan(raw){
   const parts=String(raw).split('#');
   let phone=parts[0].replace(/\D/g,''); if(phone.startsWith('51')&&phone.length===11)phone=phone.slice(2);
   const code=(parts[1]||'').trim().toUpperCase();
-  if(phone.length!==9){ toast('QR no reconocido'); return; }
+  if(phone.length!==9){ _qrMoveFallo('⚠️ QR no reconocido — usa la etiqueta del pedido'); return; }
   const all=allStatuses(); const target=_qrMove.status; const ti=all.indexOf(target);
-  if(ti<0){ toast('⚠️ Estado no válido'); return; }
+  if(ti<0){ _qrMoveFallo('⚠️ Estado no válido'); return; }
   let match=null;
   if(code && window.PrintModule && PrintModule.codigoEnvio){
     match=S.shipments.find(s=>s.phone===phone && String(PrintModule.codigoEnvio(s)).toUpperCase()===code);
-    if(!match){ toast('⚠️ '+phone+' #'+code+' no encontrado'); return; }
+    if(!match){ _qrMoveFallo('⚠️ '+phone+' #'+code+' no encontrado'); return; }
   } else {
     // Viejo (sin código): candidatos con ese número que PUEDEN avanzar a este estado.
     const cand=S.shipments.filter(s=>s.phone===phone && all.indexOf(s.status)>=0 && all.indexOf(s.status)<ti);
     if(cand.length===1) match=cand[0];
-    else if(cand.length>1){ toast('⚠️ Varios pedidos con '+phone+' — usa etiqueta nueva'); return; }
+    else if(cand.length>1){ _qrMoveFallo('⚠️ Varios pedidos con '+phone+' — usa etiqueta nueva'); return; }
     else {
       // 0 candidatos que avancen. Si ya hay uno EXACTAMENTE en este estado → mostrarlo limpio.
       const same=S.shipments.filter(s=>s.phone===phone && all.indexOf(s.status)===ti);
       if(same.length===1){ _qrMove.last=null; _qrMove.shown=same[0].id; render(); return; }
       const any=S.shipments.find(s=>s.phone===phone);
-      toast(any?('⚠️ '+any.name+' está en '+any.status):('⚠️ '+phone+' no encontrado')); return;
+      _qrMoveFallo(any?('⚠️ '+any.name+' está en '+any.status):('⚠️ '+phone+' no encontrado')); return;
     }
   }
   const ci=all.indexOf(match.status);
-  if(ci<0){ toast('⚠️ Estado desconocido'); return; }
+  if(ci<0){ _qrMoveFallo('⚠️ Estado desconocido'); return; }
   // Ya está en ese estado: sin aviso ni tira, solo mostrar ese pedido (como una búsqueda).
   if(ci===ti){ _qrMove.last=null; _qrMove.shown=match.id; render(); return; }
-  if(ci>ti){ toast('⚠️ No se puede retroceder: '+match.name+' está en '+match.status); return; }
+  if(ci>ti){ _qrMoveFallo('⚠️ No se puede retroceder: '+match.name+' está en '+match.status); return; }
   const prev=match.status; match.status=target;
   if(window._fbSaveShipmentNow) window._fbSaveShipmentNow(match); else save(match.id);
   _qrMove.last={ id:match.id, prev:prev }; _qrMove.shown=match.id;
