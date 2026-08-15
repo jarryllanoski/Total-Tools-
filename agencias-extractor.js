@@ -74,6 +74,9 @@
   /* Mapea agencia cruda de Olva (department/province/district/lat/lng/horario
      por día) al MISMO esquema común que Shalom, para que la búsqueda del
      formulario funcione idéntico sin importar el courier. */
+  /* Gemelo en el servidor: functions/olvaNormalizar.js, que aplica el MISMO
+     mapeo al respaldo en vivo (agenciasOlva). Si Olva cambia sus campos, se
+     tocan los dos. */
   var _DIAS_HORARIO = ['monday','tuesday','wednesday','thursday','friday'];
   function _mapOlva(raw) {
     var h = raw.horario;

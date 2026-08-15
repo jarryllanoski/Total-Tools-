@@ -15,6 +15,7 @@ const comprobante = require("./comprobante");
 const shalomWebSync = require("./shalomWebSync");
 // Seleccion de datos del cliente recurrente (logica pura, testeable aparte).
 const clienteLookup = require("./clienteLookup");
+const {normalizarOlva} = require("./olvaNormalizar");
 
 setGlobalOptions({maxInstances: 10});
 initializeApp();
@@ -661,8 +662,10 @@ exports.agenciasOlva = onRequest(
             a.nombres, a.direccion, a.department, a.province, a.district,
           ].some((f) => String(f || "").toLowerCase().includes(q)));
         }
+        // Se responde en el MISMO formato que data/agencias-olva.json: el
+        // formulario tiene un solo contrato, venga del JSON o de aqui.
         res.set("Cache-Control", "no-store");
-        res.json({resultados: lista});
+        res.json({resultados: lista.map(normalizarOlva)});
       } catch (e) {
         console.error("agenciasOlva error:", e);
         res.status(e.status || 500).json({
