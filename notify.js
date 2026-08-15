@@ -227,7 +227,8 @@
     var _onAfterPrint = function(){
       window.removeEventListener('afterprint', _onAfterPrint);
       ship._printed = true;
-      if(typeof window.save === 'function') window.save();
+      // Con id: sube SOLO este pedido. Sin id subiría los ~700.
+      if(typeof window.save === 'function') window.save(ship.id);
       if(_notifs[notifIdx]) _notifs[notifIdx].printed = true;
       _render();
       if(typeof window.toast === 'function') window.toast('✅ Impreso — ' + ship.name);

@@ -325,7 +325,9 @@ window.PrintModule = {
 
     // Marcar como impresos
     _list.forEach(s=>{ s.printed = true; });
-    window.save&&save();
+    // Lista de ids en UNA llamada: "imprimir todos" puede ser 700 pedidos y
+    // save(id) en bucle reescribe el estado completo cada vez (7,6 s de bloqueo).
+    window.save && window.save(_list.map(s=>s.id));
 
     this.close();
   }

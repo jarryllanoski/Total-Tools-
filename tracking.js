@@ -319,7 +319,7 @@ async function autoTrackingCheck() {
 
   var okCount  = 0;
   var errCount = 0;
-  var changedCount = 0; // ★ cuántos pedidos cambiaron de verdad en este ciclo
+  var changedIds = []; // ★ qué pedidos cambiaron de verdad en este ciclo
 
   for (var i = 0; i < pendientes.length; i++) {
     var ship = pendientes[i];
@@ -332,7 +332,7 @@ async function autoTrackingCheck() {
         errCount++;
       } else {
         okCount++;
-        if (resultado !== 'sin-cambio') changedCount++; // ★ hubo cambio real
+        if (resultado !== 'sin-cambio') changedIds.push(ship.id); // ★ hubo cambio real
       }
     } catch(e) {
       errCount++;
@@ -361,8 +361,11 @@ async function autoTrackingCheck() {
   // ★ Solo guardar (y subir ts → disparar recargas) si algún pedido cambió de verdad.
   // Si ningún pedido cambió, NO guardamos: así no se genera el rebote de lecturas
   // entre dispositivos que disparaba millones de lecturas/día.
-  if (changedCount > 0) {
-    if (typeof window.save === 'function') window.save();
+  // Se guardan SOLO los pedidos que cambiaron (lista de ids, una escritura).
+  // Antes era window.save() sin id — que además de estar muerto habría subido
+  // los ~700 pedidos enteros cada ciclo.
+  if (changedIds.length && typeof window.save === 'function') {
+    window.save(changedIds);
   }
   if (typeof window.render === 'function') window.render();
   _autoRunning = false;

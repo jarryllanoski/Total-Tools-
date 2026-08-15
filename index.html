@@ -1278,11 +1278,20 @@ let _dirtyAll = true; // true = subir todo (config/suppliers/masivo); arranque s
 let _dirtyConfigOnly = false; // true = subir SOLO config (toggles de Config)
 
 const save = (shipId) => {
+  // Lista vacía = no cambió nada. Sin esta guarda caería en "sin id" y subiría
+  // los ~700 pedidos por gusto.
+  if(Array.isArray(shipId) && !shipId.length) return;
   _S_TS = Date.now();
   window._S_TS = _S_TS;
   window.S = S;
   // Marcar qué cambió
-  if(shipId === 'config'){
+  if(Array.isArray(shipId)){
+    // ★ Varios pedidos de una vez (imprimir un lote, ciclo de auto-tracking).
+    // Marca todos y serializa UNA sola vez: llamar save(id) en un bucle de 700
+    // congela el panel 7,6 s porque cada llamada reescribe el estado completo.
+    shipId.forEach(id => { if(id) _dirtyShips.add(id); });
+    _dirtyConfigOnly = false;
+  } else if(shipId === 'config'){
     // ★ Solo config cambió (toggles de Config: días, couriers, etc.).
     // No marca ningún pedido: si no hay otros pedidos sucios pendientes,
     // _fbSave subirá únicamente el documento config (no los 180 pedidos).
@@ -1302,6 +1311,12 @@ const save = (shipId) => {
   clearTimeout(_fbSaveTimer);
   _fbSaveTimer = setTimeout(() => { _fbSaveWithRetry(S, 0); }, 800);
 };
+// ★ save() se declara con const, y un const de nivel superior NO se cuelga de
+// window (a diferencia de las function). Los módulos que hacían
+// `typeof window.save === 'function'` veían undefined y NO GUARDABAN NADA:
+// print.js, notify.js, respaldo.js (¡restaurar un respaldo no persistía!) y el
+// ciclo de auto-tracking. Una línea los revive a los cuatro.
+window.save = save;
 
 // Guardar con hasta 3 reintentos ante fallos de red
 async function _fbSaveWithRetry(data, attempt){
@@ -3164,9 +3179,9 @@ render();
 <!-- ★ SHALOM tracking — cargado al final -->
 <script src="storage.js?v=2"></script>
 <script src="config.js?v=13"></script>
-<script src="print.js?v=13"></script>
-<script src="notify.js?v=3"></script>
-<script src="tracking.js?v=3"></script>
+<script src="print.js?v=14"></script>
+<script src="notify.js?v=4"></script>
+<script src="tracking.js?v=4"></script>
 <script src="floatpanel.js?v=2"></script>
 <script src="delivery.js?v=7"></script>
 <script src="qrtracking.js?v=3"></script>
