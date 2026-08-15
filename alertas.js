@@ -84,6 +84,35 @@ Alertas.calcular = function(){
   return out;
 };
 
+/* ── Estado del sistema (latido que escribe el backend) ──────────────
+   Viaja dentro de panel/config, que el panel ya descarga en cada poll → se
+   lee sin una sola lectura extra. */
+function _salud(){ return (global.S && global.S.salud) || null; }
+
+function _haceCuanto(iso){
+  var t = Date.parse(iso || '');
+  if (!isFinite(t)) return '—';
+  var m = Math.round((Date.now() - t) / 60000);
+  if (m < 1) return 'hace un momento';
+  if (m < 60) return 'hace ' + m + ' min';
+  var h = Math.round(m / 60);
+  if (h < 24) return 'hace ' + h + ' h';
+  return 'hace ' + Math.round(h / 24) + ' d';
+}
+
+// Severidad del sistema: 'ok' | 'aviso' | 'error'
+Alertas.estadoSistema = function(){
+  var s = _salud();
+  if (!s) return { nivel: 'aviso', txt: 'Sin datos todavía', detalle: 'Aún no hay ninguna corrida registrada.' };
+  if (s.activo === false) return { nivel: 'error', txt: 'Apagado', detalle: 'El seguimiento automático no está corriendo (motor: ' + (s.motor || '—') + ').' };
+  var vieja = Date.parse(s.ultimaCorrida || '');
+  if (isFinite(vieja) && (Date.now() - vieja) > 3 * 3600000) {
+    return { nivel: 'error', txt: 'Sin señal', detalle: 'La última corrida fue ' + _haceCuanto(s.ultimaCorrida) + '.' };
+  }
+  if (s.errores > 0) return { nivel: 'aviso', txt: 'Con errores', detalle: s.errores + ' error(es) en la última corrida.' };
+  return { nivel: 'ok', txt: 'Activo', detalle: 'Última corrida ' + _haceCuanto(s.ultimaCorrida) + '.' };
+};
+
 /* ── CSS ─────────────────────────────────────────────────────────── */
 function _css(){
   if (document.getElementById('alertasCSS')) return;
@@ -92,8 +121,26 @@ function _css(){
     '#alertasBtn{position:relative;display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border:none;background:none;padding:0;cursor:pointer;color:var(--text2);flex-shrink:0}',
     '#alertasBtn svg{width:16px;height:16px;display:block}',
     '#alertasBtn.on{color:#f59e0b}',
+    '#alertasBtn.err{color:var(--red)}',
     '#alertasBadge{position:absolute;top:-4px;right:-6px;min-width:14px;height:14px;padding:0 3px;border-radius:7px;background:#f59e0b;color:#0d1117;font-size:9px;font-weight:800;display:none;align-items:center;justify-content:center;line-height:1}',
     '#alertasBadge.show{display:flex}',
+    '#alertasBadge.err{background:var(--red);color:#fff}',
+    '.al-sis{display:flex;align-items:center;gap:9px;padding:10px 11px;border-radius:9px;margin-bottom:8px;border:1px solid}',
+    '.al-sis.ok{background:rgba(46,160,67,.08);border-color:rgba(46,160,67,.3)}',
+    '.al-sis.aviso{background:rgba(245,158,11,.08);border-color:rgba(245,158,11,.3)}',
+    '.al-sis.error{background:rgba(247,129,102,.10);border-color:rgba(247,129,102,.35)}',
+    '.al-sis-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0}',
+    '.al-sis.ok .al-sis-dot{background:var(--green)}',
+    '.al-sis.aviso .al-sis-dot{background:#f59e0b}',
+    '.al-sis.error .al-sis-dot{background:var(--red)}',
+    '.al-kpis{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}',
+    '.al-kpi{flex:1;min-width:70px;background:var(--bg2);border:1px solid var(--bd);border-radius:8px;padding:7px 6px;text-align:center}',
+    '.al-kpi-n{font-size:15px;font-weight:800;font-family:Syne,sans-serif;color:var(--text)}',
+    '.al-kpi-l{font-size:9px;color:var(--text2);text-transform:uppercase;margin-top:1px}',
+    '.al-ev{font-size:11px;color:var(--text2);padding:6px 8px;background:var(--bg2);border:1px solid var(--bd);border-radius:7px;margin-bottom:5px;cursor:pointer}',
+    '.al-ev b{color:var(--red);font-family:monospace}',
+    '.al-btns{display:flex;gap:7px;margin-top:4px}',
+    '.al-btns button{flex:1;padding:9px;border-radius:8px;border:1px solid var(--bd);background:var(--bg2);color:var(--text2);font-size:11.5px;font-weight:700;cursor:pointer;font-family:inherit}',
     '.al-sec{margin-bottom:14px}',
     '.al-sec-ttl{font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:var(--text2);margin-bottom:7px;display:flex;align-items:center;justify-content:space-between}',
     '.al-sec-cnt{background:rgba(245,158,11,.15);color:#f59e0b;border-radius:10px;padding:1px 7px;font-size:10px;font-weight:800}',
@@ -134,17 +181,26 @@ Alertas.refrescar = function(){
   var btn = document.getElementById('alertasBtn');
   var bad = document.getElementById('alertasBadge');
   if (!btn || !bad) return;
-  var a = Alertas.calcular();
+  var a   = Alertas.calcular();
+  var sis = Alertas.estadoSistema();
+  // Rojo manda: un sistema caído es más grave que pedidos por atender.
+  btn.classList.remove('on', 'err');
+  if (sis.nivel === 'error') btn.classList.add('err');
+  else if (a.total > 0)      btn.classList.add('on');
+
   if (a.total > 0) {
     bad.textContent = a.total > 99 ? '99+' : String(a.total);
     bad.classList.add('show');
-    btn.classList.add('on');
-    btn.title = a.total + ' cosa' + (a.total !== 1 ? 's' : '') + ' requiere' + (a.total !== 1 ? 'n' : '') + ' tu atención';
+    bad.classList.toggle('err', sis.nivel === 'error');
+  } else if (sis.nivel === 'error') {
+    bad.textContent = '!';
+    bad.classList.add('show', 'err');
   } else {
-    bad.classList.remove('show');
-    btn.classList.remove('on');
-    btn.title = 'Alertas — todo en orden';
+    bad.classList.remove('show', 'err');
   }
+
+  btn.title = (sis.nivel === 'error' ? '⚠️ ' + sis.txt + ' · ' : '') +
+    (a.total > 0 ? a.total + ' por atender' : 'Todo en orden');
 };
 
 /* ── Panel ───────────────────────────────────────────────────────── */
@@ -186,6 +242,51 @@ function _seccion(titulo, lista, subFn){
   '</div>';
 }
 
+// Eventos AGRUPADOS por código: "SHALOM_SIN_RESPUESTA ×12 · hace 3 h".
+// Un log que repite doce veces lo mismo no se lee; agrupado sí.
+function _eventosHtml(){
+  var s = _salud();
+  var ev = (s && Array.isArray(s.eventos)) ? s.eventos : [];
+  if (!ev.length) return '';
+  var g = {};
+  ev.forEach(function(e){
+    var k = e.codigo || 'ERROR';
+    if (!g[k]) g[k] = { n: 0, ultimo: e.ts, pedidoId: e.pedidoId, pedido: e.pedido, msg: e.msg };
+    g[k].n++;
+    if (String(e.ts) > String(g[k].ultimo)) { g[k].ultimo = e.ts; g[k].pedidoId = e.pedidoId; g[k].pedido = e.pedido; g[k].msg = e.msg; }
+  });
+  var filas = Object.keys(g).sort(function(a,b){ return g[b].n - g[a].n; }).map(function(k){
+    var x = g[k];
+    var ir = x.pedidoId ? ' onclick="Alertas.ir(\'' + String(x.pedidoId).replace(/'/g,"\\'") + '\')"' : '';
+    return '<div class="al-ev"' + ir + '><b>' + _esc(k) + '</b> ×' + x.n + ' · ' + _haceCuanto(x.ultimo) +
+      (x.pedido ? '<br>último: ' + _esc(x.pedido) : '') + '</div>';
+  }).join('');
+  return '<div class="al-sec"><div class="al-sec-ttl"><span>🧾 Últimos problemas</span></div>' + filas + '</div>';
+}
+
+function _sistemaHtml(){
+  var s = _salud();
+  var e = Alertas.estadoSistema();
+  var kpis = s ? ('<div class="al-kpis">' +
+      '<div class="al-kpi"><div class="al-kpi-n">' + (s.enCola != null ? s.enCola : '—') + '</div><div class="al-kpi-l">En cola</div></div>' +
+      '<div class="al-kpi"><div class="al-kpi-n">' + (s.procesados != null ? s.procesados : '—') + '</div><div class="al-kpi-l">Procesados</div></div>' +
+      '<div class="al-kpi"><div class="al-kpi-n">' + (s.errores != null ? s.errores : '—') + '</div><div class="al-kpi-l">Errores</div></div>' +
+      '<div class="al-kpi"><div class="al-kpi-n">' + (s.sinGuia != null ? s.sinGuia : '—') + '</div><div class="al-kpi-l">Sin guía</div></div>' +
+    '</div>') : '';
+  return '<div class="al-sec">' +
+    '<div class="al-sec-ttl"><span>⚙️ Estado del sistema</span></div>' +
+    '<div class="al-sis ' + e.nivel + '"><span class="al-sis-dot"></span>' +
+      '<div style="flex:1;min-width:0"><div style="font-size:12.5px;font-weight:700;color:var(--text)">Seguimiento automático: ' + _esc(e.txt) + '</div>' +
+      '<div style="font-size:11px;color:var(--text2);margin-top:2px">' + _esc(e.detalle) +
+      (s && s.hayMas ? ' · quedan pedidos en cola' : '') + '</div></div>' +
+    '</div>' + kpis +
+    '<div class="al-btns">' +
+      '<button onclick="Alertas.sincronizar(this)">🔄 Sincronizar ahora</button>' +
+      '<button onclick="Alertas.reprogramar(this)">⏱️ Reprogramar cola</button>' +
+    '</div>' +
+  '</div>';
+}
+
 Alertas.abrir = function(){
   _montarPanel();
   var a = Alertas.calcular();
@@ -193,16 +294,31 @@ Alertas.abrir = function(){
   var inp  = document.getElementById('alertasDias');
   if (inp) inp.value = _diasCierre();
   if (body) {
-    if (!a.total) {
-      body.innerHTML = '<div class="al-ok">✅<br>Todo en orden<br><span style="font-size:11.5px">No hay pedidos retrasados ni datos faltantes.</span></div>';
-    } else {
-      body.innerHTML =
-        _seccion('⏰ Retrasados', a.retrasados, function(s){ return 'Debía salir el ' + _esc(s.date) + ' · ' + _esc(s.status); }) +
-        _seccion('📋 Shalom sin guía', a.sinGuia, function(s){ return 'Falta guía o código — no se puede seguir'; }) +
-        _seccion('💰 Sin finalizar', a.sinCerrar, function(s){ return 'Enviado el ' + _esc(s.date) + ' · ' + _esc(s.status); });
-    }
+    var atencion = a.total ?
+      (_seccion('⏰ Retrasados', a.retrasados, function(s){ return 'Debía salir el ' + _esc(s.date) + ' · ' + _esc(s.status); }) +
+       _seccion('📋 Shalom sin guía', a.sinGuia, function(){ return 'Falta guía o código — no se puede seguir'; }) +
+       _seccion('💰 Sin finalizar', a.sinCerrar, function(s){ return 'Enviado el ' + _esc(s.date) + ' · ' + _esc(s.status); }))
+      : '<div class="al-ok">✅<br>Todo en orden<br><span style="font-size:11.5px">No hay pedidos retrasados ni datos faltantes.</span></div>';
+    body.innerHTML = atencion + _sistemaHtml() + _eventosHtml();
   }
   global.openOverlay('alertasOverlay');
+};
+
+/* Botones del bloque de sistema — reusan las funciones del panel. */
+Alertas.sincronizar = function(btn){
+  if (typeof global.syncShalomWebNow !== 'function') return;
+  if (btn) { btn.disabled = true; btn.textContent = '⏳…'; }
+  global.closeOverlay('alertasOverlay');
+  global.goPage && global.goPage('configurar');
+  global.syncShalomWebNow();
+};
+Alertas.reprogramar = async function(btn){
+  if (typeof global.reprogramarColaShalom !== 'function') return;
+  if (btn) { btn.disabled = true; btn.textContent = '⏳…'; }
+  var r = await global.reprogramarColaShalom();
+  if (r && r.ok && global.toast) global.toast('✅ Cola: ' + r.enCola + ' pedidos');
+  Alertas.abrir();
+  Alertas.refrescar();
 };
 
 // Tocar una alerta → abrir ese pedido.

@@ -1998,15 +1998,33 @@ function toggleTrackingWebCliente(){
   save('config');
   toast(on?'📱 El cliente verá el estado de Shalom':'🙈 Estado de Shalom solo en tu panel');
 }
-/* Horas programadas del Motor B (tránsito / destino). */
-function setTrackingWebHoras(){
+/* Horas programadas del Motor B (tránsito / destino). Al guardarlas se
+   REPROGRAMA la cola: si no, los pedidos ya encolados conservarían su fecha
+   vieja y tu cambio recién se notaría una vuelta después. */
+async function setTrackingWebHoras(){
   S.config=S.config||{};
   const t=parseInt(document.getElementById('cfgTrackingWebTransitoH').value,10);
   const d=parseInt(document.getElementById('cfgTrackingWebDestinoH').value,10);
   if(t>=1&&t<=72) S.config.trackingWebIntervalTransitoH=t;
   if(d>=1&&d<=168) S.config.trackingWebIntervalDestinoH=d;
   save('config');
-  toast('⏱️ Horas de rastreo guardadas');
+  toast('⏱️ Horas guardadas — reprogramando cola…');
+  const r=await reprogramarColaShalom();
+  if(r&&r.ok) toast('✅ Cola reprogramada: '+r.enCola+' en cola');
+}
+
+/* Reconstruye/reprograma la cola del seguimiento automático con el intervalo
+   ACTUAL. Se usa al cambiar las horas y desde el botón de Estado del sistema
+   (también sirve para meter en cola los pedidos que ya existían). */
+async function reprogramarColaShalom(){
+  try{
+    if(typeof window._authEnsureToken==='function') await window._authEnsureToken();
+    const tok=localStorage.getItem('tt_id_token')||'';
+    const r=await fetch('https://us-central1-total-tools-24ce8.cloudfunctions.net/syncShalomWebNow?accion=reprogramar',
+      {headers:{Authorization:'Bearer '+tok}}).then(x=>x.json());
+    if(!r||!r.ok) toast('⚠️ '+((r&&r.motivo)||'No se pudo reprogramar'));
+    return r;
+  }catch(e){ toast('⚠️ Sin conexión para reprogramar'); return null; }
 }
 /* Boton manual: corre el pipeline del Motor B YA (sin esperar al scheduler
    cada 30 min) y muestra el diagnostico + resultado directo en el panel. */
@@ -2027,9 +2045,9 @@ async function syncShalomWebNow(){
     if(!r.ejecutado){
       txt+='\n'+(r.motivo||'No se ejecutó.');
     } else {
-      txt+='\nPedidos Shalom: '+r.pedidosShalom+' | Vencidos: '+r.vencidos+' | Procesados: '+r.procesados;
-      txt+='\nOK: '+r.ok+' · Errores: '+r.errores+' · Pendientes próxima ronda: '+r.pendientes;
-      txt+='\n📋 Rellenados en tarjeta (sin consultar): '+(r.rellenados||0);
+      txt+='\nProcesados: '+r.procesados+' · OK: '+r.ok+' · Errores: '+r.errores;
+      if(r.saneados) txt+=' · Sacados de la cola: '+r.saneados;
+      if(r.hayMas) txt+='\n⏳ Quedan más en cola — se toman en la próxima ronda.';
       if(r.detalle&&r.detalle.length){
         txt+='\n\n'+r.detalle.map(function(x){ return (x.ok?'✓':'✗')+' '+x.pedido+(x.sugerida?' → '+x.sugerida:''); }).join('\n');
       }
@@ -3137,7 +3155,7 @@ render();
 </script>
 <!-- ★ SHALOM tracking — cargado al final -->
 <script src="storage.js?v=2"></script>
-<script src="config.js?v=12"></script>
+<script src="config.js?v=13"></script>
 <script src="print.js?v=13"></script>
 <script src="notify.js?v=3"></script>
 <script src="tracking.js?v=2"></script>
@@ -3149,7 +3167,7 @@ render();
 <script src="respaldo.js?v=1"></script>
 <script src="ayuda.js?v=2"></script>
 <script src="dashboard.js?v=2"></script>
-<script src="alertas.js?v=1"></script>
+<script src="alertas.js?v=2"></script>
 <script src="voz.js?v=2"></script>
 <script src="cotizacion.js?v=1"></script>
 <script>

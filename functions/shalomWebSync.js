@@ -66,6 +66,33 @@ const estaVencido = (ship, nowMs) => {
   return !Number.isFinite(t) || t <= nowMs;
 };
 
+// Espaciado creciente ante fallos: 1h, 2h, 4h, 8h, 24h. Tras MAX_ERRORES
+// seguidos el pedido SALE de la cola y queda marcado para revision manual —
+// deja de castigar a Shalom y de gastar corridas en algo roto.
+const BACKOFF_H = [1, 2, 4, 8, 24];
+const MAX_ERRORES = 5;
+const proximaTrasError = (errores, nowMs) => {
+  const i = Math.min(Math.max(errores - 1, 0), BACKOFF_H.length - 1);
+  return new Date(nowMs + BACKOFF_H[i] * 3600000).toISOString();
+};
+
+// Fecha de cola de un pedido: es a la vez el RELOJ y la MARCA de elegibilidad.
+//   · no elegible (sin guia/codigo, terminal, no Shalom) → null = fuera de cola
+//   · nunca consultado                                   → ahora = entra ya
+//   · consultado                                         → ultima + intervalo
+// Devolver null saca el pedido de la cola sin necesidad de ninguna otra marca.
+const fechaCola = (ship, cfg, nowMs) => {
+  if (!esElegible(ship)) return null;
+  const nowIso = new Date(nowMs).toISOString();
+  const ultima = ship && ship.trackingWebUltimaConsulta;
+  if (!ultima) return nowIso;
+  const t = Date.parse(ultima);
+  if (!Number.isFinite(t)) return nowIso;
+  const auto = ship.trackingWebEstadoNormalizado || null;
+  const prox = calcularProximaConsulta(auto, t, cfg);
+  return (Date.parse(prox) <= nowMs) ? nowIso : prox;
+};
+
 // Calcula la proxima consulta segun el estado detectado (horas configurables
 // desde panel/config, con los mismos valores del Manual Shalom por defecto).
 const calcularProximaConsulta = (autoEstado, nowMs, cfg) => {
@@ -153,15 +180,21 @@ const decidirCambios = (ship, data, nowMs, cfg) => {
   const nowIso = new Date(nowMs).toISOString();
   const modoEtiqueta = etiquetaModo(cfg);
 
-  // Error del worker: solo campos de observacion, nada visible.
+  // Error del worker: solo campos de observacion, nada visible. El reintento se
+  // ESPACIA (1h,2h,4h,8h,24h) y tras MAX_ERRORES el pedido sale de la cola
+  // (proximaConsulta=null) marcado para revision manual.
   if (!data || !data.ok) {
+    const errores = (ship.erroresSeguidosWeb || 0) + 1;
+    const rendido = errores >= MAX_ERRORES;
     return {
       trackingWebFuente: "web",
       trackingWebUltimaConsulta: nowIso,
       trackingWebError: (data && data.error) || "sin respuesta",
-      erroresSeguidosWeb: (ship.erroresSeguidosWeb || 0) + 1,
-      trackingWebActivo: true,
-      trackingWebProximaConsulta: calcularProximaConsulta(null, nowMs, cfg),
+      erroresSeguidosWeb: errores,
+      trackingWebActivo: !rendido,
+      trackingWebRequiereAtencion: rendido ? true : null,
+      trackingWebProximaConsulta: rendido ?
+        null : proximaTrasError(errores, nowMs),
     };
   }
 
@@ -180,6 +213,7 @@ const decidirCambios = (ship, data, nowMs, cfg) => {
     trackingWebUltimaConsulta: nowIso,
     trackingWebError: null,
     erroresSeguidosWeb: 0,
+    trackingWebRequiereAtencion: null, // se recupero solo
   };
 
   // TRACKING VISIBLE (texto de Shalom): se escribe SIEMPRE que el texto cambie,
@@ -208,12 +242,13 @@ const decidirCambios = (ship, data, nowMs, cfg) => {
 
   // El polling se detiene cuando Shalom marca entregado (aunque en observacion
   // no se haya movido la etiqueta): un envio entregado ya no cambia.
+  // Con el modelo de COLA, "detenerse" tiene que BORRAR la fecha: si se dejara
+  // la vieja (ya pasada) el pedido seguiria saliendo vencido para siempre.
+  // null = fuera de la cola.
   const detenerse = autoEstado === "FINALIZADO";
   write.trackingWebActivo = !detenerse;
-  if (!detenerse) {
-    write.trackingWebProximaConsulta =
-      calcularProximaConsulta(autoEstado, nowMs, cfg);
-  }
+  write.trackingWebProximaConsulta = detenerse ?
+    null : calcularProximaConsulta(autoEstado, nowMs, cfg);
 
   return write;
 };
@@ -222,6 +257,8 @@ module.exports = {
   detectarEstadoAuto,
   esElegible,
   estaVencido,
+  fechaCola,
+  MAX_ERRORES,
   calcularProximaConsulta,
   consultarWorker,
   decidirCambios,

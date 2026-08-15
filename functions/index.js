@@ -775,53 +775,133 @@ const leerCfgTracking = async () => {
 // entre el scheduler automatico y el boton manual "Sincronizar ahora", para
 // no duplicar logica. No filtra por trackingMotor — quien llama decide si
 // corresponde ejecutar.
+// Anillo de eventos (ultimos N) — vive dentro del propio latido de salud, asi
+// no hay coleccion que crezca sin fin, ni indices, ni limpiezas programadas.
+const MAX_EVENTOS = 100;
+const anillo = (previos, nuevos) => {
+  const todos = (Array.isArray(previos) ? previos : []).concat(nuevos || []);
+  return todos.slice(-MAX_EVENTOS);
+};
+
+// Latido de salud. Se guarda DENTRO de panel/config (campo "salud"), que el
+// panel ya descarga en cada poll → el centro de alertas lo ve sin una sola
+// lectura extra. El panel escribe con updateMask, asi que no lo pisa.
+const escribirSalud = async (parcial, eventos) => {
+  const snap = await db.doc(CFG_DOC).get();
+  const prev = (snap.exists && snap.data().salud) || {};
+  const salud = Object.assign({}, prev, parcial);
+  if (eventos && eventos.length) salud.eventos = anillo(prev.eventos, eventos);
+  await db.doc(CFG_DOC).set({salud: salud}, {merge: true});
+};
+
+// Cuenta cuantos pedidos Shalom NO se pueden seguir por falta de guia/codigo.
+// Se calcula solo en la reprogramacion (no en cada corrida) para no pagar el
+// barrido completo cada 30 min.
+const contarSinGuia = (docs) => {
+  let n = 0;
+  docs.forEach((doc) => {
+    const s = doc.data();
+    const courier = String(s.courier || "").toUpperCase();
+    if (courier.indexOf("SHALOM") < 0) return;
+    if (s.status === "FINALIZADO") return;
+    const g = s.trackingOrderNumber || s.shalomGuia || "";
+    const c = s.trackingOrderCode || s.shalomCodigo || "";
+    if (!g || !c) n++;
+  });
+  return n;
+};
+
+// Reconstruye/reprograma la COLA. Un solo barrido, sin consultar a Shalom:
+//   · pone o quita la fecha de cola de cada pedido segun el intervalo ACTUAL
+//     (por eso al cambiar las horas en Config la cola se ajusta al instante);
+//   · de paso rellena las tarjetas que tienen dato observado pero estan vacias.
+// Se usa (a) una vez para meter en cola los pedidos existentes y (b) cada vez
+// que cambias las horas.
+const reprogramarCola = async (cfg) => {
+  const nowMs = Date.now();
+  // Un unico barrido por prefijo: cubre SHALOM, "SHALOM EMPRESAS", etc.
+  const snap = await db.collection(SHIP_COL)
+      .where("courier", ">=", "SHALOM")
+      .where("courier", "<=", "SHALOM\uf8ff").get(); // \uf8ff = fin del prefijo
+
+  let enCola = 0; let fuera = 0; let rellenados = 0;
+  for (const doc of snap.docs) {
+    const ship = doc.data();
+    const write = {};
+
+    const fecha = shalomWebSync.fechaCola(ship, cfg, nowMs);
+    if ((ship.trackingWebProximaConsulta || null) !== fecha) {
+      write.trackingWebProximaConsulta = fecha;
+    }
+    if (fecha) enCola++; else fuera++;
+
+    // Backfill: hay dato observado pero la tarjeta esta vacia/desfasada.
+    if (ship.trackingWebRawStatus &&
+        ship.trackingStatus !== ship.trackingWebRawStatus) {
+      const iso = ship.trackingWebUltimaConsulta ||
+        new Date(nowMs).toISOString();
+      Object.assign(write, shalomWebSync.appendTracking(
+          ship, ship.trackingWebRawStatus, "backfill", iso));
+      rellenados++;
+    }
+
+    if (Object.keys(write).length) {
+      await db.doc(SHIP_COL + "/" + doc.id).set(write, {merge: true});
+    }
+  }
+
+  const sinGuia = contarSinGuia(snap.docs);
+  await escribirSalud({
+    enCola: enCola,
+    sinGuia: sinGuia,
+    ultimaReprogramacion: new Date(nowMs).toISOString(),
+  }, null);
+
+  return {
+    revisados: snap.size,
+    enCola: enCola,
+    fuera: fuera,
+    rellenados: rellenados,
+    sinGuia: sinGuia,
+  };
+};
+
 const runShalomWebSync = async (cfg) => {
   const workerUrl = SHALOMWEB_URL.value();
   const nowMs = Date.now();
+  const nowIso = new Date(nowMs).toISOString();
 
+  // COLA: se pide SOLO lo que vence. Campo unico → Firestore lo indexa solo,
+  // no hace falta indice compuesto. Sustituye al barrido de todos los Shalom
+  // (de decenas de miles de lecturas/dia a unas pocas) y de paso elimina el
+  // hueco de cobertura: ya no se filtra por el nombre exacto del courier.
   const snap = await db.collection(SHIP_COL)
-      .where("courier", "==", "SHALOM").get();
+      .where("trackingWebProximaConsulta", "<=", nowIso)
+      .orderBy("trackingWebProximaConsulta")
+      .limit(MAX_SHALOMWEB_POR_CORRIDA + 1).get();
 
-  const vencidos = [];
-  const rellenar = []; // backfill: tienen dato observado pero tarjeta vacia
-  snap.forEach((doc) => {
-    const ship = doc.data();
-    if (shalomWebSync.esElegible(ship) &&
-        shalomWebSync.estaVencido(ship, nowMs)) {
-      vencidos.push({id: doc.id, ship: ship});
-    }
-    // Backfill: el Motor B ya observo el estado (trackingWebRawStatus) pero
-    // la tarjeta (trackingStatus) esta vacia o desactualizada. Copiamos el
-    // dato existente SIN volver a consultar Shalom. Aplica a cualquier pedido
-    // Shalom con dato observado (incluidos terminales).
-    if (ship.trackingWebRawStatus &&
-        ship.trackingStatus !== ship.trackingWebRawStatus) {
-      rellenar.push({id: doc.id, ship: ship});
-    }
-  });
+  const cola = snap.docs.map((d) => ({id: d.id, ship: d.data()}));
+  const hayMas = cola.length > MAX_SHALOMWEB_POR_CORRIDA;
+  const lote = cola.slice(0, MAX_SHALOMWEB_POR_CORRIDA);
 
-  // Backfill primero (instantaneo, sin red).
-  let rellenados = 0;
-  for (let i = 0; i < rellenar.length; i++) {
-    const item = rellenar[i];
-    const raw = item.ship.trackingWebRawStatus;
-    // Mismo escritor atomico que Motor B → el backfill ahora TAMBIEN escribe
-    // trackingHistory (antes faltaba: dejaba hora pero sin boton Historial).
-    const nowIso = item.ship.trackingWebUltimaConsulta ||
-      new Date(nowMs).toISOString();
-    const block = shalomWebSync.appendTracking(
-        item.ship, raw, "backfill", nowIso);
-    await db.doc(SHIP_COL + "/" + item.id).set(block, {merge: true});
-    rellenados++;
-  }
-
-  const lote = vencidos.slice(0, MAX_SHALOMWEB_POR_CORRIDA);
   let actualizados = 0;
   let errores = 0;
+  let saneados = 0;
   const detalle = [];
+  const eventos = [];
 
   for (let i = 0; i < lote.length; i++) {
     const item = lote[i];
+
+    // Cinturon: si algo entro a la cola sin ser elegible (guia borrada,
+    // finalizado a mano), sale sola. Auto-saneamiento, sin consultar.
+    if (!shalomWebSync.esElegible(item.ship)) {
+      await db.doc(SHIP_COL + "/" + item.id)
+          .set({trackingWebProximaConsulta: null}, {merge: true});
+      saneados++;
+      continue;
+    }
+
     const guia = item.ship.trackingOrderNumber || item.ship.shalomGuia;
     const codigo = item.ship.trackingOrderCode || item.ship.shalomCodigo;
     const data = await shalomWebSync.consultarWorker(workerUrl, guia, codigo);
@@ -829,7 +909,20 @@ const runShalomWebSync = async (cfg) => {
     if (write && Object.keys(write).length) {
       await db.doc(SHIP_COL + "/" + item.id).set(write, {merge: true});
     }
-    if (data && data.ok) actualizados++; else errores++;
+    if (data && data.ok) {
+      actualizados++;
+    } else {
+      errores++;
+      eventos.push({
+        ts: nowIso,
+        nivel: "error",
+        codigo: write.trackingWebRequiereAtencion ?
+          "REINTENTOS_AGOTADOS" : "SHALOM_SIN_RESPUESTA",
+        msg: String((data && data.error) || "sin respuesta").slice(0, 120),
+        pedidoId: item.id,
+        pedido: item.ship.name || item.id,
+      });
+    }
     detalle.push({
       pedido: item.ship.name || item.id,
       ok: !!(data && data.ok),
@@ -841,14 +934,14 @@ const runShalomWebSync = async (cfg) => {
   }
 
   return {
-    pedidosShalom: snap.size,
-    vencidos: vencidos.length,
     procesados: lote.length,
-    rellenados: rellenados,
+    saneados: saneados,
     ok: actualizados,
     errores: errores,
-    pendientes: vencidos.length - lote.length,
+    hayMas: hayMas,
     detalle: detalle,
+    eventos: eventos,
+    nowIso: nowIso,
   };
 };
 
@@ -862,16 +955,42 @@ exports.syncShalomWeb = onSchedule(
     },
     async () => {
       const cfg = await leerCfgTracking();
+      const nowIso = new Date().toISOString();
+      // Motor apagado: NO se hace nada, pero SI se deja latido — asi el panel
+      // muestra "apagado" en vez de quedarse mudo (fallo silencioso).
       if (cfg.trackingMotor !== "web") {
-        console.log("[syncShalomWeb] motor 'web' apagado — nada que hacer");
+        await escribirSalud({
+          motor: cfg.trackingMotor || "apagado",
+          activo: false,
+          ultimaCorrida: nowIso,
+        }, null);
         return;
       }
-      const r = await runShalomWebSync(cfg);
-      console.log(
-          "[syncShalomWeb] listo — pedidos Shalom:", r.pedidosShalom,
-          "vencidos:", r.vencidos, "procesados:", r.procesados,
-          "ok:", r.ok, "errores:", r.errores, "pendientes:", r.pendientes,
-      );
+      let r = null;
+      try {
+        r = await runShalomWebSync(cfg);
+      } catch (e) {
+        await escribirSalud({
+          motor: "web", activo: true, ultimaCorrida: nowIso,
+        }, [{
+          ts: nowIso, nivel: "error", codigo: "CORRIDA_FALLIDA",
+          msg: String((e && e.message) || e).slice(0, 160),
+        }]);
+        throw e;
+      }
+      await escribirSalud({
+        motor: "web",
+        activo: true,
+        ultimaCorrida: r.nowIso,
+        intervaloMin: 30,
+        procesados: r.procesados,
+        ok: r.ok,
+        errores: r.errores,
+        saneados: r.saneados,
+        hayMas: r.hayMas,
+        horasTransito: cfg.trackingWebIntervalTransitoH || 12,
+        horasDestino: cfg.trackingWebIntervalDestinoH || 24,
+      }, r.eventos);
     },
 );
 
@@ -911,7 +1030,8 @@ exports.syncShalomWebNow = onRequest(
           horasDestino: cfg.trackingWebIntervalDestinoH || 24,
         };
 
-        if (cfg.trackingMotor !== "web") {
+        if (cfg.trackingMotor !== "web" &&
+            (req.query.accion || "") !== "reprogramar") {
           res.status(200).json({
             ok: true, ejecutado: false, diag: diag,
             motivo: "El motor no esta en 'web' — solo diagnostico, " +
@@ -920,7 +1040,24 @@ exports.syncShalomWebNow = onRequest(
           return;
         }
 
+        // ?accion=reprogramar → reconstruye la cola con el intervalo ACTUAL
+        // (se usa una vez para los pedidos existentes y cada vez que cambias
+        // las horas en Config). No consulta a Shalom: solo escribe.
+        if ((req.query.accion || "") === "reprogramar") {
+          const rp = await reprogramarCola(cfg);
+          res.status(200).json({
+            ok: true, ejecutado: true, reprogramado: true, diag: diag, ...rp,
+          });
+          return;
+        }
+
         const r = await runShalomWebSync(cfg);
+        await escribirSalud({
+          motor: "web", activo: true, ultimaCorrida: r.nowIso,
+          procesados: r.procesados, ok: r.ok, errores: r.errores,
+          saneados: r.saneados, hayMas: r.hayMas,
+          horasTransito: diag.horasTransito, horasDestino: diag.horasDestino,
+        }, r.eventos);
         res.status(200).json({ok: true, ejecutado: true, diag: diag, ...r});
       } catch (e) {
         console.error("syncShalomWebNow error:", e);
