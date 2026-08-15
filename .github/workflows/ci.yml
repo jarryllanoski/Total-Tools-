@@ -111,6 +111,54 @@ jobs:
           done
           exit $fallos
 
+      - name: Ningún window.X apunta a un const/let sin exportar
+        run: |
+          set -e
+          python3 - <<'PY'
+          import re, pathlib, sys
+
+          # POR QUÉ EXISTE ESTA COMPROBACIÓN
+          # Un `const` o `let` de nivel superior NO se cuelga de window; una
+          # `function` sí. Cuando un módulo hace `window.save(...)` y save se
+          # declaró con const, la llamada no falla: devuelve undefined y el
+          # guardián `typeof window.save === 'function'` la salta en silencio.
+          # Así estuvieron muertas durante meses las llamadas de respaldo.js
+          # (restaurar un respaldo no persistía), print.js, notify.js y el ciclo
+          # de auto-tracking. Esto lo hace imposible de repetir.
+
+          fuentes = sorted(pathlib.Path('.').glob('*.js')) + [
+              pathlib.Path('index.html'), pathlib.Path('formulario.html')]
+          declarado_const, es_funcion, exportado, usos = {}, set(), set(), {}
+          for p in fuentes:
+              if not p.exists():
+                  continue
+              t = p.read_text(encoding='utf8')
+              for m in re.finditer(r'^(?:const|let)\s+([A-Za-z_$][\w$]*)\s*=', t, re.M):
+                  declarado_const.setdefault(m.group(1), str(p))
+              for m in re.finditer(r'^function\s+([A-Za-z_$][\w$]*)', t, re.M):
+                  es_funcion.add(m.group(1))
+              for m in re.finditer(r'window\.([A-Za-z_$][\w$]*)\s*=(?!=)', t):
+                  exportado.add(m.group(1))
+              for m in re.finditer(r'window\.([A-Za-z_$][\w$]*)', t):
+                  usos.setdefault(m.group(1), set()).add(str(p))
+
+          # Solo se marca lo que el PROYECTO declara con const/let y nadie
+          # exporta. Los nombres del navegador (window.open, window.location) y
+          # los de terceros no entran aqui.
+          malos = [(n, declarado_const[n], sorted(s))
+                   for n, s in usos.items()
+                   if n in declarado_const and n not in es_funcion
+                   and n not in exportado]
+          for n, d, s in sorted(malos):
+              print(f'::error file={d}::window.{n} se usa en '
+                    f'{", ".join(s)} pero {n} se declaro con const/let y nunca '
+                    f'se asigna a window: esas llamadas no hacen nada. '
+                    f'Anade "window.{n} = {n};"')
+          if malos:
+              sys.exit(1)
+          print('ok: ningun window.X apunta a un const/let sin exportar')
+          PY
+
       - name: El ?v= se subió al cambiar un .js
         env:
           BASE_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
