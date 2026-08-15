@@ -476,24 +476,44 @@ exports.agenciasShalom = onRequest(
 // GET → listado completo de agencias (shalom-api.lat/api/listar)
 // URL separada de agenciasShalom — caller: agencias-extractor.js (panel admin)
 exports.shalomListar = onRequest(
-    {secrets: [SHALOM_KEY], region: "us-central1"},
+    {
+      secrets: [SHALOM_KEY],
+      region: "us-central1",
+      timeoutSeconds: 120,
+      memory: "512MiB",
+    },
     async (req, res) => {
       setCORS(req, res);
       if (req.method === "OPTIONS") {
         res.status(204).send(""); return;
       }
       try {
+        // 90 s: /api/listar devuelve el catalogo COMPLETO (~300 KB). Con los
+        // 10 s de antes se cortaba por tiempo, y un corte no trae codigo de
+        // estado → el panel solo veia un 500 sin causa.
         const data = await shalomGet(
             `${SHALOM_BASE}/api/listar`,
             SHALOM_KEY.value(),
-            AbortSignal.timeout(10000),
+            AbortSignal.timeout(90000),
         );
         res.set("Cache-Control", "no-store");
         res.status(200).json(data);
       } catch (e) {
         console.error("shalomListar error:", e);
-        res.status(e.status || 500).json({
+        // Error UTIL para el panel: distingue corte por tiempo, respuesta de
+        // Shalom (con su codigo) y fallo de red. Antes todo era "500".
+        const esTimeout = e && (e.name === "TimeoutError" ||
+          e.name === "AbortError");
+        const motivo = esTimeout ?
+          "Shalom tardo demasiado en responder (mas de 90 s)." :
+          (e && e.status ?
+            "Shalom respondio " + e.status +
+              (e.detail ? ": " + String(e.detail).slice(0, 120) : "") :
+            "No se pudo conectar con Shalom: " +
+              String((e && e.message) || e).slice(0, 120));
+        res.status(e && e.status ? e.status : 502).json({
           error: "No se pudo obtener el listado de agencias.",
+          motivo: motivo,
         });
       }
     },

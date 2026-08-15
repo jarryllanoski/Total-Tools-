@@ -68,11 +68,16 @@
     _ultimoJSON = null;
 
     try {
+      // Leer SIEMPRE el cuerpo: la función devuelve el motivo real del fallo
+      // (corte por tiempo, respuesta de Shalom con su código, o red). Antes se
+      // perdía y solo quedaba un "HTTP 500" sin causa.
       var r = await fetch(CFG.FUNCTION_URL);
-      if (!r.ok) throw new Error('HTTP ' + r.status);
-
-      var data = await r.json();
-      if (data && data.error) throw new Error(data.error);
+      var data = null;
+      try { data = await r.json(); } catch (e) { data = null; }
+      if (!r.ok) {
+        throw new Error((data && (data.motivo || data.error)) || ('HTTP ' + r.status));
+      }
+      if (data && data.error) throw new Error(data.motivo || data.error);
 
       var lista = data.agencias || data.resultados || data.data ||
                   (Array.isArray(data) ? data : []);
@@ -99,8 +104,9 @@
       _toast('✅ ' + agencias.length + ' agencias extraídas');
 
     } catch (e) {
-      _setEstado('❌ No se pudo extraer: ' + (e.message || 'error') +
-                 '<br><span style="font-size:11px;color:#8b949e">¿Ya desplegaste la función shalomListar?</span>', '#f87171');
+      _setEstado('❌ No se pudo extraer<br><span style="font-size:11.5px">' +
+                 String(e.message || 'error') + '</span>' +
+                 '<br><span style="font-size:11px;color:#8b949e">Si dice que Shalom tardó o respondió con error, es de su lado — reintenta en unos minutos.</span>', '#f87171');
       console.warn('[AgenciasExtractor]', e);
     } finally {
       if (btn) { btn.disabled = false; btn.textContent = '📥 Extraer agencias'; }
