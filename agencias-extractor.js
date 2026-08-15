@@ -23,6 +23,35 @@
 
   function _txt(s) { return String(s == null ? '' : s).trim(); }
 
+  /* Saneo de calidad de datos — aplica a CUALQUIER courier (punto único, no
+     por-mapper): si algún catálogo de origen trae basura, se corrige aquí una
+     sola vez.
+     - Coordenadas fuera del territorio peruano (lat/lon invertidos, typo del
+       origen, etc.) → se tratan como "sin coordenadas" (igual que si vinieran
+       vacías): nunca ofrecen una agencia como "cerca de mí" con una distancia
+       falsa, pero la agencia sigue siendo buscable por texto.
+     - Duplicados exactos (mismo nombre + mismas coordenadas) → se descartan,
+       quedándose con el primero. */
+  function _coordValidaPeru(lat, lon) {
+    return isFinite(lat) && isFinite(lon) &&
+      lat >= -19 && lat <= 1 && lon >= -82 && lon <= -68;
+  }
+  function _sanear(agencias) {
+    var vistos = {};
+    var out = [];
+    agencias.forEach(function (a) {
+      var lat = parseFloat(a.latitud), lon = parseFloat(a.longitud);
+      if (!(lat === 0 && lon === 0) && !_coordValidaPeru(lat, lon)) {
+        a = Object.assign({}, a, { latitud: '', longitud: '' });
+      }
+      var clave = a.nombre + '|' + a.latitud + '|' + a.longitud;
+      if (vistos[clave]) return; // duplicado exacto: se descarta
+      vistos[clave] = true;
+      out.push(a);
+    });
+    return out;
+  }
+
   /* Mapea agencia cruda de Shalom al esquema común.
      Acepta nombres crudos (lugar_over, zona, hora_atencion) o ya adaptados. */
   function _mapShalom(raw) {
@@ -129,7 +158,7 @@
                   (Array.isArray(data) ? data : []);
       if (!Array.isArray(lista)) lista = [];
 
-      var agencias = lista.map(c.mapper).filter(function (a) { return a.nombre; });
+      var agencias = _sanear(lista.map(c.mapper).filter(function (a) { return a.nombre; }));
 
       if (!agencias.length) {
         _setEstado(key, '⚠️ La función respondió pero sin agencias. Revisa el endpoint de origen.', '#f59e0b');
