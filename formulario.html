@@ -181,11 +181,6 @@ textarea.fi{resize:vertical;line-height:1.5}
 .addr-opt.active .addr-opt-lbl{color:var(--blue)}
 .addr-result{background:var(--card2);border:1px solid var(--blue);border-radius:10px;padding:10px 12px;font-size:13px;color:var(--text);margin-bottom:8px;display:none;line-height:1.5}
 .addr-result.show{display:block}
-.addr-suggestions{background:var(--card2);border:1px solid var(--bd);border-radius:10px;overflow:hidden;margin-bottom:8px;display:none;max-height:200px;overflow-y:auto}
-.addr-suggestions.show{display:block}
-.addr-sug-item{padding:10px 12px;font-size:12px;cursor:pointer;border-bottom:1px solid var(--bd);line-height:1.4}
-.addr-sug-item:last-child{border-bottom:none}
-.addr-sug-item:hover,.addr-sug-item:active{background:#12203d}
 </style>
 </head>
 <body>
@@ -467,7 +462,6 @@ let trackRefreshId = null;
 let currentToken   = '';
 let _deliveryAddr  = '';
 let _addrMode      = '';
-let _addrSearchTimer = null;
 let _phoneTimer    = null;
 let _knownClient   = null;
 let _prefillName   = '';
@@ -1149,7 +1143,7 @@ function useKnownAddress(){
   if(shortcut) shortcut.style.display='none';
   const opts=$('addrOpts');
   if(opts) opts.style.display='none';
-  ['addrGpsPanel','addrSearchPanel','addrManualPanel'].forEach(id=>{const e=$(id);if(e)e.style.display='none';});
+  ['addrGpsPanel','addrManualPanel'].forEach(id=>{const e=$(id);if(e)e.style.display='none';});
   let confirmed=$('addrConfirmed');
   if(!confirmed){
     confirmed=document.createElement('div');
@@ -1520,45 +1514,6 @@ function editGpsAddr(){
   if(ta) ta.value=_deliveryAddr;
   _deliveryAddr=''; _gpsLat=null; _gpsLon=null;
   setAddrMode('manual');
-}
-
-function onAddrSearch(val){
-  clearTimeout(_addrSearchTimer);
-  const sugg=$('addrSuggestions');
-  _deliveryAddr='';
-  if(!val||val.trim().length<3){
-    if(sugg){ sugg.classList.remove('show'); sugg.innerHTML=''; }
-    return;
-  }
-  _addrSearchTimer=setTimeout(async()=>{
-    if(sugg){ sugg.classList.add('show'); sugg.innerHTML='<div class="addr-sug-item" style="color:var(--text2)">Buscando...</div>'; }
-    try{
-      const q=encodeURIComponent(val.trim());
-      const r=await fetch(`https://nominatim.openstreetmap.org/search?q=${q}&format=json&limit=5&accept-language=es&countrycodes=pe`);
-      const results=await r.json();
-      if(!results.length){
-        if(sugg) sugg.innerHTML='<div class="addr-sug-item" style="color:var(--text2)">Sin resultados. Prueba con otra búsqueda.</div>';
-        return;
-      }
-      if(sugg){
-        sugg.innerHTML=results.map(item=>{
-          const safe=item.display_name.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
-          return `<div class="addr-sug-item" onclick="selSugAddress('${safe}')">${esc(item.display_name)}</div>`;
-        }).join('');
-      }
-    }catch(e){
-      if(sugg) sugg.innerHTML='<div class="addr-sug-item" style="color:var(--red)">Error al buscar. Verifica tu conexión.</div>';
-    }
-  },400);
-}
-
-function selSugAddress(addr){
-  _deliveryAddr=addr;
-  const inp=$('addrSearchInput');
-  if(inp) inp.value=addr;
-  const sugg=$('addrSuggestions');
-  if(sugg){ sugg.classList.remove('show'); sugg.innerHTML=''; }
-  $('err_deliveryAddr')&&$('err_deliveryAddr').classList.remove('show');
 }
 
 /* ─── DATE CHIPS ────────────────────────────────────────────────── */
@@ -2599,8 +2554,6 @@ window.setAddrMode          = setAddrMode;
 window.getGPS               = getGPS;
 window._gpsCopiarLink       = _gpsCopiarLink;
 window.editGpsAddr          = editGpsAddr;
-window.onAddrSearch         = onAddrSearch;
-window.selSugAddress        = selSugAddress;
 window.submitOrder          = submitOrder;
 window.buscarPedido         = buscarPedido;
 window.goToTracking         = goToTracking;
