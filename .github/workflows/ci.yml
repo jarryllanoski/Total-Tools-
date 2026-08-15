@@ -2,6 +2,19 @@ name: CI
 
 # Verificación automática en cada push/PR a main.
 # NO despliega nada — solo valida que el código no tenga errores.
+#
+# Qué se comprueba y por qué:
+#   1. Lint del backend (functions/).
+#   2. Sintaxis de TODOS los .js de la raíz — con comodín, no con una lista a
+#      mano: la lista anterior se había desfasado y dejaba alertas.js y
+#      cotizacion.js (1 161 líneas) sin verificar nunca.
+#   3. Sintaxis del JavaScript EN LÍNEA de los .html — son ~4 674 líneas (las
+#      2 398 de index.html y las 2 276 de formulario.html) que ninguna
+#      comprobación miraba.
+#   4. Que todo <script src> apunte a un archivo que existe.
+#   5. Que el ?v= se haya subido cuando cambia un .js. Sin esto, un despliegue
+#      "sale bien" pero los clientes siguen con la versión vieja en caché.
+
 on:
   push:
     branches: [main]
@@ -25,20 +38,123 @@ jobs:
         run: npm run lint
 
   validate-frontend:
-    name: Validar sintaxis del frontend
+    name: Validar el frontend
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # hace falta el historial para comparar el ?v=
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
-      - name: Validar sintaxis de los .js del panel
+
+      - name: Sintaxis de los .js de la raíz
         run: |
-          for f in config.js print.js tracking.js delivery.js notify.js \
-                   floatpanel.js storage.js auth.js dashboard.js qrtracking.js \
-                   ticket.js respaldo.js ayuda.js voz.js loading-screen.js \
-                   agencias-extractor.js firebase-config.js; do
-            if [ -f "$f" ]; then
-              node --check "$f" && echo "  ok: $f" || { echo "  FALLA: $f"; exit 1; }
+          set -e
+          n=0
+          for f in *.js; do
+            node --check "$f" || { echo "::error file=$f::error de sintaxis"; exit 1; }
+            echo "  ok: $f"
+            n=$((n+1))
+          done
+          echo "$n archivos verificados"
+
+      - name: Sintaxis del JavaScript en línea de los .html
+        run: |
+          set -e
+          rm -rf /tmp/inline && mkdir -p /tmp/inline
+          python3 - <<'PY'
+          import re, pathlib
+          total = 0
+          for html in ['index.html', 'formulario.html']:
+              p = pathlib.Path(html)
+              if not p.exists():
+                  continue
+              texto = p.read_text(encoding='utf8')
+              # Bloques <script> SIN atributo src (los que llevan src ya se
+              # verifican como archivo suelto en el paso anterior).
+              bloques = re.finditer(r'<script(?![^>]*\bsrc=)[^>]*>(.*?)</script>',
+                                    texto, re.S)
+              n = 0
+              for m in bloques:
+                  cuerpo = m.group(1)
+                  if not cuerpo.strip():
+                      continue
+                  n += 1
+                  total += cuerpo.count('\n')
+                  pathlib.Path(f'/tmp/inline/{html}.{n}.js').write_text(
+                      cuerpo, encoding='utf8')
+              print(f'{html}: {n} bloques en linea')
+          print(f'{total} lineas extraidas')
+          PY
+          for f in /tmp/inline/*.js; do
+            node --check "$f" || { echo "::error::error de sintaxis en $(basename "$f")"; exit 1; }
+            echo "  ok: $(basename "$f")"
+          done
+
+      - name: Todo <script src> apunta a un archivo que existe
+        run: |
+          set -e
+          fallos=0
+          for html in index.html formulario.html; do
+            [ -f "$html" ] || continue
+            for ref in $(grep -o 'src="[^"]*\.js[^"]*"' "$html" \
+                         | sed 's/src="//; s/"$//; s/?.*//'); do
+              case "$ref" in http*) continue;; esac
+              if [ -f "$ref" ]; then
+                echo "  ok: $html -> $ref"
+              else
+                echo "::error file=$html::referencia a $ref, que no existe"
+                fallos=1
+              fi
+            done
+          done
+          exit $fallos
+
+      - name: El ?v= se subió al cambiar un .js
+        env:
+          BASE_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
+        run: |
+          set -e
+          vacio=0000000000000000000000000000000000000000
+          if [ -z "$BASE_SHA" ] || [ "$BASE_SHA" = "$vacio" ] \
+             || ! git cat-file -e "$BASE_SHA^{commit}" 2>/dev/null; then
+            echo "Sin commit base con el que comparar — se omite."
+            exit 0
+          fi
+
+          # Solo los .js de la RAÍZ: los de functions/ no se sirven al navegador
+          # y no llevan ?v=.
+          cambiados=$(git diff --name-only "$BASE_SHA" HEAD -- '*.js' \
+                      | grep -v '/' || true)
+          if [ -z "$cambiados" ]; then
+            echo "Ningún .js de la raíz cambió — nada que comprobar."
+            exit 0
+          fi
+
+          fallos=0
+          for f in $cambiados; do
+            [ -f "$f" ] || continue          # borrado: no aplica
+            esc=$(printf '%s' "$f" | sed 's/\./\\./g')
+            referenciado=0
+            for html in index.html formulario.html; do
+              [ -f "$html" ] || continue
+              # El ancla src=" evita que tracking.js case dentro de
+              # qrtracking.js — ese error ya se cometió a mano una vez.
+              nueva=$(grep -o "src=\"$esc?v=[0-9]*\"" "$html" || true)
+              [ -z "$nueva" ] && continue
+              referenciado=1
+              vieja=$(git show "$BASE_SHA:$html" 2>/dev/null \
+                      | grep -o "src=\"$esc?v=[0-9]*\"" || true)
+              if [ "$nueva" = "$vieja" ]; then
+                echo "::error file=$html::$f cambió pero su ?v= sigue igual ($nueva). Súbelo o los clientes se quedan con la versión vieja en caché."
+                fallos=1
+              else
+                echo "  ok: $f  $vieja -> $nueva"
+              fi
+            done
+            if [ "$referenciado" = "0" ]; then
+              echo "  (aviso) $f cambió y no lo referencia ningún .html"
             fi
           done
+          exit $fallos
