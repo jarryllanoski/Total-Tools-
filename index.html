@@ -2072,6 +2072,7 @@ function copyPhone(phone){
 var _SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition || null;
 var _shalomRec = null;          // instancia activa
 var _shalomVozStage = null;     // 'guia' | 'codigo' | null
+var _shalomVozChain = null;     // timer del salto automático guía → código
 
 // Motivo por el que el dictado no está disponible (para explicarlo claro en vez
 // de fallar callado). Solo Chrome/Edge de escritorio; Brave lo desactiva.
@@ -2123,14 +2124,15 @@ function _shalomMicVisual(on){
 }
 
 function _shalomVozStop(){
+  if(_shalomVozChain){ clearTimeout(_shalomVozChain); _shalomVozChain=null; }
   _shalomVozStage=null;
   if(_shalomRec){ try{ _shalomRec.onend=null; _shalomRec.stop(); }catch(e){} _shalomRec=null; }
   _shalomMicVisual(false);
 }
 
 function shalomVozStart(){
-  // si ya está escuchando, el toque detiene
-  if(_shalomRec){ _shalomVozStop(); return; }
+  // si ya está escuchando (o en el salto guía → código), el toque detiene
+  if(_shalomRec||_shalomVozChain){ _shalomVozStop(); return; }
   var motivo=_motivoSinVozShalom();
   if(motivo){ toast(motivo); return; }
   var gEl=document.getElementById('fShalomGuia');
@@ -2158,18 +2160,23 @@ function _shalomVozBeginStage(){
       var d=_vozADigitos(txt);
       if(d){ gEl.value=d.substring(0,8); }
       if((gEl.value||'').length>=8){
-        // Guía completa → DETENER, sin auto-saltar a mitad de frase (esa
-        // transición era la causa de que la guía se colara en el código). El mic
-        // queda visible y pasa a sugerir "dicta el código"; el usuario lo toca
-        // cuando quiera (o escribe el código a mano).
+        // Guía completa → el micrófono SIGUE PRENDIDO y salta solo al código.
+        // Se cierra esta sesión y se abre una NUEVA tras una pausa breve: así el
+        // final de la frase de la guía no se cuela en el código (era el bug de
+        // la transición directa). La guarda anti-leak de abajo es el segundo
+        // cinturón. Tocar el mic durante la pausa cancela.
         gEl.value=gEl.value.substring(0,8);
         try{ rec.onend=null; rec.stop(); }catch(e){}
         _shalomRec=null;
-        _shalomVozStage=null;
-        _shalomMicVisual(false);
-        _updateShalomMic();
+        _shalomVozStage='codigo';
+        _shalomMicVisual(true);       // sigue en rojo: no hay que volver a encender
         cEl.focus();
-        toast('✅ Guía lista — toca 🎤 para dictar el código, o escríbelo');
+        toast('✅ Guía lista — ahora dicta el código');
+        if(_shalomVozChain) clearTimeout(_shalomVozChain);
+        _shalomVozChain=setTimeout(function(){
+          _shalomVozChain=null;
+          if(_shalomVozStage==='codigo' && !_shalomRec) _shalomVozBeginStage();
+        }, 700);
       }
     } else if(_shalomVozStage==='codigo'){
       var c=_vozACodigo(txt);
