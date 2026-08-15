@@ -13,6 +13,8 @@ const comprobante = require("./comprobante");
 // Motor B de tracking Shalom (navegador propio) — aislado del motor A
 // (shalomTracking, API paga) y de tracking.js. Ver shalomweb-tracker/.
 const shalomWebSync = require("./shalomWebSync");
+// Seleccion de datos del cliente recurrente (logica pura, testeable aparte).
+const clienteLookup = require("./clienteLookup");
 
 setGlobalOptions({maxInstances: 10});
 initializeApp();
@@ -74,6 +76,7 @@ exports.formApi = onRequest(async (req, res) => {
     else if (action === "config") await handleConfig(req, res);
     else if (action === "track") await handleTrack(req, res);
     else if (action === "formcfg") await handleFormCfg(req, res);
+    else if (action === "client") await handleClient(req, res);
     else res.status(400).json({status: "error", error: "Acción desconocida"});
   } catch (e) {
     console.error("formApi error:", action, e);
@@ -294,6 +297,51 @@ async function handleFormCfg(req, res) {
   res.json(snap.data());
 }
 
+// ── action=client ──────────────────────────────────────────────────────────
+// GET ?action=client&phone=9XXXXXXXX → {name, address} del ultimo pedido, para
+// reconocer al cliente que vuelve y ahorrarle escribir sus datos.
+//
+// PRIVACIDAD — el formulario es publico (se abre sin token), asi que este
+// endpoint podria usarse para averiguar si un numero es cliente y obtener su
+// domicilio. Cuatro barreras lo hacen inviable como via de cosecha:
+//   1. Rate limit por IP (20/min).
+//   2. Se devuelve el MINIMO: nombre y direccion. Nunca DNI, montos, notas,
+//      documentos, historial ni el resto del pedido.
+//   3. Solo pedidos de los ultimos 12 meses.
+//   4. Respuesta IDENTICA ({}) en todos los casos negativos —sin datos, fuera
+//      de ventana, limite alcanzado o error— para no revelar el porque.
+/**
+ * @param {Object} req request
+ * @param {Object} res response
+ */
+async function handleClient(req, res) {
+  res.set("Cache-Control", "no-store");
+  const vacio = () => res.json({});
+
+  if (!(await checkRateLimit("formApi_client", req))) return vacio();
+
+  const phone = String(req.query.phone || "").replace(/\D/g, "").slice(-9);
+  if (phone.length !== 9) return vacio();
+
+  try {
+    // Sin orderBy: la igualdad usa el indice automatico y no hace falta crear
+    // un indice compuesto. El tope acota el costo; el mas reciente se elige en
+    // memoria (un cliente real no tiene decenas de pedidos abiertos).
+    const snap = await db.collection(SHIP_COL)
+        .where("phone", "==", phone).limit(50).get();
+    if (snap.empty) return vacio();
+
+    const pedidos = [];
+    snap.forEach((d) => pedidos.push(d.data()));
+
+    const cli = clienteLookup.elegirCliente(pedidos, Date.now());
+    return cli ? res.json(cli) : vacio();
+  } catch (e) {
+    console.error("handleClient error:", e);
+    return vacio(); // nunca romper el formulario por esto
+  }
+}
+
 // ── action=track ───────────────────────────────────────────────────────────
 /**
  * @param {Object} req request
@@ -405,6 +453,9 @@ const RATE_LIMITS = {
   shalomTracking: {windowMs: 60000, max: 150},
   shalomTicket: {windowMs: 60000, max: 50},
   formApi_create: {windowMs: 60000, max: 10},
+  // Consulta de cliente recurrente: 20/min alcanza de sobra para el uso real
+  // (una consulta por pedido) y hace inviable cosechar la cartera.
+  formApi_client: {windowMs: 60000, max: 20},
 };
 
 /**

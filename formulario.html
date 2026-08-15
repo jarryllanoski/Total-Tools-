@@ -1063,8 +1063,11 @@ function onCourierChange(name){
     if(agBox){agBox.style.display='none';resetAgency();}
     if(addrBox) addrBox.style.display='block';
     if(encBox) encBox.style.display='none';
-    _updateKnownAddrShortcut();
   }
+  // Siempre: la propia función decide (solo aplica a delivery con dirección
+  // previa). Llamarla en TODOS los casos evita dejar el atajo montado al
+  // cambiar a agencia/retiro — invisible por el padre, pero estado sucio.
+  _updateKnownAddrShortcut();
   // Tarjeta visual con el ícono del courier elegido
   const badge=$('courierBadge');
   if(badge){
@@ -1495,7 +1498,7 @@ function _construirWaMsg(order, trackCode, trackToken){
   return `🛒 *NUEVO PEDIDO* — ${bizName}\n`+
     `━━━━━━━━━━━━━━━\n`+
     `👤 *Cliente:* ${order.name}\n`+
-    `📞 *WhatsApp:* +51${order.phone}`+
+    `📞 *WhatsApp:* ${order.phone}`+
     `${dirLabel}${refLine}${dniLine}${encLine}\n`+
     `🚚 *Courier:* ${order.courier}\n`+
     `📅 *Fecha de envío:* ${dateLabel}${notesLine}\n`+
