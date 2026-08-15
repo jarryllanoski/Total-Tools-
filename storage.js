@@ -160,7 +160,6 @@ function patchLoadDoc() {
 
     if (!shipId) {
       // Pedido nuevo — usar base64 como siempre (se sube al guardar)
-      console.log('[Storage] Pedido nuevo — usando base64 temporal');
       _origLoadDoc(input, slot);
       return;
     }
@@ -189,7 +188,6 @@ function patchLoadDoc() {
           global.autoEstadoPorDoc(shipId, slot);
         }
 
-        console.log('[Storage] Subido:', docObj.path, '→', docObj.d);
       })
       .catch(function(e) {
         console.warn('[Storage] Error subiendo, usando base64:', e.message);
@@ -199,7 +197,6 @@ function patchLoadDoc() {
       });
   };
 
-  console.log('[Storage] loadDoc patcheado ✓');
   return true;
 }
 
@@ -224,7 +221,6 @@ async function migrarDocsNuevos(shipId, docs) {
       var file = base64ToFile(doc.d, doc.n || (slot + '.jpg'), doc.t || 'image/jpeg');
       var storageDoc = await uploadFile(file, shipId, slot);
       resultado[slot] = storageDoc;
-      console.log('[Storage] Migrado', slot, '→', storageDoc.d);
     } catch(e) {
       console.warn('[Storage] Error migrando', slot, '— manteniendo base64:', e.message);
     }
@@ -287,7 +283,6 @@ function patchSaveShipment() {
     _origSave();
   };
 
-  console.log('[Storage] saveShipment patcheado ✓');
   return true;
 }
 
@@ -334,7 +329,6 @@ var StorageModule = {
         attempts++;
         setTimeout(tryPatch, 200);
       } else {
-        console.log('[Storage] Módulo listo | Firebase Storage: total-tools-24ce8.firebasestorage.app');
       }
     }
     setTimeout(tryPatch, 500);

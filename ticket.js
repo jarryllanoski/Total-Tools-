@@ -207,7 +207,6 @@
         attempts++;
         setTimeout(tryPatch, 200);
       } else {
-        console.log('[Ticket] Módulo listo — POST /api/ticket-image (PNG)');
       }
     }
     setTimeout(tryPatch, 500);

@@ -395,7 +395,10 @@
       <div class="hdr-title" id="hdrName" style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer" title="Doble tap → Dashboard">Mi Negocio</div>
       <div id="fbDot" title="Conectando..." style="width:8px;height:8px;border-radius:50%;background:var(--text2);flex-shrink:0;transition:background .6s;animation:fbPulse 1.5s infinite" onclick="toast('☁️ Firebase: '+this.title)"></div>
     </div>
-    <div class="hdr-phone" id="hdrPhone">999000000</div>
+    <div style="display:flex;align-items:center;gap:8px">
+      <div class="hdr-phone" id="hdrPhone">999000000</div>
+      <div id="alertasSlot" style="display:flex;align-items:center"></div>
+    </div>
   </div>
   <div id="notifyBellSlot"></div>
   <button class="hdr-out" onclick="if(window.AuthModule)AuthModule.logout()" title="Cerrar sesión">↪</button>
@@ -1709,6 +1712,7 @@ function render(){
   // de estado; hook explícito, sin monkey-patch. Idempotente (avisa una vez).
   if(window.Tracking&&Tracking.checkDestinoAlerts)Tracking.checkDestinoAlerts();
   updateStats(); updateAdvBar(); _qrMoveIndicator();
+  if(window.Alertas&&Alertas.refrescar)Alertas.refrescar(); // badge de alertas al día
   const sel=S.shipments.filter(x=>x.sel);
   // Resaltar en azul el botón "seleccionar todo" si hay algún pedido seleccionado
   const _selBtn=$('selAllBtn'); if(_selBtn) _selBtn.classList.toggle('sel-on', sel.length>0);
@@ -3145,6 +3149,7 @@ render();
 <script src="respaldo.js?v=1"></script>
 <script src="ayuda.js?v=2"></script>
 <script src="dashboard.js?v=2"></script>
+<script src="alertas.js?v=1"></script>
 <script src="voz.js?v=2"></script>
 <script src="cotizacion.js?v=1"></script>
 <script>

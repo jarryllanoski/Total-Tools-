@@ -272,7 +272,6 @@ QRTracking.init = function(){
   function tryPatch(){
     if(global.Tracking && global.Tracking.renderCardBlock){
       QRTracking.patchTrackingBlock();
-      console.log('[QRTracking] v2 listo — fórmula: orderNumber + 3473503');
     } else if(attempts < 20){
       attempts++;
       setTimeout(tryPatch, 300);

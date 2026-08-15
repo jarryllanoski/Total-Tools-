@@ -48,7 +48,6 @@ function _esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;'
    LLAMADA A FIREBASE FUNCTION
 ══════════════════════════════════════════════ */
 async function consultarShalom(orderNumber, orderCode) {
-  console.log('[Tracking] CONSULTANDO SHALOM', orderNumber, orderCode);
   // ★ Timeout: si Shalom no responde en 12s, abortar y seguir con el siguiente.
   // Evita que una consulta colgada trabe todo el ciclo de auto-tracking.
   var _ctrl = new AbortController();
@@ -64,7 +63,6 @@ async function consultarShalom(orderNumber, orderCode) {
       signal: _ctrl.signal
     });
     var raw = await r.json();
-    console.log('[Tracking] RESPUESTA SHALOM', raw);
     return raw;
   } catch(e) {
     if(e.name === 'AbortError'){
@@ -298,7 +296,6 @@ async function autoTrackingCheck() {
 
   // Pausado tras 3 fallos — esperar consulta manual exitosa
   if (_autoPaused) {
-    console.log('[Tracking] Auto-check pausado — API caída. Consulta manualmente para reactivar.');
     return;
   }
 
@@ -319,7 +316,6 @@ async function autoTrackingCheck() {
   });
 
   if (!pendientes.length) { _autoRunning = false; return; }
-  console.log('[Tracking] Auto-check:', pendientes.length, 'pedidos');
 
   var okCount  = 0;
   var errCount = 0;
@@ -360,7 +356,6 @@ async function autoTrackingCheck() {
     // Al menos 1 OK → resetear
     _autoFailCount = 0;
     _autoPaused    = false;
-    console.log('[Tracking] Auto-check OK (' + okCount + ' respuestas, ' + changedCount + ' con cambios)');
   }
 
   // ★ Solo guardar (y subir ts → disparar recargas) si algún pedido cambió de verdad.
@@ -600,7 +595,6 @@ function _getShipments() {
     try {
       var v = window[key];
       if (v && typeof v === 'object' && Array.isArray(v.shipments) && v.shipments.length > 0) {
-        console.log('[Tracking] Shipments encontrados en window.' + key);
         return v.shipments;
       }
     } catch(e) {}
@@ -615,16 +609,15 @@ function _findShip(shipId) {
     console.warn('[Tracking] No se pudo obtener lista de shipments');
     return null;
   }
-  console.log('[Tracking] Buscando ID:', shipId, '| Disponibles:', list.map(function(s){ return s.id; }));
   // Búsqueda exacta primero
   var found = list.find(function(x){ return String(x.id) === String(shipId); });
   if (found) return found;
   // Fallback: buscar por trackingOrderNumber
   found = list.find(function(x){ return x.trackingOrderNumber && x.trackingOrderNumber === shipId; });
-  if (found) { console.log('[Tracking] Encontrado por trackingOrderNumber'); return found; }
+  if (found) return found;
   // Fallback: buscar por shalomGuia
   found = list.find(function(x){ return x.shalomGuia && x.shalomGuia === shipId; });
-  if (found) { console.log('[Tracking] Encontrado por shalomGuia'); return found; }
+  if (found) return found;
   console.warn('[Tracking] Pedido no encontrado con ID:', shipId);
   return null;
 }
@@ -808,15 +801,12 @@ async function _consultarMotorB(ship, shipId) {
 /* ── consultarAhora ──────────────────────────────────────────────── */
 Tracking.consultarAhora = async function(shipId) {
   var ship = _findShip(shipId);
-  console.log('[Tracking] CLICK CONSULTAR | ID recibido:', shipId);
-  console.log('[Tracking] Shipments disponibles:', (_getShipments()||[]).map(function(s){ return s.id+'|'+s.name; }));
 
   if (!ship) {
     console.warn('[Tracking] Pedido no encontrado con ID:', shipId);
     if (typeof window.toast === 'function') window.toast('⚠️ Error: pedido no encontrado');
     return;
   }
-  console.log('[Tracking] Pedido encontrado:', ship.name, '| Guía:', ship.trackingOrderNumber||ship.shalomGuia||'SIN GUÍA');
 
   // Leer guía desde cualquier campo disponible
   var guia   = ship.trackingOrderNumber || ship.shalomGuia   || '';
@@ -844,7 +834,6 @@ Tracking.consultarAhora = async function(shipId) {
   if (resultado !== 'error' && _autoPaused) {
     _autoPaused    = false;
     _autoFailCount = 0;
-    console.log('[Tracking] Auto-check reactivado tras consulta manual exitosa.');
     if (typeof window.toast === 'function') window.toast('✅ Tracking auto reactivado');
   }
 
@@ -1064,7 +1053,6 @@ Tracking.init = function() {
     try {
       if (typeof S !== 'undefined' && S && S.shipments) {
         window.S = S;
-        console.log('[Tracking] window.S sincronizado:', S.shipments.length, 'pedidos');
         return true;
       }
     } catch(e) {}
@@ -1081,7 +1069,6 @@ Tracking.init = function() {
       autoTrackingCheck();
     }
   }, 2000);
-  console.log('[Tracking] Módulo listo | URL:', TRK.FIREBASE_URL);
 };
 
 global.Tracking = Tracking;

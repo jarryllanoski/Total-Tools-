@@ -465,5 +465,4 @@
   /* ── Utilidad: lista de módulos con ayuda disponible ─────────────── */
   Ayuda.modulos = function(){ return Object.keys(DOCS); };
 
-  console.log('[Ayuda] Módulo listo ✓ ('+Object.keys(DOCS).length+' secciones documentadas)');
 })();

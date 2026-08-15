@@ -256,5 +256,4 @@
     _refrescarFecha();
   }
 
-  console.log('[Respaldo] Módulo listo ✓');
 })();

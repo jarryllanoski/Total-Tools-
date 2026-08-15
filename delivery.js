@@ -406,7 +406,6 @@ DeliveryModule.refrescar=function(){
 };
 DeliveryModule.init=function(){
   _css();_html();_initTap();
-  console.log('[DeliveryModule] v4 listo');
 };
 
 global.DeliveryModule=DeliveryModule;

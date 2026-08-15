@@ -2117,7 +2117,6 @@ async function shalomPrecargar(){
     const cachedTime = parseInt(localStorage.getItem('shalom_agencias_time')||'0');
     if(cached && (Date.now()-cachedTime) < 86400000){
       window._shalomData = JSON.parse(cached);
-      console.log('[Shalom] Agencias desde cache:', window._shalomData.length);
       return;
     }
   }catch(ce){}
@@ -2129,7 +2128,6 @@ async function shalomPrecargar(){
       const listaLocal = jLocal.agencias || jLocal.data || jLocal || [];
       if(Array.isArray(listaLocal) && listaLocal.length > 0){
         window._shalomData = listaLocal;
-        console.log('[Shalom] Agencias desde JSON local:', listaLocal.length);
         try{
           localStorage.setItem('shalom_agencias_cache', JSON.stringify(listaLocal));
           localStorage.setItem('shalom_agencias_time', String(Date.now()));
