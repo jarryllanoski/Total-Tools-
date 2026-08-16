@@ -48,11 +48,15 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Sintaxis de los .js de la raíz
+      - name: Sintaxis de los .js del frontend
         run: |
           set -e
+          # Todos los .js del proyecto menos functions/ (los cubre ESLint arriba)
+          # y las dependencias. Con comodín, no con lista: incluye subcarpetas
+          # como narrador/, que antes quedaban fuera.
           n=0
-          for f in *.js; do
+          for f in $(find . -name '*.js' -not -path './functions/*' \
+                     -not -path '*/node_modules/*' -not -path './.git/*' | sort); do
             node --check "$f" || { echo "::error file=$f::error de sintaxis"; exit 1; }
             echo "  ok: $f"
             n=$((n+1))
@@ -171,10 +175,11 @@ jobs:
             exit 0
           fi
 
-          # Solo los .js de la RAÍZ: los de functions/ no se sirven al navegador
-          # y no llevan ?v=.
+          # Todos los .js menos los de functions/ (no se sirven al navegador y
+          # no llevan ?v=). Se incluyen las SUBCARPETAS: narrador/etiqueta.js
+          # también se referencia con ?v= y antes quedaba fuera de esta red.
           cambiados=$(git diff --name-only "$BASE_SHA" HEAD -- '*.js' \
-                      | grep -v '/' || true)
+                      | grep -v '^functions/' || true)
           if [ -z "$cambiados" ]; then
             echo "Ningún .js de la raíz cambió — nada que comprobar."
             exit 0
