@@ -43,7 +43,11 @@
       retiro:'Retiro en tienda confirmado. Te avisamos cuando esté listo para recoger. 🏪'
     },
     place:{
-      agencia:function(a){ return 'Ubicación confirmada'+(a?': '+a:'')+'. Nuestros operadores ya conocen el destino.'; },
+      // El narrador CONFIRMA, no repite: al elegir la sede la dirección ya está
+      // en pantalla tres veces (etiqueta viva, buscador e insignia de agencia).
+      // Volcarla aquí no aportaba nada y el globo tapaba el botón Continuar.
+      // Texto fijo, igual que `delivery` — mismo criterio para los dos.
+      agencia:'Ubicación confirmada. Nuestros operadores ya conocen el destino.',
       delivery:'Dirección confirmada. Llevaremos tu herramienta hasta tu puerta.',
       encomienda:function(ci){ return 'Ciudad destino confirmada'+(ci?': '+ci:'')+'. Listo para el envío.'; }
     },
@@ -222,10 +226,12 @@
     heavyWelcomeOnce();
     var t=formCourier();
     if(t && heavySeen.courier!==t){ heavySeen.courier=t; if(HEAVY.courier[t]) say('heavy',HEAVY.courier[t]); }
+    // `ag` se sigue usando para DISPARAR (solo cuando ya se eligió la sede) y
+    // como clave ANTI-REPETICIÓN. Lo único que cambia es que ya no se imprime.
     var ag=agenciaSel();
     if(ag && heavySeen.ag!==ag){
       heavySeen.ag=ag;
-      say('heavy', HEAVY.place.agencia(ag));
+      say('heavy', HEAVY.place.agencia);
     }
   }
 
