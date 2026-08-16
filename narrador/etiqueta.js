@@ -54,6 +54,8 @@
    +'#tt-lbl .rem-sub{font-size:11.5px;color:#444;margin-top:1px}'
    // Nota de revisión (sutil, fuera de la tarjeta)
    +'#tt-lbl .revisa{text-align:center;font-size:10px;letter-spacing:1px;color:#8a8a8a;text-transform:uppercase;margin-top:7px}'
+   // La tarjeta es un ATAJO al formulario: tocarla lleva al campo que falta.
+   +'#tt-lbl .card{cursor:pointer}'
    +'@media(prefers-reduced-motion:reduce){#tt-lbl *{animation:none!important}}';
   document.head.appendChild(st);
 
@@ -137,10 +139,51 @@
       fecha:box.querySelector('.fecha'),
       remName:box.querySelector('.rem-name'),
       remTel: box.querySelector('.rem-tel'),
-      remCity:box.querySelector('.rem-city')
+      remCity:box.querySelector('.rem-city'),
+      revisa: box.querySelector('.revisa')
     };
     // REMITENTE se pinta una sola vez (dato del negocio, no cambia)
     paintRemitente();
+    box.querySelector('.card').addEventListener('click', irAlFormulario);
+  }
+
+  /* ── Atajo: tocar la etiqueta lleva al campo que falta ───────────────
+     El cliente ve SU NOMBRE en grande arriba del todo y lo toca esperando
+     escribir ahí. Antes no pasaba nada y parecía que la app estaba rota.
+     Ahora ese toque hace justo lo que quería: bajar al primer campo vacío
+     y abrirle el teclado.
+
+     ACCESIBILIDAD: esto es un ATAJO, no la única vía — los campos siguen
+     alcanzándose con el tabulador. Por eso la tarjeta NO se marca como
+     role="button" (haría que un lector de pantalla anunciara la etiqueta
+     entera como un botón) ni se mete en el orden de tabulación.
+
+     Sigue sin tocar la lógica de guardado: solo lee el DOM y enfoca. */
+  function campoQueFalta(){
+    var campos=app.querySelectorAll('input,select,textarea');
+    var primero=null;
+    for(var i=0;i<campos.length;i++){
+      var c=campos[i];
+      if(c.disabled||c.readOnly||c.type==='hidden') continue;
+      if(c.offsetParent===null) continue;              // de otro paso: no visible
+      if(!primero) primero=c;
+      if(!String(c.value||'').trim()) return c;        // el primero VACÍO
+    }
+    return primero;                                     // todo lleno
+  }
+  function irAlFormulario(e){
+    // No robarle el toque a nada que ya sea interactivo dentro de la tarjeta.
+    if(e.target&&e.target.closest&&e.target.closest('a,button,input,select,textarea')) return;
+    var destino=campoQueFalta();
+    if(!destino) return;
+    var suave=!(window.matchMedia&&window.matchMedia('(prefers-reduced-motion:reduce)').matches);
+    try{ destino.scrollIntoView({behavior:suave?'smooth':'auto',block:'center'}); }
+    catch(_e){ destino.scrollIntoView(); }
+    // El teclado solo se abre si el campo está VACÍO. Si ya estaba lleno, el
+    // cliente solo quería ver dónde se edita — no le tapamos la pantalla.
+    if(!String(destino.value||'').trim()){
+      try{ destino.focus({preventScroll:true}); }catch(_e2){ destino.focus(); }
+    }
   }
 
   var remDone=false;
@@ -178,6 +221,16 @@
 
     el.courier.textContent=courier||'';
     el.fecha.textContent=fecha||'';
+
+    // Pie: "revisa que estén correctos" solo tiene sentido cuando YA hay algo
+    // que revisar. Con la etiqueta aún en blanco era una orden imposible de
+    // cumplir —y señalaba a la tarjeta, que no se edita—, así que el cliente
+    // la tocaba y creía que la app estaba rota. Se decide con los MISMOS
+    // valores que se acaban de pintar: una sola verdad, sin volver a leer el
+    // DOM y sin poder desincronizarse de lo que se ve.
+    el.revisa.textContent=(name&&dest)
+      ? 'Revisa que tus datos estén correctos'
+      : 'Así se verá tu etiqueta';
   }
 
   // ── Montaje en el formulario (después de la cabecera) ───────────────
