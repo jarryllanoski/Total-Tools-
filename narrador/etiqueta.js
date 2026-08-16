@@ -39,9 +39,9 @@
    +'#tt-lbl .cli.ghost{color:#bbb;font-weight:600}'
    +'#tt-lbl .phone{font-size:13px;font-weight:700;margin-top:3px;color:#111}'
    +'#tt-lbl .dni{font-size:12px;font-weight:800;letter-spacing:.5px;margin-top:2px;color:#111}'
-   +'#tt-lbl .qr{flex-shrink:0;text-align:center;width:56px}'
+   +'#tt-lbl .qr{flex-shrink:0;text-align:center;width:68px;padding-top:16px}'
    +'#tt-lbl .qr img{display:block;width:56px;height:56px}'
-   +'#tt-lbl .qr .qrnum{font-size:9.5px;color:#555;margin-top:2px;word-break:break-all}'
+   +'#tt-lbl .qr .qrnum{font-size:9.5px;color:#555;margin-top:2px;white-space:nowrap}'
    // DESTINO
    +'#tt-lbl .dest{margin-top:8px;padding-top:7px;border-top:1px solid #111}'
    +'#tt-lbl .dest-addr{font-size:12px;color:#111;word-break:break-word;white-space:pre-wrap}'
@@ -51,7 +51,7 @@
    +'#tt-lbl .courier{font-size:13px;font-weight:800;text-transform:uppercase;letter-spacing:.8px;color:#111}'
    +'#tt-lbl .fecha{font-size:12.5px;font-weight:700;color:#333}'
    // REMITENTE (al pie)
-   +'#tt-lbl .rem{margin-top:8px;padding-top:7px;border-top:1px dashed #999}'
+   +'#tt-lbl .rem{margin-bottom:9px;padding-bottom:8px;border-bottom:1px dashed #999}'
    +'#tt-lbl .rem-name{font-size:12px;font-weight:700;color:#111}'
    +'#tt-lbl .rem-sub{font-size:10.5px;color:#444;margin-top:1px}'
    // Nota de revisión (sutil, fuera de la tarjeta)
@@ -103,6 +103,12 @@
     box=document.createElement('div'); box.id='tt-lbl';
     box.innerHTML=''
       +'<div class="card">'
+      +  '<div class="rem">'
+      +    '<div class="seclbl">Remitente:</div>'
+      +    '<div class="rem-name"></div>'
+      +    '<div class="rem-sub rem-tel" style="display:none"></div>'
+      +    '<div class="rem-sub rem-city" style="display:none"></div>'
+      +  '</div>'
       +  '<div class="para">'
       +    '<div class="para-info">'
       +      '<div class="seclbl">Para:</div>'
@@ -122,12 +128,6 @@
       +  '<div class="envio">'
       +    '<span class="courier"></span>'
       +    '<span class="fecha"></span>'
-      +  '</div>'
-      +  '<div class="rem">'
-      +    '<div class="seclbl">Remitente:</div>'
-      +    '<div class="rem-name"></div>'
-      +    '<div class="rem-sub rem-tel" style="display:none"></div>'
-      +    '<div class="rem-sub rem-city" style="display:none"></div>'
       +  '</div>'
       +'</div>'
       +'<div class="revisa">Revisa que tus datos estén correctos</div>';
