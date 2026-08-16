@@ -12,7 +12,9 @@
      solo se edita el TEXTO de cada campo en su sitio (sin parpadear). No
      reescribe el HTML en cada tecla → no dispara bucles ni molesta a otros
      módulos (el narrador) que también observan #app.
-   · NO editable: el cliente corrige en los campos del formulario de abajo.
+   · No se escribe SOBRE la etiqueta, pero tocarla es un ATAJO: baja al primer
+     campo vacío del formulario y le abre el teclado (antes no hacía nada y el
+     cliente creía que la app estaba rota).
    ═══════════════════════════════════════════════════════════════════ */
 (function(){
   'use strict';
@@ -27,33 +29,33 @@
   // ── Estilos (etiqueta de envío: papel blanco, bordes negros) ────────
   var st=document.createElement('style');
   st.textContent=''
-   +'#tt-lbl{margin:2px 0 14px;filter:drop-shadow(0 10px 18px rgba(0,0,0,.45))}'
-   +'#tt-lbl .card{background:#fff;color:#111;border:1.6px solid #111;border-radius:7px;padding:14px 15px;font-family:Arial,Helvetica,sans-serif;line-height:1.35}'
+   +'#tt-lbl{margin:2px 0 10px;filter:drop-shadow(0 10px 18px rgba(0,0,0,.45))}'
+   +'#tt-lbl .card{background:#fff;color:#111;border:1.6px solid #111;border-radius:7px;padding:10px 12px;font-family:Arial,Helvetica,sans-serif;line-height:1.35}'
    // PARA (cliente) + QR
    +'#tt-lbl .para{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}'
    +'#tt-lbl .para-info{flex:1;min-width:0}'
-   +'#tt-lbl .seclbl{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1.2px;color:#666;margin-bottom:3px}'
-   +'#tt-lbl .cli{font-size:20px;font-weight:800;text-transform:uppercase;line-height:1.1;word-break:break-word;color:#111}'
+   +'#tt-lbl .seclbl{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:1.1px;color:#666;margin-bottom:2px}'
+   +'#tt-lbl .cli{font-size:16px;font-weight:800;text-transform:uppercase;line-height:1.1;word-break:break-word;color:#111}'
    +'#tt-lbl .cli.ghost{color:#bbb;font-weight:600}'
-   +'#tt-lbl .phone{font-size:15px;font-weight:700;margin-top:4px;color:#111}'
-   +'#tt-lbl .dni{font-size:14px;font-weight:800;letter-spacing:.5px;margin-top:3px;color:#111}'
-   +'#tt-lbl .qr{flex-shrink:0;text-align:center;width:74px}'
-   +'#tt-lbl .qr img{display:block;width:74px;height:74px}'
+   +'#tt-lbl .phone{font-size:13px;font-weight:700;margin-top:3px;color:#111}'
+   +'#tt-lbl .dni{font-size:12px;font-weight:800;letter-spacing:.5px;margin-top:2px;color:#111}'
+   +'#tt-lbl .qr{flex-shrink:0;text-align:center;width:56px}'
+   +'#tt-lbl .qr img{display:block;width:56px;height:56px}'
    +'#tt-lbl .qr .qrnum{font-size:9.5px;color:#555;margin-top:2px;word-break:break-all}'
    // DESTINO
-   +'#tt-lbl .dest{margin-top:11px;padding-top:10px;border-top:1px solid #111}'
-   +'#tt-lbl .dest-addr{font-size:13px;color:#111;word-break:break-word;white-space:pre-wrap}'
+   +'#tt-lbl .dest{margin-top:8px;padding-top:7px;border-top:1px solid #111}'
+   +'#tt-lbl .dest-addr{font-size:12px;color:#111;word-break:break-word;white-space:pre-wrap}'
    +'#tt-lbl .dest-addr.ghost{color:#bbb}'
    // Envío (courier · fecha)
-   +'#tt-lbl .envio{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:10px;padding-top:9px;border-top:1.6px solid #111}'
+   +'#tt-lbl .envio{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:8px;padding-top:7px;border-top:1.6px solid #111}'
    +'#tt-lbl .courier{font-size:13px;font-weight:800;text-transform:uppercase;letter-spacing:.8px;color:#111}'
    +'#tt-lbl .fecha{font-size:12.5px;font-weight:700;color:#333}'
    // REMITENTE (al pie)
-   +'#tt-lbl .rem{margin-top:10px;padding-top:9px;border-top:1px dashed #999}'
-   +'#tt-lbl .rem-name{font-size:13px;font-weight:700;color:#111}'
-   +'#tt-lbl .rem-sub{font-size:11.5px;color:#444;margin-top:1px}'
+   +'#tt-lbl .rem{margin-top:8px;padding-top:7px;border-top:1px dashed #999}'
+   +'#tt-lbl .rem-name{font-size:12px;font-weight:700;color:#111}'
+   +'#tt-lbl .rem-sub{font-size:10.5px;color:#444;margin-top:1px}'
    // Nota de revisión (sutil, fuera de la tarjeta)
-   +'#tt-lbl .revisa{text-align:center;font-size:10px;letter-spacing:1px;color:#8a8a8a;text-transform:uppercase;margin-top:7px}'
+   +'#tt-lbl .revisa{text-align:center;font-size:9px;letter-spacing:1px;color:#8a8a8a;text-transform:uppercase;margin-top:5px}'
    // La tarjeta es un ATAJO al formulario: tocarla lleva al campo que falta.
    +'#tt-lbl .card{cursor:pointer}'
    +'@media(prefers-reduced-motion:reduce){#tt-lbl *{animation:none!important}}';
@@ -109,7 +111,7 @@
       +      '<div class="dni" style="display:none"></div>'
       +    '</div>'
       +    '<div class="qr">'
-      +      '<img src="narrador/qr-negocio.svg" alt="QR" width="74" height="74" loading="lazy" onerror="this.style.display=\'none\'">'
+      +      '<img src="narrador/qr-negocio.svg" alt="QR" width="56" height="56" loading="lazy" onerror="this.style.display=\'none\'">'
       +      '<div class="qrnum"></div>'
       +    '</div>'
       +  '</div>'

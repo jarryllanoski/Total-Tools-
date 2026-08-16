@@ -42,15 +42,23 @@ body{background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,
 textarea.fi{resize:vertical;line-height:1.5}
 .fi.err{border-color:var(--red)}
 .fi.sel{background:var(--card);background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%236b7280' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 16px center;padding-right:40px;padding-top:16px;padding-bottom:16px;cursor:pointer;font-weight:600}
-#courierCards{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-.cour-card{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:7px;background:var(--card2);border:1.5px solid var(--bd);border-radius:14px;padding:16px 10px;min-height:106px;cursor:pointer;font-family:inherit;color:var(--text);transition:border-color .15s,background .15s,transform .05s}
+/* 3 opciones por fila. La rejilla es de 6 columnas y cada tarjeta ocupa 2:
+   así las que sobran en la última fila se pueden CENTRAR (con 3 columnas
+   reales no se puede, harían falta medias columnas). */
+#courierCards{display:grid;grid-template-columns:repeat(6,1fr);gap:10px}
+.cour-card{grid-column:span 2;position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:7px;background:var(--card2);border:1.5px solid var(--bd);border-radius:14px;padding:16px 10px;min-height:106px;cursor:pointer;font-family:inherit;color:var(--text);transition:border-color .15s,background .15s,transform .05s}
 .cour-card:active{transform:scale(.98)}
 .cour-card.sel{border-color:#12a5b4;background:rgba(18,165,180,.10)}
-.cour-card:last-child:nth-child(odd){grid-column:1 / -1}
+/* Sobrantes de la última fila: CENTRADOS, del mismo tamaño que el resto.
+   Estirar la última a todo el ancho (como se hacía con 2 columnas) miente
+   sobre la jerarquía: parecería la opción importante. Funciona con cualquier
+   número de couriers, que el operador activa y desactiva desde el panel. */
+.cour-card:last-child:nth-child(3n+1){grid-column:3 / span 2}      /* sobra 1 */
+.cour-card:nth-last-child(2):nth-child(3n+1){grid-column:2 / span 2} /* sobran 2 */
 .cour-card .cc-ic{display:flex;align-items:center;justify-content:center}
 .cour-card .cc-ic svg{width:30px;height:30px;display:block}
 .cour-card .cc-body{display:flex;flex-direction:column;gap:2px;min-width:0;width:100%}
-.cour-card .cc-name{font-size:14px;font-weight:700;line-height:1.15}
+.cour-card .cc-name{font-size:12px;font-weight:700;line-height:1.15}
 .cour-card .cc-radio{position:absolute;top:8px;right:8px;width:18px;height:18px;border-radius:50%;border:2px solid var(--bd);transition:border-color .15s}
 .cour-card.sel .cc-radio{border-color:#12a5b4}
 .cour-card.sel .cc-radio:after{content:"";position:absolute;inset:2px;border-radius:50%;background:#12a5b4}
@@ -2478,7 +2486,7 @@ window._notesCount          = _notesCount;
 })();
 </script>
 <script src="loading-screen.js?v=1"></script>
-<script defer src="narrador/etiqueta.js?v=3"></script>
+<script defer src="narrador/etiqueta.js?v=4"></script>
 <script defer src="narrador/narrador.js?v=1"></script>
 </body>
 </html>
