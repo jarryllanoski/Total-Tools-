@@ -2159,16 +2159,32 @@ async function agBuscar(key, q){
     if(dataset && dataset.length){
       const _nrm = s => String(s==null?'':s).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
       const qu = _nrm(q);
+      // POR PALABRAS, no por frase literal. Antes se buscaba la consulta entera
+      // como una sola cadena, asi que "Lima Miraflores" daba CERO: en el texto
+      // pone "lima / lima / miraflores" y esas dos palabras nunca van seguidas.
+      // Y "san juan lurigancho" tampoco, porque el nombre real lleva un "de" en
+      // medio. Con palabras sueltas el orden da igual y los conectores sobran.
+      // Se descartan las de 1 letra (harian coincidir todo); si no queda
+      // ninguna, se usa la consulta entera como una sola palabra.
+      let palabras = qu.split(/[\s/,.\-]+/).filter(w => w.length > 1);
+      if(!palabras.length) palabras = [qu];
+      const todasEn   = t => palabras.every(w => t.indexOf(w) !== -1);
+      const abrenPalabra = t => palabras.every(w => (' '+t).indexOf(' '+w) !== -1);
       const _claveM = [];  // coincide por nombre/ubicación (prioritario)
       const _dirM   = [];  // coincide solo por dirección (relleno)
       dataset.forEach((ag,idx)=>{
         const clave = _nrm([ag.lugar_over||ag.nombre, ag.zona||ag.distrito, ag.provincia, ag.departamento].join(' '));
         const extra = _nrm(ag.direccion);
         let score;
-        if(clave.indexOf(qu)===0)                 score=0; // empieza con lo buscado
-        else if((' '+clave).indexOf(' '+qu)!==-1) score=1; // empieza una palabra
-        else if(clave.indexOf(qu)!==-1)            score=2; // contenido en nombre/ubicación
-        else { if(extra.indexOf(qu)!==-1) _dirM.push({ag,idx}); return; }
+        // Con UNA sola palabra estos tres niveles dan exactamente el mismo
+        // resultado que la version anterior: las busquedas de una palabra no
+        // cambian en nada.
+        if(clave.indexOf(qu)===0)          score=0; // empieza con lo buscado, tal cual
+        else if(abrenPalabra(clave))       score=1; // cada palabra empieza una palabra
+        else if(todasEn(clave))            score=2; // todas, en nombre/ubicación
+        else { if(palabras.every(w => clave.indexOf(w)!==-1 || extra.indexOf(w)!==-1))
+                 _dirM.push({ag,idx});
+               return; }
         _claveM.push({ag,score,idx});
       });
       _claveM.sort((a,b)=>a.score-b.score||a.idx-b.idx);
