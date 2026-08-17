@@ -46,7 +46,7 @@ textarea.fi{resize:vertical;line-height:1.5}
    así las que sobran en la última fila se pueden CENTRAR (con 3 columnas
    reales no se puede, harían falta medias columnas). */
 #courierCards{display:grid;grid-template-columns:repeat(6,1fr);gap:10px}
-.cour-card{grid-column:span 2;position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:7px;background:var(--card2);border:1.5px solid var(--bd);border-radius:14px;padding:16px 10px;min-height:106px;cursor:pointer;font-family:inherit;color:var(--text);transition:border-color .15s,background .15s,transform .05s}
+.cour-card{grid-column:span 2;position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:7px;background:var(--card2);border:2px solid #626274;border-radius:14px;padding:16px 10px;min-height:106px;cursor:pointer;font-family:inherit;color:var(--text);transition:border-color .15s,background .15s,transform .05s}
 .cour-card:active{transform:scale(.98)}
 .cour-card.sel{border-color:#12a5b4;background:rgba(18,165,180,.10)}
 /* Sobrantes de la última fila: CENTRADOS, del mismo tamaño que el resto.
@@ -59,7 +59,7 @@ textarea.fi{resize:vertical;line-height:1.5}
 .cour-card .cc-ic svg{width:30px;height:30px;display:block}
 .cour-card .cc-body{display:flex;flex-direction:column;gap:2px;min-width:0;width:100%}
 .cour-card .cc-name{font-size:12px;font-weight:700;line-height:1.15}
-.cour-card .cc-radio{position:absolute;top:8px;right:8px;width:18px;height:18px;border-radius:50%;border:2px solid var(--bd);transition:border-color .15s}
+.cour-card .cc-radio{position:absolute;top:8px;right:8px;width:18px;height:18px;border-radius:50%;border:2px solid #626274;transition:border-color .15s}
 .cour-card.sel .cc-radio{border-color:#12a5b4}
 .cour-card.sel .cc-radio:after{content:"";position:absolute;inset:2px;border-radius:50%;background:#12a5b4}
 .ferr{font-size:12px;color:var(--red);margin-top:5px;display:none}
