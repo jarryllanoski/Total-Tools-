@@ -74,7 +74,9 @@
 
   // ── Lectura de los campos del cliente (mismos getters que la boleta) ─
   function getName(){ var v=val('f_name'); return v?v.toUpperCase():''; }
-  function getPhone(){ var v=val('f_phone').replace(/\D/g,''); return v?'+51 '+v:''; }
+  // Sin prefijo: en la etiqueta se muestra el numero tal cual. Lo que se guarda
+  // en el pedido y lo que va al WhatsApp no pasa por aqui, no cambian.
+  function getPhone(){ return val('f_phone').replace(/\D/g,''); }
   function getDni(){ return val('f_dni')||''; }
   function getCourier(){
     var s=document.getElementById('f_courier'); if(!s||!s.value) return '';

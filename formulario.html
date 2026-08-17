@@ -1144,16 +1144,26 @@ function renderAgencyBox(courierName){
     const cfg = AGENCY_SOURCES[agKey];
     agBox.innerHTML = `<div class="agc-box">
       <span class="agc-lbl">Elige tu sede ${esc(cfg.label)} *</span>
-      <button type="button" id="shalomCercaBtn" onclick="agCerca('${agKey}')" style="width:100%;display:flex;align-items:center;justify-content:center;gap:8px;background:rgba(79,142,247,.12);border:1px solid rgba(79,142,247,.3);border-radius:10px;color:var(--blue);padding:11px;font-size:13.5px;font-weight:700;cursor:pointer;font-family:inherit;margin:6px 0 10px">📍 Ver sedes cerca de mí</button>
       <div style="position:relative;margin-bottom:10px">
-        <span style="position:absolute;left:14px;top:50%;transform:translateY(-50%);font-size:15px;opacity:.65;pointer-events:none">🔍</span>
+        <span style="position:absolute;left:14px;top:24px;font-size:15px;opacity:.65;pointer-events:none;line-height:1">🔍</span>
         <input class="fi" id="shalomAgInput" autocomplete="off" data-wz-focus
-          style="padding-left:42px"
+          style="padding-left:42px;padding-bottom:34px;min-height:76px"
           placeholder="Escribe tu ciudad o distrito…"
           oninput="agOnInput('${agKey}', this.value)">
-        <div id="shalomSpin" style="display:none;position:absolute;right:14px;top:50%;
-          transform:translateY(-50%);width:16px;height:16px;border:2px solid #1e1e30;
+        <div id="shalomSpin" style="display:none;position:absolute;right:14px;top:22px;
+          width:16px;height:16px;border:2px solid #1e1e30;
           border-top-color:var(--blue);border-radius:50%;animation:spin .7s linear infinite"></div>
+        <!-- "cerca de mí" vive DENTRO de la caja, en su propia línea de abajo: así
+             no compite con el texto que se escribe (antes era un botón ancho que
+             costaba 56 px de alto). Pin de ubicacion propio, NO el de Google: esto
+             usa el GPS del telefono y el catalogo local, sin tocar ningun servicio
+             de Google. -->
+        <button type="button" id="shalomCercaBtn" onclick="agCerca('${agKey}')"
+          aria-label="Ver sedes cerca de mi ubicación"
+          style="position:absolute;left:8px;right:8px;bottom:5px;height:28px;display:flex;
+                 align-items:center;justify-content:flex-end;gap:6px;background:none;border:none;
+                 color:var(--blue);font-size:12.5px;font-weight:700;cursor:pointer;
+                 font-family:inherit;padding:0 6px"><span class="geo-pin" style="display:flex"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21s7-6.4 7-11a7 7 0 1 0-14 0c0 4.6 7 11 7 11z"/><circle cx="12" cy="10" r="2.6"/></svg></span><span class="cerca-txt">cerca de mí</span></button>
       </div>
       <div id="shalomDrop" style="display:none;background:var(--card);border:1.5px solid var(--bd);
         border-radius:12px;overflow:hidden;max-height:260px;overflow-y:auto;margin-bottom:8px"></div>
@@ -2097,13 +2107,14 @@ function _cercaSoloBuscador(){
 // vive EN el botón (pin latiendo), no abajo con un mensaje de parabólica.
 function _cercaBtnBuscando(on){
   var btn=document.getElementById('shalomCercaBtn'); if(!btn) return;
-  if(on){
-    btn.disabled=true; btn.style.opacity='.75'; btn.style.cursor='progress';
-    btn.innerHTML='<span class="geo-pin">📍</span> Buscando tu ubicación…';
-  }else{
-    btn.disabled=false; btn.style.opacity=''; btn.style.cursor='pointer';
-    btn.innerHTML='📍 Ver sedes cerca de mí';
-  }
+  // Solo se cambia el TEXTO. Antes se reescribia el innerHTML entero, lo que
+  // ahora borraria el icono; y si el marcado cambia, esta funcion dejaria de
+  // funcionar en silencio.
+  var txt=btn.querySelector('.cerca-txt'); if(!txt) return;
+  btn.disabled=on;
+  btn.style.opacity=on?'.75':'';
+  btn.style.cursor=on?'progress':'pointer';
+  txt.textContent=on?'Buscando tu ubicación…':'cerca de mí';
 }
 async function agCerca(key){
   if(_cercaEnCurso) return;                 // doble-toque: ya hay uno en curso
@@ -2485,7 +2496,7 @@ window._notesCount          = _notesCount;
 })();
 </script>
 <script src="loading-screen.js?v=1"></script>
-<script defer src="narrador/etiqueta.js?v=8"></script>
+<script defer src="narrador/etiqueta.js?v=9"></script>
 <script defer src="narrador/narrador.js?v=4"></script>
 </body>
 </html>
