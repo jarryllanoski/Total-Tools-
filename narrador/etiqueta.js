@@ -58,6 +58,11 @@
    +'#tt-lbl .revisa{text-align:center;font-size:10px;letter-spacing:1px;color:#8a8a8a;text-transform:uppercase;margin-top:7px}'
    // La tarjeta es un ATAJO al formulario: tocarla lleva al campo que falta.
    +'#tt-lbl .card{cursor:pointer}'
+   // Resalte de "mira aquí" para el grupo de elección al tocar la etiqueta.
+   // Con box-shadow (no borde ni outline) para que no desplace nada.
+   +'@keyframes ttMira{0%,100%{box-shadow:0 0 0 0 rgba(18,165,180,0)}40%{box-shadow:0 0 0 3px rgba(18,165,180,.5)}}'
+   +'.tt-mira{border-radius:14px;animation:ttMira 1.1s ease-out 2}'
+   +'@media(prefers-reduced-motion:reduce){.tt-mira{animation:none;box-shadow:0 0 0 3px rgba(18,165,180,.5)}}'
    +'@media(prefers-reduced-motion:reduce){#tt-lbl *{animation:none!important}}';
   document.head.appendChild(st);
 
@@ -173,14 +178,37 @@
     }
     return primero;                                     // todo lleno
   }
+
+  // Un paso puede no tener NINGÚN campo: el de "¿cómo quieres recibir tu
+  // pedido?" son botones y su <select> real está oculto, así que campoQueFalta
+  // no encontraba nada y el toque se quedaba mudo justo ahí. Un grupo de
+  // elección sin responder también es "lo que falta".
+  function grupoSinResponder(){
+    var grupos=app.querySelectorAll('[role="radiogroup"]');
+    for(var i=0;i<grupos.length;i++){
+      var g=grupos[i];
+      if(g.offsetParent===null) continue;
+      if(!g.querySelector('[aria-checked="true"]')) return g;
+    }
+    return null;
+  }
   function irAlFormulario(e){
     // No robarle el toque a nada que ya sea interactivo dentro de la tarjeta.
     if(e.target&&e.target.closest&&e.target.closest('a,button,input,select,textarea')) return;
-    var destino=campoQueFalta();
+    var destino=campoQueFalta() || grupoSinResponder();
     if(!destino) return;
     var suave=!(window.matchMedia&&window.matchMedia('(prefers-reduced-motion:reduce)').matches);
     try{ destino.scrollIntoView({behavior:suave?'smooth':'auto',block:'center'}); }
     catch(_e){ destino.scrollIntoView(); }
+    // Grupo de elección: se SEÑALA, no se elige. Elegir un courier avanza solo
+    // de paso, así que hacerlo desde aquí sacaría al cliente de la pantalla por
+    // un toque que quizá solo era para leer la etiqueta. La decisión sigue
+    // siendo suya, con un toque directo en la tarjeta que quiera.
+    if(destino.getAttribute && destino.getAttribute('role')==='radiogroup'){
+      destino.classList.add('tt-mira');
+      setTimeout(function(){ destino.classList.remove('tt-mira'); }, 2400);
+      return;
+    }
     // El teclado solo se abre si el campo está VACÍO. Si ya estaba lleno, el
     // cliente solo quería ver dónde se edita — no le tapamos la pantalla.
     if(!String(destino.value||'').trim()){
