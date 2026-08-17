@@ -74,15 +74,14 @@
 
   // ── 3. Estilos (inyectados una vez) ────────────────────────────────
   var css = ''
-  // Sin reserva de espacio abajo: antes se empujaba el contenido 120 px para que
-  // el narrador no tapara los botones, y eso dejaba un hueco muerto que se podía
-  // seguir deslizando después del personaje. Ahora el avatar no captura toques
-  // (pointer-events:none), así que puede solaparse sin estorbar y el contenido
-  // termina donde termina.
+  // Sin reserva de espacio abajo. Antes se empujaba el contenido 120 px para que
+  // el narrador no tapara los botones, pero eso dejaba un hueco muerto que se
+  // podía seguir deslizando después del personaje. El globo es fijo y se colapsa
+  // solo, así que no hace falta empujar nada: el contenido termina donde termina.
   + '#tt-narr{position:fixed;left:10px;right:10px;bottom:10px;z-index:9000;display:flex;align-items:flex-end;gap:10px;pointer-events:none;max-width:560px;margin:0 auto;font-family:inherit;opacity:0;transform:translateY(16px);transition:opacity .4s ease,transform .4s ease}'
   + '#tt-narr.on{opacity:1;transform:none}'
   + '@media(prefers-reduced-motion:reduce){#tt-narr{transition:none}}'
-  + '#tt-narr .av{position:relative;flex:0 0 auto;width:74px;height:88px;pointer-events:none;filter:drop-shadow(0 6px 10px rgba(0,0,0,.4))}'
+  + '#tt-narr .av{position:relative;flex:0 0 auto;width:74px;height:88px;pointer-events:auto;cursor:pointer;filter:drop-shadow(0 6px 10px rgba(0,0,0,.4))}'
   + '#tt-narr .av img{width:100%;height:100%;object-fit:contain;object-position:bottom;-webkit-mask-image:linear-gradient(to bottom,#000 78%,transparent);mask-image:linear-gradient(to bottom,#000 78%,transparent);animation:ttbob 3.6s ease-in-out infinite}'
   + '@keyframes ttbob{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}'
   + '@media(prefers-reduced-motion:reduce){#tt-narr .av img{animation:none}}'
@@ -107,6 +106,7 @@
     document.body.appendChild(wrap);
     imgEl=wrap.querySelector('img'); whoEl=wrap.querySelector('.who'); txEl=wrap.querySelector('.tx');
     imgEl.onerror=function(){ wrap.querySelector('.av').style.display='none'; }; // fallback: solo texto
+    wrap.querySelector('.av').addEventListener('click',function(){ minimized=!minimized; wrap.classList.toggle('min',minimized); if(!minimized) clearTimeout(hideTimer); });
     wrap.querySelector('.x').addEventListener('click',function(){ hide(); minimized=true; wrap.classList.add('min'); });
   }
   function say(who, text){
