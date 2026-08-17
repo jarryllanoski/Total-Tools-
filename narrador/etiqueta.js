@@ -22,17 +22,7 @@
   var app=document.getElementById('app'); if(!app) return;
 
   var esc=function(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); };
-  // Un elemento OCULTO no cuenta. textContent devuelve su texto igual aunque
-  // este en display:none, y eso filtraba datos fantasma a la etiqueta: al pulsar
-  // la ✕ de la sede, la insignia se ocultaba pero conservaba el texto y el
-  // DESTINO seguia mostrando la agencia borrada. Se arregla en el origen
-  // (agReset vacia el texto) y aqui, para que ningun otro elemento oculto pueda
-  // volver a colarse.
-  var txt=function(sel){
-    var e=app.querySelector(sel);
-    if(!e || e.offsetParent===null) return '';
-    return (e.textContent||'').trim();
-  };
+  var txt=function(sel){ var e=app.querySelector(sel); return e?(e.textContent||'').trim():''; };
   var val=function(id){ var e=document.getElementById(id); return e?(e.value||'').trim():''; };
   var visible=function(id){ var e=document.getElementById(id); return !!(e&&e.offsetParent!==null); };
 
