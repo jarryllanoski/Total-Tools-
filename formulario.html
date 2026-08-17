@@ -1143,27 +1143,27 @@ function renderAgencyBox(courierName){
   if(agKey){
     const cfg = AGENCY_SOURCES[agKey];
     agBox.innerHTML = `<div class="agc-box">
-      <span class="agc-lbl">Elige tu sede ${esc(cfg.label)} *</span>
-      <div style="position:relative;margin-bottom:10px">
-        <span style="position:absolute;left:14px;top:24px;font-size:15px;opacity:.65;pointer-events:none;line-height:1">🔍</span>
-        <input class="fi" id="shalomAgInput" autocomplete="off" data-wz-focus
-          style="padding-left:42px;padding-bottom:34px;min-height:76px"
-          placeholder="Escribe tu ciudad o distrito…"
-          oninput="agOnInput('${agKey}', this.value)">
-        <div id="shalomSpin" style="display:none;position:absolute;right:14px;top:22px;
-          width:16px;height:16px;border:2px solid #1e1e30;
-          border-top-color:var(--blue);border-radius:50%;animation:spin .7s linear infinite"></div>
-        <!-- "cerca de mí" vive DENTRO de la caja, en su propia línea de abajo: así
-             no compite con el texto que se escribe (antes era un botón ancho que
-             costaba 56 px de alto). Pin de ubicacion propio, NO el de Google: esto
-             usa el GPS del telefono y el catalogo local, sin tocar ningun servicio
-             de Google. -->
+      <!-- "cerca de mí" va en la MISMA fila que el título. El título se recorta
+           solo con "…" si hace falta (flex-shrink), asi que cuando el boton pasa
+           a decir "Buscando tu ubicacion…" —mas largo— no se desborda ni en
+           pantallas de 360 px, sin medir nada a mano y sin saltos. -->
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:6px">
+        <span class="agc-lbl" style="margin-bottom:0;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Elige tu sede ${esc(cfg.label)} *</span>
         <button type="button" id="shalomCercaBtn" onclick="agCerca('${agKey}')"
           aria-label="Ver sedes cerca de mi ubicación"
-          style="position:absolute;left:8px;right:8px;bottom:5px;height:28px;display:flex;
-                 align-items:center;justify-content:flex-end;gap:6px;background:none;border:none;
-                 color:var(--blue);font-size:12.5px;font-weight:700;cursor:pointer;
-                 font-family:inherit;padding:0 6px"><span class="geo-pin" style="display:flex"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21s7-6.4 7-11a7 7 0 1 0-14 0c0 4.6 7 11 7 11z"/><circle cx="12" cy="10" r="2.6"/></svg></span><span class="cerca-txt">cerca de mí</span></button>
+          style="flex-shrink:0;min-height:44px;display:flex;align-items:center;gap:6px;
+                 background:none;border:none;color:var(--blue);font-size:12.5px;font-weight:700;
+                 cursor:pointer;font-family:inherit;padding:0 2px 0 10px"><span class="geo-pin" style="display:flex"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21s7-6.4 7-11a7 7 0 1 0-14 0c0 4.6 7 11 7 11z"/><circle cx="12" cy="10" r="2.6"/></svg></span><span class="cerca-txt">cerca de mí</span></button>
+      </div>
+      <div style="position:relative;margin-bottom:10px">
+        <span style="position:absolute;left:14px;top:50%;transform:translateY(-50%);font-size:15px;opacity:.65;pointer-events:none">🔍</span>
+        <input class="fi" id="shalomAgInput" autocomplete="off" data-wz-focus
+          style="padding-left:42px"
+          placeholder="Escribe tu ciudad o distrito…"
+          oninput="agOnInput('${agKey}', this.value)">
+        <div id="shalomSpin" style="display:none;position:absolute;right:14px;top:50%;
+          transform:translateY(-50%);width:16px;height:16px;border:2px solid #1e1e30;
+          border-top-color:var(--blue);border-radius:50%;animation:spin .7s linear infinite"></div>
       </div>
       <div id="shalomDrop" style="display:none;background:var(--card);border:1.5px solid var(--bd);
         border-radius:12px;overflow:hidden;max-height:260px;overflow-y:auto;margin-bottom:8px"></div>
@@ -2305,6 +2305,11 @@ function agReset(key){
   if(drop){ drop.style.display='none'; drop.innerHTML=''; }
   const badge = $('shalomSelBadge');
   if(badge) badge.style.display='none';
+  // Vaciar el TEXTO, no solo ocultarlo: la etiqueta viva lo lee con textContent,
+  // que devuelve el texto aunque el elemento este oculto. Sin esto, al pulsar la
+  // ✕ la etiqueta seguia mostrando la sede borrada y parecia un fallo de la app.
+  const txt = $('shalomSelTxt');
+  if(txt) txt.textContent = '';
 }
 
 window.agOnInput = agOnInput;
@@ -2496,7 +2501,7 @@ window._notesCount          = _notesCount;
 })();
 </script>
 <script src="loading-screen.js?v=1"></script>
-<script defer src="narrador/etiqueta.js?v=9"></script>
+<script defer src="narrador/etiqueta.js?v=10"></script>
 <script defer src="narrador/narrador.js?v=4"></script>
 </body>
 </html>
