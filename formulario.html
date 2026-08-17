@@ -86,7 +86,7 @@ textarea.fi{resize:vertical;line-height:1.5}
 .date-opt.active .d-day,.date-opt.active .d-mon{color:var(--blue)}
 
 /* AGENCY CASCADE */
-.agc-box{margin-top:14px;padding:14px;background:var(--card2);border:1px solid var(--bd);border-radius:12px}
+.agc-box{padding:14px;background:var(--card2);border:1px solid var(--bd);border-radius:12px}
 .agc-lbl{font-size:11px;font-weight:700;color:var(--text2);letter-spacing:.6px;text-transform:uppercase;margin-bottom:10px;display:block}
 .cascade{display:flex;flex-direction:column;gap:10px}
 .agc-list{display:flex;flex-direction:column;gap:6px;margin-top:8px;max-height:180px;overflow-y:auto}
@@ -825,7 +825,7 @@ function renderForm(){
 
   setApp(`
     ${headerHtml()}
-    <div style="padding-bottom:12px">
+    <div class="wz-wrap">
       <div id="wzProgress" class="wz-progress"></div>
       <div class="wz-step" data-step="1">
       <div class="fg">
@@ -2330,7 +2330,17 @@ function _wzInjectCss(){
   if(document.getElementById('wzCss')) return;
   var s=document.createElement('style'); s.id='wzCss';
   s.textContent=''
-   +'.wz-progress{margin:2px 0 16px}'
+   // ESPACIO ENTRE LA BARRA DE PROGRESO Y EL PASO. Su UNICO dueño es
+   // .wz-progress: es el bloque cuyo trabajo es encabezar el paso, asi que le
+   // toca declarar cuanto aire deja debajo. Antes tambien lo declaraba
+   // .agc-box (margin-top:14px) y los dos margenes se FUNDIAN —ganaba el
+   // mayor—, asi que tocar uno solo no hacia nada. Ese margin-top se quito por
+   // redundante: .agc-box es siempre el primer hijo de su paso.
+   // El colapso de margenes se DEJA a proposito: hace que el hueco sea el mayor
+   // de lo que pida cada lado, asi un bloque que necesite mas aire (Retiro en
+   // tienda pide 18px) lo conserva sin tener que listarlo aqui.
+   +'.wz-wrap{padding-bottom:12px}'
+   +'.wz-progress{margin:2px 0 8px}'
    +'.wz-ptxt{font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:#8b949e;margin-bottom:6px;font-weight:700}'
    +'.wz-pbar{height:6px;background:#1c2333;border-radius:99px;overflow:hidden}'
    +'.wz-pbar i{display:block;height:100%;background:linear-gradient(90deg,#12a5b4,#5b9bff);border-radius:99px;transition:width .35s ease}'
