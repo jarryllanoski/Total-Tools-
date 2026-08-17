@@ -170,7 +170,6 @@ textarea.fi{resize:vertical;line-height:1.5}
 .brand-foot .bf-item{font-size:12px;color:var(--text2);white-space:nowrap;display:inline-flex;align-items:center;gap:5px}
 .brand-foot .bf-ic{width:13px;height:13px;flex:none}
 .brand-foot .bf-web{color:#12a5b4;text-decoration:none;font-weight:600}
-.brand-foot .bf-web:active{text-decoration:underline}
 .brand-foot .bf-dot{color:var(--text2);opacity:.4}
 .brand-foot .bf-soc .bf-item{font-size:11px;opacity:.85}
 .used-note{text-align:center;font-size:12px;color:var(--text2);margin-top:14px;padding:10px 14px;background:rgba(107,114,128,.06);border:1px solid var(--bd);border-radius:10px;line-height:1.5}
@@ -632,17 +631,7 @@ function headerHtml(ayudaTipo){
   const brand = isTrack
     ? `<div class="biz-name">${esc(bizName)}</div>${bizCity?`<div class="biz-city">📍 ${esc(bizCity)}</div>`:''}`
     : '';
-  // AYUDA. En SEGUIMIENTO se queda como siempre (chip morado en su fila).
-  // En el FORMULARIO se baja sobre la etiqueta, justo ENCIMA del QR, y se pone
-  // discreta: así deja de ocupar una fila entera para ella sola (34 px) y no
-  // compite con el contenido. El hueco sobre el QR lo reserva etiqueta.js
-  // (.qr{padding-top}), por eso no lo tapa.
-  const ayudaEstilo = isTrack
-    ? 'top:2px;right:0;gap:4px;background:rgba(167,139,250,.12);' +
-      'border:1px solid rgba(167,139,250,.3);color:#a78bfa;padding:5px 10px;font-size:12px'
-    : 'top:3px;right:7px;z-index:5;gap:3px;background:rgba(255,255,255,.92);' +
-      'border:1px solid #c9c9c9;color:#555;padding:2px 7px;font-size:10.5px';
-  return `<div class="biz-header" style="position:relative${isTrack?'':';padding:6px 0 0'}">${brand}<div onclick="${ayudaFn}" style="position:absolute;${ayudaEstilo};display:flex;align-items:center;border-radius:8px;cursor:pointer;font-weight:700" title="Ayuda">📖 Ayuda</div></div>`;
+  return `<div class="biz-header" style="position:relative${isTrack?'':';min-height:34px'}">${brand}<div onclick="${ayudaFn}" style="position:absolute;top:2px;right:0;display:flex;align-items:center;gap:4px;background:rgba(167,139,250,.12);border:1px solid rgba(167,139,250,.3);color:#a78bfa;border-radius:8px;padding:5px 10px;cursor:pointer;font-size:12px;font-weight:700" title="Ayuda">📖 Ayuda</div></div>`;
 }
 
 /* ─── Ayuda del formulario (autocontenida, pública) ──────────────── */
@@ -754,7 +743,7 @@ function brandFooterHtml(){
   return `
     <div class="brand-foot">
       <div class="bf-row">
-        <a class="bf-item bf-web" href="https://totaltoolspe.com" target="_blank" rel="noopener">${web} totaltoolspe.com</a>
+        <span class="bf-item bf-web">${web} totaltoolspe.com</span>
       </div>
       <div class="bf-row bf-soc">
         <span class="bf-item">${fb} Total One-Stop Tools Station</span>
@@ -2496,7 +2485,7 @@ window._notesCount          = _notesCount;
 })();
 </script>
 <script src="loading-screen.js?v=1"></script>
-<script defer src="narrador/etiqueta.js?v=5"></script>
+<script defer src="narrador/etiqueta.js?v=6"></script>
 <script defer src="narrador/narrador.js?v=4"></script>
 </body>
 </html>
