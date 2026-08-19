@@ -357,20 +357,43 @@ function _qrValor(s){
   return nuevo ? (String(s.phone||'')+'#'+_codigoEnvio(s)) : String(s.phone||'');
 }
 
+// ── ¿A DÓNDE VA ESTE ENVÍO? — un solo dueño de la regla ──────────────
+// Los dos formatos de impresión (etiqueta y lista de despacho) preguntan aquí
+// en vez de repetir el criterio. Cada courier guarda el destino en un sitio
+// distinto: SHALOM/domicilio lo dejan en `address`, y ENCOMIENDA parte el dato
+// en `ciudadDestino` (la ciudad) + `encAgencia` (el nombre de la agencia).
+function _destino(s){ return s.address || s.ciudadDestino || '—'; }
+
+// Nombre de la agencia, venga del formulario (encAgencia) o del modal de guía
+// Shalom (shippingAgency / agencia_nombre).
+function _agenciaNombre(s){
+  return String(s.encAgencia || s.shippingAgency || s.agencia_nombre || '').trim();
+}
+
+// Línea "🏪 <agencia>" para la etiqueta. Se omite cuando el nombre YA está
+// dentro del destino: en Shalom `address` suele traer la dirección completa de
+// la agencia, y sin esta guarda saldría repetido en la etiqueta.
+function _agenciaLinea(s, cls){
+  var ag = _agenciaNombre(s);
+  if(!ag) return '';
+  var dest = String(_destino(s)).toLowerCase();
+  if(dest.indexOf(ag.toLowerCase()) >= 0) return '';
+  return '<div class="'+(cls||'agencia')+'">🏪 '+esc(ag)+'</div>';
+}
+
 /* ── FORMATO 1: ETIQUETA ─────────────────────────────────────────── */
 function _htmlEtiqueta(list, bultos, bizName, bizPhone, bizCity, fecha, qrUrl){
   const cards = [];
   list.forEach(s=>{
     for(let b=0; b<bultos; b++){
       const bLabel = bultos>1 ? ` (${b+1}/${bultos})` : '';
-      const addr = s.address || s.ciudadDestino || '—';
+      const addr = _destino(s);
       // Nota recortada SOLO para la etiqueta (para que no la deforme). La nota
       // completa se conserva en el pedido, tracking y panel.
       const _noteFull = s.notes ? String(s.notes) : '';
       const _noteShort = _noteFull.length > 140 ? _noteFull.slice(0,140).trim()+'…' : _noteFull;
       const notes = _noteFull ? `<div class="notes">📝 ${esc(_noteShort)}</div>` : '';
-      const agencia = s.courier&&s.courier.toUpperCase().includes('SHALOM') && s.address
-        ? `<div class="agencia">🏢 ${esc(s.address)}</div>` : '';
+      const agencia = _agenciaLinea(s);
       cards.push(`
         <div class="card">
           <div class="card-top">
@@ -393,6 +416,7 @@ function _htmlEtiqueta(list, bultos, bizName, bizPhone, bizCity, fecha, qrUrl){
             ${(s.dniRecoger||s.dni)?`<div class="dest-dni"><b>DNI:</b> ${esc(s.dniRecoger||s.dni)}</div>`:''}
             <div style="font-size:clamp(7.5pt,1.4vw,9pt);font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#555;margin:2mm 0 1mm">DESTINO:</div>
             <div class="dest-addr">${esc(addr)}</div>
+            ${agencia}
             ${s.referencia?`<div class="agencia"><b>Ref:</b> ${esc(s.referencia)}</div>`:''}
             ${notes}
           </div>
@@ -491,7 +515,8 @@ function _htmlEtiqueta(list, bultos, bizName, bizPhone, bizCity, fecha, qrUrl){
 /* ── FORMATO 2: LISTA DE DESPACHO ────────────────────────────────── */
 function _htmlLista(list, bultos, bizName, bizPhone, bizCity, fecha, qrUrl){
   const rows = list.map((s,i)=>{
-    const addr = s.address || s.ciudadDestino || '—';
+    const addr = _destino(s);
+    const agencia = _agenciaLinea(s, 'row-sub');
     const bultosLabel = bultos > 1 ? `<span style="background:#fef3c7;padding:1px 5px;border-radius:3px;font-size:9pt">${bultos} bultos</span>` : '';
     return `<tr class="${i%2===0?'even':'odd'}">
       <td class="num">${i+1}</td>
@@ -501,6 +526,7 @@ function _htmlLista(list, bultos, bizName, bizPhone, bizCity, fecha, qrUrl){
       </td>
       <td>
         <div class="row-addr">${esc(addr)}</div>
+        ${agencia}
         ${s.dniRecoger?`<div class="row-sub">DNI: ${esc(s.dniRecoger)}</div>`:''}
         ${s.referencia?`<div class="row-sub">Ref: ${esc(s.referencia)}</div>`:''}
       </td>

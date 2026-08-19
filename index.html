@@ -1225,20 +1225,16 @@ window.waLink = function(phone, msg){
   if(msg) url += '?text=' + encodeURIComponent(msg);
   return url;
 };
-// Con usuario: se copia al portapapeles y se abre WhatsApp para pegarlo en su
-// buscador. Es un toque más que con número, pero funciona seguro.
+// Con usuario: SOLO se copia al portapapeles y se avisa. No se abre WhatsApp
+// a propósito: no existe forma de llegar al chat de alguien solo con su
+// usuario. Se probó abrir wa.me sin número y WhatsApp responde con un error
+// ("no se encontró el número de teléfono … es demasiado corto"), que parece un
+// fallo de esta app. Mejor un paso honesto que uno que aparenta funcionar.
+// Si algún día WhatsApp publica el enlace por usuario, entra en waLink y ya.
 function _waUsuario(u){
   var usr = String(u||'').trim();
-  var abrir = function(){
-    // Se abre en una pestaña nueva el MISMO dominio que ya usa todo el panel.
-    // Se descartó el esquema whatsapp:// a propósito: en el escritorio sin la
-    // app instalada deja un aviso feo del navegador y, medido en pruebas, se
-    // comía el foco del formulario abierto. Un https normal no molesta a nadie.
-    try{ window.open('https://wa.me/', '_blank'); }catch(e){}
-  };
   var ok = function(){
-    if(typeof toast==='function') toast('📋 '+usr+' copiado — pégalo en el buscador de WhatsApp');
-    abrir();
+    if(typeof toast==='function') toast('📋 '+usr+' copiado — búscalo en WhatsApp');
   };
   if(navigator.clipboard&&navigator.clipboard.writeText){
     navigator.clipboard.writeText(usr).then(ok).catch(function(){ if(typeof toast==='function') toast('📋 '+usr); });
@@ -3238,7 +3234,7 @@ render();
 <!-- ★ SHALOM tracking — cargado al final -->
 <script src="storage.js?v=2"></script>
 <script src="config.js?v=14"></script>
-<script src="print.js?v=14"></script>
+<script src="print.js?v=15"></script>
 <script src="notify.js?v=4"></script>
 <script src="tracking.js?v=4"></script>
 <script src="floatpanel.js?v=2"></script>
