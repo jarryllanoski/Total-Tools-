@@ -664,7 +664,7 @@
     <div class="sheet-title"><span id="formTitle">Nuevo Envío</span><span onclick="if(window.Ayuda)Ayuda.abrir('nuevoEnvio')" style="float:right;font-size:11px;color:#8b949e;cursor:pointer;font-weight:400" title="Ayuda">📖 Ayuda</span></div>
     <div class="frow">
       <div class="fg"><label class="fl">Nombre *</label><input class="fi" id="fName" placeholder="Nombre completo"></div>
-      <div class="fg"><label class="fl">Teléfono *</label><input class="fi phone-norm" id="fPhone" placeholder="9XXXXXXXX" inputmode="numeric" oninput="if(typeof _clienteHintUpdate==='function')_clienteHintUpdate()"></div>
+      <div class="fg"><label class="fl">Teléfono *</label><input class="fi phone-norm" id="fPhone" placeholder="9XXXXXXXX o @usuario" inputmode="text" oninput="if(typeof _clienteHintUpdate==='function')_clienteHintUpdate()"></div>
     </div>
     <div class="frow">
       <div class="fg"><label class="fl">DNI</label><input class="fi" id="fDni" placeholder="12345678" maxlength="8" inputmode="numeric" oninput="if(typeof _clienteHintUpdate==='function')_clienteHintUpdate()"></div>
@@ -1200,17 +1200,58 @@
 const cap=s=>s.charAt(0).toUpperCase()+s.slice(1);
 const $=id=>document.getElementById(id);
 
+// ★ El campo teléfono admite DOS formas: número peruano (lo de siempre) o
+// usuario de WhatsApp (@nombre), que desde 2026 permite escribirle a alguien
+// sin conocer su número. Este predicado es el ÚNICO dueño de esa distinción:
+// cada sitio que usa el teléfono pregunta aquí en vez de repetir la regla.
+// Reglas de WhatsApp: 3-35 caracteres entre letras, números, puntos y guiones bajos.
+function esUsuarioWA(v){
+  return /^@[A-Za-z0-9._]{3,35}$/.test(String(v==null?'':v).trim());
+}
+window.esUsuarioWA = esUsuarioWA;
+
 // ★ WhatsApp centralizado: el prefijo de país vive en UN solo lugar.
 // waLink(phone,msg) → devuelve la URL. waOpen(phone,msg) → la abre.
 const WA_PREFIX = '51'; // código de país (Perú). Cambiar aquí si se necesita.
 window.waLink = function(phone, msg){
+  // Usuario (@nombre): WhatsApp NO publica un enlace de chat por usuario — su
+  // formato click-to-chat sigue aceptando solo números. Devolvemos null a
+  // propósito, para que quien llame decida qué hacer, en vez de fabricar una
+  // URL inventada que al abrirse daría error y parecería un fallo de la app.
+  if(esUsuarioWA(phone)) return null;
   var p = String(phone||'').replace(/[^0-9]/g,''); // limpiar espacios, guiones, etc.
   if(!p) return null;
   var url = 'https://wa.me/' + WA_PREFIX + p;
   if(msg) url += '?text=' + encodeURIComponent(msg);
   return url;
 };
+// Con usuario: se copia al portapapeles y se abre WhatsApp para pegarlo en su
+// buscador. Es un toque más que con número, pero funciona seguro.
+function _waUsuario(u){
+  var usr = String(u||'').trim();
+  var abrir = function(){
+    // Se abre en una pestaña nueva el MISMO dominio que ya usa todo el panel.
+    // Se descartó el esquema whatsapp:// a propósito: en el escritorio sin la
+    // app instalada deja un aviso feo del navegador y, medido en pruebas, se
+    // comía el foco del formulario abierto. Un https normal no molesta a nadie.
+    try{ window.open('https://wa.me/', '_blank'); }catch(e){}
+  };
+  var ok = function(){
+    if(typeof toast==='function') toast('📋 '+usr+' copiado — pégalo en el buscador de WhatsApp');
+    abrir();
+  };
+  if(navigator.clipboard&&navigator.clipboard.writeText){
+    navigator.clipboard.writeText(usr).then(ok).catch(function(){ if(typeof toast==='function') toast('📋 '+usr); });
+  } else {
+    var t=document.createElement('textarea'); t.value=usr; t.style.cssText='position:fixed;top:-9999px';
+    document.body.appendChild(t); t.select();
+    try{ document.execCommand('copy'); ok(); }catch(e){ if(typeof toast==='function') toast('📋 '+usr); }
+    t.remove();
+  }
+}
+window._waUsuario = _waUsuario;
 window.waOpen = function(phone, msg){
+  if(esUsuarioWA(phone)){ _waUsuario(phone); return null; }
   var url = window.waLink(phone, msg);
   if(url) window.open(url, '_blank');
   return url;
@@ -1231,7 +1272,16 @@ window.S = S; // ★ Exponer S globalmente para tracking.js
 // (estático o creado dinámicamente, como el del motorizado) se limpia solo, sin
 // cablear cada campo. Los valores de cada campo siguen 100% independientes.
 function normPeruPhone(s){
-  var v=String(s==null?'':s).replace(/\D/g,'');
+  var raw=String(s==null?'':s);
+  // Usuario de WhatsApp (@nombre): se deja pasar, recortando solo lo que
+  // WhatsApp no admite. Sin esta guarda, el replace de abajo borraba la arroba
+  // en cada tecla y el campo era imposible de llenar.
+  // Se guarda en minúsculas a propósito: así el buscador del panel (que compara
+  // en minúsculas) y el escaneo del QR encuentran el pedido sin código extra.
+  if(raw.trim().charAt(0)==='@'){
+    return '@'+raw.trim().slice(1).replace(/[^A-Za-z0-9._]/g,'').toLowerCase().slice(0,35);
+  }
+  var v=raw.replace(/\D/g,'');
   if(v.startsWith('51')&&v.length>9) v=v.slice(2);
   return v.slice(0,9);
 }
@@ -1851,7 +1901,7 @@ function cardHTML(s){
     </div>
     ${pvtNote?`<div class="pvt-note" id="pvt_${s.id}" style="display:none" ondblclick="openPrivateNote('${s.id}')">🔒 ${escH(pvtNote)}</div>`:''}
     <div class="card-meta">
-      <span class="meta"><a href="tel:+51${escH(s.phone)}" class="ph-call" onclick="event.stopPropagation()" title="Llamar">📞</a>${escH(s.phone)}<button class="ph-copy" onclick="event.stopPropagation();copyPhone('${escH(s.phone)}')" title="Copiar número"><svg viewBox="0 0 448 512" width="11" height="11" fill="currentColor" aria-hidden="true"><path d="M320 448v40c0 13.255-10.745 24-24 24H24c-13.255 0-24-10.745-24-24V120c0-13.255 10.745-24 24-24h72v296c0 30.879 25.121 56 56 56h168zm0-344V0H152c-13.255 0-24 10.745-24 24v368c0 13.255 10.745 24 24 24h272c13.255 0 24-10.745 24-24V128H344c-13.2 0-24-10.8-24-24zm120.971-31.029L375.029 7.029A24 24 0 0 0 358.059 0H352v96h96v-6.059a24 24 0 0 0-7.029-16.97z"/></svg></button></span>
+      <span class="meta">${esUsuarioWA(s.phone)?'':`<a href="tel:+51${escH(s.phone)}" class="ph-call" onclick="event.stopPropagation()" title="Llamar">📞</a>`}${escH(s.phone)}<button class="ph-copy" onclick="event.stopPropagation();copyPhone('${escH(s.phone)}')" title="Copiar número"><svg viewBox="0 0 448 512" width="11" height="11" fill="currentColor" aria-hidden="true"><path d="M320 448v40c0 13.255-10.745 24-24 24H24c-13.255 0-24-10.745-24-24V120c0-13.255 10.745-24 24-24h72v296c0 30.879 25.121 56 56 56h168zm0-344V0H152c-13.255 0-24 10.745-24 24v368c0 13.255 10.745 24 24 24h272c13.255 0 24-10.745 24-24V128H344c-13.2 0-24-10.8-24-24zm120.971-31.029L375.029 7.029A24 24 0 0 0 358.059 0H352v96h96v-6.059a24 24 0 0 0-7.029-16.97z"/></svg></button></span>
       <span class="meta">📅 ${escH(s.date||'—')} <button onclick="copyCardLink('${s.id}')" title="Copiar link" style="background:none;border:none;color:#388bfd;font-size:11px;cursor:pointer;padding:0 0 0 2px;vertical-align:middle">🔗</button></span>
       ${s.cost?`<span class="meta">💰 S/ ${escH(s.cost)}</span>`:''}
     </div>
@@ -2105,7 +2155,9 @@ function clearPaste(){ const p=document.getElementById('fPaste'); if(p){ p.value
 
 /* Copiar el número de la tarjeta (iconito ⧉ al lado del número) */
 function copyPhone(phone){
-  const clean=String(phone).replace(/\D/g,'');
+  // Con usuario de WhatsApp se copia tal cual (la arroba hace falta para
+  // pegarlo en su buscador); con número, solo los dígitos, como siempre.
+  const clean=esUsuarioWA(phone)?String(phone).trim():String(phone).replace(/\D/g,'');
   const done=()=>toast('📋 Copiado ✓');
   if(navigator.clipboard&&navigator.clipboard.writeText){ navigator.clipboard.writeText(clean).then(done).catch(()=>toast('📋 '+clean)); }
   else { const t=document.createElement('textarea'); t.value=clean; t.style.cssText='position:fixed;top:-9999px'; document.body.appendChild(t); t.select(); try{document.execCommand('copy');done();}catch(e){toast(clean);} t.remove(); }
@@ -2931,8 +2983,15 @@ function handleQR(raw){
   if(_qrMove.on){ _qrMoveOnScan(raw); return; }
   // QR de Shalom (guía) — igual que siempre
   if(raw&&raw.includes('/document/')){const _parts=raw.split('/document/');const _qrId=parseInt(_parts[0]);if(!isNaN(_qrId)){const _ord=String(_qrId-3473503);const _found=S.shipments.find(s=>(s.trackingOrderNumber===_ord)||(s.shalomGuia===_ord));const _fEl=$('qrFound');_fEl.textContent='✅ Guía: '+_ord;_fEl.style.display='block';setTimeout(()=>{closeQR();$('fSearch').value=_ord;_filt='';renderChips();render();if(_found){setTimeout(()=>{document.querySelectorAll('.card').forEach(c=>{if(c.innerHTML.includes(_ord)){c.style.background='rgba(56,139,253,.15)';setTimeout(()=>c.style.background='',1500)}})},200);toast('✅ '+_found.name);}else{toast('⚠️ Guía no encontrada: '+_ord);}},800);return;}}
-  // Nuestra etiqueta: "número" (viejo) o "número#código" (nuevo). Solo usamos el número para buscar.
-  let phone=String(raw).split('#')[0].replace(/\D/g,'');if(phone.startsWith('51')&&phone.length===11)phone=phone.slice(2);if(phone.length!==9){toast('QR no reconocido');_qrAF=requestAnimationFrame(scanLoop);return}const f=$('qrFound');f.textContent=`✅ ${phone}`;f.style.display='block';const m=S.shipments.find(s=>s.phone===phone);setTimeout(()=>{closeQR();$('fSearch').value=phone;_filt='';renderChips();render();if(m){setTimeout(()=>{document.querySelectorAll('.card').forEach(c=>{if(c.innerHTML.includes(phone)){c.style.background='rgba(56,139,253,.15)';setTimeout(()=>c.style.background='',1500)}})},200);toast(`✅ ${m.name}`)}else{toast(`⚠️ No encontrado: ${phone}`)}},800)}
+  // Nuestra etiqueta: "número" (viejo) o "número#código" (nuevo). Solo usamos el
+  // número para buscar. Desde 2026 ese primer tramo puede ser un usuario de
+  // WhatsApp (@nombre) en vez de un número: se acepta tal cual, ya viene en
+  // minúsculas desde el campo, así que compara igual que el resto del panel.
+  const _qrBruto=String(raw).split('#')[0].trim();
+  let phone;
+  if(esUsuarioWA(_qrBruto)){ phone=_qrBruto.toLowerCase(); }
+  else { phone=_qrBruto.replace(/\D/g,'');if(phone.startsWith('51')&&phone.length===11)phone=phone.slice(2);if(phone.length!==9){toast('QR no reconocido');_qrAF=requestAnimationFrame(scanLoop);return} }
+  const f=$('qrFound');f.textContent=`✅ ${phone}`;f.style.display='block';const m=S.shipments.find(s=>s.phone===phone);setTimeout(()=>{closeQR();$('fSearch').value=phone;_filt='';renderChips();render();if(m){setTimeout(()=>{document.querySelectorAll('.card').forEach(c=>{if(c.innerHTML.includes(phone)){c.style.background='rgba(56,139,253,.15)';setTimeout(()=>c.style.background='',1500)}})},200);toast(`✅ ${m.name}`)}else{toast(`⚠️ No encontrado: ${phone}`)}},800)}
 function closeQR(){if(_qrAF)cancelAnimationFrame(_qrAF);if(_qrStream)_qrStream.getTracks().forEach(t=>t.stop());_qrStream=null;_qrAF=null;$('qrVideo').srcObject=null;$('qrOverlay').classList.remove('open')}
 
 /* ═══════════════════════════════════════════════════════════════════════
@@ -3178,7 +3237,7 @@ render();
 </script>
 <!-- ★ SHALOM tracking — cargado al final -->
 <script src="storage.js?v=2"></script>
-<script src="config.js?v=13"></script>
+<script src="config.js?v=14"></script>
 <script src="print.js?v=14"></script>
 <script src="notify.js?v=4"></script>
 <script src="tracking.js?v=4"></script>

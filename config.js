@@ -668,6 +668,13 @@ function saveShipment(){
   }
   const name=$('fName').value.trim(),phone=$('fPhone').value.trim(),addr=$('fAddr').value.trim();
   if(!name||!phone||!addr){toast('⚠️ Nombre, teléfono y dirección requeridos');return}
+  // El teléfono admite número (como siempre) o usuario de WhatsApp (@nombre).
+  // Solo se valida cuando el operador EMPEZÓ con arroba: así un "@ab" a medio
+  // escribir no se guarda roto, y los números siguen entrando exactamente igual
+  // que hasta hoy (nada de estrenar reglas sobre los pedidos que ya funcionan).
+  if(phone.charAt(0)==='@' && !(typeof window.esUsuarioWA==='function' && window.esUsuarioWA(phone))){
+    toast('⚠️ Usuario de WhatsApp: @ y 3 a 35 letras, números, puntos o guiones bajos');return;
+  }
   const extra={};document.querySelectorAll('.xf').forEach(el=>extra[el.dataset.f]=el.value);
   const dni=($('fDni')||{value:''}).value.trim();
   const _isEncSave=($('fCourier').value||'').toUpperCase().includes('ENCOMIENDA');
