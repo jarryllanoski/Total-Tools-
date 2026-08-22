@@ -13,6 +13,23 @@
 
 ## Arreglados
 
+### ✅ 14 · Todo el rastreo Shalom (Motor A y B) — reCAPTCHA v3
+
+El rastreo automático fallaba en silencio: Shalom protege su portal con
+**reCAPTCHA v3**, que puntúa invisible cada visita, y un servidor nunca saca
+nota — recibía 403 + login, pero el worker devolvía `ok:true` igual. Se retiró
+todo (las 7 Cloud Functions, el worker Cloud Run, ~460 líneas de `tracking.js`)
+y se sustituyó por una **puerta única** (`shalom.js`), hoy desconectada, lista
+para la integración nueva contra `pro.shalom.pe`. Historia completa y plan de
+reconexión: **docs/SHALOM.md**.
+
+### ✅ 13 · La etiqueta retrocedía a ENVIADO al guardar la guía
+
+`_guardarEdicion` forzaba `ship.status='ENVIADO'` en cada guardado; un pedido ya
+en *LLEGÓ A DESTINO* retrocedía con solo entrar a corregir la guía. Ahora
+guardar conserva la etiqueta. (Era el "a veces cambia de etiqueta y se regresa
+solo".) El caso de mover hacia atrás por QR desaparece con el Motor B retirado.
+
 ### ✅ 12 · `window.save` no existía — 4 módulos sin guardar nada
 
 `save()` se declara con `const`, y **un `const` de nivel superior no se cuelga

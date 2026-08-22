@@ -689,17 +689,8 @@ function saveShipment(){
   const _sCodigo = ($('fShalomCodigo') ? $('fShalomCodigo').value.trim() : '')||'';
   if(_sGuia)  { data.trackingOrderNumber=_sGuia;   data.shalomGuia=_sGuia; }
   if(_sCodigo){ data.trackingOrderCode  =_sCodigo; data.shalomCodigo=_sCodigo; }
-  // ★ COLA del seguimiento automático: la fecha de próxima consulta es a la vez
-  //   el reloj y la marca de elegibilidad. Con guía+código y sin finalizar →
-  //   entra a la cola (el backend la consulta en su próxima corrida). Al
-  //   finalizar o quedarse sin datos → sale (null). Un solo campo, nada que se
-  //   pueda desincronizar.
-  if(($('fCourier').value||'').toUpperCase().includes('SHALOM')){
-    const _prevS = _editId ? (S.shipments.find(x=>x.id===_editId)||{}) : {};
-    const _elegible = !!(_sGuia && _sCodigo) && data.status!=='FINALIZADO';
-    if(!_elegible) data.trackingWebProximaConsulta=null;
-    else if(!_prevS.trackingWebProximaConsulta) data.trackingWebProximaConsulta=new Date().toISOString();
-  }
+  // (La cola del seguimiento automático se retiró: escribía
+  // trackingWebProximaConsulta para el Motor B, que ya no existe. Ver shalom.js.)
   // ★ DELIVERY: motorizado (nombre, teléfono) + link inDriver. Solo se tocan si el
   //   courier es DELIVERY (no ensucia otros pedidos); null al vaciar, para que
   //   "quitar" también se propague a la nube.

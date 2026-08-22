@@ -60,7 +60,8 @@ Consecuencias que hay que tener presentes al tocar cualquier cosa:
 |---|---:|---|
 | `index.html` | 3 219 | Página + **2 380 líneas de JavaScript**: estado global `S`, capa Firestore, render de tarjetas, estadísticas, QR, voz |
 | `config.js` | 1 559 | **Nueve cosas distintas** (ver aviso abajo) |
-| `tracking.js` | 1 138 | Shalom: consulta, interpretación, historial, avisos "llegó a destino" |
+| `tracking.js` | ~640 | UI de tracking Shalom: tarjeta, edición de guía, historial, avisos "llegó a destino". El rastreo pasa por `shalom.js` (ver docs/SHALOM.md) |
+| `shalom.js` | ~65 | Puerta única a Shalom (consultar/ticket/agencias/registrar); hoy desconectada |
 | `cotizacion.js` | 785 | Cotizaciones y comprobantes |
 | `print.js` | 644 | Etiquetas y listas para imprimir |
 | `floatpanel.js` | 570 | Mini paneles flotantes (solo PC) |
@@ -89,8 +90,7 @@ Consecuencias que hay que tener presentes al tocar cualquier cosa:
 
 | Archivo | Qué hace |
 |---|---|
-| `index.js` | Todas las Cloud Functions (`formApi`, `shalomTracking`, `olvaListar`, `agenciasOlva`, el scheduler…) |
-| `shalomWebSync.js` | Motor B: lógica pura, sin Firestore. Decide a quién consultar y cómo interpretar |
+| `index.js` | Cloud Functions: `formApi`, `olvaListar`, `agenciasOlva`, `extraerComprobante`. (Las 7 funciones Shalom se retiraron — ver docs/SHALOM.md) |
 | `clienteLookup.js` | Reconocer al cliente que vuelve, por teléfono |
 | `olvaNormalizar.js` | Traduce la agencia cruda de Olva al formato del catálogo |
 | `comprobante.js` | Lectura de comprobantes |
@@ -119,8 +119,8 @@ panel/forms/configs/{id}        fotos del formulario
 
 **Las escrituras usan `updateMask`** (`fsPatch` en `index.html`). Eso significa
 que un PATCH toca **solo los campos enviados** y respeta el resto del documento.
-Es la propiedad que evita que dos dispositivos —o el panel y el Motor B— se
-pisen mutuamente. **No la pierdas al refactorizar.**
+Es la propiedad que evita que dos dispositivos se pisen mutuamente. **No la
+pierdas al refactorizar.**
 
 > Sin `updateMask`, un PATCH de Firestore **reemplaza el documento entero** y
 > borra los campos que no mandaste.
