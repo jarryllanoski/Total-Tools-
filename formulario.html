@@ -1997,7 +1997,10 @@ const AGENCY_SOURCES = {
   SHALOM: {
     label: 'Shalom',
     jsonPath: './data/agencias-shalom.json',
-    apiUrl: 'https://us-central1-total-tools-24ce8.cloudfunctions.net/agenciasShalom',
+    // Sin respaldo en vivo: la función agenciasShalom se retiró (el portal de
+    // Shalom exige reCAPTCHA v3). El buscador usa solo el catálogo local, que
+    // es rápido y funciona sin red. Ver docs/SHALOM.md.
+    apiUrl: '',
     cacheKey: 'shalom'
   },
   OLVA: {
@@ -2048,7 +2051,9 @@ async function agPrecargar(key){
       }
     }
   }catch(le){ console.warn('['+cfg.label+'] JSON local no disponible:', le.message); }
-  // 3. Fallback: Cloud Function en vivo
+  // 3. Fallback: Cloud Function en vivo (solo si el courier la tiene; Shalom ya
+  //    no — se queda con el catálogo local cargado arriba).
+  if(!cfg.apiUrl) return;
   try{
     const r = await fetch(cfg.apiUrl);
     if(!r.ok) return;
@@ -2208,8 +2213,8 @@ async function agBuscar(key, q){
       if(_claveM.length > TOPE) aviso = _claveM.length + ' sedes — escribe tu distrito (ej. Miraflores) para afinar';
       resultados = resultados.slice(0, TOPE);
     }
-    // 2. Si no hay resultados, consultar API
-    if(!resultados.length){
+    // 2. Si no hay resultados, consultar API (Shalom ya no la tiene → se omite)
+    if(!resultados.length && cfg.apiUrl){
       const r = await fetch(cfg.apiUrl + '?q=' + encodeURIComponent(q));
       if(r.ok){
         const j = await r.json();

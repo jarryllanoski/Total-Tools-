@@ -138,6 +138,17 @@
   AgenciasExtractor.extraer = async function (key) {
     var c = COURIERS.find(function (x) { return x.key === key; });
     if (!c) return;
+
+    // Shalom pasa por la PUERTA ÚNICA (shalom.js), hoy desconectada: su portal
+    // exige reCAPTCHA v3 y un servidor no puede extraerlo. Olva sigue igual.
+    if (key === 'shalom') {
+      if (global.Shalom && typeof global.Shalom.agencias === 'function') global.Shalom.agencias();
+      _setEstado(key, '🔧 Extracción de Shalom en reconstrucción — el buscador ' +
+        'sigue usando el catálogo local guardado.', '#d29922');
+      if (global.toast) global.toast('🔧 Extraer agencias Shalom no disponible aún');
+      return;
+    }
+
     var btn = document.getElementById('agExtractorBtn_' + key);
     if (btn) { btn.disabled = true; btn.textContent = '⏳ Extrayendo...'; }
     _setEstado(key, '⏳ Consultando todas las agencias de ' + c.label + '...', '#8b949e');

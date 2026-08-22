@@ -283,6 +283,10 @@ var _autoFailCount = 0;   // ciclos consecutivos sin ningún OK
 var _autoPaused   = false; // pausa tras 3 fallos
 
 async function autoTrackingCheck() {
+  // Rastreo automático DESCONECTADO: la integración vieja se retiró (Shalom
+  // protege su portal con reCAPTCHA v3; ver shalom.js / docs/SHALOM.md). No
+  // consulta nada hasta que la nueva esté lista. El resto queda inactivo.
+  return;
   if (_autoRunning) return;
 
   // Gate: si el usuario apagó el auto-tracking en Config, no consultar solo.
@@ -869,58 +873,24 @@ async function _consultarMotorB(ship, shipId) {
 /* ── consultarAhora ──────────────────────────────────────────────── */
 Tracking.consultarAhora = async function(shipId) {
   var ship = _findShip(shipId);
-
   if (!ship) {
-    console.warn('[Tracking] Pedido no encontrado con ID:', shipId);
     if (typeof window.toast === 'function') window.toast('⚠️ Error: pedido no encontrado');
     return;
   }
-
-  // Leer guía desde cualquier campo disponible
-  var guia   = ship.trackingOrderNumber || ship.shalomGuia   || '';
-  var codigo = ship.trackingOrderCode   || ship.shalomCodigo || '';
-
+  var guia = ship.trackingOrderNumber || ship.shalomGuia || '';
   if (!guia) {
     if (typeof window.toast === 'function') window.toast('⚠️ Primero guarda el número de orden');
     return;
   }
-
-  // Rutear al MOTOR ELEGIDO: si es "web" (tu servidor), va por Motor B; si no
-  // ('api' u otro), sigue el camino de siempre (Motor A / API paga, intacto).
-  var motor = (window.S && window.S.config && window.S.config.trackingMotor) || '';
-  if (motor === 'web') { await _consultarMotorB(ship, shipId); return; }
-
-  // Mostrar spinner en el botón
-  var btn = document.getElementById('btn-consult-'+shipId);
-  if (btn) { btn.innerHTML = '<span class="trk-spin-inline"></span> Consultando...'; btn.disabled = true; }
-  if (typeof window.toast === 'function') window.toast('⏳ Consultando Shalom...');
-
-  var raw      = await consultarShalom(guia, codigo);
-  var resultado = aplicarResultado(ship, raw, 'manual');
-
-  // Reactivar auto-tracking si estaba pausado y consulta manual fue exitosa
-  if (resultado !== 'error' && _autoPaused) {
-    _autoPaused    = false;
-    _autoFailCount = 0;
-    if (typeof window.toast === 'function') window.toast('✅ Tracking auto reactivado');
-  }
-
-  if (typeof window.save   === 'function') window.save(ship.id);
-  // ★ Subida INMEDIATA a Firebase (no esperar los 800ms del debounce).
-  // Resuelve el caso: consultar y recargar rápido perdía el cambio porque
-  // el guardado de 800ms se cancelaba al recargar. Ahora sube al instante.
-  // El merge (corregido, solo _dirtyShips) ya evita que esto bloquee otros dispositivos.
-  if (typeof window._fbSaveShipmentNow === 'function') window._fbSaveShipmentNow(ship);
-  if (typeof window.render === 'function') window.render();
-
-  if (resultado === 'error') {
-    if (typeof window.toast === 'function') window.toast('⚠️ No se pudo consultar. Verifica número y código.');
-  } else if (resultado === 'FINALIZADO') {
-    if (typeof window.toast === 'function') window.toast('✅ FINALIZADO — Shalom confirma entrega');
-  } else if (resultado === 'EN_DESTINO') {
-    if (typeof window.toast === 'function') window.toast('📍 Pedido llegó a destino — avisar al cliente');
-  } else {
-    if (typeof window.toast === 'function') window.toast('🔄 Estado: ' + (ship.trackingStatus || '—'));
+  // Todo el rastreo Shalom pasa por la PUERTA ÚNICA (shalom.js). Hoy está
+  // desconectada — avisa honesto en vez de consultar una API que ya no existe.
+  // Cuando la integración nueva (pro.shalom.pe) esté lista, este botón se
+  // enciende solo, sin tocar nada aquí.
+  var codigo = ship.trackingOrderCode || ship.shalomCodigo || '';
+  if (window.Shalom && typeof window.Shalom.consultarGuia === 'function') {
+    await window.Shalom.consultarGuia(guia, codigo);
+  } else if (typeof window.toast === 'function') {
+    window.toast('🔧 Rastreo Shalom en reconstrucción');
   }
 };
 
@@ -979,52 +949,13 @@ async function _bulkTrackMotorB(ids) {
    Si el motor es "web" (tu servidor) → Motor B con throttle compartido; si es
    "api" (u otro) → camino de siempre (Motor A / API paga), intacto. */
 Tracking.bulkTrack = async function(ids) {
-  var motor = (window.S && window.S.config && window.S.config.trackingMotor) || '';
-  if (motor === 'web') { return _bulkTrackMotorB(ids); }
-  var COOLDOWN = 30 * 60 * 1000; // 30 min
-  var ahora = Date.now();
-  var ships = (ids || []).map(_findShip).filter(Boolean);
-  var toTrack = [], recientes = 0, sinNum = 0;
-  ships.forEach(function(s){
-    var isShalom = s.courier && String(s.courier).toUpperCase().indexOf('SHALOM') >= 0;
-    var guia = s.trackingOrderNumber || s.shalomGuia || '';
-    if (!isShalom) return;                 // solo Shalom
-    if (s.status === 'FINALIZADO') return; // ya entregado
-    if (!guia) { sinNum++; return; }
-    if (ahora - (s.trackingLastAutoCheck || 0) < COOLDOWN) { recientes++; return; }
-    toTrack.push(s);
-  });
-  if (!toTrack.length) {
-    var m0 = 'Nada nuevo para trackear';
-    if (recientes) m0 += ' · ' + recientes + ' ya consultado' + (recientes!==1?'s':'') + ' hace poco';
-    if (sinNum) m0 += ' · ' + sinNum + ' sin número';
-    if (window.toast) window.toast(m0);
-    return;
+  // Rastreo masivo por la PUERTA ÚNICA (shalom.js), hoy desconectada. Un solo
+  // aviso honesto en vez de recorrer una API que ya no existe.
+  if (window.Shalom && typeof window.Shalom.consultarGuia === 'function') {
+    await window.Shalom.consultarGuia();
+  } else if (window.toast) {
+    window.toast('🔧 Rastreo Shalom en reconstrucción');
   }
-  if (window.toast) window.toast('⏳ Trackeando ' + toTrack.length + ' Shalom...');
-  var ok = 0, err = 0;
-  for (var i = 0; i < toTrack.length; i++) {
-    var s = toTrack[i];
-    var guia = s.trackingOrderNumber || s.shalomGuia || '';
-    var codigo = s.trackingOrderCode || s.shalomCodigo || '';
-    try {
-      var raw = await consultarShalom(guia, codigo);
-      var res = aplicarResultado(s, raw, 'auto');
-      if (res === 'error') { err++; }
-      else {
-        ok++;
-        if (window.save) window.save(s.id);
-        if (window._fbSaveShipmentNow) window._fbSaveShipmentNow(s);
-      }
-    } catch (e) { err++; }
-    await new Promise(function(r){ setTimeout(r, 600); }); // respiro entre consultas
-  }
-  if (window.render) window.render();
-  var msg = '✅ ' + ok + ' trackeado' + (ok!==1?'s':'');
-  if (recientes) msg += ' · ' + recientes + ' ya consultado' + (recientes!==1?'s':'');
-  if (sinNum) msg += ' · ' + sinNum + ' sin número';
-  if (err) msg += ' · ' + err + ' error' + (err!==1?'es':'');
-  if (window.toast) window.toast(msg);
 };
 
 /* ── verHistorial ────────────────────────────────────────────────── */

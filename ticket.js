@@ -123,6 +123,14 @@
       return;
     }
 
+    // Jalar el ticket pasa por la PUERTA ÚNICA (shalom.js), hoy desconectada.
+    // Aviso honesto en vez de llamar a una API que ya no existe. Cuando la
+    // integración nueva (pro.shalom.pe → Comprobantes) esté lista, se enciende.
+    if (global.Shalom && typeof global.Shalom.ticket === 'function') {
+      await global.Shalom.ticket(data.orderNumber, data.orderCode);
+      return;
+    }
+
     var btn     = document.getElementById('btnJalarTicket');
     var prevTxt = btn ? btn.textContent : '';
     if (btn) { btn.disabled = true; btn.textContent = '⏳ Generando...'; }
