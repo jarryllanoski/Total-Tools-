@@ -123,11 +123,18 @@
       return;
     }
 
-    // Jalar el ticket pasa por la PUERTA ÚNICA (shalom.js), hoy desconectada.
-    // Aviso honesto en vez de llamar a una API que ya no existe. Cuando la
-    // integración nueva (pro.shalom.pe → Comprobantes) esté lista, se enciende.
+    // Jalar el ticket pasa por la PUERTA ÚNICA (shalom.js). Hoy desconectada:
+    // la puerta devuelve {ok:false} y aquí avisamos honesto. Cuando la
+    // integración (pro.shalom.pe → Comprobantes) esté lista, devolverá
+    // {ok:true, url|dataUrl} y este botón cargará el ticket en el slot guía.
     if (global.Shalom && typeof global.Shalom.ticket === 'function') {
-      await global.Shalom.ticket(data.orderNumber, data.orderCode);
+      var rt = await global.Shalom.ticket(data.orderNumber, data.orderCode);
+      if (!rt || !rt.ok) {
+        _toast(rt && rt.motivo === 'NO_ENCONTRADO' ?
+          '⚠️ Shalom no encontró esa guía' : '🔧 Jalar ticket en reconstrucción');
+        return;
+      }
+      // (Futuro) aplicar rt.url / rt.dataUrl al slot guía. Por ahora no llega aquí.
       return;
     }
 

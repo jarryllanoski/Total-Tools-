@@ -44,6 +44,90 @@ function detectarEstadoAuto(estadoTexto) {
 }
 
 /* ══════════════════════════════════════════════
+   APLICADOR — único dueño de "qué hacer con una respuesta de Shalom"
+══════════════════════════════════════════════ */
+/* Modo de movimiento de etiquetas, leído de la config: off | auto | semi.
+   Mismo criterio y compat que el backend. */
+function _modoEtiqueta(){
+  var c = window.S && window.S.config;
+  var m = c && c.trackingEtiquetaModo;
+  if (m === 'off' || m === 'auto' || m === 'semi') return m;
+  return (c && c.trackingWebCambiaEtiqueta) ? 'auto' : 'off';
+}
+
+/* Traduce un código de motivo a un aviso en español (honesto, nunca mudo). */
+function _motivoTexto(motivo){
+  switch (motivo) {
+    case 'DESCONECTADO':  return '🔧 Rastreo Shalom en reconstrucción';
+    case 'NO_ENCONTRADO': return '⚠️ Shalom no encontró esa guía — verifica número y código';
+    case 'BLOQUEADO':     return '⚠️ Shalom pidió verificación — intenta desde tu navegador';
+    case 'SIN_DATO':      return '⚠️ Shalom no devolvió estado — reintenta en un momento';
+    default:              return '⚠️ No se pudo consultar Shalom';
+  }
+}
+
+/* Escritor atómico del tracking visible: estado + mensaje + hora + historial en
+   una sola pasada. Es IMPOSIBLE dejar un estado sin su hora ni su entrada. */
+function _escribirTracking(ship, estado, fecha){
+  var iso = fecha || new Date().toISOString();
+  if (!ship.trackingHistory) ship.trackingHistory = [];
+  ship.trackingHistory.push({date: iso, status: estado, message: estado, source: 'shalom'});
+  ship.trackingStatus     = estado;
+  ship.trackingMessage    = estado;
+  ship.trackingLastUpdate = iso;
+}
+
+/* ÚNICO lugar que aplica una respuesta de la puerta a un pedido. Lo usan el
+   botón manual, el masivo y el auto-check. Devuelve:
+     { cambio:true,  resultado:'FINALIZADO'|'EN_DESTINO'|'ENVIADO'|'ok', estado }
+     { cambio:false, motivo }   ← sin dato real: NO toca el pedido (nunca finge)
+   Mueve la etiqueta respetando el modo (off/semi/auto) y sin retroceder jamás. */
+function _aplicarEstadoShalom(ship, resp){
+  ship.trackingLastAutoCheck = Date.now();
+  if (!resp || !resp.ok) return {cambio: false, motivo: (resp && resp.motivo) || 'SIN_DATO'};
+
+  // El estado semántico viene de la barra de pasos (más robusto) o, si no, del
+  // texto. pasos: 0 origen · 1 tránsito · 2 destino · 3 entregado.
+  var autoEstado;
+  if (typeof resp.pasos === 'number') {
+    autoEstado = resp.pasos >= 3 ? 'FINALIZADO' : (resp.pasos === 2 ? 'EN_DESTINO' : null);
+  } else {
+    autoEstado = detectarEstadoAuto(resp.estado || '');
+  }
+
+  var estadoTexto = (resp.estado || '').trim();
+  if (!estadoTexto && autoEstado == null) {
+    return {cambio: false, motivo: 'SIN_DATO'}; // ni texto ni barra → no inventamos
+  }
+
+  // 1) Tracking visible: se escribe siempre que el texto cambie.
+  if (estadoTexto && ship.trackingStatus !== estadoTexto) {
+    _escribirTracking(ship, estadoTexto, resp.fecha);
+  }
+
+  // 2) Etiqueta interna: según el MODO, y SOLO hacia adelante (nunca retrocede).
+  var modo = _modoEtiqueta();
+  var resultado = 'ok';
+  var isShalom = ship.courier && ship.courier.toUpperCase().includes('SHALOM');
+  if (isShalom && modo !== 'off') {
+    if (autoEstado === 'FINALIZADO') {
+      if (modo !== 'semi' && ship.status !== 'FINALIZADO') ship.status = 'FINALIZADO';
+      resultado = 'FINALIZADO';
+    } else if (autoEstado === 'EN_DESTINO') {
+      var conSaldo = ship.cost && parseFloat(ship.cost) > 0;
+      if (conSaldo && ['PENDIENTE DE PAGO','FINALIZADO'].indexOf(ship.status) < 0) {
+        ship.status = 'PENDIENTE DE PAGO'; resultado = 'EN_DESTINO';
+      } else if (['LLEGÓ A DESTINO','PENDIENTE DE PAGO','FINALIZADO'].indexOf(ship.status) < 0) {
+        ship.status = 'LLEGÓ A DESTINO'; resultado = 'EN_DESTINO';
+      } else { resultado = 'EN_DESTINO'; }
+    } else if (['NUEVO PEDIDO','EN PROCESO','POR ALISTAR','ALISTADO'].indexOf(ship.status) >= 0) {
+      ship.status = 'ENVIADO'; resultado = 'ENVIADO';
+    }
+  }
+  return {cambio: true, resultado: resultado, estado: estadoTexto};
+}
+
+/* ══════════════════════════════════════════════
    ALERTA DE DESTINO
 ══════════════════════════════════════════════ */
 /* ── Aviso "llegó a destino" — vigilante AGNÓSTICO AL MOTOR ─────────────────
@@ -454,38 +538,72 @@ Tracking._guardarEdicion = function(shipId) {
   if (typeof window.toast  === 'function') window.toast('✅ Tracking guardado');
 };
 
-/* ── consultarAhora ──────────────────────────────────────────────── */
+/* Consulta un pedido por la puerta y aplica el resultado. Devuelve el objeto
+   del aplicador. No toca UI global (lo hace el llamador). */
+async function _consultarYAplicar(ship){
+  var guia = ship.trackingOrderNumber || ship.shalomGuia || '';
+  var codigo = ship.trackingOrderCode || ship.shalomCodigo || '';
+  var resp = (window.Shalom && typeof window.Shalom.consultarGuia === 'function') ?
+    await window.Shalom.consultarGuia(guia, codigo) : {ok: false, motivo: 'DESCONECTADO'};
+  return _aplicarEstadoShalom(ship, resp);
+}
+
+/* ── consultarAhora: botón ⟳ por tarjeta ─────────────────────────── */
 Tracking.consultarAhora = async function(shipId) {
   var ship = _findShip(shipId);
   if (!ship) {
-    if (typeof window.toast === 'function') window.toast('⚠️ Error: pedido no encontrado');
+    if (window.toast) window.toast('⚠️ Error: pedido no encontrado');
     return;
   }
   var guia = ship.trackingOrderNumber || ship.shalomGuia || '';
   if (!guia) {
-    if (typeof window.toast === 'function') window.toast('⚠️ Primero guarda el número de orden');
+    if (window.toast) window.toast('⚠️ Primero guarda el número de orden');
     return;
   }
-  // Todo el rastreo Shalom pasa por la PUERTA ÚNICA (shalom.js). Hoy está
-  // desconectada — avisa honesto en vez de consultar una API que ya no existe.
-  // Cuando la integración nueva (pro.shalom.pe) esté lista, este botón se
-  // enciende solo, sin tocar nada aquí.
-  var codigo = ship.trackingOrderCode || ship.shalomCodigo || '';
-  if (window.Shalom && typeof window.Shalom.consultarGuia === 'function') {
-    await window.Shalom.consultarGuia(guia, codigo);
-  } else if (typeof window.toast === 'function') {
-    window.toast('🔧 Rastreo Shalom en reconstrucción');
+  var btn = document.getElementById('btn-consult-'+shipId);
+  if (btn) { btn.innerHTML = '<span class="trk-spin-inline"></span> Consultando...'; btn.disabled = true; }
+  if (window.toast) window.toast('⏳ Consultando Shalom...');
+
+  var r = await _consultarYAplicar(ship);
+  if (r.cambio) {
+    if (window.save) window.save(ship.id);
+    if (window._fbSaveShipmentNow) window._fbSaveShipmentNow(ship); // subida inmediata
+    if (window.render) window.render();
+    if (window.toast) {
+      window.toast(
+        r.resultado === 'FINALIZADO' ? '✅ FINALIZADO — Shalom confirma entrega' :
+        r.resultado === 'EN_DESTINO' ? '📍 Llegó a destino — avisar al cliente' :
+        r.resultado === 'ENVIADO'    ? '🚚 En camino — marcado ENVIADO' :
+        '🔄 Estado: ' + (ship.trackingStatus || '—'));
+    }
+  } else {
+    if (window.toast) window.toast(_motivoTexto(r.motivo));
+    if (btn) { btn.innerHTML = '⟳ Consultar'; btn.disabled = false; }
   }
 };
 
-/* ── bulkTrack: masivo desde el ícono 🔄 con selección → puerta única. */
+/* ── bulkTrack: masivo desde el ícono 🔄 con selección ───────────── */
 Tracking.bulkTrack = async function(ids) {
-  // Rastreo masivo por la PUERTA ÚNICA (shalom.js), hoy desconectada. Un solo
-  // aviso honesto en vez de recorrer una API que ya no existe.
-  if (window.Shalom && typeof window.Shalom.consultarGuia === 'function') {
-    await window.Shalom.consultarGuia();
-  } else if (window.toast) {
-    window.toast('🔧 Rastreo Shalom en reconstrucción');
+  var ships = (ids || []).map(_findShip).filter(Boolean).filter(function(s){
+    var isShalom = s.courier && String(s.courier).toUpperCase().indexOf('SHALOM') >= 0;
+    var guia = s.trackingOrderNumber || s.shalomGuia || '';
+    return isShalom && guia && s.status !== 'FINALIZADO';
+  });
+  if (!ships.length) { if (window.toast) window.toast('Nada Shalom para consultar'); return; }
+  if (window.toast) window.toast('⏳ Consultando ' + ships.length + ' Shalom...');
+  var ok = 0, err = 0, changed = [], ultimoMotivo = null;
+  for (var i = 0; i < ships.length; i++) {
+    var r = await _consultarYAplicar(ships[i]);
+    if (r.cambio) { ok++; changed.push(ships[i].id); }
+    else { err++; ultimoMotivo = r.motivo; }
+    if (i < ships.length - 1) await new Promise(function(res){ setTimeout(res, 700); });
+  }
+  if (changed.length && window.save) window.save(changed);
+  if (window.render) window.render();
+  if (window.toast) {
+    // Si NINGUNO respondió, di el motivo (p.ej. desconectado); si algunos sí, resume.
+    if (!ok && ultimoMotivo) window.toast(_motivoTexto(ultimoMotivo));
+    else window.toast('✅ ' + ok + ' consultado' + (ok!==1?'s':'') + (err ? ' · ' + err + ' sin dato' : ''));
   }
 };
 
@@ -574,6 +692,44 @@ Tracking.copiarLink = function(id) {
   }
 };
 
+/* ── Auto-check al abrir el panel ────────────────────────────────────
+   GATEADO en Shalom.DISPONIBLE: hoy la puerta está desconectada, así que esto
+   NO hace nada. Cuando se conecte, consulta los Shalom pendientes que ya toca
+   refrescar (según las horas de Config) y aplica por el mismo aplicador que el
+   manual. El motor "sin abrir el panel" será Cloud Scheduler + sesión prestada
+   (ver docs/SHALOM.md); esto es el complemento/respaldo para cuando trabajas. */
+var _autoRunning = false;
+async function autoTrackingCheck() {
+  if (!(window.Shalom && window.Shalom.DISPONIBLE)) return; // apagado hasta conectar
+  if (_autoRunning) return;
+  var cfg = (window.S && window.S.config) || {};
+  if (cfg.shalomAutoTrack === false) return;               // el operador lo apagó
+  var ships = _getShipments();
+  if (!ships) return;
+  var ahora = Date.now();
+  var hTran = (Number(cfg.trackingWebIntervalTransitoH) || 12) * 3600000;
+  var hDest = (Number(cfg.trackingWebIntervalDestinoH) || 24) * 3600000;
+  var pend = ships.filter(function(s){
+    var isShalom = s.courier && String(s.courier).toUpperCase().indexOf('SHALOM') >= 0;
+    var guia = s.trackingOrderNumber || s.shalomGuia || '';
+    if (!isShalom || !guia || s.status === 'FINALIZADO') return false;
+    var enDestino = (s.status === 'LLEGÓ A DESTINO' || s.status === 'PENDIENTE DE PAGO');
+    return (ahora - (s.trackingLastAutoCheck || 0)) >= (enDestino ? hDest : hTran);
+  });
+  if (!pend.length) return;
+  _autoRunning = true;
+  var ok = 0, changed = [];
+  for (var i = 0; i < pend.length; i++) {
+    try { var r = await _consultarYAplicar(pend[i]); if (r.cambio) { ok++; changed.push(pend[i].id); } }
+    catch (e) { /* la puerta ya devuelve {ok:false}; no rompemos el ciclo */ }
+    if (i < pend.length - 1) await new Promise(function(res){ setTimeout(res, 700); });
+  }
+  if (changed.length && window.save) window.save(changed);
+  if (window.render) window.render();
+  if (ok && window.toast) window.toast('🔄 Auto: ' + ok + ' actualizado' + (ok!==1?'s':''));
+  _autoRunning = false;
+}
+
 /* ── init ────────────────────────────────────────────────────────── */
 Tracking.init = function() {
   _injectCSS();
@@ -590,9 +746,9 @@ Tracking.init = function() {
   }
   setTimeout(function() {
     if (!_syncS()) {
-      // Si no se sincronizó, reintentar a los 5s (el rastreo automático ya no
-      // corre aquí: vive en shalom.js, hoy desconectado).
-      setTimeout(_syncS, 2000);
+      setTimeout(function(){ _syncS(); autoTrackingCheck(); }, 2000);
+    } else {
+      autoTrackingCheck(); // no-op mientras Shalom.DISPONIBLE sea false
     }
   }, 2000);
 };
