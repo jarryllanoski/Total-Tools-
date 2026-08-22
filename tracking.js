@@ -596,14 +596,15 @@ function _injectOverlays() {
     'El cliente elige agencia Shalom en el formulario.',
     'El pedido llega al panel como <b>NUEVO PEDIDO</b>.',
     'Edita el pedido y coloca número de orden y código.',
-    'Guarda tracking → el pedido pasa automáticamente a <b>ENVIADO</b>.',
+    'Guarda tracking → el pedido <b>conserva su etiqueta actual</b>. La primera consulta (manual o automática) lo pasa a <b>ENVIADO</b>.',
     'Presiona <b>⟳ Consultar</b> en cualquier momento para actualizar al instante.',
-    'El sistema consulta Shalom automáticamente cada <b>12 horas</b> (en tránsito) y cada <b>24 horas</b> al llegar a destino. Al entregarse deja de consultar.',
-    'Shalom dice "En tránsito" → etiqueta <b>ENVIADO</b> + cliente ve subtítulo informativo.',
-    'Shalom dice "Demora" → etiqueta <b>ENVIADO</b> + cliente ve aviso de demora.',
-    'Shalom dice "En destino" → cambia automáticamente a <b>LLEGÓ A DESTINO</b> (cada 2h revisa).',
+    'El sistema consulta Shalom automáticamente cada <b>12 horas</b> en tránsito y <b>24 horas</b> en destino, o <b>lo que configures</b> en ⚙️ Configuración → Shalom. Al entregarse deja de consultar.',
+    'Shalom dice "En tránsito" → etiqueta <b>ENVIADO</b> + el cliente ve el estado en su link.',
+    'Shalom dice "Demora de envíos" → etiqueta <b>ENVIADO</b> + el cliente ve el aviso de demora en su link.',
+    'Shalom dice "En destino" → cambia automáticamente a <b>LLEGÓ A DESTINO</b>.',
     'Si el pedido tiene saldo pendiente → cambia a <b>PENDIENTE DE PAGO</b>.',
     'Shalom dice "Entregado" → cambia automáticamente a <b>FINALIZADO</b>.',
+    'Los pasos 7 al 11 dependen de <b>Cambiar etiquetas</b> (⚙️ Configuración): <b>Apagado</b> = solo registra, no mueve nada · <b>Semiautomática</b> = mueve todo menos <b>FINALIZADO</b>, que cierras tú · <b>Automática</b> = mueve todo.',
   ];
   ov2.innerHTML = '<div id="trkManualSheet">'+
     '<div style="font-family:Syne,sans-serif;font-weight:800;font-size:17px;margin-bottom:14px">📖 Manual Shalom</div>'+
@@ -768,10 +769,11 @@ Tracking._guardarEdicion = function(shipId) {
     ship.shalomEstado      = '';
   }
 
-  // Cambiar a ENVIADO automáticamente
-  if (ship.status !== 'ENVIADO' && ship.status !== 'FINALIZADO') {
-    ship.status = 'ENVIADO';
-  }
+  // Guardar la guía NO mueve la etiqueta: conserva la que tenía. Es la primera
+  // consulta (manual o automática) la que la pasa a ENVIADO. Antes esto forzaba
+  // ENVIADO en cada guardado, así que un pedido ya en LLEGÓ A DESTINO retrocedía
+  // a ENVIADO al entrar solo a corregir la guía — el "a veces cambia de etiqueta
+  // y se regresa solo" que buscábamos.
 
   if (typeof window.save   === 'function') window.save(ship.id);
   // ★ Subida INMEDIATA: al poner la guía y pasar a ENVIADO, sube al instante.
