@@ -1,10 +1,11 @@
 /**
- * tracking.js — Módulo Shalom Tracking
- * =====================================
- * Conecta con Firebase Function shalomTracking
- * Sin API key expuesta — todo pasa por Firebase
- *
- * URL: https://us-central1-total-tools-24ce8.cloudfunctions.net/shalomTracking
+ * tracking.js — UI de tracking Shalom en el panel
+ * ================================================
+ * Tarjeta de tracking, modal de edición de guía, historial, manual, y el
+ * vigilante "llegó a destino" (agnóstico al motor). El rastreo en sí (consultar,
+ * masivo) pasa por la PUERTA ÚNICA shalom.js, hoy desconectada — ver docs/SHALOM.md.
+ * El motor viejo (API paga + worker propio) se retiró: Shalom protege su portal
+ * con reCAPTCHA v3 y un servidor nunca saca nota.
  */
 (function(global){
 'use strict';
@@ -13,113 +14,19 @@
    CONFIGURACIÓN
 ══════════════════════════════════════════════ */
 var TRK = {
-  FIREBASE_URL: 'https://us-central1-total-tools-24ce8.cloudfunctions.net/shalomTracking',
-  AUTO_INTERVAL_MS:         12 * 60 * 60 * 1000, // 12 horas — en tránsito (base)
-  AUTO_INTERVAL_DESTINO_MS: 24 * 60 * 60 * 1000, // 24 horas — llegó a destino / pendiente de pago
+  // Únicas palabras clave que sobreviven: las usa detectarEstadoAuto para el
+  // vigilante "llegó a destino" (agnóstico al motor). El motor de rastreo vive
+  // ahora en shalom.js; su lógica vieja se retiró.
   KEYWORDS_ENTREGADO: ['entregado','entrega realizada','entrega completa','recogido','recojo completado','delivered'],
   KEYWORDS_DESTINO:   ['llegó a destino','llego a destino','en agencia destino','disponible para recojo',
                        'disponible para retiro','en agencia de destino','a disposicion',
                        'en destino','en destino -','en la agencia','en destino-'],
-  KEYWORDS_TRANSITO:  ['en transito','en tránsito','en camino','en ruta','en traslado','recibido en agencia origen',
-                       'salida de agencia','saliendo','despachado','procesando'],
-  KEYWORDS_DEMORA:    ['demora','demorado','retraso','retrasado','no entregado','intento de entrega',
-                       'pendiente de entrega','ausente','domicilio cerrado'],
 };
-
-// Detectar subtítulo informativo para el cliente (tránsito/demora)
-function detectarSubtituloCliente(estadoTexto) {
-  if (!estadoTexto) return null;
-  var t = estadoTexto.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
-  for (var i = 0; i < TRK.KEYWORDS_DEMORA.length; i++) {
-    if (t.includes(TRK.KEYWORDS_DEMORA[i])) return 'demora';
-  }
-  for (var j = 0; j < TRK.KEYWORDS_TRANSITO.length; j++) {
-    if (t.includes(TRK.KEYWORDS_TRANSITO[j])) return 'transito';
-  }
-  return null;
-}
 
 /* ══════════════════════════════════════════════
    HELPER — escapar HTML
 ══════════════════════════════════════════════ */
 function _esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
-
-/* ══════════════════════════════════════════════
-   LLAMADA A FIREBASE FUNCTION
-══════════════════════════════════════════════ */
-async function consultarShalom(orderNumber, orderCode) {
-  // ★ Timeout: si Shalom no responde en 12s, abortar y seguir con el siguiente.
-  // Evita que una consulta colgada trabe todo el ciclo de auto-tracking.
-  var _ctrl = new AbortController();
-  var _timer = setTimeout(function(){ _ctrl.abort(); }, 12000);
-  try {
-    var r = await fetch(TRK.FIREBASE_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        orderNumber: String(orderNumber).trim(),
-        orderCode:   String(orderCode || '').trim()
-      }),
-      signal: _ctrl.signal
-    });
-    var raw = await r.json();
-    return raw;
-  } catch(e) {
-    if(e.name === 'AbortError'){
-      console.warn('[Tracking] Timeout 12s — Shalom no respondió:', orderNumber);
-    } else {
-      console.warn('[Tracking] Error fetch:', e.message);
-    }
-    return null;
-  } finally {
-    clearTimeout(_timer); // ★ limpiar el temporizador pase lo que pase
-  }
-}
-
-/* ══════════════════════════════════════════════
-   EXTRACTOR DE ESTADO — soporta cualquier formato
-══════════════════════════════════════════════ */
-function extraerEstado(raw) {
-  if (!raw) return null;
-  // Formato nuevo: { statuses: { message } }
-  if (raw.statuses) {
-    var st = raw.statuses;
-    return st.message || st.estado || st.status || st.descripcion || null;
-  }
-  var d = raw.data || raw.result || raw.tracking || raw;
-  return d.estado || d.status || d.estado_actual || d.message || d.msg || null;
-}
-
-function extraerHistorial(raw) {
-  if (!raw) return [];
-  var d = raw.data || raw.result || raw.tracking || raw;
-  var hist = d.historial || d.history || d.estados || d.events || d.movimientos || [];
-  return hist.map(function(e) {
-    return {
-      estado: e.estado  || e.status || e.descripcion || e.event   || e.movimiento || '',
-      fecha:  e.fecha   || e.date   || e.datetime    || e.hora    || e.fecha_hora  || '',
-      lugar:  e.lugar   || e.location || e.ciudad    || e.oficina || '',
-    };
-  });
-}
-
-function extraerOrigen(raw) {
-  if (!raw) return '';
-  var d = raw.data || raw.result || raw.tracking || raw;
-  return d.origen || d.ciudad_origen || d.from || d.origen_ciudad || '';
-}
-
-function extraerDestino(raw) {
-  if (!raw) return '';
-  var d = raw.data || raw.result || raw.tracking || raw;
-  return d.destino || d.ciudad_destino || d.to || d.destino_ciudad || '';
-}
-
-function extraerUltimoMovimiento(raw) {
-  var hist = extraerHistorial(raw);
-  if (!hist.length) return null;
-  return hist[hist.length - 1];
-}
 
 /* ══════════════════════════════════════════════
    DETECCIÓN AUTOMÁTICA DE ESTADO
@@ -134,245 +41,6 @@ function detectarEstadoAuto(estadoTexto) {
     if (t.includes(TRK.KEYWORDS_DESTINO[j])) return 'EN_DESTINO';
   }
   return null;
-}
-
-/* ══════════════════════════════════════════════
-   APLICAR RESULTADO AL SHIPMENT
-══════════════════════════════════════════════ */
-/* Modo de movimiento de etiquetas (AGNÓSTICO AL MOTOR), leído de la config.
-   Mismo criterio y compatibilidad que el backend: 'off' | 'auto' | 'semi'. */
-function _etiquetaModo(){
-  var c = window.S && window.S.config;
-  var m = c && c.trackingEtiquetaModo;
-  if (m === 'off' || m === 'auto' || m === 'semi') return m;
-  return (c && c.trackingWebCambiaEtiqueta) ? 'auto' : 'off';
-}
-/* ¿Se puede mover la etiqueta a `target`? off=nunca; semi=todo menos FINALIZADO;
-   auto=todo. (El tracking/observación se registra igual en los 3 modos.) */
-function _puedeMoverEtiqueta(target){
-  var m = _etiquetaModo();
-  if (m === 'off') return false;
-  if (m === 'semi' && target === 'FINALIZADO') return false;
-  return true;
-}
-
-function aplicarResultado(ship, raw, source) {
-  var now = new Date().toISOString();
-
-  if (!raw || raw.error) {
-    if (!ship.trackingHistory) ship.trackingHistory = [];
-    ship.trackingHistory.push({
-      date:    now,
-      status:  'ERROR',
-      message: (raw && raw.message) ? raw.message : 'No se pudo consultar. Verifica número y código.',
-      source:  source || 'manual'
-    });
-    ship.trackingLastAutoCheck = Date.now();
-    return 'error';
-  }
-
-  // ★ Formato nuevo { search:{}, statuses:{} } o formato antiguo
-  var estadoTexto, historial, origen, destino;
-  if (raw.statuses) {
-    var st = raw.statuses;
-    estadoTexto = st.message || st.estado || st.status || st.descripcion || '—';
-    origen  = (raw.search && (raw.search.origen  || raw.search.ciudad_origen))  || st.origen  || '';
-    destino = (raw.search && (raw.search.destino || raw.search.ciudad_destino)) || st.destino || '';
-    var histRaw = st.historial || st.history || st.estados || st.movimientos || [];
-    if (!Array.isArray(histRaw) && histRaw && typeof histRaw === 'object') histRaw = Object.values(histRaw);
-    historial = (Array.isArray(histRaw) ? histRaw : []).map(function(e){
-      return { estado: e.estado||e.status||e.descripcion||String(e), fecha: e.fecha||e.date||'', lugar: e.lugar||e.ciudad||'' };
-    });
-    if (!historial.length && estadoTexto && estadoTexto !== '—') {
-      historial = [{ estado: estadoTexto, fecha: new Date().toISOString(), lugar: destino }];
-    }
-  } else {
-    estadoTexto = extraerEstado(raw);
-    historial   = extraerHistorial(raw);
-    origen      = extraerOrigen(raw);
-    destino     = extraerDestino(raw);
-  }
-  var ultimoMov  = historial.length ? historial[historial.length-1] : null;
-  var autoEstado = detectarEstadoAuto(estadoTexto);
-  var guiaOk = !!(ship.trackingOrderNumber || ship.shalomGuia);
-
-  // ★ Detectar si el estado Shalom es idéntico al de la última consulta.
-  // En auto-check, si nada cambió, NO tocamos campos ni historial: así no se
-  // genera un "cambio" que dispare save() y recargas en cadena entre dispositivos.
-  var nuevoTexto   = estadoTexto || '—';
-  var mismoEstado  = (ship.trackingStatus === nuevoTexto);
-  var esAuto       = (source === 'auto');
-
-  if (esAuto && mismoEstado) {
-    // Solo marcar la hora del último chequeo (interno, no afecta la tarjeta).
-    ship.trackingLastAutoCheck = Date.now();
-    return 'sin-cambio'; // ← el auto-check sabrá que este pedido no necesita guardado
-  }
-
-  // Actualizar campos del shipment
-  ship.trackingStatus        = estadoTexto || '—';
-  ship.trackingMessage       = estadoTexto || '—';
-  ship.trackingLastUpdate    = now;
-  ship.trackingLastAutoCheck = Date.now();
-  ship.trackingOrigen        = origen;
-  ship.trackingDestino       = destino;
-  ship.trackingUltimoMov     = ultimoMov;
-
-  // Guardar historial Shalom completo
-  if (historial.length) ship.trackingHistorialShalom = historial;
-
-  // Agregar entrada al log de consultas
-  if (!ship.trackingHistory) ship.trackingHistory = [];
-  ship.trackingHistory.push({
-    date:    now,
-    status:  estadoTexto || '—',
-    message: estadoTexto || '—',
-    source:  source || 'manual'
-  });
-
-  // ★ Automatizaciones de estado — solo para courier SHALOM
-  var isShalom = ship.courier && ship.courier.toUpperCase().includes('SHALOM');
-  // El movimiento de la ETIQUETA (ship.status) respeta el modo (off/auto/semi).
-  // El tracking/observación ya se registró arriba; aquí solo se decide mover o no.
-  if (isShalom) {
-    if (autoEstado === 'FINALIZADO' && ship.status !== 'FINALIZADO') {
-      if (_puedeMoverEtiqueta('FINALIZADO')) ship.status = 'FINALIZADO';
-      return 'FINALIZADO';
-    }
-    if (autoEstado === 'EN_DESTINO') {
-      // Si tiene saldo pendiente → PENDIENTE DE PAGO, sino → LLEGÓ A DESTINO
-      if (ship.cost && parseFloat(ship.cost) > 0 && ship.status !== 'PENDIENTE DE PAGO') {
-        if (_puedeMoverEtiqueta('PENDIENTE DE PAGO')) ship.status = 'PENDIENTE DE PAGO';
-        return 'PENDIENTE DE PAGO';
-      } else if (ship.status !== 'LLEGÓ A DESTINO' && ship.status !== 'PENDIENTE DE PAGO' && ship.status !== 'FINALIZADO') {
-        if (_puedeMoverEtiqueta('LLEGÓ A DESTINO')) ship.status = 'LLEGÓ A DESTINO';
-        return 'EN_DESTINO';
-      }
-    }
-    // Si estaba en NUEVO PEDIDO/EN PROCESO y tiene guía → ENVIADO
-    if (autoEstado === null && guiaOk &&
-        (ship.status === 'NUEVO PEDIDO' || ship.status === 'EN PROCESO' || ship.status === 'POR ALISTAR' || ship.status === 'ALISTADO')) {
-      if (_puedeMoverEtiqueta('ENVIADO')) ship.status = 'ENVIADO';
-      return 'ENVIADO';
-    }
-  } else {
-    // Para otros couriers solo FINALIZADO automático
-    if (autoEstado === 'FINALIZADO' && ship.status !== 'FINALIZADO') {
-      if (_puedeMoverEtiqueta('FINALIZADO')) ship.status = 'FINALIZADO';
-      return 'FINALIZADO';
-    }
-  }
-  // Guardar subtítulo informativo para el cliente
-  var subtitulo = detectarSubtituloCliente(estadoTexto);
-  if (subtitulo) {
-    ship.trackingSubtituloCliente = subtitulo;
-  } else if (autoEstado === 'EN_DESTINO') {
-    ship.trackingSubtituloCliente = 'destino';
-  } else if (autoEstado === 'FINALIZADO') {
-    ship.trackingSubtituloCliente = 'entregado';
-  }
-
-  return 'ok';
-}
-
-/* ══════════════════════════════════════════════
-   TRACKING AUTOMÁTICO (al abrir el panel)
-══════════════════════════════════════════════ */
-var _autoRunning = false;
-var _autoFailCount = 0;   // ciclos consecutivos sin ningún OK
-var _autoPaused   = false; // pausa tras 3 fallos
-
-async function autoTrackingCheck() {
-  // Rastreo automático DESCONECTADO: la integración vieja se retiró (Shalom
-  // protege su portal con reCAPTCHA v3; ver shalom.js / docs/SHALOM.md). No
-  // consulta nada hasta que la nueva esté lista. El resto queda inactivo.
-  return;
-  if (_autoRunning) return;
-
-  // Gate: si el usuario apagó el auto-tracking en Config, no consultar solo.
-  // (El botón "Consultar" por tarjeta y el tracking masivo manual siguen funcionando.)
-  if (window.S && window.S.config && window.S.config.shalomAutoTrack === false) return;
-
-  // Gate MOTOR: si el motor activo es "web" (Motor B / mi servidor), el Motor A
-  // (API paga) NO debe auto-consultar — el backend ya mantiene el estado. Evita
-  // cobros de la API paga y que los dos motores se pisen las etiquetas.
-  if (window.S && window.S.config && window.S.config.trackingMotor === 'web') return;
-
-  // Pausado tras 3 fallos — esperar consulta manual exitosa
-  if (_autoPaused) {
-    return;
-  }
-
-  var _ships = _getShipments();
-  if (!_ships) { _autoRunning = false; return; }
-  _autoRunning = true;
-
-  var ahora = Date.now();
-  var pendientes = _ships.filter(function(s) {
-    if (!s.trackingOrderNumber && !s.shalomGuia) return false;
-    if (s.status === 'FINALIZADO') return false;
-    var ultima = s.trackingLastAutoCheck || 0;
-    var diff = ahora - ultima;
-    var intervalo = (s.status === 'LLEGÓ A DESTINO' || s.status === 'PENDIENTE DE PAGO')
-      ? TRK.AUTO_INTERVAL_DESTINO_MS   // llegó a destino → cada 24h
-      : TRK.AUTO_INTERVAL_MS;          // en tránsito → cada 12h
-    return diff >= intervalo;
-  });
-
-  if (!pendientes.length) { _autoRunning = false; return; }
-
-  var okCount  = 0;
-  var errCount = 0;
-  var changedIds = []; // ★ qué pedidos cambiaron de verdad en este ciclo
-
-  for (var i = 0; i < pendientes.length; i++) {
-    var ship = pendientes[i];
-    var guia   = ship.trackingOrderNumber || ship.shalomGuia   || '';
-    var codigo = ship.trackingOrderCode   || ship.shalomCodigo || '';
-    try {
-      var raw      = await consultarShalom(guia, codigo);
-      var resultado = aplicarResultado(ship, raw, 'auto');
-      if (resultado === 'error') {
-        errCount++;
-      } else {
-        okCount++;
-        if (resultado !== 'sin-cambio') changedIds.push(ship.id); // ★ hubo cambio real
-      }
-    } catch(e) {
-      errCount++;
-      console.warn('[Tracking] Auto-check error:', e);
-    }
-    await new Promise(function(r){ setTimeout(r, 600); });
-  }
-
-  // Sin ningún OK en este ciclo → acumular fallo
-  if (okCount === 0 && errCount > 0) {
-    _autoFailCount++;
-    console.warn('[Tracking] Ciclo fallido #' + _autoFailCount + ' (0 OK de ' + errCount + ')');
-    if (_autoFailCount >= 3) {
-      _autoPaused = true;
-      console.warn('[Tracking] Auto-check PAUSADO tras 3 ciclos fallidos.');
-      if (typeof window.toast === 'function') {
-        window.toast('⚠️ Tracking auto pausado — API Shalom sin respuesta');
-      }
-    }
-  } else if (okCount > 0) {
-    // Al menos 1 OK → resetear
-    _autoFailCount = 0;
-    _autoPaused    = false;
-  }
-
-  // ★ Solo guardar (y subir ts → disparar recargas) si algún pedido cambió de verdad.
-  // Si ningún pedido cambió, NO guardamos: así no se genera el rebote de lecturas
-  // entre dispositivos que disparaba millones de lecturas/día.
-  // Se guardan SOLO los pedidos que cambiaron (lista de ids, una escritura).
-  // Antes era window.save() sin id — que además de estar muerto habría subido
-  // los ~700 pedidos enteros cada ciclo.
-  if (changedIds.length && typeof window.save === 'function') {
-    window.save(changedIds);
-  }
-  if (typeof window.render === 'function') window.render();
-  _autoRunning = false;
 }
 
 /* ══════════════════════════════════════════════
@@ -653,7 +321,6 @@ function _estadoChip(ship) {
 ══════════════════════════════════════════════ */
 var Tracking = {};
 Tracking.checkDestinoAlerts = _checkDestinoAlerts; // vigilante "llegó a destino" (hook desde render)
-Tracking._puedeMoverEtiqueta = _puedeMoverEtiqueta; // predicado del modo (off/auto/semi) — testeable
 
 /* ── Helper: obtener shipments desde cualquier fuente ─────────────── */
 function _getShipments() {
@@ -787,89 +454,6 @@ Tracking._guardarEdicion = function(shipId) {
   if (typeof window.toast  === 'function') window.toast('✅ Tracking guardado');
 };
 
-/* ── MOTOR B (tu servidor): throttle compartido con el scheduler ──────
-   _motorBVencido replica el criterio de estaVencido del backend: ¿ya toca
-   consultar este pedido? (por timestamp trackingWebProximaConsulta, no por
-   "alguien entró"). Así el botón/masivo del panel y el scheduler NO se pisan ni
-   estampidan el worker. Sin fecha (nunca consultado) → vencido = true. */
-function _motorBVencido(ship) {
-  var prox = ship && ship.trackingWebProximaConsulta ?
-    Date.parse(ship.trackingWebProximaConsulta) : 0;
-  return !(prox && isFinite(prox) && prox > Date.now());
-}
-
-/* Consulta UN pedido por Motor B vía syncShalomWebTest (autenticada, escribe en
-   Firestore) y aplica el resultado al pedido local. Reutilizado por el botón
-   por-tarjeta (force=true, manual explícito) y el masivo (force=false, respeta
-   el throttle). Devuelve 'ok' | 'skip' | 'error'. No toca el botón ni hace
-   render: eso lo decide el llamador. */
-/* ¿El registro visible está incompleto? (tiene status pero le falta hora o
-   historial). Mismo criterio que el backend → coherencia entre A y B. */
-function _registroIncompleto(ship) {
-  return !ship.trackingLastUpdate ||
-    !(ship.trackingHistory && ship.trackingHistory.length);
-}
-/* Escritor atómico LOCAL (mismo contrato que el backend appendTracking): deja
-   status/message/lastUpdate/historial/motorOrigen coherentes en una sola pasada.
-   Solo display; en Motor B, Firestore lo escribe el backend. */
-function _appendTrackingLocal(ship, status, source) {
-  var now = new Date().toISOString();
-  if (!ship.trackingHistory) ship.trackingHistory = [];
-  ship.trackingHistory.push({date: now, status: status, message: status, source: source || 'web'});
-  ship.trackingStatus     = status;
-  ship.trackingMessage    = status;
-  ship.trackingLastUpdate = now;
-  ship.trackingMotorOrigen = 'web';
-}
-
-async function _motorBConsultarUno(ship, shipId, force) {
-  if (!force && !_motorBVencido(ship)) return 'skip';
-  var tok = '';
-  try {
-    if (typeof window._authEnsureToken === 'function') await window._authEnsureToken();
-    tok = localStorage.getItem('tt_id_token') || '';
-  } catch(e){}
-  var url = 'https://us-central1-total-tools-24ce8.cloudfunctions.net/syncShalomWebTest?pedidoId=' + encodeURIComponent(shipId);
-  var r = await fetch(url, { headers: { Authorization: 'Bearer ' + tok } });
-  var data = await r.json();
-  if (data && data.ok && data.cambios) {
-    // El backend ya devuelve el BLOQUE COHERENTE cuando hay algo que escribir
-    // (incluye reparaciones de registros incompletos). Lo aplicamos tal cual.
-    Object.keys(data.cambios).forEach(function(k){ ship[k] = data.cambios[k]; });
-    // Caso borde: el backend no reescribió (mismo texto y registro completo)
-    // pero el device local está desincronizado o su registro está incompleto.
-    // Escribimos el bloque coherente LOCAL (mismo contrato) en vez de un
-    // override parcial de status/message sin hora ni historial.
-    var msg = data.resultadoWorker && data.resultadoWorker.statuses && data.resultadoWorker.statuses.message;
-    if (msg && !('trackingStatus' in data.cambios) &&
-        (msg !== ship.trackingStatus || _registroIncompleto(ship))) {
-      _appendTrackingLocal(ship, msg, 'web');
-    }
-    return 'ok';
-  }
-  return 'error';
-}
-
-/* ── consultarAhora vía MOTOR B: botón por-tarjeta (manual = forzado) ── */
-async function _consultarMotorB(ship, shipId) {
-  var btn = document.getElementById('btn-consult-'+shipId);
-  if (btn) { btn.innerHTML = '<span class="trk-spin-inline"></span> Consultando...'; btn.disabled = true; }
-  if (typeof window.toast === 'function') window.toast('⏳ Consultando tu servidor...');
-  try {
-    var res = await _motorBConsultarUno(ship, shipId, true); // botón manual = forzar
-    if (res === 'ok') {
-      if (typeof window.render === 'function') window.render();
-      if (typeof window.toast === 'function') window.toast('🔄 Estado: ' + (ship.trackingStatus || '—'));
-    } else {
-      if (typeof window.toast === 'function') window.toast('⚠️ No se pudo consultar tu servidor');
-      if (btn) { btn.innerHTML = '⟳ Consultar'; btn.disabled = false; }
-    }
-  } catch (e) {
-    if (typeof window.toast === 'function') window.toast('⚠️ Error de red al consultar tu servidor');
-    if (btn) { btn.innerHTML = '⟳ Consultar'; btn.disabled = false; }
-  }
-}
-
 /* ── consultarAhora ──────────────────────────────────────────────── */
 Tracking.consultarAhora = async function(shipId) {
   var ship = _findShip(shipId);
@@ -894,60 +478,7 @@ Tracking.consultarAhora = async function(shipId) {
   }
 };
 
-/* ── Tracking MASIVO manual (botón 🔄 con selección) ──────────────
-   Consulta Shalom SOLO de los pedidos pasados, una vez por cliente, con
-   cooldown de 30 min. Comparte el mismo trackingLastAutoCheck que el auto
-   y el "Consultar", así no re-consulta lo recién consultado (ahorra API).
-   Reutiliza el mismo motor (consultarShalom + aplicarResultado). No toca
-   el botón "Consultar" por tarjeta. */
-/* ── Masivo por MOTOR B (tu servidor) ────────────────────────────────
-   Consulta 1-por-pedido seleccionado vía syncShalomWebTest, secuencial y con
-   espaciado (el worker es concurrency 1). Respeta el throttle compartido
-   trackingWebProximaConsulta: salta lo que aún no vence (no re-consulta lo
-   recién hecho por el scheduler u otro operador). */
-async function _bulkTrackMotorB(ids) {
-  var ships = (ids || []).map(_findShip).filter(Boolean);
-  var toTrack = [], recientes = 0, sinNum = 0;
-  ships.forEach(function(s){
-    var isShalom = s.courier && String(s.courier).toUpperCase().indexOf('SHALOM') >= 0;
-    var guia = s.trackingOrderNumber || s.shalomGuia || '';
-    var codigo = s.trackingOrderCode || s.shalomCodigo || '';
-    if (!isShalom) return;                 // solo Shalom
-    if (s.status === 'FINALIZADO') return; // ya entregado
-    if (!guia || !codigo) { sinNum++; return; }
-    if (!_motorBVencido(s)) { recientes++; return; } // throttle compartido
-    toTrack.push(s);
-  });
-  if (!toTrack.length) {
-    var m0 = 'Nada nuevo para consultar';
-    if (recientes) m0 += ' · ' + recientes + ' consultado' + (recientes!==1?'s':'') + ' hace poco';
-    if (sinNum) m0 += ' · ' + sinNum + ' sin número/código';
-    if (window.toast) window.toast(m0);
-    return;
-  }
-  if (window.toast) window.toast('⏳ Consultando ' + toTrack.length + ' Shalom (tu servidor)...');
-  var ok = 0, err = 0;
-  for (var i = 0; i < toTrack.length; i++) {
-    var s = toTrack[i];
-    try {
-      var res = await _motorBConsultarUno(s, s.id, false); // masivo = respeta throttle
-      if (res === 'ok') { ok++; } else if (res === 'error') { err++; }
-    } catch (e) { err++; }
-    if (i < toTrack.length - 1) {
-      await new Promise(function(r){ setTimeout(r, 800); }); // gentil con el worker
-    }
-  }
-  if (window.render) window.render();
-  var msg = '✅ ' + ok + ' consultado' + (ok!==1?'s':'');
-  if (recientes) msg += ' · ' + recientes + ' hace poco';
-  if (sinNum) msg += ' · ' + sinNum + ' sin número';
-  if (err) msg += ' · ' + err + ' error' + (err!==1?'es':'');
-  if (window.toast) window.toast(msg);
-}
-
-/* ── bulkTrack: enruta por motor (masivo desde el ícono 🔄 con selección) ─
-   Si el motor es "web" (tu servidor) → Motor B con throttle compartido; si es
-   "api" (u otro) → camino de siempre (Motor A / API paga), intacto. */
+/* ── bulkTrack: masivo desde el ícono 🔄 con selección → puerta única. */
 Tracking.bulkTrack = async function(ids) {
   // Rastreo masivo por la PUERTA ÚNICA (shalom.js), hoy desconectada. Un solo
   // aviso honesto en vez de recorrer una API que ya no existe.
@@ -1059,13 +590,9 @@ Tracking.init = function() {
   }
   setTimeout(function() {
     if (!_syncS()) {
-      // Si no se sincronizó, reintentar a los 5s
-      setTimeout(function() {
-        _syncS();
-        autoTrackingCheck();
-      }, 2000);
-    } else {
-      autoTrackingCheck();
+      // Si no se sincronizó, reintentar a los 5s (el rastreo automático ya no
+      // corre aquí: vive en shalom.js, hoy desconectado).
+      setTimeout(_syncS, 2000);
     }
   }, 2000);
 };
