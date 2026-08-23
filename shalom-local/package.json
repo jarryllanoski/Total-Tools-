@@ -2,12 +2,14 @@
   "name": "shalom-local",
   "version": "0.1.0",
   "private": true,
-  "description": "Lector local del seguimiento publico de Shalom (corre en tu PC, IP residencial). Fase A: solo leer.",
+  "description": "Lector local del seguimiento publico de Shalom (corre en tu PC, IP residencial). Fase A: leer. Fase B: subir a Firestore.",
   "main": "rastrear.js",
   "scripts": {
-    "debug": "node rastrear.js --debug"
+    "debug": "node rastrear.js --debug",
+    "subir": "node subir.js"
   },
   "dependencies": {
-    "playwright": "^1.47.0"
+    "playwright": "^1.47.0",
+    "firebase-admin": "^12.6.0"
   }
 }

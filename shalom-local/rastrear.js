@@ -80,19 +80,31 @@ function parsearEstado(textoVisible) {
   return {ok: !!estado, estado: estado, fecha: fecha, bloqueado: false};
 }
 
-// ── Driver del navegador (solo se carga si de verdad vamos a abrirlo) ────────
-async function rastrear(numero, codigo, opts) {
-  opts = opts || {};
+/*
+ * Abre el navegador con perfil persistente (cookies estables entre corridas:
+ * mejora la nota de reCAPTCHA con el tiempo). Quien la abre debe cerrarla
+ * (ctx.close()) al terminar. Compartida entre rastrear.js (una guía) y
+ * subir.js (varias guías en la misma sesión — más rápido y más "humano" que
+ * abrir/cerrar un navegador por cada una).
+ */
+async function abrirContexto() {
   const {chromium} = require("playwright");
-
-  // Navegador VISIBLE (headless=false) y perfil persistente: es lo que mejor
-  // puntúa en reCAPTCHA. Nada de trucos de sigilo — es un navegador real.
-  const ctx = await chromium.launchPersistentContext(PERFIL_DIR, {
+  return chromium.launchPersistentContext(PERFIL_DIR, {
     headless: false,
     viewport: {width: 1280, height: 900},
     locale: "es-PE",
   });
-  const page = ctx.pages()[0] || await ctx.newPage();
+}
+
+// ── Driver del navegador ──────────────────────────────────────────────────
+// Si se pasa `opts.ctx` (un contexto ya abierto), lo REUTILIZA y NO lo cierra
+// al terminar — así subir.js puede consultar muchas guías en una sola sesión.
+// Sin `opts.ctx`, abre y cierra su propio contexto (uso suelto / CLI).
+async function rastrear(numero, codigo, opts) {
+  opts = opts || {};
+  const ctxPropio = !opts.ctx;
+  const ctx = opts.ctx || await abrirContexto();
+  const page = await ctx.newPage();
   const out = {numero, codigo};
 
   try {
@@ -131,7 +143,8 @@ async function rastrear(numero, codigo, opts) {
     return out;
   } finally {
     await page.waitForTimeout(opts.debug ? 1500 : 200);
-    await ctx.close().catch(() => {});
+    await page.close().catch(() => {});
+    if (ctxPropio) await ctx.close().catch(() => {}); // solo cerramos lo que abrimos
   }
 }
 
@@ -164,7 +177,7 @@ async function main() {
 }
 
 // Exportamos parsearEstado para poder probarla sin abrir el navegador.
-module.exports = {parsearEstado, rastrear};
+module.exports = {parsearEstado, rastrear, abrirContexto};
 
 if (require.main === module) {
   main().catch((e) => { console.error("Error:", e && e.message || e); process.exit(1); });

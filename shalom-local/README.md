@@ -42,12 +42,42 @@ Se abre un navegador, busca la guía y:
 **Pásame el archivo `.txt` de `./debug/`** (o su contenido). Con eso **calibro el
 lector** contra la estructura real y dejamos la lectura fina y confiable.
 
-## Qué NO hace todavía (siguientes fases)
+✅ **Probado el 22/08/26**: la PC pasó el reCAPTCHA y leyó el estado real
+correctamente en el primer intento.
 
-- **Fase B:** subir el estado a tu Firestore (necesitará una *clave de servicio*
-  de Firebase, que generas tú y se guarda solo aquí, nunca en el repo).
-- **Fase C:** correr solo cada X horas (Programador de tareas de Windows / cron)
-  y mover etiquetas según tu config.
+## FASE B — subir el estado a tu Firestore
+
+Consulta todos los pedidos Shalom pendientes (guía+código, sin finalizar) y
+escribe el resultado, moviendo la etiqueta según tu modo de Config (Apagado /
+Semiautomática / Automática) — el mismo aplicador que usa el botón ⟳ del panel.
+
+### Generar la clave (una sola vez, la haces tú)
+
+1. **Firebase Console** → ⚙️ **Configuración del proyecto** → pestaña
+   **Cuentas de servicio**.
+2. Botón **"Generar nueva clave privada"** → se descarga un `.json`.
+3. Renómbralo a **`serviceAccount.json`** y ponlo en esta carpeta
+   (`shalom-local/`). Ya está en `.gitignore`: nunca se sube al repositorio ni
+   pasa por ningún chat.
+
+### Correrlo
+
+```bash
+node subir.js --dry-run     # simulación: muestra qué haría, no escribe nada
+node subir.js               # de verdad: consulta y escribe
+node subir.js 92678946      # una sola guía puntual
+```
+
+Sin la clave, el script se detiene con un mensaje claro (no un error críptico)
+diciéndote exactamente qué generar y dónde ponerlo.
+
+**Regla de oro:** si Shalom no dio un dato real (bloqueado o sin estado
+reconocible), el pedido **no se toca**. Nunca se finge un estado.
+
+## Qué NO hace todavía (siguiente fase)
+
+- **Fase C:** correr solo cada X horas (Programador de tareas de Windows) sin
+  que tengas que ejecutarlo a mano.
 
 Cada fase se prueba antes de pasar a la siguiente.
 
