@@ -67,6 +67,23 @@ function parsearEstado(textoVisible) {
   const bloqueado = /inicia sesion para rastrear|para poder rastrear tu envio necesitas/.test(t);
   if (bloqueado) return {ok: false, estado: null, fecha: fecha, bloqueado: true};
 
+  // Guía/código que Shalom no reconoce — texto exacto visto en pantalla real:
+  // "No se encontró la orden de servicio." Es un dato MAL escrito, no un fallo
+  // nuestro ni de Shalom: hay que avisarlo distinto de todo lo demás.
+  const noEncontrado = /no se encontro la orden de servicio/.test(t);
+  if (noEncontrado) {
+    return {ok: false, estado: null, fecha: fecha, bloqueado: false, noEncontrado: true};
+  }
+
+  // Tropiezo TEMPORAL del lado de Shalom — texto exacto visto en pantalla real:
+  // "Ups, algo no ha funcionado correctamente. Inténtalo de nuevo pronto."
+  // NO es un dato malo: el número puede estar perfecto. Se avisa distinto para
+  // no mandar a "revisar el número" cuando el problema es de Shalom, no tuyo.
+  const errorShalom = /algo no ha funcionado correctamente/.test(t);
+  if (errorShalom) {
+    return {ok: false, estado: null, fecha: fecha, bloqueado: false, errorShalom: true};
+  }
+
   // Estado = la clave que aparece MÁS TEMPRANO (el encabezado, no la barra).
   let estado = null;
   let mejorIdx = Infinity;
@@ -121,7 +138,9 @@ async function rastrear(numero, codigo, opts) {
     else await inputs.nth(1).press("Enter");
 
     // Esperamos a que la página pinte algo reconocible (estado o muro de login).
-    const CLAVE_RE = /en\s*origen|en\s*tr[aá]nsito|en\s*destino|entregado|demora|inicia sesi/i;
+    // OJO: esta regex corre sobre el texto CRUDO (con tildes) del navegador,
+    // no sobre el normalizado — "encontró" lleva tilde, hay que aceptarla.
+    const CLAVE_RE = /en\s*origen|en\s*tr[aá]nsito|en\s*destino|entregado|demora|inicia sesi|no se encontr[oó]|algo no ha funcionado/i;
     await page.waitForFunction(
         (re) => re.test(document.body.innerText), CLAVE_RE, {timeout: 20000},
     ).catch(() => {});

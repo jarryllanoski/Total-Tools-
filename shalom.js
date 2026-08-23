@@ -26,6 +26,7 @@
  *
  *   En error, todos: { ok:false, motivo:CODIGO }
  *     DESCONECTADO · NO_ENCONTRADO · BLOQUEADO (reCAPTCHA/sesión) · SIN_DATO
+ *     · ERROR_SHALOM (tropiezo temporal del lado de Shalom, no del dato)
  *   REGLA DE ORO: jamás ok:true sin dato real. Sin estado → ok:false. (La
  *   lección más cara: el éxito falso ocultó días de fallo.)
  */

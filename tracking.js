@@ -62,6 +62,7 @@ function _motivoTexto(motivo){
     case 'NO_ENCONTRADO': return '⚠️ Shalom no encontró esa guía — verifica número y código';
     case 'BLOQUEADO':     return '⚠️ Shalom pidió verificación — intenta desde tu navegador';
     case 'SIN_DATO':      return '⚠️ Shalom no devolvió estado — reintenta en un momento';
+    case 'ERROR_SHALOM':  return '⚠️ Shalom tuvo un error temporal — se reintentará solo';
     default:              return '⚠️ No se pudo consultar Shalom';
   }
 }

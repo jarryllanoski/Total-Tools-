@@ -63,6 +63,10 @@ function modoEtiqueta(cfg) {
 function decidirCambios(ship, lectura, cfg) {
   const nowMs = Date.now();
   if (lectura.bloqueado) return {cambio: false, motivo: "BLOQUEADO"};
+  // "No se encontró la orden de servicio": dato mal tecleado, no un fallo.
+  if (lectura.noEncontrado) return {cambio: false, motivo: "NO_ENCONTRADO"};
+  // "Ups, algo no ha funcionado correctamente": tropiezo DE SHALOM, no del dato.
+  if (lectura.errorShalom) return {cambio: false, motivo: "ERROR_SHALOM"};
   if (!lectura.ok || !lectura.estado) return {cambio: false, motivo: "SIN_DATO"};
 
   const estadoTexto = lectura.estado;
@@ -158,7 +162,7 @@ async function main() {
     "Consultando " + pendientes.length + " pedido" + (pendientes.length !== 1 ? "s" : "") + "…\n");
 
   const ctx = await abrirContexto();
-  let ok = 0, sinDato = 0, bloqueados = 0;
+  let ok = 0, sinDato = 0, bloqueados = 0, noEncontrados = 0, erroresShalom = 0;
   try {
     for (let i = 0; i < pendientes.length; i++) {
       const item = pendientes[i];
@@ -172,8 +176,16 @@ async function main() {
       }
       const dec = decidirCambios(item.ship, lectura, cfg);
       if (!dec.cambio) {
-        if (lectura.bloqueado) {
+        if (dec.motivo === "BLOQUEADO") {
           bloqueados++; console.log("⚠️  bloqueado (reCAPTCHA/login)");
+        } else if (dec.motivo === "NO_ENCONTRADO") {
+          // Dato mal tecleado, no un fallo del lector ni de Shalom.
+          noEncontrados++;
+          console.log("🔴 guía/código no coinciden con ningún pedido — revisa el número de orden");
+        } else if (dec.motivo === "ERROR_SHALOM") {
+          // Tropiezo del lado de Shalom, no del dato: se reintenta en la próxima corrida.
+          erroresShalom++;
+          console.log("⚠️  Shalom tuvo un error temporal — se reintentará más tarde");
         } else {
           sinDato++;
           // Autodiagnóstico: guardamos lo que Shalom mostró, SOLO cuando no lo
@@ -204,8 +216,10 @@ async function main() {
   console.log("\n── Resumen ──");
   console.log("✅ " + ok + " actualizado" + (ok !== 1 ? "s" : "") +
     (dryRun ? " (simulación — nada se escribió)" : ""));
-  if (sinDato) console.log("❓ " + sinDato + " sin dato reconocible");
-  if (bloqueados) console.log("⚠️  " + bloqueados + " bloqueados por Shalom (reintenta más tarde)");
+  if (noEncontrados) console.log("🔴 " + noEncontrados + " con guía/código que Shalom no reconoce — revisa esos números");
+  if (erroresShalom) console.log("⚠️  " + erroresShalom + " con error temporal de Shalom (no es tu dato — se reintenta solo)");
+  if (bloqueados) console.log("⚠️  " + bloqueados + " bloqueados por reCAPTCHA (reintenta más tarde)");
+  if (sinDato) console.log("❓ " + sinDato + " sin dato reconocible — revisa debug/ para calibrar");
 }
 
 module.exports = {decidirCambios, detectarEstadoAuto, modoEtiqueta};
