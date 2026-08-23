@@ -1,0 +1,13 @@
+{
+  "name": "shalom-local",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Lector local del seguimiento publico de Shalom (corre en tu PC, IP residencial). Fase A: solo leer.",
+  "main": "rastrear.js",
+  "scripts": {
+    "debug": "node rastrear.js --debug"
+  },
+  "dependencies": {
+    "playwright": "^1.47.0"
+  }
+}
