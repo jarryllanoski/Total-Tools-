@@ -172,8 +172,22 @@ async function main() {
       }
       const dec = decidirCambios(item.ship, lectura, cfg);
       if (!dec.cambio) {
-        if (lectura.bloqueado) { bloqueados++; console.log("⚠️  bloqueado (reCAPTCHA/login)"); }
-        else { sinDato++; console.log("❓ sin dato reconocible"); }
+        if (lectura.bloqueado) {
+          bloqueados++; console.log("⚠️  bloqueado (reCAPTCHA/login)");
+        } else {
+          sinDato++;
+          // Autodiagnóstico: guardamos lo que Shalom mostró, SOLO cuando no lo
+          // reconocemos, para calibrar sin tener que volver a consultar a mano.
+          let dondeQuedo = "";
+          if (lectura.textoBruto) {
+            const dir = path.join(__dirname, "debug");
+            fs.mkdirSync(dir, {recursive: true});
+            const archivo = path.join(dir, "sindato_" + item.guia + "_" + item.codigo + ".txt");
+            fs.writeFileSync(archivo, lectura.textoBruto, "utf8");
+            dondeQuedo = " — guardado en debug/" + path.basename(archivo);
+          }
+          console.log("❓ sin dato reconocible" + dondeQuedo);
+        }
       } else {
         console.log("✅ " + dec.estado + (dec.resultado !== "ok" ? " → " + dec.resultado : ""));
         if (!dryRun) {

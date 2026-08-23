@@ -130,6 +130,8 @@ async function rastrear(numero, codigo, opts) {
     const texto = await page.locator("body").innerText().catch(() => "");
     const res = parsearEstado(texto);
     Object.assign(out, res);
+    out.textoBruto = texto; // siempre disponible: permite autodiagnosticar sin
+    //   tener que volver a consultar cuando algo no se reconoce (ver subir.js).
 
     // En modo debug guardamos TODO para calibrar el lector contra la realidad.
     if (opts.debug) {
