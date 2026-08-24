@@ -106,6 +106,79 @@ function decidirCambios(ship, lectura, cfg) {
   return {cambio: true, cambios: cambios, resultado: resultado, estado: estadoTexto};
 }
 
+// ── Candado: nunca dos corridas a la vez ────────────────────────────────────
+// El Programador puede disparar mientras una corrida sigue viva (PC lenta, o
+// una corrida larga). Sin esto tendrías DOS navegadores golpeando Shalom a la
+// vez — justo lo que sube el riesgo de bloqueo. El candado guarda el PID: si el
+// proceso que lo dejó ya murió (corte de luz, cierre forzado), se ignora solo.
+const LOCK = path.join(__dirname, ".corriendo.lock");
+let candadoTomado = false;
+
+// Cada cuánto corre la tarea programada. El panel lo usa para saber a partir de
+// cuándo alarmarse: con 6 h, avisar a las 3 h daría rojo casi siempre.
+const INTERVALO_MIN = 360;
+
+function tomarCandado() {
+  try {
+    if (fs.existsSync(LOCK)) {
+      const pid = parseInt(fs.readFileSync(LOCK, "utf8").trim(), 10);
+      let vivo = false;
+      try { process.kill(pid, 0); vivo = true; } catch (e) { vivo = false; }
+      if (vivo) return false;              // otra corrida en curso: no arrancamos
+      fs.unlinkSync(LOCK);                 // candado huérfano: se limpia solo
+    }
+    fs.writeFileSync(LOCK, String(process.pid), "utf8");
+    candadoTomado = true;
+    return true;
+  } catch (e) { return true; } // ante la duda, dejamos correr (no bloquear por el candado)
+}
+function soltarCandado() { try { fs.unlinkSync(LOCK); } catch (e) {} }
+
+// ── Registro mensual ────────────────────────────────────────────────────────
+// Un archivo por mes, y se borran solos los de más de 3 meses. Sin esto, una
+// corrida que falla de madrugada no deja rastro y volvemos al fallo silencioso.
+function registrar(linea) {
+  try {
+    const dir = path.join(__dirname, "logs");
+    fs.mkdirSync(dir, {recursive: true});
+    const ahora = new Date();
+    const mes = ahora.getFullYear() + "-" + String(ahora.getMonth() + 1).padStart(2, "0");
+    const sello = ahora.toLocaleString("es-PE", {hour12: false}).replace(",", "");
+    fs.appendFileSync(path.join(dir, mes + ".log"), "[" + sello + "] " + linea + "\n", "utf8");
+
+    // Limpieza: fuera los registros de más de 3 meses.
+    const limite = new Date(ahora.getFullYear(), ahora.getMonth() - 3, 1);
+    fs.readdirSync(dir).forEach((f) => {
+      const m = f.match(/^(\d{4})-(\d{2})\.log$/);
+      if (!m) return;
+      if (new Date(+m[1], +m[2] - 1, 1) < limite) {
+        try { fs.unlinkSync(path.join(dir, f)); } catch (e) {}
+      }
+    });
+  } catch (e) { /* el registro nunca debe tumbar la corrida */ }
+}
+
+// ── Latido: revive el centro de alertas del panel ───────────────────────────
+// Se escribe DENTRO de panel/config (campo "salud"), que el panel ya sabe leer
+// y mostrar con su semáforo, sus KPIs y sus problemas agrupados. Va con merge,
+// así que no pisa el resto de la configuración. Se ve desde el celular sin
+// tener nada abierto: el lector corre en la PC, pero el latido viaja a Firestore.
+const MAX_EVENTOS = 100;
+async function escribirLatido(db, resumen, eventos) {
+  try {
+    const snap = await db.doc("panel/config").get();
+    const prev = (snap.exists && snap.data().salud) || {};
+    const salud = Object.assign({}, prev, resumen);
+    if (eventos && eventos.length) {
+      const todos = (Array.isArray(prev.eventos) ? prev.eventos : []).concat(eventos);
+      salud.eventos = todos.slice(-MAX_EVENTOS);
+    }
+    await db.doc("panel/config").set({salud: salud}, {merge: true});
+  } catch (e) {
+    console.log("   (no se pudo escribir el latido: " + (e && e.message || e) + ")");
+  }
+}
+
 // ── Firestore (Admin SDK) ────────────────────────────────────────────────────
 function requiereAdmin() {
   const keyPath = path.join(__dirname, "serviceAccount.json");
@@ -146,6 +219,15 @@ async function main() {
   const args = process.argv.slice(2);
   const dryRun = args.includes("--dry-run");
   const soloOrden = args.find((a) => !a.startsWith("--"));
+  const arrancado = Date.now();
+
+  // El candado solo aplica a la corrida COMPLETA. Una consulta suelta es tan
+  // poco tráfico que no necesita turno, y bloquearla sería molesto.
+  if (!soloOrden && !tomarCandado()) {
+    console.log("⏭️  Ya hay una corrida en curso — esta se salta.");
+    registrar("saltada (ya había una corrida en curso)");
+    return;
+  }
 
   const db = requiereAdmin();
   const cfgSnap = await db.doc("panel/config").get();
@@ -163,6 +245,14 @@ async function main() {
 
   const ctx = await abrirContexto();
   let ok = 0, sinDato = 0, bloqueados = 0, noEncontrados = 0, erroresShalom = 0;
+  // Eventos para el centro de alertas del panel: se agrupan por código y son
+  // pulsables (te llevan al pedido). Así el caso "guía mal escrita" no se
+  // pierde en la terminal — lo ves desde el celular.
+  const eventos = [];
+  const anotar = (codigo, item, msg) => eventos.push({
+    ts: new Date().toISOString(), nivel: "error", codigo: codigo,
+    pedidoId: item.id, pedido: item.ship.name || item.id, msg: msg || "",
+  });
   try {
     for (let i = 0; i < pendientes.length; i++) {
       const item = pendientes[i];
@@ -178,14 +268,17 @@ async function main() {
       if (!dec.cambio) {
         if (dec.motivo === "BLOQUEADO") {
           bloqueados++; console.log("⚠️  bloqueado (reCAPTCHA/login)");
+          anotar("SHALOM_BLOQUEO", item, "Shalom pidió verificación");
         } else if (dec.motivo === "NO_ENCONTRADO") {
           // Dato mal tecleado, no un fallo del lector ni de Shalom.
           noEncontrados++;
           console.log("🔴 guía/código no coinciden con ningún pedido — revisa el número de orden");
+          anotar("GUIA_NO_ENCONTRADA", item, "guía " + item.guia + " / " + item.codigo);
         } else if (dec.motivo === "ERROR_SHALOM") {
           // Tropiezo del lado de Shalom, no del dato: se reintenta en la próxima corrida.
           erroresShalom++;
           console.log("⚠️  Shalom tuvo un error temporal — se reintentará más tarde");
+          anotar("SHALOM_ERROR_TEMPORAL", item, "reintento en la próxima corrida");
         } else {
           sinDato++;
           // Autodiagnóstico: guardamos lo que Shalom mostró, SOLO cuando no lo
@@ -199,6 +292,7 @@ async function main() {
             dondeQuedo = " — guardado en debug/" + path.basename(archivo);
           }
           console.log("❓ sin dato reconocible" + dondeQuedo);
+          anotar("ESTADO_NO_RECONOCIDO", item, "revisar debug/");
         }
       } else {
         console.log("✅ " + dec.estado + (dec.resultado !== "ok" ? " → " + dec.resultado : ""));
@@ -213,6 +307,9 @@ async function main() {
     await ctx.close().catch(() => {});
   }
 
+  const seg = Math.round((Date.now() - arrancado) / 1000);
+  const dur = seg < 60 ? seg + "s" : Math.floor(seg / 60) + "m " + (seg % 60) + "s";
+
   console.log("\n── Resumen ──");
   console.log("✅ " + ok + " actualizado" + (ok !== 1 ? "s" : "") +
     (dryRun ? " (simulación — nada se escribió)" : ""));
@@ -220,10 +317,41 @@ async function main() {
   if (erroresShalom) console.log("⚠️  " + erroresShalom + " con error temporal de Shalom (no es tu dato — se reintenta solo)");
   if (bloqueados) console.log("⚠️  " + bloqueados + " bloqueados por reCAPTCHA (reintenta más tarde)");
   if (sinDato) console.log("❓ " + sinDato + " sin dato reconocible — revisa debug/ para calibrar");
+
+  // Registro en disco: aunque no estés mirando la pantalla, mañana lo lees.
+  const resumenTxt = ok + " actualizados · " + noEncontrados + " guía no reconocida · " +
+    erroresShalom + " error Shalom · " + bloqueados + " bloqueados · " + sinDato +
+    " sin dato (" + dur + ")" + (dryRun ? " [simulación]" : "");
+  registrar((soloOrden ? "[guía " + soloOrden + "] " : "") + resumenTxt);
+
+  // Latido → el centro de alertas del panel (y tu celular) lo muestran solo.
+  // En simulación o consulta suelta NO se escribe: el latido representa la
+  // corrida completa de verdad, y ensuciarlo daría una lectura falsa del sistema.
+  if (!dryRun && !soloOrden) {
+    await escribirLatido(db, {
+      activo: true,
+      motor: "pc-local",
+      equipo: require("os").hostname(),   // qué máquina corrió (útil si mañana hay dos)
+      ultimaCorrida: new Date().toISOString(),
+      intervaloMin: INTERVALO_MIN,        // el panel calcula con esto cuándo alarmarse
+      enCola: pendientes.length,
+      procesados: ok,
+      errores: bloqueados + erroresShalom + sinDato,
+      sinGuia: noEncontrados,
+      duracionSeg: seg,
+    }, eventos);
+  }
 }
 
 module.exports = {decidirCambios, detectarEstadoAuto, modoEtiqueta};
 
 if (require.main === module) {
-  main().catch((e) => { console.error("Error:", e && e.message || e); process.exit(1); });
+  // El candado se suelta pase lo que pase (error, Ctrl+C, process.exit).
+  process.on("exit", function(){ if (candadoTomado) soltarCandado(); });
+  process.on("SIGINT", function(){ process.exit(130); });
+  main().catch((e) => {
+    console.error("Error:", e && e.message || e);
+    registrar("ERROR: " + (e && e.message || e));
+    process.exit(1);
+  });
 }

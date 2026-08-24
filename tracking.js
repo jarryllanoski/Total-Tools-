@@ -23,6 +23,12 @@ var TRK = {
                        'en destino','en destino -','en la agencia','en destino-'],
 };
 
+/* Los estados TAL COMO los muestra Shalom. El texto se guarda literal (es lo
+   que ve el operador y el cliente); la interpretación la hace el aplicador.
+   El primero vacío = "no cambiar", para que guardar la guía no toque el estado. */
+var ESTADOS_SHALOM = ['', 'En origen', 'En tránsito', 'Demora de envíos',
+  'En destino', 'Entregado', 'Retorno a origen'];
+
 /* ══════════════════════════════════════════════
    HELPER — escapar HTML
 ══════════════════════════════════════════════ */
@@ -69,10 +75,12 @@ function _motivoTexto(motivo){
 
 /* Escritor atómico del tracking visible: estado + mensaje + hora + historial en
    una sola pasada. Es IMPOSIBLE dejar un estado sin su hora ni su entrada. */
-function _escribirTracking(ship, estado, fecha){
+function _escribirTracking(ship, estado, fecha, origen){
   var iso = fecha || new Date().toISOString();
   if (!ship.trackingHistory) ship.trackingHistory = [];
-  ship.trackingHistory.push({date: iso, status: estado, message: estado, source: 'shalom'});
+  // origen: 'shalom' (lectura automática) | 'manual' (lo puso el operador).
+  // El historial lo muestra con su distintivo, así se sabe de dónde salió cada dato.
+  ship.trackingHistory.push({date: iso, status: estado, message: estado, source: origen || 'shalom'});
   ship.trackingStatus     = estado;
   ship.trackingMessage    = estado;
   ship.trackingLastUpdate = iso;
@@ -83,7 +91,7 @@ function _escribirTracking(ship, estado, fecha){
      { cambio:true,  resultado:'FINALIZADO'|'EN_DESTINO'|'ENVIADO'|'ok', estado }
      { cambio:false, motivo }   ← sin dato real: NO toca el pedido (nunca finge)
    Mueve la etiqueta respetando el modo (off/semi/auto) y sin retroceder jamás. */
-function _aplicarEstadoShalom(ship, resp){
+function _aplicarEstadoShalom(ship, resp, origen){
   ship.trackingLastAutoCheck = Date.now();
   if (!resp || !resp.ok) return {cambio: false, motivo: (resp && resp.motivo) || 'SIN_DATO'};
 
@@ -103,7 +111,7 @@ function _aplicarEstadoShalom(ship, resp){
 
   // 1) Tracking visible: se escribe siempre que el texto cambie.
   if (estadoTexto && ship.trackingStatus !== estadoTexto) {
-    _escribirTracking(ship, estadoTexto, resp.fecha);
+    _escribirTracking(ship, estadoTexto, resp.fecha, origen);
   }
 
   // 2) Etiqueta interna: según el MODO, y SOLO hacia adelante (nunca retrocede).
@@ -111,6 +119,17 @@ function _aplicarEstadoShalom(ship, resp){
   var resultado = 'ok';
   var isShalom = ship.courier && ship.courier.toUpperCase().includes('SHALOM');
   if (isShalom && modo !== 'off') {
+    // "Retorno a origen" es una EXCEPCIÓN, no un avance del recorrido: el
+    // paquete vuelve. No entra en la regla monotónica normal — se mueve a esa
+    // etiqueta salvo que el pedido ya esté cerrado. Solo si esa etiqueta existe
+    // en tu lista (es una etiqueta personalizada, no una de las fijas).
+    if (/retorno a origen/i.test(estadoTexto)) {
+      var etiquetas = (window.S && window.S.labels) || [];
+      if (etiquetas.indexOf('RETORNO A ORIGEN') >= 0 && ship.status !== 'FINALIZADO') {
+        ship.status = 'RETORNO A ORIGEN';
+      }
+      return {cambio: true, resultado: 'RETORNO', estado: estadoTexto};
+    }
     if (autoEstado === 'FINALIZADO') {
       if (modo !== 'semi' && ship.status !== 'FINALIZADO') ship.status = 'FINALIZADO';
       resultado = 'FINALIZADO';
@@ -488,8 +507,22 @@ Tracking.abrirEdicion = function(shipId) {
     '<input id="trkOrdNum" class="fi" placeholder="Ej: 82037653" style="font-family:monospace" inputmode="numeric" value="'+_esc(ship.trackingOrderNumber||ship.shalomGuia||'')+'"></div>',
     '<div><label style="font-size:10px;font-weight:700;color:#8b949e;letter-spacing:.8px;display:block;margin-bottom:4px">CÓDIGO</label>',
     '<input id="trkOrdCode" class="fi" placeholder="Ej: TT9C" style="font-family:monospace;text-transform:uppercase" oninput="this.value=this.value.toUpperCase()" maxlength="8" value="'+_esc(ship.trackingOrderCode||ship.shalomCodigo||'')+'"></div>',
-    '<div><label style="font-size:10px;font-weight:700;color:#8b949e;letter-spacing:.8px;display:block;margin-bottom:4px">AGENCIA DESTINO (opcional)</label>',
-    '<input id="trkAgencia" class="fi" placeholder="Ej: Agencia Lima Norte" value="'+_esc(ship.shippingAgency||ship.agencia_nombre||'')+'"></div>',
+    // ESTADO: lo que dice Shalom, puesto a mano. Vale IGUAL que una lectura
+    // automática — pasa por el mismo aplicador, así que escribe historial y
+    // mueve la etiqueta según tu modo. Pensado para el celular, donde el
+    // rastreo automático (que corre en la PC) no puede llegar.
+    '<div><label style="font-size:10px;font-weight:700;color:#8b949e;letter-spacing:.8px;display:block;margin-bottom:4px">ESTADO EN SHALOM</label>',
+    '<select id="trkEstado" class="fs">',
+    // Se preselecciona el estado actual (si coincide con uno de la lista) para
+    // que veas dónde está el pedido sin tener que abrir el historial. Aun así,
+    // guardar sin tocarlo no reescribe nada: el aplicador ignora el estado
+    // repetido, así que no ensucia el historial con entradas duplicadas.
+    ESTADOS_SHALOM.map(function(e){
+      var sel = (e && e === (ship.trackingStatus || '')) ? ' selected' : '';
+      return '<option value="'+_esc(e)+'"'+sel+'>'+(e ? _esc(e) : '— No cambiar —')+'</option>';
+    }).join(''),
+    '</select>',
+    '<div style="font-size:10.5px;color:#8b949e;margin-top:5px;line-height:1.4">Se registra igual que una consulta automática y mueve la etiqueta según tu configuración.</div></div>',
     '</div>',
     '<div style="display:flex;gap:8px">',
     '<button onclick="document.getElementById(\'delOverlay\').classList.remove(\'open\')" style="flex:1;padding:12px;background:#1c2333;border:1px solid #30363d;border-radius:9px;color:#8b949e;font-size:13px;cursor:pointer;font-family:inherit">Cancelar</button>',
@@ -505,8 +538,8 @@ Tracking._guardarEdicion = function(shipId) {
   if (!ship) return;
   var num    = (document.getElementById('trkOrdNum')  ||{}).value||'';
   var code   = (document.getElementById('trkOrdCode') ||{}).value||'';
-  var agencia= (document.getElementById('trkAgencia') ||{}).value||'';
-  num = num.trim(); code = code.trim(); agencia = agencia.trim();
+  var estado = (document.getElementById('trkEstado')  ||{}).value||'';
+  num = num.trim(); code = code.trim(); estado = estado.trim();
   if (!num) { if(typeof window.toast==='function') window.toast('⚠️ Ingresa el número de orden'); return; }
 
   var guiaAnterior = ship.trackingOrderNumber || ship.shalomGuia || '';
@@ -514,7 +547,6 @@ Tracking._guardarEdicion = function(shipId) {
   ship.trackingOrderCode   = code;
   ship.shalomGuia          = num;
   ship.shalomCodigo        = code;
-  if (agencia) { ship.shippingAgency = agencia; ship.agencia_nombre = agencia; }
   ship.shippingCourier = 'Shalom';
 
   // Si cambió la guía, resetear estado
@@ -531,12 +563,28 @@ Tracking._guardarEdicion = function(shipId) {
   // a ENVIADO al entrar solo a corregir la guía — el "a veces cambia de etiqueta
   // y se regresa solo" que buscábamos.
 
+  // ESTADO puesto a mano: entra por el MISMO aplicador que el automático, así
+  // que hace exactamente lo mismo (historial + etiqueta según el modo). Vacío =
+  // no cambiar. Se marca como 'manual' para distinguirlo en el historial.
+  var rEstado = null;
+  if (estado) rEstado = _aplicarEstadoShalom(ship, {ok: true, estado: estado}, 'manual');
+
   if (typeof window.save   === 'function') window.save(ship.id);
   // ★ Subida INMEDIATA: al poner la guía y pasar a ENVIADO, sube al instante.
   if (typeof window._fbSaveShipmentNow === 'function') window._fbSaveShipmentNow(ship);
   if (typeof window.render === 'function') window.render();
   document.getElementById('delOverlay').classList.remove('open');
-  if (typeof window.toast  === 'function') window.toast('✅ Tracking guardado');
+  if (typeof window.toast === 'function') {
+    // Si se puso un estado, el aviso dice qué pasó con la etiqueta — igual que
+    // cuando la consulta la hace el lector automático.
+    window.toast(
+      !rEstado ? '✅ Tracking guardado' :
+      rEstado.resultado === 'FINALIZADO' ? '✅ ' + estado + ' — FINALIZADO' :
+      rEstado.resultado === 'EN_DESTINO' ? '📍 ' + estado + ' — avisar al cliente' :
+      rEstado.resultado === 'RETORNO'    ? '↩️ ' + estado :
+      rEstado.resultado === 'ENVIADO'    ? '🚚 ' + estado + ' — marcado ENVIADO' :
+      '✅ Estado: ' + estado);
+  }
 };
 
 /* Consulta un pedido por la puerta y aplica el resultado. Devuelve el objeto
@@ -654,7 +702,11 @@ Tracking.verHistorial = function(shipId) {
       '<div style="background:#1c2333;border:1px solid #30363d;border-radius:9px;padding:4px 12px">',
       hist.slice().reverse().map(function(h){
         var fecha = h.date ? new Date(h.date).toLocaleString('es-PE',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}) : '';
-        var srcBadge = h.source==='auto'
+        // AUTO = lo leyó el lector de la PC ('shalom', 'shalom-local', 'auto');
+        // MANUAL = lo puso el operador a mano. Antes cualquier cosa que no
+        // dijera 'auto' salía como MANUAL, así que las lecturas automáticas se
+        // mostraban mal.
+        var srcBadge = (h.source !== 'manual')
           ? '<span style="background:rgba(167,139,250,.15);color:#a78bfa;border:1px solid rgba(167,139,250,.3);border-radius:6px;padding:1px 6px;font-size:9px;font-weight:700;margin-left:5px">AUTO</span>'
           : '<span style="background:rgba(56,139,253,.15);color:#388bfd;border:1px solid rgba(56,139,253,.3);border-radius:6px;padding:1px 6px;font-size:9px;font-weight:700;margin-left:5px">MANUAL</span>';
         return '<div class="trk-hist-row">'+

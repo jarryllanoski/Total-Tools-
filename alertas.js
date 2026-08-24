@@ -115,12 +115,18 @@ Alertas.estadoSistema = function(){
   var s = _salud();
   if (!s) return { nivel: 'aviso', txt: 'Sin datos todavía', detalle: 'Aún no hay ninguna corrida registrada.' };
   if (s.activo === false) return { nivel: 'error', txt: 'Apagado', detalle: 'El seguimiento automático no está corriendo (motor: ' + (s.motor || '—') + ').' };
+  // El umbral SALE DEL INTERVALO REAL que informa el propio latido, no de un
+  // número fijo: con corridas cada 6 h, alarmarse a las 3 h daría rojo casi
+  // siempre. Se avisa recién cuando se saltaron ~dos corridas seguidas.
+  var intervaloMs = (Number(s.intervaloMin) || 360) * 60000;
+  var umbral = intervaloMs * 2 + 30 * 60000;
+  var donde = s.equipo ? ' en ' + s.equipo : '';
   var vieja = Date.parse(s.ultimaCorrida || '');
-  if (isFinite(vieja) && (Date.now() - vieja) > 3 * 3600000) {
-    return { nivel: 'error', txt: 'Sin señal', detalle: 'La última corrida fue ' + _haceCuanto(s.ultimaCorrida) + '.' };
+  if (isFinite(vieja) && (Date.now() - vieja) > umbral) {
+    return { nivel: 'error', txt: 'Sin señal', detalle: 'La última corrida fue ' + _haceCuanto(s.ultimaCorrida) + donde + '. ¿La PC está encendida?' };
   }
-  if (s.errores > 0) return { nivel: 'aviso', txt: 'Con errores', detalle: s.errores + ' error(es) en la última corrida.' };
-  return { nivel: 'ok', txt: 'Activo', detalle: 'Última corrida ' + _haceCuanto(s.ultimaCorrida) + '.' };
+  if (s.errores > 0) return { nivel: 'aviso', txt: 'Con avisos', detalle: s.errores + ' pedido(s) sin poder leerse en la última corrida.' };
+  return { nivel: 'ok', txt: 'Activo', detalle: 'Última corrida ' + _haceCuanto(s.ultimaCorrida) + donde + '.' };
 };
 
 /* ── CSS ─────────────────────────────────────────────────────────── */
@@ -290,9 +296,14 @@ function _sistemaHtml(){
       '<div style="font-size:11px;color:var(--text2);margin-top:2px">' + _esc(e.detalle) +
       (s && s.hayMas ? ' · quedan pedidos en cola' : '') + '</div></div>' +
     '</div>' + kpis +
-    '<div class="al-btns">' +
-      '<button onclick="Alertas.sincronizar(this)">🔄 Sincronizar ahora</button>' +
-      '<button onclick="Alertas.reprogramar(this)">⏱️ Reprogramar cola</button>' +
+    // Antes había aquí "Sincronizar ahora" y "Reprogramar cola". Ya no pueden
+    // funcionar: el motor corre en la PC, no en la nube, así que desde el panel
+    // (y menos desde el celular) no hay nada que disparar. Un botón que no puede
+    // cumplir es peor que ninguno — se reemplaza por decir dónde corre.
+    '<div style="font-size:11px;color:var(--text2);line-height:1.5;padding:2px 2px 0">' +
+      '🖥️ El seguimiento corre en tu PC cada ' +
+      Math.round(((s && Number(s.intervaloMin)) || 360) / 60) + ' h.' +
+      '<br>Desde aquí puedes poner el estado a mano en cada pedido (✏️ Editar).' +
     '</div>' +
   '</div>';
 }
@@ -323,22 +334,9 @@ Alertas.abrir = function(sinTraer){
   }
 };
 
-/* Botones del bloque de sistema — reusan las funciones del panel. */
-Alertas.sincronizar = function(btn){
-  if (typeof global.syncShalomWebNow !== 'function') return;
-  if (btn) { btn.disabled = true; btn.textContent = '⏳…'; }
-  global.closeOverlay('alertasOverlay');
-  global.goPage && global.goPage('configurar');
-  global.syncShalomWebNow();
-};
-Alertas.reprogramar = async function(btn){
-  if (typeof global.reprogramarColaShalom !== 'function') return;
-  if (btn) { btn.disabled = true; btn.textContent = '⏳…'; }
-  var r = await global.reprogramarColaShalom();
-  if (r && r.ok && global.toast) global.toast('✅ Cola: ' + r.enCola + ' pedidos');
-  await Alertas.cargarSalud();   // latido fresco tras reprogramar
-  Alertas.abrir(true);
-};
+/* (Aquí vivían Alertas.sincronizar y Alertas.reprogramar. Se retiraron con sus
+   botones: el motor corre en la PC, no en la nube, así que desde el panel no
+   había nada que disparar y llamaban a funciones ya desconectadas.) */
 
 // Tocar una alerta → abrir ese pedido.
 Alertas.ir = function(id){

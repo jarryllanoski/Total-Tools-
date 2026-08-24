@@ -74,12 +74,61 @@ diciéndote exactamente qué generar y dónde ponerlo.
 **Regla de oro:** si Shalom no dio un dato real (bloqueado o sin estado
 reconocible), el pedido **no se toca**. Nunca se finge un estado.
 
-## Qué NO hace todavía (siguiente fase)
+## FASE C — que corra solo cada 6 horas
 
-- **Fase C:** correr solo cada X horas (Programador de tareas de Windows) sin
-  que tengas que ejecutarlo a mano.
+`correr.bat` es lo que ejecuta el Programador de tareas. No llames a `node`
+directamente desde el Programador: el `.bat` resuelve las rutas absolutas (el
+Programador **no** hereda la carpeta de trabajo — causa nº1 de "funciona a mano
+pero programado no"), comprueba que Node exista y deja constancia en `logs/`.
 
-Cada fase se prueba antes de pasar a la siguiente.
+### Probar el .bat primero
+
+```powershell
+.\correr.bat
+```
+Debe hacer lo mismo que `node subir.js`. Revisa que se creó `logs\arranques.log`.
+
+### Registrar la tarea (una sola vez)
+
+1. Menú Inicio → **Programador de tareas** → **Crear tarea…** (no "tarea básica").
+2. **General**
+   - Nombre: `Total Tools — Seguimiento Shalom`
+   - ⚠️ Dejar marcado **"Ejecutar solo cuando el usuario haya iniciado sesión"**.
+     **NO** marcar *"Ejecutar aunque el usuario no haya iniciado sesión"*: el
+     navegador necesita un escritorio visible y con esa opción falla siempre.
+3. **Desencadenadores** → Nuevo…
+   - Diariamente, empezar a las **07:00**
+   - ✅ **Repetir cada: 6 horas** · durante: **1 día** (o "indefinidamente")
+4. **Acciones** → Nueva…
+   - Acción: *Iniciar un programa*
+   - Programa: `C:\Users\Windows 11\Desktop\Total-Tools-\shalom-local\correr.bat`
+   - **Iniciar en**: `C:\Users\Windows 11\Desktop\Total-Tools-\shalom-local`
+5. **Condiciones**
+   - ✅ **Reactivar el equipo para ejecutar esta tarea** (la PC se suspende sola)
+   - ❌ Desmarcar *"Iniciar la tarea solo si el equipo está conectado a la corriente"*
+     si es una laptop y quieres que corra con batería.
+6. **Configuración**
+   - ✅ **Ejecutar la tarea lo antes posible tras un inicio programado omitido**
+     (si la PC estuvo apagada, recupera al encender)
+   - ✅ Detener la tarea si se ejecuta más de: **1 hora**
+
+Con eso corre a las **07:00 · 13:00 · 19:00 · 01:00**.
+
+### Cómo saber que está funcionando
+
+- **Desde el panel (o tu celular):** el 🔔 centro de alertas muestra *"Seguimiento
+  automático: Activo · Última corrida hace 2 h"*, con sus KPIs y los problemas
+  agrupados. El latido viaja a Firestore, así que **lo ves sin tener la PC
+  delante**.
+- **En la PC:** `logs\2026-08.log` tiene el resumen de cada corrida.
+
+### Detalles que ya están resueltos
+
+- **Candado**: si una corrida sigue viva, la siguiente se salta (nunca dos
+  navegadores golpeando Shalom a la vez). Se limpia solo si el proceso murió.
+- **Registro mensual** con borrado automático de lo que pase de 3 meses.
+- **La ventana del navegador se ve** a propósito: un navegador visible puntúa
+  mejor en el reCAPTCHA de Shalom que uno oculto. Dura ~3 minutos.
 
 ## Privacidad
 
