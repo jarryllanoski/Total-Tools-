@@ -129,6 +129,31 @@ Con eso corre a las **07:00 · 13:00 · 19:00 · 01:00**.
 - **Registro mensual** con borrado automático de lo que pase de 3 meses.
 - **La ventana del navegador se ve** a propósito: un navegador visible puntúa
   mejor en el reCAPTCHA de Shalom que uno oculto. Dura ~3 minutos.
+- **Espera de Internet real**: al despertar de la suspensión, Windows a veces
+  tarda en reconectar el Wi-Fi aunque el ícono ya diga "conectado". `subir.js`
+  comprueba con una petición real antes de abrir el navegador (hasta 2 min de
+  reintentos); si no hay red, se salta la corrida con un aviso claro en vez de
+  quedarse pegado.
+- **Vigía de 20 minutos**: si algo se cuelga igual (perfil de navegador
+  bloqueado por una corrida anterior que no cerró bien, etc.), el script se
+  fuerza a cerrar solo a los 20 min, liberando el candado. Así nunca queda un
+  `node.exe` zombie bloqueando las siguientes corridas.
+
+### Si ves varias corridas "colgadas" (`node.exe` acumulados)
+
+Si el Administrador de tareas muestra varios `node.exe` en ejecución (busca
+"node" en el buscador de arriba) y el 🔔 centro de alertas dice "hace muchas
+horas" en vez de cada 6h, revisa también en el Programador de tareas,
+Propiedades de la tarea → pestaña **Configuración**:
+
+- ✅ **"Detener la tarea si se ejecuta más de: 1 hora"** — respaldo a nivel de
+  Windows además del vigía interno.
+- **"Si la tarea ya se está ejecutando"** → debe decir **"No iniciar una nueva
+  instancia"** (no "en paralelo") — así una corrida colgada no deja que se
+  amontonen varias más.
+
+Termina los `node.exe` colgados a mano una vez (Finalizar tarea) — con el
+vigía y la espera de Internet ya en el código, no debería volver a pasar.
 
 ## Privacidad
 

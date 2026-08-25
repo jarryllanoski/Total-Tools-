@@ -27,10 +27,44 @@
 
 const path = require("path");
 const fs = require("fs");
+const https = require("https");
 const {rastrear, abrirContexto} = require("./rastrear.js");
 
 const PAUSA_ENTRE_CONSULTAS_MS = 2500; // gentil con Shalom — mismo ritmo que el
 //   worker viejo, para no verse como una ráfaga de bot.
+
+// ── Internet REAL antes de arrancar ─────────────────────────────────────────
+// Cuando el Programador despierta la PC de la suspensión, Windows puede tardar
+// en reconectar el Wi-Fi aunque el ícono ya diga "conectado". Si abrimos el
+// navegador contra una red que no responde, rastrear.js puede quedarse
+// esperando mucho más de lo esperado. Se comprueba con una petición real (no
+// basta con el estado del adaptador) y se reintenta antes de rendirse.
+const ESPERA_INTERNET_MS = 2 * 60 * 1000; // 2 minutos de margen tras despertar
+function hayInternet() {
+  return new Promise((resolve) => {
+    const req = https.get("https://shalom.com.pe", {timeout: 8000}, (res) => {
+      res.destroy();
+      resolve(true);
+    });
+    req.on("timeout", () => { req.destroy(); resolve(false); });
+    req.on("error", () => resolve(false));
+  });
+}
+async function esperarInternet(maxMs) {
+  const desde = Date.now();
+  do {
+    if (await hayInternet()) return true;
+    await new Promise((r) => setTimeout(r, 10000));
+  } while (Date.now() - desde < maxMs);
+  return false;
+}
+
+// ── Vigía: nunca colgado más de la cuenta ───────────────────────────────────
+// Segundo seguro además del "Detener la tarea si se ejecuta más de..." del
+// Programador: si CUALQUIER paso se cuelga (perfil de navegador bloqueado por
+// una corrida zombie, red que nunca vuelve, lo que sea), esto fuerza el cierre
+// en vez de dejar un node.exe vivo para siempre bloqueando las próximas corridas.
+const VIGIA_MIN = 20;
 
 // ── Reglas de negocio — COPIA DELIBERADA de tracking.js, ver cabecera ───────
 const KEYWORDS_ENTREGADO = ["entregado", "recogido"];
@@ -221,6 +255,15 @@ async function main() {
   const soloOrden = args.find((a) => !a.startsWith("--"));
   const arrancado = Date.now();
 
+  // Antes que nada: ¿hay Internet DE VERDAD? Si la PC recién se despertó y la
+  // red todavía no responde, mejor esperar un poco y avisar claro que abrir el
+  // navegador contra la nada.
+  if (!(await esperarInternet(ESPERA_INTERNET_MS))) {
+    console.log("❌ Sin Internet tras " + Math.round(ESPERA_INTERNET_MS / 60000) + " min de espera — se salta esta corrida.");
+    registrar("saltada (sin Internet tras " + Math.round(ESPERA_INTERNET_MS / 60000) + " min de espera)");
+    return;
+  }
+
   // El candado solo aplica a la corrida COMPLETA. Una consulta suelta es tan
   // poco tráfico que no necesita turno, y bloquearla sería molesto.
   if (!soloOrden && !tomarCandado()) {
@@ -349,7 +392,18 @@ if (require.main === module) {
   // El candado se suelta pase lo que pase (error, Ctrl+C, process.exit).
   process.on("exit", function(){ if (candadoTomado) soltarCandado(); });
   process.on("SIGINT", function(){ process.exit(130); });
-  main().catch((e) => {
+
+  // Si algo cuelga la corrida (perfil de navegador bloqueado, red que nunca
+  // vuelve, etc.) esto la mata igual — el candado y el navegador quedan
+  // liberados en vez de un node.exe zombie esperando para siempre.
+  const vigia = setTimeout(() => {
+    console.error("⏱️  La corrida superó " + VIGIA_MIN + " min — se fuerza el cierre.");
+    registrar("ERROR: se forzó el cierre por exceder " + VIGIA_MIN + " min (vigía)");
+    process.exit(1);
+  }, VIGIA_MIN * 60 * 1000);
+
+  main().then(() => clearTimeout(vigia)).catch((e) => {
+    clearTimeout(vigia);
     console.error("Error:", e && e.message || e);
     registrar("ERROR: " + (e && e.message || e));
     process.exit(1);
