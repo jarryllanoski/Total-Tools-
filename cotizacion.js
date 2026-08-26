@@ -49,6 +49,14 @@
   function _stockFind(cod){ return Stock.find(_tiendaProvId(), cod); }  // ¿está en tienda?
   function _provs(){ return ((window.S&&S.suppliers)||[]).filter(function(x){ return x.tipo!=='tienda'; }); }
   function _provName(id){ var p=((window.S&&S.suppliers)||[]).find(function(x){ return x.id===id; }); return p?(p.name||'proveedor'):'proveedor'; }
+  // Proveedores para el selector por ítem: primero los que YA tienen ese
+  // código en su Excel (destino más probable), luego el resto. Una sola
+  // fuente de verdad para el orden — la usa el selector de cada fila.
+  function _provsOrdenados(codigo){
+    var conStock=[], sinStock=[];
+    _provs().forEach(function(pv){ (Stock.find(pv.id, codigo) ? conStock : sinStock).push(pv); });
+    return conStock.concat(sinStock);
+  }
   // ¿hay alguna fuente de stock cargada (tienda o algún proveedor)?
   function _haySources(){
     if(_tiendaStock()) return true;
@@ -314,25 +322,32 @@
     }
     html+=_rows.map(function(r,i){
       var stockLine='';
-      if(!r.enTienda && r.proveedor){
-        // Ya enviado a cotizar → mostrar a quién (con opción de quitar).
-        stockLine='<div style="font-size:10.5px;color:var(--blue);margin-top:5px;padding-left:38px">📤 Enviado a <b>'+_esc(_provName(r.proveedor))+'</b> <span onclick="Cotizacion._quitarEnvio('+i+')" style="color:var(--red);cursor:pointer;margin-left:6px">✕ quitar</span></div>';
-      } else if(hay && !r.enTienda){
+      if(!r.enTienda && !r.proveedor && hay){
         var c=_clasificarItem(r);
-        if(c.tipo==='tienda'){
-          var m=_stockFind(r.codigo);
-          stockLine='<div style="font-size:10.5px;color:var(--green,#2ea043);margin-top:5px;padding-left:38px">🏬 En tienda'+(m&&m.precio?(' · '+_esc(m.precio)):'')+(m&&m.stock?(' · stock '+_esc(m.stock)):'')+'</div>';
-        } else if(c.tipo==='proveedor'){
-          stockLine='<div style="font-size:10.5px;color:var(--blue);margin-top:5px;padding-left:38px">🏭 Disponible en: '+c.provs.map(function(pv){ return _esc(pv.name||'?'); }).join(', ')+'</div>';
-        } else {
-          stockLine='<div style="font-size:10.5px;color:#d29922;margin-top:5px;padding-left:38px">⚠️ Faltante — no está en tienda ni en proveedores</div>';
+        if(c.tipo==='proveedor'){
+          stockLine='<div style="font-size:10.5px;color:var(--blue);margin-top:5px;padding-left:2px">🏭 Disponible en: '+c.provs.map(function(pv){ return _esc(pv.name||'?'); }).join(', ')+'</div>';
+        } else if(c.tipo==='faltante'){
+          stockLine='<div style="font-size:10.5px;color:#d29922;margin-top:5px;padding-left:2px">⚠️ Faltante — no está en tienda ni en proveedores</div>';
         }
+      } else if(r.enTienda){
+        var m=_stockFind(r.codigo);
+        if(m && (m.precio||m.stock)) stockLine='<div style="font-size:10.5px;color:var(--green,#2ea043);margin-top:5px;padding-left:2px">🏬'+(m.precio?(' '+_esc(m.precio)):'')+(m.stock?(' · stock '+_esc(m.stock)):'')+'</div>';
       }
-      return '<div style="border:1px solid var(--bd);border-radius:8px;padding:6px;margin-bottom:6px;background:'+(r.enTienda?'rgba(46,160,67,.08)':'transparent')+'">'
-        + '<div style="display:flex;gap:6px;align-items:center">'
-        +   '<button onclick="Cotizacion._togTienda('+i+')" title="'+(r.enTienda?'En tienda (tocá si falta)':'Falta — conseguir (tocá si ya lo tenés)')+'" style="background:none;border:1px solid var(--bd);border-radius:8px;width:30px;height:30px;font-size:15px;cursor:pointer;flex-shrink:0;padding:0">'+(r.enTienda?'🏬':'🛒')+'</button>'
-        +   '<input value="'+_esc(r.codigo)+'" oninput="Cotizacion._edit('+i+',\'codigo\',this.value)" placeholder="Código" style="width:84px;background:var(--bg2);border:1px solid var(--bd);border-radius:8px;color:var(--text);padding:8px;font-size:12px;font-family:monospace;box-sizing:border-box">'
-        +   '<input value="'+_esc(r.desc)+'" oninput="Cotizacion._edit('+i+',\'desc\',this.value)" placeholder="Descripción" style="flex:1;min-width:0;background:var(--bg2);border:1px solid var(--bd);border-radius:8px;color:var(--text);padding:8px;font-size:12px;box-sizing:border-box">'
+      // Selector de destino: 🏬 Tienda, cada 🏭 proveedor (el que ya tiene ese
+      // código en su Excel va primero, con ✓), o sin asignar. Un solo lugar
+      // para elegir a dónde va el ítem — reemplaza el toggle binario de antes.
+      var provsOrd=_provsOrdenados(r.codigo);
+      var destino='<option value=""'+(!r.enTienda&&!r.proveedor?' selected':'')+'>— Elegir —</option>'
+        + '<option value="tienda"'+(r.enTienda?' selected':'')+'>🏬 Tienda</option>'
+        + provsOrd.map(function(pv){
+            var tieneStock=!!Stock.find(pv.id, r.codigo);
+            return '<option value="'+_esc(pv.id)+'"'+(r.proveedor===pv.id?' selected':'')+'>🏭 '+_esc(pv.name||'?')+(tieneStock?' ✓':'')+'</option>';
+          }).join('');
+      return '<div style="border:1px solid var(--bd);border-radius:8px;padding:6px;margin-bottom:6px;background:'+(r.enTienda?'rgba(46,160,67,.08)':(r.proveedor?'rgba(56,139,253,.08)':'transparent'))+'">'
+        + '<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">'
+        +   '<select onchange="Cotizacion._elegirDestino('+i+',this.value)" title="¿A dónde va este ítem?" style="width:96px;background:var(--bg2);border:1px solid var(--bd);border-radius:8px;color:var(--text);padding:8px 4px;font-size:11px;flex-shrink:0;box-sizing:border-box">'+destino+'</select>'
+        +   '<input value="'+_esc(r.codigo)+'" oninput="Cotizacion._edit('+i+',\'codigo\',this.value)" placeholder="Código" style="width:74px;background:var(--bg2);border:1px solid var(--bd);border-radius:8px;color:var(--text);padding:8px;font-size:12px;font-family:monospace;box-sizing:border-box">'
+        +   '<input value="'+_esc(r.desc)+'" oninput="Cotizacion._edit('+i+',\'desc\',this.value)" placeholder="Descripción" style="flex:1;min-width:80px;background:var(--bg2);border:1px solid var(--bd);border-radius:8px;color:var(--text);padding:8px;font-size:12px;box-sizing:border-box">'
         +   '<input value="'+_esc(r.cant)+'" oninput="Cotizacion._edit('+i+',\'cant\',this.value)" inputmode="numeric" style="width:40px;background:var(--bg2);border:1px solid var(--bd);border-radius:8px;color:var(--text);padding:8px;font-size:12px;text-align:center;box-sizing:border-box">'
         +   '<button onclick="Cotizacion._del('+i+')" style="background:none;border:none;color:var(--red);font-size:18px;cursor:pointer;padding:0 2px;flex-shrink:0">✕</button>'
         + '</div>'
@@ -559,11 +574,17 @@
     _addRow: function(){ _rows.push({codigo:'',desc:'',cant:1,enTienda:false}); _renderRows();
       var el=document.getElementById('cotizList'); if(el) el.scrollTop=el.scrollHeight; },
 
-    // Alternar "en tienda" (🏬) vs "falta" (🛒). Exclusivo: en tienda limpia el
-    // proveedor. Persiste al toque para que la vista de la Tienda quede en sync.
-    _togTienda: function(i){ if(_rows[i]){ _rows[i].enTienda=!_rows[i].enTienda; if(_rows[i].enTienda) _rows[i].proveedor=null; _persist(); _renderRows(); } },
-    // Quitar el envío a proveedor de un ítem (vuelve a faltante/disponible).
-    _quitarEnvio: function(i){ if(_rows[i]){ _rows[i].proveedor=null; _persist(); _renderRows(); if(typeof render==='function') render(); } },
+    // Selector de destino por ítem: 'tienda' | id de proveedor | '' (sin
+    // asignar). Exclusivos entre sí. Persiste al toque para que la ficha del
+    // proveedor y la vista de Tienda queden siempre en sync (modelo relacional).
+    _elegirDestino: function(i, val){
+      if(!_rows[i]) return;
+      if(val==='tienda'){ _rows[i].enTienda=true; _rows[i].proveedor=null; }
+      else if(val){ _rows[i].enTienda=false; _rows[i].proveedor=val; }
+      else { _rows[i].enTienda=false; _rows[i].proveedor=null; }
+      _persist(); _renderRows();
+      if(typeof render==='function') render();
+    },
 
     // ── STOCK: API pública (usada por el panel 🧾 y por la UI de Proveedores) ─
     stock: Stock,          // Cotizacion.stock.get/set/del/find/importAOA(pid,...)
@@ -726,15 +747,15 @@
   var AYUDA_COTIZ = {
     titulo: 'Cotización',
     icono: '🧾',
-    actualizado: '2026-07-14',
+    actualizado: '2026-08-26',
     pasos: [
       'En cualquier pedido, tocá el icono <b>🧾</b> (al lado del 💬) para abrir la cotización.',
       'Si el pedido trae el <b>comprobante de venta</b> (link de la boleta), los productos se <b>jalan solos</b> al abrir el 🧾 en los estados de preparación (NUEVO PEDIDO, EN PROCESO, POR ALISTAR). Si no se jalan, tocá <b>📥 Jalar del comprobante</b>. Funciona con boletas <b>ticket</b> y <b>A4</b>.',
       'También podés subir el <b>PDF</b> de la boleta o <b>pegar el texto</b>: se extraen <b>código, descripción y cantidad</b> automáticamente. Todo es editable — corregí, agregá (➕ Fila) o borrá (✕) lo que haga falta.',
-      'Marcá lo que ya tenés con <b>🏬 en tienda</b>. Lo que quede en <b>🛒</b> son los <b>faltantes</b> (lo que hay que conseguir).',
+      'Cada fila tiene un <b>selector</b> a la izquierda: elegí a dónde va ese ítem — <b>🏬 Tienda</b> (ya lo tenés) o el <b>🏭 proveedor</b> que corresponda (el que ya tiene ese código en su Excel aparece primero, con ✓). Queda asignado al toque, sin pasos extra.',
       'Subí tu <b>Stock de tienda</b> (Excel) desde acá y el <b>Excel de cada proveedor</b> en la sección Proveedores. El sistema detecta las columnas solo.',
-      'Cada ítem se clasifica automáticamente: <b>🏬 en tienda</b>, <b>🏭 en proveedor</b> (te dice cuál) o <b>⚠️ faltante</b> (no está en ningún lado). Arriba ves el resumen.',
-      'Tocá <b>📤 Enviar faltantes a proveedor</b> (o pasá el pedido a <b>EN PROCESO</b>): te <b>sugiere</b> el proveedor que tiene más ítems; elegís y los faltantes se agregan a su lista en <b>Proveedores</b> para que cotice.',
+      'Lo que no asignes se clasifica automáticamente: <b>🏭 disponible en</b> (te dice en qué proveedor está) o <b>⚠️ faltante</b> (no está en ningún lado). Arriba ves el resumen.',
+      'Si tenés varios ítems para el mismo proveedor, tocá <b>📤 Enviar faltantes a proveedor</b> (o pasá el pedido a <b>EN PROCESO</b>): te <b>sugiere</b> el proveedor que tiene más ítems y los asigna todos de una — mismo resultado que elegirlos uno por uno.',
       'Desde <b>Proveedores</b> le enviás la lista por WhatsApp para que te cotice.'
     ],
     faq: [
