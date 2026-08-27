@@ -363,6 +363,26 @@ window._formSnapshotDirty=function(){
   return typeof _formSnapshot==='function' && _formSnapshot()!==window._formSnap;
 };
 
+/* Chip de estado Shalom en el modal de editar (SOLO LECTURA).
+   Refleja s.trackingStatus tal cual está guardado — no consulta ni mueve nada.
+   Mismo criterio de color que _estadoChip de tracking.js, replicado inline para
+   no acoplar el modal a ese módulo. Sin estado → oculto (no muestra "—"). */
+function _pintarShalomEstado(estado){
+  const el=$('fShalomEstado'); if(!el) return;
+  const st=(estado||'').trim();
+  if(!st || st==='—'){ el.style.display='none'; el.textContent=''; return; }
+  const u=st.toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+  let bg,fg,ico;
+  if(u.includes('ENTREGADO'))                       { bg='rgba(46,160,67,.15)';  fg='#3fb950'; ico='✅'; }
+  else if(u.includes('AGENCIA')||u.includes('DESTINO')){ bg='rgba(56,139,253,.15)'; fg='#58a6ff'; ico='🏢'; }
+  else if(u.includes('TRANSITO')||u.includes('CAMINO')){ bg='rgba(210,153,34,.15)'; fg='#d29922'; ico='🚌'; }
+  else if(u.includes('ERROR')||u.includes('NO SE'))  { bg='rgba(248,81,73,.15)';  fg='#f85149'; ico='⚠'; }
+  else                                                { bg='rgba(139,148,158,.15)';fg='#8b949e'; ico='📦'; }
+  el.style.background=bg; el.style.color=fg;
+  el.textContent=ico+' '+st;
+  el.style.display='inline-block';
+}
+
 /* FORM */
 let _editId=null;
 function openForm(id){
@@ -439,8 +459,10 @@ function openForm(id){
       if($('fDlvDriver'))      $('fDlvDriver').value      = s._dlvDriver||'';
       if($('fDlvDriverPhone')) $('fDlvDriverPhone').value = s._dlvDriverPhone||'';
       if($('fDlvRutaLink'))    $('fDlvRutaLink').value    = s._dlvRutaLink||'';
+      _pintarShalomEstado(s.trackingStatus);
     }
   } else {
+    _pintarShalomEstado('');
     if($('fShalomGuia'))   $('fShalomGuia').value   = '';
     if($('fShalomCodigo')) $('fShalomCodigo').value = '';
     if($('fDlvDriver'))      $('fDlvDriver').value      = '';

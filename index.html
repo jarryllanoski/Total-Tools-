@@ -691,6 +691,9 @@
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
         <span style="font-size:10px;font-weight:700;color:#388bfd;letter-spacing:.8px;text-transform:uppercase">🚌 Guía Shalom (opcional)</span>
         <span style="display:flex;align-items:center;gap:8px">
+          <!-- Chip de estado (solo lectura): refleja s.trackingStatus ya guardado.
+               Sin onclick, sin consulta — puro reflejo visual. Lo pinta config.js. -->
+          <span id="fShalomEstado" style="display:none;font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;white-space:nowrap"></span>
           <button type="button" id="shalomScanBtn" onclick="shalomScanGuia()" title="Escanear el ticket con la cámara (lee orden y código)" style="background:none;border:none;padding:2px 4px;cursor:pointer;font-size:15px;line-height:1;color:#8b949e">📷</button>
           <button type="button" id="shalomMicBtn" onclick="shalomVozStart()" title="Dictar guía y código por voz" style="display:none;background:none;border:none;padding:2px 4px;cursor:pointer;font-size:15px;line-height:1;color:#8b949e">🎤</button>
         </span>
@@ -3197,7 +3200,7 @@ render();
 </script>
 <!-- ★ SHALOM tracking — cargado al final -->
 <script src="storage.js?v=2"></script>
-<script src="config.js?v=15"></script>
+<script src="config.js?v=16"></script>
 <script src="print.js?v=15"></script>
 <script src="notify.js?v=4"></script>
 <script src="shalom.js?v=3"></script>
