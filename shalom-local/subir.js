@@ -81,18 +81,17 @@ function detectarEstadoAuto(estadoTexto) {
   return null;
 }
 
-function modoEtiqueta(cfg) {
-  const m = cfg && cfg.trackingEtiquetaModo;
-  if (m === "off" || m === "auto" || m === "semi") return m;
-  return (cfg && cfg.trackingWebCambiaEtiqueta) ? "auto" : "off";
-}
-
 /*
  * Decide qué escribir en Firestore para UN pedido, a partir de la lectura del
  * lector. Devuelve SOLO los campos que cambian (nunca el objeto completo — el
  * mismo principio que ya corrigió el bug de window.save: no reescribir de más).
  *   {cambio:true,  cambios:{...}, resultado}
  *   {cambio:false, motivo}   ← sin dato real: no se escribe nada
+ *
+ * NUNCA toca `status` (la etiqueta): se retiró el movimiento automático, aquí y
+ * en el panel. Este script registra lo que dice Shalom; mover la etiqueta es
+ * decisión del operador. `resultado` se sigue calculando solo para el resumen
+ * que se imprime en el registro.
  */
 function decidirCambios(ship, lectura, cfg) {
   const nowMs = Date.now();
@@ -118,24 +117,10 @@ function decidirCambios(ship, lectura, cfg) {
     cambios.trackingHistory = hist;
   }
 
-  // 2) Etiqueta: según el modo, SOLO hacia adelante, nunca retrocede.
-  const modo = modoEtiqueta(cfg);
+  // 2) La etiqueta NO se toca. Solo se interpreta para el resumen del registro.
   let resultado = "ok";
-  if (modo !== "off") {
-    if (autoEstado === "FINALIZADO") {
-      if (modo !== "semi" && ship.status !== "FINALIZADO") cambios.status = "FINALIZADO";
-      resultado = "FINALIZADO";
-    } else if (autoEstado === "EN_DESTINO") {
-      const conSaldo = ship.cost && parseFloat(ship.cost) > 0;
-      if (conSaldo && ["PENDIENTE DE PAGO", "FINALIZADO"].indexOf(ship.status) < 0) {
-        cambios.status = "PENDIENTE DE PAGO"; resultado = "EN_DESTINO";
-      } else if (["LLEGÓ A DESTINO", "PENDIENTE DE PAGO", "FINALIZADO"].indexOf(ship.status) < 0) {
-        cambios.status = "LLEGÓ A DESTINO"; resultado = "EN_DESTINO";
-      } else { resultado = "EN_DESTINO"; }
-    } else if (["NUEVO PEDIDO", "EN PROCESO", "POR ALISTAR", "ALISTADO"].indexOf(ship.status) >= 0) {
-      cambios.status = "ENVIADO"; resultado = "ENVIADO";
-    }
-  }
+  if (autoEstado === "FINALIZADO")      resultado = "FINALIZADO";
+  else if (autoEstado === "EN_DESTINO") resultado = "EN_DESTINO";
 
   return {cambio: true, cambios: cambios, resultado: resultado, estado: estadoTexto};
 }
@@ -386,7 +371,7 @@ async function main() {
   }
 }
 
-module.exports = {decidirCambios, detectarEstadoAuto, modoEtiqueta};
+module.exports = {decidirCambios, detectarEstadoAuto};
 
 if (require.main === module) {
   // El candado se suelta pase lo que pase (error, Ctrl+C, process.exit).

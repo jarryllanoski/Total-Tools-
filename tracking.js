@@ -52,15 +52,6 @@ function detectarEstadoAuto(estadoTexto) {
 /* ══════════════════════════════════════════════
    APLICADOR — único dueño de "qué hacer con una respuesta de Shalom"
 ══════════════════════════════════════════════ */
-/* Modo de movimiento de etiquetas, leído de la config: off | auto | semi.
-   Mismo criterio y compat que el backend. */
-function _modoEtiqueta(){
-  var c = window.S && window.S.config;
-  var m = c && c.trackingEtiquetaModo;
-  if (m === 'off' || m === 'auto' || m === 'semi') return m;
-  return (c && c.trackingWebCambiaEtiqueta) ? 'auto' : 'off';
-}
-
 /* Traduce un código de motivo a un aviso en español (honesto, nunca mudo). */
 function _motivoTexto(motivo){
   switch (motivo) {
@@ -114,36 +105,17 @@ function _aplicarEstadoShalom(ship, resp, origen){
     _escribirTracking(ship, estadoTexto, resp.fecha, origen);
   }
 
-  // 2) Etiqueta interna: según el MODO, y SOLO hacia adelante (nunca retrocede).
-  var modo = _modoEtiqueta();
+  // 2) La etiqueta NO se mueve. Se retiró el movimiento automático (y con él el
+  //    modo off/semi/auto): `ship.status` ahora lo cambias solo tú.
+  //    Lo que SÍ se conserva es *interpretar* lo que dice Shalom y devolverlo en
+  //    `resultado`, porque de ahí salen los avisos: el toast que te dice "llegó a
+  //    destino — avisar al cliente" y la alerta 🎉 del panel. Registrar e
+  //    informar sí; decidir por ti, no.
   var resultado = 'ok';
-  var isShalom = ship.courier && ship.courier.toUpperCase().includes('SHALOM');
-  if (isShalom && modo !== 'off') {
-    // "Retorno a origen" es una EXCEPCIÓN, no un avance del recorrido: el
-    // paquete vuelve. No entra en la regla monotónica normal — se mueve a esa
-    // etiqueta salvo que el pedido ya esté cerrado. Solo si esa etiqueta existe
-    // en tu lista (es una etiqueta personalizada, no una de las fijas).
-    if (/retorno a origen/i.test(estadoTexto)) {
-      var etiquetas = (window.S && window.S.labels) || [];
-      if (etiquetas.indexOf('RETORNO A ORIGEN') >= 0 && ship.status !== 'FINALIZADO') {
-        ship.status = 'RETORNO A ORIGEN';
-      }
-      return {cambio: true, resultado: 'RETORNO', estado: estadoTexto};
-    }
-    if (autoEstado === 'FINALIZADO') {
-      if (modo !== 'semi' && ship.status !== 'FINALIZADO') ship.status = 'FINALIZADO';
-      resultado = 'FINALIZADO';
-    } else if (autoEstado === 'EN_DESTINO') {
-      var conSaldo = ship.cost && parseFloat(ship.cost) > 0;
-      if (conSaldo && ['PENDIENTE DE PAGO','FINALIZADO'].indexOf(ship.status) < 0) {
-        ship.status = 'PENDIENTE DE PAGO'; resultado = 'EN_DESTINO';
-      } else if (['LLEGÓ A DESTINO','PENDIENTE DE PAGO','FINALIZADO'].indexOf(ship.status) < 0) {
-        ship.status = 'LLEGÓ A DESTINO'; resultado = 'EN_DESTINO';
-      } else { resultado = 'EN_DESTINO'; }
-    } else if (['NUEVO PEDIDO','EN PROCESO','POR ALISTAR','ALISTADO'].indexOf(ship.status) >= 0) {
-      ship.status = 'ENVIADO'; resultado = 'ENVIADO';
-    }
-  }
+  if (/retorno a origen/i.test(estadoTexto))   resultado = 'RETORNO';
+  else if (autoEstado === 'FINALIZADO')        resultado = 'FINALIZADO';
+  else if (autoEstado === 'EN_DESTINO')        resultado = 'EN_DESTINO';
+
   return {cambio: true, resultado: resultado, estado: estadoTexto};
 }
 
@@ -570,19 +542,18 @@ Tracking._guardarEdicion = function(shipId) {
   if (estado) rEstado = _aplicarEstadoShalom(ship, {ok: true, estado: estado}, 'manual');
 
   if (typeof window.save   === 'function') window.save(ship.id);
-  // ★ Subida INMEDIATA: al poner la guía y pasar a ENVIADO, sube al instante.
+  // ★ Subida INMEDIATA: para que el link del cliente lo vea al instante.
   if (typeof window._fbSaveShipmentNow === 'function') window._fbSaveShipmentNow(ship);
   if (typeof window.render === 'function') window.render();
   document.getElementById('delOverlay').classList.remove('open');
   if (typeof window.toast === 'function') {
-    // Si se puso un estado, el aviso dice qué pasó con la etiqueta — igual que
-    // cuando la consulta la hace el lector automático.
+    // El aviso informa lo que dice Shalom y, cuando toca, sugiere la acción.
+    // Ya no anuncia cambios de etiqueta: la etiqueta la mueves tú.
     window.toast(
       !rEstado ? '✅ Tracking guardado' :
-      rEstado.resultado === 'FINALIZADO' ? '✅ ' + estado + ' — FINALIZADO' :
+      rEstado.resultado === 'FINALIZADO' ? '✅ ' + estado + ' — puedes finalizarlo' :
       rEstado.resultado === 'EN_DESTINO' ? '📍 ' + estado + ' — avisar al cliente' :
       rEstado.resultado === 'RETORNO'    ? '↩️ ' + estado :
-      rEstado.resultado === 'ENVIADO'    ? '🚚 ' + estado + ' — marcado ENVIADO' :
       '✅ Estado: ' + estado);
   }
 };
@@ -620,9 +591,9 @@ Tracking.consultarAhora = async function(shipId) {
     if (window.render) window.render();
     if (window.toast) {
       window.toast(
-        r.resultado === 'FINALIZADO' ? '✅ FINALIZADO — Shalom confirma entrega' :
+        r.resultado === 'FINALIZADO' ? '✅ Shalom confirma entrega — puedes finalizarlo' :
         r.resultado === 'EN_DESTINO' ? '📍 Llegó a destino — avisar al cliente' :
-        r.resultado === 'ENVIADO'    ? '🚚 En camino — marcado ENVIADO' :
+        r.resultado === 'RETORNO'    ? '↩️ ' + (ship.trackingStatus || 'Retorno a origen') :
         '🔄 Estado: ' + (ship.trackingStatus || '—'));
     }
   } else {

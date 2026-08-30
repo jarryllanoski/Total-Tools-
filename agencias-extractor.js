@@ -52,25 +52,6 @@
     return out;
   }
 
-  /* Mapea agencia cruda de Shalom al esquema común.
-     Acepta nombres crudos (lugar_over, zona, hora_atencion) o ya adaptados. */
-  function _mapShalom(raw) {
-    return {
-      ter_id:       _txt(raw.ter_id || raw.id),
-      nombre:       _txt(raw.nombre || raw.lugar_over || raw.nombre_agencia),
-      departamento: _txt(raw.departamento),
-      provincia:    _txt(raw.provincia),
-      distrito:     _txt(raw.distrito || raw.zona),
-      direccion:    _txt(raw.direccion),
-      referencia:   _txt(raw.referencia),
-      telefono:     _txt(raw.telefono),
-      horario:      _txt(raw.horario || raw.hora_atencion),
-      horarioDom:   _txt(raw.horarioDom || raw.hora_domingo),
-      latitud:      _txt(raw.latitud || raw.lat),
-      longitud:     _txt(raw.longitud || raw.lng || raw.lon)
-    };
-  }
-
   /* Mapea agencia cruda de Olva (department/province/district/lat/lng/horario
      por día) al MISMO esquema común que Shalom, para que la búsqueda del
      formulario funcione idéntico sin importar el courier. */
@@ -105,14 +86,11 @@
     };
   }
 
-  /* Un objeto por courier con catálogo propio. Orden = orden en pantalla. */
+  /* Un objeto por courier con catálogo propio. Orden = orden en pantalla.
+     Shalom se retiró: su extracción dependía del rastreo viejo. El buscador de
+     agencias del formulario sigue funcionando con el catálogo local guardado
+     (data/agencias-shalom.json, 542 sedes) — eso NO se toca. */
   var COURIERS = [
-    {
-      key: 'shalom', label: 'Shalom',
-      functionUrl: 'https://us-central1-total-tools-24ce8.cloudfunctions.net/shalomListar',
-      outFile: 'agencias-shalom.json',
-      mapper: _mapShalom
-    },
     {
       key: 'olva', label: 'Olva',
       functionUrl: 'https://us-central1-total-tools-24ce8.cloudfunctions.net/olvaListar',
@@ -138,16 +116,6 @@
   AgenciasExtractor.extraer = async function (key) {
     var c = COURIERS.find(function (x) { return x.key === key; });
     if (!c) return;
-
-    // Shalom pasa por la PUERTA ÚNICA (shalom.js), hoy desconectada: su portal
-    // exige reCAPTCHA v3 y un servidor no puede extraerlo. Olva sigue igual.
-    if (key === 'shalom') {
-      if (global.Shalom && typeof global.Shalom.agencias === 'function') global.Shalom.agencias();
-      _setEstado(key, '🔧 Extracción de Shalom en reconstrucción — el buscador ' +
-        'sigue usando el catálogo local guardado.', '#d29922');
-      if (global.toast) global.toast('🔧 Extraer agencias Shalom no disponible aún');
-      return;
-    }
 
     var btn = document.getElementById('agExtractorBtn_' + key);
     if (btn) { btn.disabled = true; btn.textContent = '⏳ Extrayendo...'; }

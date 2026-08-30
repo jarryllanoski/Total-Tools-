@@ -164,10 +164,7 @@
 
       if (typeof _docs !== 'undefined')        _docs.guia = docObj;
       if (typeof refreshSlot === 'function')   refreshSlot('guia');
-      // Auto-avanzar estado (respeta el toggle de config); solo pedido existente.
-      if (shipId && typeof global.autoEstadoPorDoc === 'function') {
-        global.autoEstadoPorDoc(shipId, 'guia');
-      }
+      // Cargar el ticket ya NO mueve la etiqueta: el estado lo cambias tú.
 
       _toast('🚚 Guía / Ticket cargado ✓ — Guarda el pedido para conservarlo');
     } catch (e) {

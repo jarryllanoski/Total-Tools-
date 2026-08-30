@@ -34,50 +34,35 @@ NUEVO PEDIDO → EN PROCESO → POR ALISTAR → ALISTADO → ENVIADO
   lista del panel — un pedido en `ANULADO` sale de la cola de tracking pero el
   panel no sabe pintarlo.
 
-### Subir documento avanza la etiqueta
-
-`index.html` → `autoEstadoPorDoc()`
-
-| Documento | Lleva a |
-|---|---|
-| ticket | `EN PROCESO` |
-| embalado | `ALISTADO` |
-| guía | `ENVIADO` |
-
-**Es una escalera que solo sube.** Nunca retrocede: si el pedido ya está más
-adelante, no se toca. Gobernado por `S.config.autoEstadoDoc` (por defecto
-encendido).
-
 ---
 
-## 2. Quién puede mover una etiqueta sola
+## 2. Nadie mueve una etiqueta sola
 
-Tres cosas distintas mueven `ship.status` sin que tú lo pidas. **Si tocas una,
-revisa las tres** — es donde más fácil se rompe algo.
+**Invariante actual (30 ago 2026): `ship.status` solo cambia cuando el operador
+lo cambia.** No hay ninguna ruta automática.
 
-| Origen | Dónde | Cuándo |
+Se retiraron las cuatro que existían:
+
+| Origen retirado | Dónde estaba | Qué hacía |
 |---|---|---|
-| Subir un documento | `index.html:autoEstadoPorDoc` | escalera monótona, solo sube |
-| Guardar la guía Shalom | `tracking.js:_guardarEdicion` | pasa a `ENVIADO` |
-| Consulta a Shalom (Motor A) | `tracking.js:aplicarResultado` | según lo que diga Shalom |
-| Consulta a Shalom (Motor B) | `shalomWebSync.js:calcularEtiqueta` | ídem, desde el backend |
+| Subir un documento | `index.html:autoEstadoPorDoc` | boleta → `EN PROCESO`, embalado → `ALISTADO`, guía → `ENVIADO` |
+| Guardar la guía Shalom | `tracking.js:_guardarEdicion` | pasaba a `ENVIADO` |
+| Respuesta de Shalom | `tracking.js:_aplicarEstadoShalom` | según el modo off/semi/auto |
+| Lector local | `shalom-local/subir.js:decidirCambios` | la copia en Node de la regla anterior |
 
-### El modo de etiquetas
+Con ellas se fue el **modo de etiquetas** (`trackingEtiquetaModo`, con sus
+valores `off`/`auto`/`semi`) y el selector de **motor de rastreo**
+(`trackingMotor`). Los campos siguen existiendo en `panel/config` porque borrar
+datos no aporta nada, pero **ya nadie los lee**.
 
-`S.config.trackingEtiquetaModo` — vale para los dos motores:
+> **Lo que SÍ se conservó:** interpretar lo que dice Shalom para **avisar**.
+> `detectarEstadoAuto` sigue viva y alimenta el aviso 🎉 "llegó a destino"
+> (`_checkDestinoAlerts`) y los toasts ("puedes finalizarlo", "avisar al
+> cliente"). La distinción es deliberada: **informar sí, decidir por ti no.**
 
-| Modo | Qué hace |
-|---|---|
-| `off` | **No mueve ninguna etiqueta.** Solo registra lo que dice Shalom |
-| `auto` | Mueve todo, incluido `FINALIZADO` |
-| `semi` | Mueve todo **menos** `FINALIZADO` — ese lo cierras a mano |
-
-Compatibilidad: si el campo no existe, se deriva del booleano viejo
-`trackingWebCambiaEtiqueta`.
-
-> ⚠️ **Excepción conocida:** `tracking.js:_guardarEdicion` mueve a `ENVIADO`
-> **sin consultar el modo**. Aunque tengas `off`, guardar la guía mueve el
-> pedido. Está registrado en `DEUDA.md` § T-2.
+> **Si la automatización vuelve** (con la API oficial y sus webhooks), tiene que
+> volver por **un solo sitio**, no por cuatro. Esa fue la lección de esta
+> limpieza.
 
 ---
 
@@ -113,56 +98,28 @@ Estados previos = `NUEVO PEDIDO`, `EN PROCESO`, `POR ALISTAR`, `ALISTADO`.
 
 ## 4. Cuándo se consulta a Shalom
 
-### Un solo motor a la vez
+**Hoy: solo cuando alguien lo pide.** El selector de motor, los intervalos y la
+cola del worker se retiraron junto con el rastreo viejo. Quedan dos caminos, los
+dos a petición:
 
-`S.config.trackingMotor` — `off` · `api` (Motor A, API paga) · `web` (Motor B,
-worker propio).
-
-**Nunca los dos.** El Motor A se apaga solo si el motor activo es `web`
-(`tracking.js:autoTrackingCheck` sale al inicio). Si los dos corrieran, se
-pisarían las etiquetas y pagarías la API sin necesidad.
-
-### Los intervalos
-
-| Situación | Cada |
+| Camino | Quién lo dispara |
 |---|---|
-| En tránsito | **12 h** |
-| Llegó a destino / pendiente de pago | **24 h** |
+| ⟳ Consultar / 🔄 masivo | el operador, desde el panel |
+| `shalom-local/subir.js` | el Programador de tareas de Windows, cada 6 h |
 
-Configurables desde `panel/config` con
-`trackingWebIntervalTransitoH` / `trackingWebIntervalDestinoH`.
-
-### La cola del Motor B
-
-El campo `trackingWebProximaConsulta` es a la vez **el reloj y la marca de
-elegibilidad**:
-
-- **Con fecha** → está en la cola; se consulta cuando esa fecha vence.
-- **`null`** → fuera de la cola.
-
-> ⚠️ **Al detener un pedido hay que poner `null`, no dejar la fecha vieja.** Si
-> se deja una fecha ya pasada, el pedido sale vencido **para siempre** y se
-> consulta en cada corrida.
-
-**Otras reglas de la cola:**
-
-- Máximo **25 pedidos por corrida**, con **2 500 ms** de pausa entre consultas
-  (gentil con Shalom y su reCAPTCHA).
-- Ante error: reintentos espaciados **1 h, 2 h, 4 h, 8 h, 24 h**. Tras **5
-  errores seguidos** el pedido sale de la cola marcado para revisión manual.
-- Un pedido entra a la cola solo si es **Shalom + tiene guía y código + no está
-  en estado terminal**.
-- **El scheduler corre cada 30 minutos.**
+`shalom-local` sigue vivo **a propósito** hasta que la integración con la API
+oficial esté probada: es lo que mantiene los estados al día mientras tanto. No
+mueve etiquetas (§ 2), solo registra.
 
 ### Lo visible y la etiqueta son cosas separadas
 
-El **tracking visible** (`trackingStatus`, `trackingHistory`) se escribe
-**siempre** que el texto cambie, sin importar el modo de etiquetas. La
-**etiqueta interna** (`status`) solo se mueve según el modo.
+El **tracking visible** (`trackingStatus`, `trackingHistory`) se escribe siempre
+que el texto cambie. La **etiqueta interna** (`status`) no se toca nunca de
+forma automática — ver § 2.
 
-Y el escritor es **atómico**: `appendTracking()` escribe estado, hora e
-historial en el mismo bloque. **Nunca debe quedar un estado sin su hora o sin su
-entrada de historial.**
+Y el escritor es **atómico**: `_escribirTracking()` escribe estado, mensaje,
+hora e historial en el mismo bloque. **Nunca debe quedar un estado sin su hora o
+sin su entrada de historial.**
 
 ---
 

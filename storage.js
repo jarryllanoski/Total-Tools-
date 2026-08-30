@@ -182,11 +182,8 @@ function patchLoadDoc() {
                    :                        '🧾 Boleta / Factura subida ✓';
         global.toast(subMsg);
 
-        // Auto-avanzar estado (escalera monotónica, respeta el toggle de config).
-        // Fuente única: index.html → autoEstadoPorDoc.
-        if (shipId && typeof global.autoEstadoPorDoc === 'function') {
-          global.autoEstadoPorDoc(shipId, slot);
-        }
+        // Subir un documento ya NO mueve la etiqueta: el estado lo cambias tú.
+        // (Antes: boleta → EN PROCESO, embalado → ALISTADO, guía → ENVIADO.)
 
       })
       .catch(function(e) {

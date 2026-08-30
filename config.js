@@ -230,7 +230,7 @@ function _procesarDoc(file,slot){
     toast('⏳ Subiendo documento...');
     StorageModule.uploadFile(file,shipId,slot).then(function(docObj){
       _docs[slot]=docObj; refreshSlot(slot); _docToast(slot);
-      if(typeof autoEstadoPorDoc==='function') autoEstadoPorDoc(shipId,slot);
+      // Subir un documento ya NO mueve la etiqueta: el estado lo cambias tú.
     }).catch(function(e){
       console.warn('[Doc] Storage falló, usando base64:',e&&e.message);
       _procesarDocBase64(file,slot);
@@ -1308,26 +1308,14 @@ function loadCfgUI(){
   $('cfgName').value=S.config.name||'';$('cfgPhone').value=S.config.phone||'';$('cfgCity').value=S.config.city||'';
   // Toggle auto-tracking Shalom (por defecto encendido)
   { const t=$('tglShalomAuto'); if(t) t.classList.toggle('on', S.config.shalomAutoTrack!==false); }
-  // Toggle auto-estado al subir documento (por defecto encendido)
-  { const t=$('tglAutoEstadoDoc'); if(t) t.classList.toggle('on', S.config.autoEstadoDoc!==false); }
-  // Motor de rastreo (Fase 4): selector + opciones del motor propio.
+  // Configuración Shalom: solo queda "Mostrar en el link del cliente". El motor
+  // de rastreo, el modo de etiquetas y los intervalos se retiraron con el
+  // rastreo viejo. Los campos que quedan en S.config (trackingMotor,
+  // trackingEtiquetaModo, trackingWebInterval*) NO se borran a propósito: son
+  // datos guardados y borrarlos no aporta nada; simplemente ya nadie los lee.
   {
-    const motor=S.config.trackingMotor||'off';
-    const sel=$('cfgTrackingMotor'); if(sel) sel.value=motor;
-    const box=$('cfgTrackingWebBox'); if(box) box.style.display=(motor==='web')?'block':'none';
-    const em=$('cfgTrackingEtiquetaModo');
-    if(em){
-      const modo=S.config.trackingEtiquetaModo||(S.config.trackingWebCambiaEtiqueta?'auto':'off');
-      em.value=modo;
-      const d=$('cfgTrackingEtiquetaDesc');
-      if(d&&typeof window._etiquetaModoDesc==='function') d.innerHTML=window._etiquetaModoDesc(modo);
-    }
     const tc=$('tglTrackingWebCliente');
     if(tc) tc.classList.toggle('on', !!S.config.trackingWebMostrarCliente);
-    const th=$('cfgTrackingWebTransitoH');
-    if(th) th.value=S.config.trackingWebIntervalTransitoH||12;
-    const dh=$('cfgTrackingWebDestinoH');
-    if(dh) dh.value=S.config.trackingWebIntervalDestinoH||24;
   }
 
   // DISPATCH DAYS
