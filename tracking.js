@@ -52,14 +52,22 @@ function detectarEstadoAuto(estadoTexto) {
 /* ══════════════════════════════════════════════
    APLICADOR — único dueño de "qué hacer con una respuesta de Shalom"
 ══════════════════════════════════════════════ */
-/* Traduce un código de motivo a un aviso en español (honesto, nunca mudo). */
+/* Traduce un código de motivo a un aviso en español (honesto, nunca mudo).
+   Cada motivo dice qué pasó Y qué hacer: un aviso que no orienta obliga a
+   adivinar, y adivinar sobre un envío de un cliente sale caro. */
 function _motivoTexto(motivo){
   switch (motivo) {
     case 'DESCONECTADO':  return '🔧 Rastreo Shalom en reconstrucción';
     case 'NO_ENCONTRADO': return '⚠️ Shalom no encontró esa guía — verifica número y código';
-    case 'BLOQUEADO':     return '⚠️ Shalom pidió verificación — intenta desde tu navegador';
+    case 'BLOQUEADO':     return '🔑 La clave de la API no es válida o el plan venció — revisa tu panel de Shalom API';
+    case 'LIMITE':        return '⏳ Se agotó la cuota del plan por ahora — reintenta más tarde';
     case 'SIN_DATO':      return '⚠️ Shalom no devolvió estado — reintenta en un momento';
-    case 'ERROR_SHALOM':  return '⚠️ Shalom tuvo un error temporal — se reintentará solo';
+    case 'ERROR_SHALOM':  return '⚠️ Shalom tuvo un error temporal — reintenta en un momento';
+    case 'SIN_RED':       return '📡 Sin conexión — revisa tu internet y reintenta';
+    // La respuesta llegó pero no se reconoció su forma. NO se inventa un
+    // estado: se avisa para poder ajustar el traductor con el dato real.
+    case 'FORMATO_DESCONOCIDO':
+      return '🔧 Shalom respondió en un formato no reconocido — avísame para ajustarlo';
     default:              return '⚠️ No se pudo consultar Shalom';
   }
 }
@@ -716,15 +724,25 @@ Tracking.copiarLink = function(id) {
   }
 };
 
-/* ── Auto-check al abrir el panel ────────────────────────────────────
-   GATEADO en Shalom.DISPONIBLE: hoy la puerta está desconectada, así que esto
-   NO hace nada. Cuando se conecte, consulta los Shalom pendientes que ya toca
-   refrescar (según las horas de Config) y aplica por el mismo aplicador que el
-   manual. El motor "sin abrir el panel" será Cloud Scheduler + sesión prestada
-   (ver docs/SHALOM.md); esto es el complemento/respaldo para cuando trabajas. */
+/* ── Auto-check al abrir el panel — APAGADO A PROPÓSITO ──────────────
+   Esto consultaba TODOS los pedidos Shalom pendientes cada vez que abrías el
+   panel. Antes no se notaba porque estaba gateado en Shalom.DISPONIBLE, que
+   era false; al conectar la API oficial se habría despertado solo y, con ~60
+   pedidos en cola, habría disparado ~60 consultas en cada apertura.
+
+   Se deja apagado por dos razones:
+     1. Fase 1 es para VALIDAR con el botón ⟳ Consultar, de a una guía. Un
+        barrido masivo antes de comprobar que el traductor lee bien la
+        respuesta multiplicaría un error por sesenta.
+     2. Los webhooks de la Fase 2 hacen innecesario preguntar: Shalom avisa
+        cuando algo cambia. Este ciclo desaparece entonces.
+
+   Para reactivarlo temporalmente: poner AUTO_CHECK_ACTIVO en true. */
+var AUTO_CHECK_ACTIVO = false;
 var _autoRunning = false;
 async function autoTrackingCheck() {
-  if (!(window.Shalom && window.Shalom.DISPONIBLE)) return; // apagado hasta conectar
+  if (!AUTO_CHECK_ACTIVO) return;                           // ver nota de arriba
+  if (!(window.Shalom && window.Shalom.DISPONIBLE)) return; // puerta desconectada
   if (_autoRunning) return;
   var cfg = (window.S && window.S.config) || {};
   if (cfg.shalomAutoTrack === false) return;               // el operador lo apagó

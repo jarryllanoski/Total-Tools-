@@ -8,11 +8,12 @@
  * llama decide qué mostrar. Así la misma puerta sirve para el botón manual, el
  * auto-check del panel o un Cloud Scheduler, sin acoplarse a ninguno.
  *
- * ESTADO: DESCONECTADO a propósito. La integración vieja se retiró — Shalom
- * protege su portal con reCAPTCHA v3 (puntúa invisible cada visita) y un
- * servidor nunca saca nota. La nueva irá contra pro.shalom.pe con la cuenta del
- * negocio. Cuando esté lista, se rellenan estos 4 métodos y `DISPONIBLE=true`,
- * y toda la UI se enciende sola. Ver docs/SHALOM.md.
+ * CÓMO LLEGA A SHALOM (y por qué no directo):
+ *   navegador → Cloud Function `shalomApi` → api.shalom-api.lat
+ * La API key es un secreto y vive en Secret Manager, del lado del servidor. Si
+ * viajara al navegador, cualquiera con F12 la vería y gastaría el plan del
+ * negocio. La función además exige que seas administrador y solo permite las
+ * operaciones de una lista blanca — no es un proxy ciego.
  *
  * CONTRATO (lo que devuelve cada método; una promesa):
  *   consultarGuia(guia, codigo) → {
@@ -25,24 +26,74 @@
  *   registrar(pedido)      → { ok:true, guia:'…', codigo:'…' }
  *
  *   En error, todos: { ok:false, motivo:CODIGO }
- *     DESCONECTADO · NO_ENCONTRADO · BLOQUEADO (reCAPTCHA/sesión) · SIN_DATO
+ *     DESCONECTADO · NO_ENCONTRADO · BLOQUEADO (clave/plan) · SIN_DATO
  *     · ERROR_SHALOM (tropiezo temporal del lado de Shalom, no del dato)
+ *     · LIMITE (cuota agotada) · FORMATO_DESCONOCIDO (respuesta no reconocida)
  *   REGLA DE ORO: jamás ok:true sin dato real. Sin estado → ok:false. (La
  *   lección más cara: el éxito falso ocultó días de fallo.)
  */
 (function (global) {
   'use strict';
 
+  var FUNC = 'https://us-central1-total-tools-24ce8.cloudfunctions.net/shalomApi';
   var OFF = {ok: false, motivo: 'DESCONECTADO'};
 
-  var Shalom = {
-    // Interruptor maestro. Mientras sea false, el auto-check del panel no corre
-    // y los botones avisan "en reconstrucción". Se pone true al conectar.
-    DISPONIBLE: false,
+  /* Token del panel. Mismo patrón que cotizacion.js: renueva si hace falta y
+     lee el que guarda auth.js. Sin token, la función responde 401. */
+  function _token() {
+    var p = Promise.resolve();
+    try {
+      if (typeof global._authEnsureToken === 'function') {
+        p = Promise.resolve(global._authEnsureToken());
+      }
+    } catch (e) { /* sin auth: seguimos y la función dirá 401 */ }
+    return p.then(function () {
+      try { return localStorage.getItem('tt_id_token') || ''; } catch (e) { return ''; }
+    });
+  }
 
-    consultarGuia: function () {
-      return Promise.resolve(OFF);
+  /* Llama a la Cloud Function. Nunca lanza: cualquier tropiezo se traduce al
+     vocabulario de motivos, para que quien llama siempre pueda avisar algo
+     honesto en vez de quedarse mudo. */
+  function _llamar(op, cuerpo) {
+    if (!global.fetch) return Promise.resolve(OFF);
+    return _token().then(function (tok) {
+      return fetch(FUNC + '?op=' + encodeURIComponent(op), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': tok ? ('Bearer ' + tok) : ''
+        },
+        body: JSON.stringify(cuerpo || {})
+      });
+    }).then(function (r) {
+      if (r.status === 401 || r.status === 403) {
+        return {ok: false, motivo: 'BLOQUEADO'};
+      }
+      return r.json().catch(function () {
+        return {ok: false, motivo: 'ERROR_SHALOM'};
+      });
+    }).catch(function () {
+      return {ok: false, motivo: 'SIN_RED'};
+    });
+  }
+
+  var Shalom = {
+    // Interruptor maestro. La consulta ya va contra la API oficial; el ticket,
+    // las agencias y el registro llegan en las fases siguientes.
+    DISPONIBLE: true,
+
+    consultarGuia: function (guia, codigo) {
+      if (!guia || !codigo) return Promise.resolve({ok: false, motivo: 'SIN_DATO'});
+      return _llamar('track', {orderNumber: String(guia), orderCode: String(codigo)});
     },
+
+    // Comprueba la clave y devuelve el consumo del mes. Útil para diagnosticar
+    // sin tocar ningún pedido.
+    validar: function () {
+      return _llamar('validate', {});
+    },
+
     ticket: function () {
       return Promise.resolve(OFF);
     },

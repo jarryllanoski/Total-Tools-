@@ -632,3 +632,99 @@ exports.extraerComprobante = onRequest(
     },
 );
 
+// ── shalomApi ──────────────────────────────────────────────────────────────
+// Intermediario entre el panel y la API oficial de Shalom.
+//
+// POR QUE EXISTE (y el navegador no llama a Shalom directo): la API key es un
+// secreto. En el navegador, cualquiera con F12 la ve y gasta el plan del
+// negocio. Aqui vive en Secret Manager y no sale nunca.
+//
+// TRES BARRERAS, en este orden:
+//   1. Token de Firebase Auth valido  → no es un endpoint abierto.
+//   2. Correo en la lista de administradores → que alguien tenga cuenta de
+//      Firebase no basta; tiene que ser el duenio. Mismo criterio que
+//      firestore.rules → esAdmin().
+//   3. Lista blanca de operaciones → NO es un proxy ciego. Solo se permite lo
+//      que el panel usa; nadie puede pasar por aqui para llamar a cualquier
+//      ruta de Shalom con la clave del negocio.
+const {defineSecret} = require("firebase-functions/params");
+const SHALOM_API_KEY = defineSecret("SHALOM_API_KEY");
+const shalomApi = require("./shalomApi");
+
+// Misma lista que firestore.rules. Si agregas un admin, actualiza los dos.
+const ADMINS = ["admin@totaltools.com"];
+
+/**
+ * Comprueba que quien llama es un administrador del panel.
+ * @param {Object} req request
+ * @return {Promise<Object>} {ok:true, email} o {ok:false, code, motivo}
+ */
+async function exigirAdmin(req) {
+  const authz = req.get("Authorization") || "";
+  const bearer = authz.match(/^Bearer\s+(.+)$/i);
+  if (!bearer) return {ok: false, code: 401, motivo: "No autorizado"};
+  let tok;
+  try {
+    tok = await getAuth().verifyIdToken(bearer[1]);
+  } catch (e) {
+    return {ok: false, code: 401, motivo: "Token invalido"};
+  }
+  const email = (tok && tok.email) || "";
+  if (!ADMINS.includes(email)) {
+    return {ok: false, code: 403, motivo: "Sin permiso"};
+  }
+  return {ok: true, email};
+}
+
+exports.shalomApi = onRequest(
+    {region: "us-central1", secrets: [SHALOM_API_KEY], timeoutSeconds: 60},
+    async (req, res) => {
+      setCORS(req, res);
+      if (req.method === "OPTIONS") {
+        res.status(204).send("");
+        return;
+      }
+      try {
+        const permiso = await exigirAdmin(req);
+        if (!permiso.ok) {
+          res.status(permiso.code).json({ok: false, motivo: permiso.motivo});
+          return;
+        }
+
+        const clave = SHALOM_API_KEY.value();
+        const op = String(req.query.op || "").trim();
+        const b = req.body;
+        const cuerpo = (b && typeof b === "object") ? b : {};
+
+        // ── Lista blanca de operaciones ───────────────────────────────────
+        if (op === "validate") {
+          // Comprueba la clave y devuelve el consumo del mes.
+          const r = await shalomApi.validate(clave);
+          res.status(r.ok ? 200 : 502).json(r);
+          return;
+        }
+
+        if (op === "track") {
+          const guia = String(
+              cuerpo.orderNumber || req.query.orderNumber || "").trim();
+          const codigo = String(
+              cuerpo.orderCode || req.query.orderCode || "").trim();
+          if (!guia || !codigo) {
+            res.status(400).json({ok: false, motivo: "Falta guia o codigo"});
+            return;
+          }
+          const r = await shalomApi.track(clave, guia, codigo);
+          // 200 siempre que la llamada se pudo hacer: el {ok:false, motivo} es
+          // una respuesta valida del contrato, no un fallo de transporte.
+          res.status(200).json(r);
+          return;
+        }
+
+        res.status(400).json({ok: false, motivo: "Operacion no permitida"});
+      } catch (e) {
+        console.error("shalomApi error:", e);
+        res.status(500).json({ok: false, motivo: "ERROR_INTERNO"});
+      }
+    },
+);
+
