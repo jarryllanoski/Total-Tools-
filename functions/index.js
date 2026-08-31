@@ -747,96 +747,264 @@ exports.shalomApi = onRequest(
 
 
 // ── shalomWebhook ──────────────────────────────────────────────────────────
-// Recibe los avisos de Shalom cuando una guia cambia de estado.
+// Recibe los avisos de Shalom cuando una guia cambia de estado. Es la pieza
+// que reemplaza al sondeo: en vez de preguntar cada 6 h desde la PC, Shalom
+// avisa en el momento.
 //
-// ESTA PRIMERA VERSION ESTA EN **MODO APRENDIZAJE** Y NO ESCRIBE EN NINGUN
-// PEDIDO. El motivo es honesto: la documentacion publica no dice ni la forma
-// del evento ni como se llama la cabecera de la firma. Sin esos dos datos,
-// verificar la firma seria adivinar, y procesar sin verificar seria dejar que
-// cualquiera invente estados de tus envios.
+// ES UNA PUERTA ABIERTA A INTERNET. Cualquiera puede enviarle un POST, asi que
+// TODO evento se verifica antes de tocar un pedido:
 //
-// Entonces esta version hace una sola cosa: ANOTAR lo que llega —— nombres de
-// cabeceras, forma del cuerpo (tipos, no valores) y que algoritmo de firma
-// encaja. Con eso escribimos la verificacion contra el contrato real y recien
-// ahi se activa la escritura.
+//   1. FIRMA HMAC-SHA256 sobre el cuerpo CRUDO (no el interpretado: si se
+//      re-serializa el JSON, un espacio de diferencia cambia la firma).
+//   2. COMPARACION DE TIEMPO CONSTANTE. Comparar con === filtra informacion:
+//      el tiempo que tarda en fallar delata cuantos caracteres acerto, y con
+//      suficientes intentos se reconstruye la firma.
+//   3. DEDUPLICACION por id de evento. La documentacion garantiza que los
+//      reintentos reusan el mismo id; se usa `create()`, que falla si el
+//      documento ya existe — atomico, sin condiciones de carrera.
 //
-// Que NO hace, a proposito:
-//   · No toca pedidos.        · No mueve etiquetas.
-//   · No guarda datos de personas (solo tipos).
+// Si algo no cuadra, NO se toca el pedido y queda anotado el motivo. Nunca se
+// escribe un estado que no se pudo verificar.
+//
+// La cabecera de la firma no esta documentada, asi que se detecta: se prueban
+// las que huelen a firma y se anota cual encajo. Queda registrado para poder
+// fijarlo despues.
+const crypto = require("crypto");
 const WEBHOOK_DIAG = "panel/diagnostico";
-const MAX_EVENTOS_GUARDADOS = 5;
+const WEBHOOK_EVENTOS = "panel/webhookEventos/items";
+const SHALOM_WEBHOOK_SECRET = defineSecret("SHALOM_WEBHOOK_SECRET");
 
 /**
- * Nombres de cabecera candidatos para la firma. Se prueban todos y se anota
- * cual venia, para escribir la verificacion contra el nombre real.
- * @param {Object} req request
- * @return {Object} {cabeceras: [...], firmaPosible: {...}}
+ * Compara dos textos en tiempo constante. Devuelve false ante cualquier
+ * diferencia de longitud o contenido, sin delatar donde estaba la diferencia.
+ * @param {string} a primer valor
+ * @param {string} b segundo valor
+ * @return {boolean} si son iguales
  */
-function _inspeccionarCabeceras(req) {
-  const interesantes = [];
-  const firma = {};
+function _igualSeguro(a, b) {
+  const ba = Buffer.from(String(a || ""), "utf8");
+  const bb = Buffer.from(String(b || ""), "utf8");
+  if (ba.length !== bb.length) return false;
+  try {
+    return crypto.timingSafeEqual(ba, bb);
+  } catch (e) {
+    return false;
+  }
+}
+
+/**
+ * Busca la cabecera de firma y comprueba el HMAC contra el cuerpo crudo.
+ * Prueba los formatos habituales (hex pelado y con prefijo "sha256=").
+ * @param {Object} req request
+ * @param {string} secreto secreto de firma
+ * @return {Object} {valida, cabecera, formato, motivo}
+ */
+function _verificarFirma(req, secreto) {
+  if (!secreto) return {valida: false, motivo: "SIN_SECRETO"};
+  const crudo = req.rawBody;
+  if (!crudo) return {valida: false, motivo: "SIN_CUERPO_CRUDO"};
+
+  const esperado = crypto.createHmac("sha256", secreto)
+      .update(crudo).digest("hex");
+
   const h = req.headers || {};
-  Object.keys(h).forEach((k) => {
-    const kl = k.toLowerCase();
-    // Solo cabeceras propias del proveedor o relacionadas con firma/eventos.
-    if (/shalom|signature|firma|event|hmac|digest|timestamp/.test(kl)) {
-      interesantes.push(k);
-      // El id de evento no es secreto y lo necesitamos para deduplicar.
-      if (/event-id|event_id/.test(kl)) firma[k] = String(h[k]);
-      // De las demas solo guardamos su longitud: una firma es un secreto.
-      else firma[k] = "(" + String(h[k] || "").length + " caracteres)";
+  const candidatas = Object.keys(h).filter((k) =>
+    /signature|firma|hmac|digest/i.test(k));
+  if (!candidatas.length) return {valida: false, motivo: "SIN_CABECERA_FIRMA"};
+
+  for (const k of candidatas) {
+    const recibido = String(h[k] || "").trim();
+    if (_igualSeguro(recibido, esperado)) {
+      return {valida: true, cabecera: k, formato: "hex"};
     }
-  });
-  return {cabeceras: interesantes.sort(), detalle: firma};
+    // Formato "sha256=<hex>", el que usan GitHub y Shopify.
+    const conPrefijo = recibido.replace(/^sha256=/i, "");
+    if (_igualSeguro(conPrefijo, esperado)) {
+      return {valida: true, cabecera: k, formato: "sha256=hex"};
+    }
+    // Algunos proveedores lo mandan en base64.
+    const b64 = crypto.createHmac("sha256", secreto)
+        .update(crudo).digest("base64");
+    if (_igualSeguro(recibido, b64)) {
+      return {valida: true, cabecera: k, formato: "base64"};
+    }
+  }
+  return {valida: false, motivo: "FIRMA_NO_COINCIDE", probadas: candidatas};
+}
+
+/**
+ * Saca el id de evento de las cabeceras (para deduplicar).
+ * @param {Object} req request
+ * @return {string} id, o cadena vacia
+ */
+function _idEvento(req) {
+  const h = req.headers || {};
+  const k = Object.keys(h).find((x) => /event-id|event_id/i.test(x));
+  return k ? String(h[k] || "").trim() : "";
+}
+
+/**
+ * Encuentra la guia, el codigo y el estado dentro del evento. La forma no
+ * esta documentada, asi que se buscan los nombres habituales en la raiz y un
+ * nivel adentro. Si no aparece, se dice — no se inventa.
+ * @param {Object} ev cuerpo del evento
+ * @return {Object} {guia, codigo, estado}
+ */
+function _datosDelEvento(ev) {
+  const cajas = [ev, ev.data, ev.order, ev.tracking, ev.payload]
+      .filter((x) => x && typeof x === "object");
+  const buscar = (nombres) => {
+    for (const caja of cajas) {
+      for (const n of nombres) {
+        const v = caja[n];
+        if (v !== undefined && v !== null && String(v).trim() !== "") {
+          return String(v).trim();
+        }
+      }
+    }
+    return "";
+  };
+  return {
+    guia: buscar(["orderNumber", "numero_orden", "guia", "numeroOrden"]),
+    codigo: buscar(["orderCode", "codigo_orden", "codigo", "codigoOrden"]),
+    estado: buscar(
+        ["status", "estado", "message", "newStatus", "estadoActual"]),
+  };
+}
+
+/**
+ * Anota en Firestore lo que llego, para poder ajustar sin volver a esperar un
+ * evento. Guarda tipos y nombres, nunca valores con datos de personas.
+ * @param {Object} datos que anotar
+ * @return {Promise<void>}
+ */
+async function _anotarDiagnostico(datos) {
+  try {
+    const ref = db.doc(WEBHOOK_DIAG);
+    const snap = await ref.get();
+    const previo = (snap.exists && snap.data().webhook) || {};
+    const muestras = Array.isArray(previo.muestras) ? previo.muestras : [];
+    if (muestras.length < 5) muestras.push(datos);
+    await ref.set({webhook: {
+      recibidos: (previo.recibidos || 0) + 1,
+      ultimo: new Date().toISOString(),
+      muestras: muestras,
+    }}, {merge: true});
+  } catch (e) {
+    console.error("[shalomWebhook] no se pudo anotar:", e.message);
+  }
+}
+
+/**
+ * Busca el pedido por su numero de guia. Se prueban los dos campos que
+ * conviven en los datos historicos.
+ * @param {string} guia numero de guia
+ * @return {Promise<Object|null>} {ref, datos} o null
+ */
+async function _pedidoPorGuia(guia) {
+  const campos = ["trackingOrderNumber", "shalomGuia"];
+  for (const campo of campos) {
+    const q = await db.collection(SHIP_COL)
+        .where(campo, "==", guia).limit(1).get();
+    if (!q.empty) return {ref: q.docs[0].ref, datos: q.docs[0].data()};
+  }
+  return null;
 }
 
 exports.shalomWebhook = onRequest(
-    {region: "us-central1", timeoutSeconds: 30},
+    {region: "us-central1", secrets: [SHALOM_WEBHOOK_SECRET],
+      timeoutSeconds: 30},
     async (req, res) => {
-      // Shalom hace POST. Cualquier otra cosa se rechaza sin ceremonia.
       if (req.method !== "POST") {
         res.status(405).json({ok: false, motivo: "Solo POST"});
         return;
       }
       try {
-        const cab = _inspeccionarCabeceras(req);
+        const secreto = SHALOM_WEBHOOK_SECRET.value();
+        const firma = _verificarFirma(req, secreto);
         const cuerpo = (req.body && typeof req.body === "object") ?
           req.body : {};
-        const esquema = shalomApi.esquemaDe(cuerpo);
 
-        // Se guarda el ULTIMO evento y un contador. Tope de eventos para que
-        // un aluvion no infle el documento ni la factura de Firestore.
-        const ref = db.doc(WEBHOOK_DIAG);
-        const snap = await ref.get();
-        const previo = (snap.exists && snap.data().webhook) || {};
-        const n = (previo.recibidos || 0) + 1;
-        const muestras = Array.isArray(previo.muestras) ? previo.muestras : [];
-        if (muestras.length < MAX_EVENTOS_GUARDADOS) {
-          muestras.push({
+        if (!firma.valida) {
+          // No se toca nada. Se anota para poder ajustar la verificacion.
+          await _anotarDiagnostico({
             cuando: new Date().toISOString(),
-            cabeceras: cab.cabeceras,
-            detalleCabeceras: cab.detalle,
-            esquemaCuerpo: esquema,
-            tieneRawBody: !!req.rawBody,
+            resultado: "FIRMA_RECHAZADA",
+            motivo: firma.motivo,
+            cabecerasProbadas: firma.probadas || [],
+            cabeceras: Object.keys(req.headers || {})
+                .filter((k) => /shalom|signature|event|hmac/i.test(k)),
+            esquemaCuerpo: shalomApi.esquemaDe(cuerpo),
           });
+          console.warn("[shalomWebhook] firma rechazada:", firma.motivo);
+          res.status(401).json({ok: false, motivo: "Firma invalida"});
+          return;
         }
-        await ref.set({webhook: {
-          modo: "aprendizaje",
-          recibidos: n,
-          ultimo: new Date().toISOString(),
-          muestras: muestras,
-        }}, {merge: true});
 
-        console.log("[shalomWebhook] evento recibido. Cabeceras:",
-            JSON.stringify(cab.cabeceras),
-            "Esquema:", JSON.stringify(esquema));
+        // Deduplicacion atomica: create() falla si el evento ya se proceso.
+        const idEv = _idEvento(req);
+        if (idEv) {
+          const idLimpio = idEv.replace(/[^A-Za-z0-9_-]/g, "_").slice(0, 100);
+          try {
+            await db.doc(WEBHOOK_EVENTOS + "/" + idLimpio)
+                .create({cuando: new Date().toISOString()});
+          } catch (e) {
+            console.log("[shalomWebhook] repetido, se ignora:", idLimpio);
+            res.status(200).json({ok: true, repetido: true});
+            return;
+          }
+        }
 
-        // 200 a proposito: si respondieramos error, Shalom reintentaria en
-        // bucle un evento que de todos modos no vamos a procesar todavia.
-        res.status(200).json({ok: true, modo: "aprendizaje"});
+        const d = _datosDelEvento(cuerpo);
+        if (!d.guia) {
+          await _anotarDiagnostico({
+            cuando: new Date().toISOString(),
+            resultado: "SIN_GUIA_EN_EVENTO",
+            firmaOk: true, cabeceraFirma: firma.cabecera,
+            formatoFirma: firma.formato,
+            esquemaCuerpo: shalomApi.esquemaDe(cuerpo),
+          });
+          res.status(200).json({ok: true, motivo: "Sin guia reconocible"});
+          return;
+        }
+
+        const pedido = await _pedidoPorGuia(d.guia);
+        if (!pedido) {
+          // Guia que no es nuestra o pedido borrado: no es un error.
+          res.status(200).json({ok: true, motivo: "Pedido no encontrado"});
+          return;
+        }
+
+        // Solo se escribe si el texto CAMBIO. Repetir el mismo estado
+        // ensuciaria el historial con entradas identicas.
+        const s = pedido.datos;
+        if (d.estado && s.trackingStatus !== d.estado) {
+          const iso = new Date().toISOString();
+          const hist = Array.isArray(s.trackingHistory) ?
+            s.trackingHistory.slice() : [];
+          hist.push({date: iso, status: d.estado, message: d.estado,
+            source: "webhook"});
+          await pedido.ref.set({
+            trackingStatus: d.estado,
+            trackingMessage: d.estado,
+            trackingLastUpdate: iso,
+            trackingHistory: hist,
+          }, {merge: true});
+          console.log("[shalomWebhook] actualizado", d.guia, "->", d.estado);
+        }
+
+        // La ETIQUETA (status) no se toca nunca. Ese es el invariante de todo
+        // el sistema: informar si, decidir por el operador no.
+        await _anotarDiagnostico({
+          cuando: new Date().toISOString(),
+          resultado: "PROCESADO",
+          cabeceraFirma: firma.cabecera, formatoFirma: firma.formato,
+          esquemaCuerpo: shalomApi.esquemaDe(cuerpo),
+        });
+        res.status(200).json({ok: true});
       } catch (e) {
         console.error("shalomWebhook error:", e);
-        res.status(200).json({ok: true});
+        res.status(500).json({ok: false});
       }
     },
 );
