@@ -94,6 +94,16 @@
       return _llamar('validate', {});
     },
 
+    /* Diagnóstico: devuelve la FORMA de la respuesta de Shalom (nombres de
+       campos y tipos, nunca valores) más cómo la interpreta hoy el traductor.
+       Existe porque la documentación de la API describe qué enviar pero no qué
+       devuelve; en vez de suponer la forma, se mide. No escribe en ningún
+       pedido y no expone datos de personas. */
+    esquema: function (guia, codigo) {
+      if (!guia || !codigo) return Promise.resolve({ok: false, motivo: 'SIN_DATO'});
+      return _llamar('esquema', {orderNumber: String(guia), orderCode: String(codigo)});
+    },
+
     ticket: function () {
       return Promise.resolve(OFF);
     },

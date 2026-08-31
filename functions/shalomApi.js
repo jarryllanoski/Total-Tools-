@@ -254,12 +254,70 @@ async function validate(apiKey) {
   return llamar(apiKey, "/validate");
 }
 
+// ── Diagnostico: la FORMA de una respuesta, nunca su contenido ──────────────
+// La documentacion publica describe que enviar pero no que devuelve. En vez de
+// suponer la forma (y escribir un traductor contra una hipotesis), se mide: se
+// hace una llamada real y se devuelve solo el ESQUELETO — nombres de campos y
+// tipos, con los valores reemplazados por su tipo.
+//
+// Por que devolver tipos y no valores: la respuesta trae datos de personas
+// (nombre y documento del destinatario). Lo que no sale del servidor no se
+// puede filtrar por accidente. El esquema alcanza para escribir el traductor.
+
+/**
+ * Reemplaza cada valor por su tipo, conservando la estructura.
+ * @param {*} v valor a describir
+ * @param {number} prof profundidad actual (corta la recursion)
+ * @return {*} el mismo arbol, con tipos en lugar de valores
+ */
+function esquemaDe(v, prof) {
+  prof = prof || 0;
+  if (prof > 6) return "…(mas profundo)";
+  if (v === null) return "null";
+  if (Array.isArray(v)) {
+    if (!v.length) return "array vacio";
+    return ["array de " + v.length, esquemaDe(v[0], prof + 1)];
+  }
+  const t = typeof v;
+  if (t !== "object") return t;
+  const out = {};
+  Object.keys(v).slice(0, 40).forEach((k) => {
+    out[k] = esquemaDe(v[k], prof + 1);
+  });
+  return out;
+}
+
+/**
+ * Llama a /track y devuelve la FORMA de la respuesta, no su contenido.
+ * Herramienta de diagnostico: sirve para escribir el traductor contra el
+ * contrato real. Tambien devuelve como lo interpreta hoy el traductor, para
+ * ver de un vistazo si acierta.
+ * @param {string} apiKey clave
+ * @param {string} orderNumber numero de guia
+ * @param {string} orderCode codigo
+ * @return {Promise<Object>} {ok, esquema, interpretado}
+ */
+async function esquemaTrack(apiKey, orderNumber, orderCode) {
+  const r = await llamar(apiKey, "/track", {
+    method: "POST",
+    body: {orderNumber: String(orderNumber), orderCode: String(orderCode)},
+  });
+  if (!r.ok) return r;
+  return {
+    ok: true,
+    esquema: esquemaDe(r.data),
+    interpretado: normalizarTrack(r.data),
+  };
+}
+
 module.exports = {
   BASE,
   MOTIVO,
   llamar,
   normalizarTrack,
   _pasosDesdeTexto,
+  esquemaDe,
+  esquemaTrack,
   track,
   validate,
 };

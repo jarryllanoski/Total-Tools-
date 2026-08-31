@@ -704,6 +704,23 @@ exports.shalomApi = onRequest(
           return;
         }
 
+        if (op === "esquema") {
+          // Diagnostico: devuelve la FORMA de la respuesta de Shalom (tipos,
+          // no valores) para poder escribir el traductor contra el contrato
+          // real en vez de contra una suposicion. No escribe en ningun pedido.
+          const g = String(
+              cuerpo.orderNumber || req.query.orderNumber || "").trim();
+          const c = String(
+              cuerpo.orderCode || req.query.orderCode || "").trim();
+          if (!g || !c) {
+            res.status(400).json({ok: false, motivo: "Falta guia o codigo"});
+            return;
+          }
+          const r = await shalomApi.esquemaTrack(clave, g, c);
+          res.status(200).json(r);
+          return;
+        }
+
         if (op === "track") {
           const guia = String(
               cuerpo.orderNumber || req.query.orderNumber || "").trim();
@@ -728,3 +745,98 @@ exports.shalomApi = onRequest(
     },
 );
 
+
+// ── shalomWebhook ──────────────────────────────────────────────────────────
+// Recibe los avisos de Shalom cuando una guia cambia de estado.
+//
+// ESTA PRIMERA VERSION ESTA EN **MODO APRENDIZAJE** Y NO ESCRIBE EN NINGUN
+// PEDIDO. El motivo es honesto: la documentacion publica no dice ni la forma
+// del evento ni como se llama la cabecera de la firma. Sin esos dos datos,
+// verificar la firma seria adivinar, y procesar sin verificar seria dejar que
+// cualquiera invente estados de tus envios.
+//
+// Entonces esta version hace una sola cosa: ANOTAR lo que llega —— nombres de
+// cabeceras, forma del cuerpo (tipos, no valores) y que algoritmo de firma
+// encaja. Con eso escribimos la verificacion contra el contrato real y recien
+// ahi se activa la escritura.
+//
+// Que NO hace, a proposito:
+//   · No toca pedidos.        · No mueve etiquetas.
+//   · No guarda datos de personas (solo tipos).
+const WEBHOOK_DIAG = "panel/diagnostico";
+const MAX_EVENTOS_GUARDADOS = 5;
+
+/**
+ * Nombres de cabecera candidatos para la firma. Se prueban todos y se anota
+ * cual venia, para escribir la verificacion contra el nombre real.
+ * @param {Object} req request
+ * @return {Object} {cabeceras: [...], firmaPosible: {...}}
+ */
+function _inspeccionarCabeceras(req) {
+  const interesantes = [];
+  const firma = {};
+  const h = req.headers || {};
+  Object.keys(h).forEach((k) => {
+    const kl = k.toLowerCase();
+    // Solo cabeceras propias del proveedor o relacionadas con firma/eventos.
+    if (/shalom|signature|firma|event|hmac|digest|timestamp/.test(kl)) {
+      interesantes.push(k);
+      // El id de evento no es secreto y lo necesitamos para deduplicar.
+      if (/event-id|event_id/.test(kl)) firma[k] = String(h[k]);
+      // De las demas solo guardamos su longitud: una firma es un secreto.
+      else firma[k] = "(" + String(h[k] || "").length + " caracteres)";
+    }
+  });
+  return {cabeceras: interesantes.sort(), detalle: firma};
+}
+
+exports.shalomWebhook = onRequest(
+    {region: "us-central1", timeoutSeconds: 30},
+    async (req, res) => {
+      // Shalom hace POST. Cualquier otra cosa se rechaza sin ceremonia.
+      if (req.method !== "POST") {
+        res.status(405).json({ok: false, motivo: "Solo POST"});
+        return;
+      }
+      try {
+        const cab = _inspeccionarCabeceras(req);
+        const cuerpo = (req.body && typeof req.body === "object") ?
+          req.body : {};
+        const esquema = shalomApi.esquemaDe(cuerpo);
+
+        // Se guarda el ULTIMO evento y un contador. Tope de eventos para que
+        // un aluvion no infle el documento ni la factura de Firestore.
+        const ref = db.doc(WEBHOOK_DIAG);
+        const snap = await ref.get();
+        const previo = (snap.exists && snap.data().webhook) || {};
+        const n = (previo.recibidos || 0) + 1;
+        const muestras = Array.isArray(previo.muestras) ? previo.muestras : [];
+        if (muestras.length < MAX_EVENTOS_GUARDADOS) {
+          muestras.push({
+            cuando: new Date().toISOString(),
+            cabeceras: cab.cabeceras,
+            detalleCabeceras: cab.detalle,
+            esquemaCuerpo: esquema,
+            tieneRawBody: !!req.rawBody,
+          });
+        }
+        await ref.set({webhook: {
+          modo: "aprendizaje",
+          recibidos: n,
+          ultimo: new Date().toISOString(),
+          muestras: muestras,
+        }}, {merge: true});
+
+        console.log("[shalomWebhook] evento recibido. Cabeceras:",
+            JSON.stringify(cab.cabeceras),
+            "Esquema:", JSON.stringify(esquema));
+
+        // 200 a proposito: si respondieramos error, Shalom reintentaria en
+        // bucle un evento que de todos modos no vamos a procesar todavia.
+        res.status(200).json({ok: true, modo: "aprendizaje"});
+      } catch (e) {
+        console.error("shalomWebhook error:", e);
+        res.status(200).json({ok: true});
+      }
+    },
+);
