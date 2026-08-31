@@ -1,5 +1,56 @@
 # Shalom — integración de rastreo, tickets, agencias y registro
 
+## El contrato de `POST /track` — medido, no supuesto
+
+> **Por qué está escrito acá.** La documentación de `api.shalom-api.lat`
+> describe qué **enviar** pero no qué **devuelve**. Esta forma se obtuvo
+> midiendo una respuesta real el **31/08/2026** con la operación de
+> diagnóstico (`Shalom.esquema`). Si algún día el traductor deja de reconocer
+> la respuesta, se vuelve a medir en vez de adivinar.
+
+La respuesta trae **dos bloques**:
+
+```
+{
+  search:   { success, message, data: { …detalles del envío… } },
+  statuses: { success, message, data: { …el recorrido… } }
+}
+```
+
+⚠️ El envoltorio del recorrido se llama **`statuses`** (en inglés), no
+`estados`. Ese fue exactamente el motivo de que el primer traductor no lo
+reconociera.
+
+### `statuses.data` — el recorrido
+
+Siete claves. Cada una es `null` mientras no ocurra, y un objeto con `fecha`
+(a veces `completo`, `cargueros`) cuando ocurre:
+
+| Clave | Barra | Nota |
+|---|:--:|---|
+| `registrado` | 0 | antes de entrar a la agencia |
+| `origen` | 0 | |
+| `transito` | 1 | trae `cargueros` |
+| `destino` | 2 | |
+| `reparto` | 2 | reparto a domicilio: mismo tramo para el cliente |
+| `entregado` | 3 | |
+| `demora` | — | **no es un paso**: es una condición que se superpone |
+
+`statuses.message` trae la redacción del propio Shalom ("En tránsito",
+"Entregado"). **Se prefiere sobre nuestro texto**: es lo que el cliente ve en
+la web de Shalom, y que el panel dijera otra cosa sería confuso al comparar.
+
+### `search.data` — detalles del envío
+
+Además del estado, cada consulta trae gratis: `entregado` (booleano, sirve de
+contraste con la barra), `monto`, `estado_pago`, `tipo_pago`, `contenido`,
+`direccion_entrega`, `aereo`, `fecha_emision`, el `comprobante` (serie y
+número), `remitente` y `destinatario` (documento y nombre), y —importante para
+registrar envíos— **`origen.id` y `destino.id`, que son los `ter_id`** de las
+agencias.
+
+
+
 Este documento explica **por qué** el rastreo automático de Shalom se retiró,
 **cómo** quedó el código, y **qué** hace falta para reconectarlo. Léelo antes de
 volver a tocar nada de Shalom: aquí está la razón para no repetir caminos que ya

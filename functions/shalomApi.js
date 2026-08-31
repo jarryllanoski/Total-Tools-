@@ -104,12 +104,21 @@ async function llamar(apiKey, ruta, opts) {
 // lo dice (FORMATO_DESCONOCIDO) en vez de inventar. Cuando veamos una respuesta
 // real, esto se ajusta en un solo sitio.
 
-/** Los cuatro pasos de la barra de Shalom, en orden. */
+// Los pasos del recorrido, del MAS AVANZADO al menos. El primero que tenga
+// dato real manda: asi un envio entregado no se confunde con uno en origen
+// solo porque ambos pasos existen en el arbol.
+//
+// `idx` es la posicion en la barra de 4 pasos que ya pinta el panel y el link
+// del cliente (0 origen · 1 transito · 2 destino · 3 entregado). Por eso
+// `reparto` comparte el 2 con `destino`: para el cliente, el paquete ya llego
+// a su ciudad; que salga a repartirse es un detalle del mismo tramo.
 const PASOS = [
   {clave: "entregado", idx: 3, texto: "Entregado"},
+  {clave: "reparto", idx: 2, texto: "En reparto"},
   {clave: "destino", idx: 2, texto: "En destino"},
   {clave: "transito", idx: 1, texto: "En tránsito"},
   {clave: "origen", idx: 0, texto: "En origen"},
+  {clave: "registrado", idx: 0, texto: "Registrado"},
 ];
 
 /**
@@ -145,29 +154,68 @@ function normalizarTrack(crudo) {
     return {ok: false, motivo: MOTIVO.SIN_DATO};
   }
 
-  // Forma A — arbol de pasos, como lo expone el portal de Shalom:
-  //   { estados: { message, data: { registrado, origen, transito, destino,
-  //     entregado } } }  · tambien se acepta sin el envoltorio "estados".
-  const cont = crudo.estados || crudo.data || crudo;
+  // ── Forma REAL, medida contra la API el 31/08/2026 ────────────────────────
+  //   { search:   {success, message, data:{...detalles del envio...}},
+  //     statuses: {success, message, data:{ registrado, origen, transito,
+  //                destino, entregado, reparto, demora }} }
+  // El envoltorio se llama "statuses" (en ingles), no "estados".
+  const st = crudo.statuses || crudo.estados;
+  if (st && typeof st === "object") {
+    const arbol = (st.data && typeof st.data === "object") ? st.data : {};
+    // `message` es la redaccion del propio Shalom ("En tránsito", "Entregado").
+    // Se prefiere sobre nuestro texto: es lo que ve el cliente en su web, y que
+    // el panel diga otra cosa que Shalom seria confuso al comparar.
+    const msg = String(st.message || "").trim();
+
+    // "demora" no es un paso del recorrido: es una condicion que se superpone.
+    // Un envio demorado sigue en transito. Se refleja en el texto, sin mover
+    // la barra hacia atras.
+    const demorado = _pasoCumplido(arbol.demora);
+
+    for (const p of PASOS) {
+      if (_pasoCumplido(arbol[p.clave])) {
+        let texto = msg || p.texto;
+        if (demorado && !/demor/i.test(texto)) texto = "Demora de envíos";
+        const r = {
+          ok: true,
+          estado: texto.trim(),
+          pasos: p.idx,
+          fecha: _fechaDe(arbol[p.clave]),
+        };
+        // Confirmacion independiente: el bloque `search` trae un booleano
+        // `entregado`. Sirve de contraste con la barra — si algun dia se
+        // contradicen, es senal de que Shalom cambio algo.
+        const det = (crudo.search && crudo.search.data) || null;
+        if (det && typeof det.entregado === "boolean") {
+          r.entregado = det.entregado;
+        }
+        return r;
+      }
+    }
+    // Estructura reconocida pero ningun paso cumplido: la guia existe y aun no
+    // registra movimiento. No es un fallo, pero tampoco hay estado que mostrar.
+    return {ok: false, motivo: MOTIVO.SIN_DATO};
+  }
+
+  // A partir de aqui, formas alternativas por si la API cambia. No se han
+  // observado, pero cuestan poco y evitan quedarse ciego ante un cambio menor.
+  const cont = crudo.data || crudo;
   const pasosObj = (cont && (cont.data || cont)) || {};
   const tienePasos = PASOS.some((p) =>
     Object.prototype.hasOwnProperty.call(pasosObj, p.clave));
 
   if (tienePasos) {
-    // El paso MAS AVANZADO que tenga dato real manda.
     for (const p of PASOS) {
       if (_pasoCumplido(pasosObj[p.clave])) {
-        const msg = (cont && (cont.message || cont.mensaje)) || "";
+        const msg2 = (cont && (cont.message || cont.mensaje)) || "";
         return {
           ok: true,
-          estado: String(msg || p.texto).trim(),
+          estado: String(msg2 || p.texto).trim(),
           pasos: p.idx,
           fecha: _fechaDe(pasosObj[p.clave]),
         };
       }
     }
-    // Estructura reconocida pero ningun paso cumplido: la guia existe y aun no
-    // registra movimiento. No es un fallo, pero tampoco hay estado que mostrar.
     return {ok: false, motivo: MOTIVO.SIN_DATO};
   }
 
