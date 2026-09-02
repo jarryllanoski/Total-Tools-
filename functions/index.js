@@ -920,7 +920,11 @@ exports.shalomWebhook = onRequest(
         return;
       }
       try {
-        const secreto = SHALOM_WEBHOOK_SECRET.value();
+        // .trim() a proposito: cargar un secreto desde un archivo o pegandolo
+        // arrastra saltos de linea invisibles con muchisima facilidad, y un
+        // "\n" de mas hace que TODA firma legitima se rechace. El sintoma es
+        // identico al de un secreto equivocado, asi que se descarta de raiz.
+        const secreto = String(SHALOM_WEBHOOK_SECRET.value() || "").trim();
         const firma = _verificarFirma(req, secreto);
         const cuerpo = (req.body && typeof req.body === "object") ?
           req.body : {};
@@ -937,7 +941,14 @@ exports.shalomWebhook = onRequest(
             esquemaCuerpo: shalomApi.esquemaDe(cuerpo),
           });
           console.warn("[shalomWebhook] firma rechazada:", firma.motivo);
-          res.status(401).json({ok: false, motivo: "Firma invalida"});
+          // Se devuelve el motivo concreto, no un mensaje generico. Saber que
+          // fallo (falta la cabecera, falta el cuerpo crudo, o la firma no
+          // coincide) no le sirve a nadie para falsificar una firma, y sin eso
+          // diagnosticar obliga a ir a buscar los registros a ciegas.
+          res.status(401).json({
+            ok: false, motivo: "Firma invalida", detalle: firma.motivo,
+            cabecerasVistas: firma.probadas || [],
+          });
           return;
         }
 
