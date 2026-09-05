@@ -41,7 +41,12 @@
     var out = [];
     agencias.forEach(function (a) {
       var lat = parseFloat(a.latitud), lon = parseFloat(a.longitud);
-      if (!(lat === 0 && lon === 0) && !_coordValidaPeru(lat, lon)) {
+      // Cualquier coordenada que no caiga dentro de Perú se vacía, y el (0,0)
+      // entra en esa regla. Antes estaba exceptuado, lo que contradecía el
+      // comentario de arriba y dejaba pasar 5 agencias de la API de Shalom con
+      // 0,0 — un punto en el Atlántico frente a África. Vacío es honesto:
+      // "no sabemos dónde está". Un 0,0 parece un dato bueno y no lo es.
+      if (!_coordValidaPeru(lat, lon)) {
         a = Object.assign({}, a, { latitud: '', longitud: '' });
       }
       var clave = a.nombre + '|' + a.latitud + '|' + a.longitud;
