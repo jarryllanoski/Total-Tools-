@@ -31,14 +31,36 @@
        vacías): nunca ofrecen una agencia como "cerca de mí" con una distancia
        falsa, pero la agencia sigue siendo buscable por texto.
      - Duplicados exactos (mismo nombre + mismas coordenadas) → se descartan,
-       quedándose con el primero. */
+       quedándose con el primero.
+     - Sedes a las que un cliente NO puede ir → se descartan (ver _esUsable). */
   function _coordValidaPeru(lat, lon) {
     return isFinite(lat) && isFinite(lon) &&
       lat >= -19 && lat <= 1 && lon >= -82 && lon <= -68;
   }
+
+  /* ¿Puede un cliente presentarse en esta sede a recoger su paquete?
+     El catálogo alimenta un buscador donde el cliente ELIGE dónde recoger, así
+     que una entrada que no sirva para eso no es un dato incompleto: es una
+     trampa. Aparece entre los resultados, se puede tocar, y el pedido termina
+     con un punto de recojo al que nadie puede llegar.
+     Dos reglas, ambas indiscutibles:
+       - Sin dirección → no hay a dónde ir.
+       - Nombre de prueba → no es una sede real (Shalom deja terminales de
+         prueba en su catálogo; una salía en los resultados de un distrito).
+     Deliberadamente NO se filtran almacenes ni centros de distribución que sí
+     traen dirección: algunos atienden público y no nos consta cuáles. Ante la
+     duda, se conserva: perder una sede real es peor que mostrar una de más. */
+  var RE_NO_REAL = /\b(prueba|test)\b/i;
+  function _esUsable(a) {
+    if (!_txt(a.direccion)) return false;
+    if (RE_NO_REAL.test(_txt(a.nombre))) return false;
+    return true;
+  }
+
   function _sanear(agencias) {
     var vistos = {};
     var out = [];
+    var descartadas = [];
     agencias.forEach(function (a) {
       var lat = parseFloat(a.latitud), lon = parseFloat(a.longitud);
       // Cualquier coordenada que no caiga dentro de Perú se vacía, y el (0,0)
@@ -49,11 +71,15 @@
       if (!_coordValidaPeru(lat, lon)) {
         a = Object.assign({}, a, { latitud: '', longitud: '' });
       }
+      if (!_esUsable(a)) { descartadas.push(a); return; }
       var clave = a.nombre + '|' + a.latitud + '|' + a.longitud;
       if (vistos[clave]) return; // duplicado exacto: se descarta
       vistos[clave] = true;
       out.push(a);
     });
+    // Se devuelve también lo descartado: filtrar en silencio es cómodo hasta
+    // el día que descarta algo que sí servía y nadie se entera.
+    out.descartadas = descartadas;
     return out;
   }
 
@@ -273,8 +299,19 @@
       // por un error. Por eso el aviso es explícito y dice cuántas faltan.
       var aviso = await _compararConActual(c, agencias.length);
 
+      // Lo descartado se dice, no se calla: si algún día el filtro se lleva
+      // algo que servía, tiene que verse acá y no descubrirse por un reclamo.
+      var desc = agencias.descartadas || [];
+      var descHtml = desc.length
+        ? '<br><span style="font-size:11px;color:#8b949e">Se descartaron <b>' + desc.length +
+          '</b> sin dirección o de prueba: ' +
+          desc.slice(0, 3).map(function (a) {
+            return String(a.nombre || '?').split('/').pop().trim();
+          }).join(', ') + (desc.length > 3 ? '…' : '') + '</span>'
+        : '';
+
       _setEstado(key,
-        '✅ <b style="color:#22c55e">' + agencias.length + ' agencias</b> extraídas.' + aviso.html + '<br>' +
+        '✅ <b style="color:#22c55e">' + agencias.length + ' agencias</b> extraídas.' + aviso.html + descHtml + '<br>' +
         '<span style="font-size:11px;color:#8b949e">Descarga el archivo y súbelo a la carpeta <b>data/</b> de tu repo (reemplaza el actual).</span>',
         '#e6edf3'
       );

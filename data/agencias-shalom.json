@@ -1,7 +1,7 @@
 {
   "meta": {
-    "total": 542,
-    "generado": "2026-06-08T03:44:14.039Z"
+    "total": 550,
+    "generado": "2026-09-05T03:16:53.104Z"
   },
   "agencias": [
     {
@@ -13,10 +13,10 @@
       "direccion": "JR. DOS DE MAYO CDRA. 15 S/N CHACHAPOYAS, REFERENCIA: JUNTO A TERMINAL DE COMBIS ETSA",
       "referencia": "",
       "telefono": "(01) 500 7878",
-      "horario": "LUNES A VIERNES - 8AM A 8PM",
-      "horarioDom": "DOMINGOS - 8:00 AM A 5:00 PM",
-      "latitud": "-6.238673290149498",
-      "longitud": "-77.86800826533634"
+      "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
+      "horarioDom": "DOMINGOS DE 8:00 AM A 5:00 PM",
+      "latitud": "-6.2386732901495",
+      "longitud": "-77.868008265336"
     },
     {
       "ter_id": "356",
@@ -27,10 +27,10 @@
       "direccion": "JR. GRAU 270, REF. JUNTO A LA AGENCIA DE VIAJES MONTEVERDE",
       "referencia": "",
       "telefono": "(01) 500 7878",
-      "horario": "LUNES A VIERNES - 8AM A 8PM",
-      "horarioDom": "DOMINGOS - 8:00 AM A 5:00 PM",
-      "latitud": "-6.226990739068646",
-      "longitud": "-77.87195979113727"
+      "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
+      "horarioDom": "DOMINGOS DE 8:00 AM A 5:00 PM",
+      "latitud": "-6.2269907390686",
+      "longitud": "-77.871959791137"
     },
     {
       "ter_id": "622",
@@ -42,9 +42,9 @@
       "referencia": "",
       "telefono": "(01) 500 7878",
       "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
-      "horarioDom": "DOMINGOS - 8:00 AM A 5:00 PM",
-      "latitud": "-5.634700302844137",
-      "longitud": "-78.52837892250335"
+      "horarioDom": "DOMINGOS DE 8:00 AM A 5:00 PM",
+      "latitud": "-5.6347003028441",
+      "longitud": "-78.528378922503"
     },
     {
       "ter_id": "49",
@@ -55,10 +55,10 @@
       "direccion": "AV. SACSAHUAMAN N° 513 - PEDRO RUIZ, REF. A MEDIA CUADRA DE LA UGEL",
       "referencia": "",
       "telefono": "(01) 500 7878",
-      "horario": "LUNES A VIERNES - 8AM A 8PM",
-      "horarioDom": "DOMINGOS - 10:00 AM A 2:00 PM",
-      "latitud": "-5.9481590587064455",
-      "longitud": "-77.97919108649704"
+      "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
+      "horarioDom": "DOMINGOS DE 10:00 AM A 2:00 PM",
+      "latitud": "-5.9481590587064",
+      "longitud": "-77.979191086497"
     },
     {
       "ter_id": "468",
@@ -69,10 +69,10 @@
       "direccion": "JR. RAMÓN CASTILLA S/N, LUYA - AMAZONAS, REF. ENTRE EL COLEGIO SECUNDARIO RAMÓN CASTILLA Y EL JR. JOSÉ GÁLVEZ, A MEDIA CDRA. DEL AGENTE DE VENTA DE PASAJES DE CIVA, MÓVIL Y TRANSPORTE CHICLAYO",
       "referencia": "",
       "telefono": "(01) 500 7878",
-      "horario": "LUNES A VIERNES - 8AM A 8PM",
-      "horarioDom": "DOMINGOS - 10:00 AM A 2:00 PM",
-      "latitud": "-6.159612028355043",
-      "longitud": "-77.94471980156138"
+      "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
+      "horarioDom": "DOMINGOS DE 10:00 AM A 2:00 PM",
+      "latitud": "-6.159612028355",
+      "longitud": "-77.944719801561"
     },
     {
       "ter_id": "48",
@@ -83,22 +83,22 @@
       "direccion": "AV. CHACHAPOYAS 1094 SECTOR GONCHILLO, REF. A 2 CUADRAS DE LA CLÍNICA SEÑOR DE LOS MILAGROS",
       "referencia": "",
       "telefono": "(01) 500 7878",
-      "horario": "LUNES A VIERNES - 8AM A 8PM",
-      "horarioDom": "DOMINGOS - 8:00 AM A 5:00 PM",
-      "latitud": "-5.750277132825345",
-      "longitud": "-78.4491910472481"
+      "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
+      "horarioDom": "DOMINGOS DE 8:00 AM A 5:00 PM",
+      "latitud": "-5.7502771328253",
+      "longitud": "-78.449191047248"
     },
     {
       "ter_id": "125",
-      "nombre": "ANCASH / HUARAZ / HUARAZ / HUARAZ",
+      "nombre": "ANCASH / HUARAZ / HUARAZ / HUARAZ CO",
       "departamento": "ANCASH",
       "provincia": "HUARAZ",
       "distrito": "HUARAZ",
       "direccion": "AV. 27 DE NOVIEMBRE CDRA. 20 S/N - VILLON BAJO, REFERENCIA: AL COSTADO DEL GRIFO PRIMAX",
       "referencia": "",
       "telefono": "(01) 500 7878",
-      "horario": "LUNES A VIERNES - 8AM A 8PM",
-      "horarioDom": "DOMINGOS - 8:00 AM A 5:00 PM",
+      "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
+      "horarioDom": "DOMINGOS DE 8:00 AM A 5:00 PM",
       "latitud": "-9.541547",
       "longitud": "-77.531075"
     },
@@ -111,8 +111,8 @@
       "direccion": "CARRETERA CENTRAL 00S/N CENT CARHUAZ - CARHUAZ - ÁNCASH, ref. MEDIA CUADRA ANTES DE LLEGAR AL ESTADIO MUNICIPAL CAPITAN CARLOS MEJIA",
       "referencia": "",
       "telefono": "(01) 500 7878",
-      "horario": "LUNES A VIERNES - 8AM A 8PM",
-      "horarioDom": "DOMINGOS - 10:00AM A 2:00PM",
+      "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
+      "horarioDom": "DOMINGOS DE 10:00 AM A 2:00 PM",
       "latitud": "-9.2841105",
       "longitud": "-77.6468648"
     },
@@ -140,9 +140,9 @@
       "referencia": "",
       "telefono": "(01) 500 7878",
       "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
-      "horarioDom": "DOMINGOS - 8:00 AM A 5:00 PM",
-      "latitud": "-10.064877234998725",
-      "longitud": "-78.15681888878282"
+      "horarioDom": "DOMINGOS DE 8:00 AM A 5:00 PM",
+      "latitud": "-10.064877234999",
+      "longitud": "-78.156818888783"
     },
     {
       "ter_id": "302",
@@ -153,10 +153,10 @@
       "direccion": "AV. 9 DE OCTUBRE N° 259 - HUAYLAS, REFERENCIA: AL COSTADO DE LA EMPRESA MÓVIL TOURS",
       "referencia": "",
       "telefono": "(01) 500 7878",
-      "horario": "LUNES A VIERNES - 8AM A 8PM",
-      "horarioDom": "DOMINGOS - 10:00 AM A 2:00 PM",
-      "latitud": "-9.04787902880895",
-      "longitud": "-77.80347053395421"
+      "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
+      "horarioDom": "DOMINGOS DE 10:00 AM A 2:00 PM",
+      "latitud": "-9.0478790288089",
+      "longitud": "-77.803470533954"
     },
     {
       "ter_id": "17",
@@ -167,10 +167,10 @@
       "direccion": "Av. Enrique Meiggs N° 2457.",
       "referencia": "",
       "telefono": "01 5007878",
-      "horario": "LUNES A VIERNES - 8AM A 8PM",
-      "horarioDom": "DOMINGOS - 8:00 AM A 5:00 PM",
-      "latitud": "-9.093950271606445",
-      "longitud": "-78.56846618652344"
+      "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
+      "horarioDom": "DOMINGOS DE 8:00 AM A 5:00 PM",
+      "latitud": "-9.0939502716064",
+      "longitud": "-78.568466186523"
     },
     {
       "ter_id": "298",
@@ -181,10 +181,10 @@
       "direccion": "AV. JOSÉ GÁLVEZ 791, CHIMBOTE - SANTA - ANCASH, REF. A 1 CDRA. ANTES DE LLEGAR AL PUENTE GÁLVEZ",
       "referencia": "",
       "telefono": "(01) 500 7878",
-      "horario": "LUNES A VIERNES - 8AM A 8PM",
-      "horarioDom": "DOMINGOS - 8:00 AM A 5:00 PM",
-      "latitud": "-9.071184513562265",
-      "longitud": "-78.5888226943701"
+      "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
+      "horarioDom": "DOMINGOS DE 8:00 AM A 5:00 PM",
+      "latitud": "-9.0711845135623",
+      "longitud": "-78.58882269437"
     },
     {
       "ter_id": "474",
@@ -195,10 +195,10 @@
       "direccion": "PAR. PARCELA N° 16757 - E SECTOR LA PERLA TRES CABEZAS - ANCASH, REF. FRENTE AL ESTADIO CENTENARIO",
       "referencia": "",
       "telefono": "(01) 500 7878",
-      "horario": "LUNES A VIERNES - 8AM A 8PM",
-      "horarioDom": "DOMINGOS - 8:00 AM A 5:00 PM",
-      "latitud": "-9.098217167822215",
-      "longitud": "-78.55854656211379"
+      "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
+      "horarioDom": "DOMINGOS DE 8:00 AM A 5:00 PM",
+      "latitud": "-9.0982171678222",
+      "longitud": "-78.558546562114"
     },
     {
       "ter_id": "321",
@@ -210,9 +210,9 @@
       "referencia": "",
       "telefono": "(01) 500 7878",
       "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
-      "horarioDom": "DOMINGOS - 8:00 AM A 5:00 PM",
-      "latitud": "-8.989422576204648",
-      "longitud": "-78.61743026041556"
+      "horarioDom": "DOMINGOS DE 8:00 AM A 5:00 PM",
+      "latitud": "-8.9894225762046",
+      "longitud": "-78.617430260416"
     },
     {
       "ter_id": "177",
@@ -223,8 +223,8 @@
       "direccion": "Urbanización José Carlos Mariategui (ex UNICRETO) mz R 3 lt 3 Ref. A una cuadra del óvalo la familia",
       "referencia": "",
       "telefono": "01 5007878",
-      "horario": "LUNES A VIERNES - 8AM A 8PM",
-      "horarioDom": "DOMINGOS - 8:00 AM A 5:00 PM",
+      "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
+      "horarioDom": "DOMINGOS DE 8:00 AM A 5:00 PM",
       "latitud": "-9.127764",
       "longitud": "-78.517709"
     },
@@ -237,10 +237,10 @@
       "direccion": "AV. JOSÉ PARDO MZ. K, LT. 17 - TRES DE OCTUBRE, REFERENCIA: FRENTE AL ÓVALO LAS AMÉRICAS",
       "referencia": "",
       "telefono": "01 5007878",
-      "horario": "LUNES A VIERNES - 8AM A 8PM",
-      "horarioDom": "DOMINGOS - 8:00 AM A 5:00 PM",
-      "latitud": "-9.117818910245735",
-      "longitud": "-78.5378990512906"
+      "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
+      "horarioDom": "DOMINGOS DE 8:00 AM A 5:00 PM",
+      "latitud": "-9.1178189102457",
+      "longitud": "-78.537899051291"
     },
     {
       "ter_id": "564",
@@ -251,10 +251,10 @@
       "direccion": "URB. NICOLAS GARATEA MZ. 100 LT. 24 - NUEVO CHIMBOTE - SANTA - ANCASH, REF. FRENTE AL PARADERO AUTOS N.- GARATEA",
       "referencia": "",
       "telefono": "(01) 500 7878",
-      "horario": "LUNES A VIERNES - 8:00 A.M A 8:00 P.M",
-      "horarioDom": "DOMINGOS - 8:00 AM A 5:00 PM",
-      "latitud": "-9.11849828064508",
-      "longitud": "-78.50611072320724"
+      "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
+      "horarioDom": "DOMINGOS DE 8:00 AM A 5:00 PM",
+      "latitud": "-9.1184982806451",
+      "longitud": "-78.506110723207"
     },
     {
       "ter_id": "568",
@@ -265,10 +265,10 @@
       "direccion": "AA.HH. BELEN MZ O LT 28 - NUEVO CHIMBOTE - SANTA - ANCASH, REF. FRENTE AL GRIFO DOXA",
       "referencia": "",
       "telefono": "(01) 500 7878",
-      "horario": "LUNES A VIERNES - 8:00 A.M A 8:00 P.M",
-      "horarioDom": "DOMINGOS - 8:00 AM A 5:00 PM",
-      "latitud": "-9.132971824536801",
-      "longitud": "-78.5090826138449"
+      "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
+      "horarioDom": "DOMINGOS DE 8:00 AM A 5:00 PM",
+      "latitud": "-9.1329718245368",
+      "longitud": "-78.509082613845"
     },
     {
       "ter_id": "363",
@@ -279,10 +279,10 @@
       "direccion": "JR. INDUSTRIAL, LTE. 14 - YUNGAY, REF. AL COSTADO DEL TERMINAL TERRESTRE Y LA TAPICERIA FREDY",
       "referencia": "",
       "telefono": "(01) 500 7878",
-      "horario": "LUNES A VIERNES - 8AM A 8PM",
-      "horarioDom": "DOMINGOS - 8:00 AM A 5:00 PM",
-      "latitud": "-9.139738290927944",
-      "longitud": "-77.74721144557195"
+      "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
+      "horarioDom": "DOMINGOS DE 8:00 AM A 5:00 PM",
+      "latitud": "-9.1397382909279",
+      "longitud": "-77.747211445572"
     },
     {
       "ter_id": "15",
@@ -293,10 +293,10 @@
       "direccion": "AV. PANAMERICANA S/N - ABANCAY - APURÍMAC, REF. A 100 METROS DE LA COMISARÍA DE BELLAVISTA, AL COSTADO DE MADERERA VEGA",
       "referencia": "",
       "telefono": "(01) 500 7878",
-      "horario": "LUNES A VIERNES - 8AM A 8PM",
-      "horarioDom": "DOMINGOS - 8:00 AM A 5:00 PM",
-      "latitud": "-13.638156277624846",
-      "longitud": "-72.89899346011285"
+      "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
+      "horarioDom": "DOMINGOS DE 8:00 AM A 5:00 PM",
+      "latitud": "-13.638156277625",
+      "longitud": "-72.898993460113"
     },
     {
       "ter_id": "9",
@@ -307,24 +307,10 @@
       "direccion": "AV. MALINAS 1355 POCHCCOTA, ANDAHUAYLAS - ANDAHUAYLAS -  APURÍMAC, REF. AL COSTADO DE LA EX CANCHA EL CENTENARIO O ALTURA DE LA UNIVERSIDAD UNSAAC",
       "referencia": "",
       "telefono": "01 5007878",
-      "horario": "LUNES A VIERNES - 8AM A 8PM",
-      "horarioDom": "DOMINGOS - 8:00 AM A 5:00 PM",
-      "latitud": "-13.660854303165582",
-      "longitud": "-73.37542902331363"
-    },
-    {
-      "ter_id": "681",
-      "nombre": "APURIMAC / ANDAHUAYLAS / ANDAHUAYLAS / ALMACÉN ANDAHUAYLAS",
-      "departamento": "APURIMAC",
-      "provincia": "ANDAHUAYLAS",
-      "distrito": "ANDAHUAYLAS",
-      "direccion": "JR. PICAFLOR 139 , ANDAHUAYLAS - ANDAHAYLAS - APURIMAC",
-      "referencia": "",
-      "telefono": "",
-      "horario": "",
-      "horarioDom": "",
-      "latitud": "-13.659454540618006",
-      "longitud": "-73.38368065841449"
+      "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
+      "horarioDom": "DOMINGOS DE 8:00 AM A 5:00 PM",
+      "latitud": "-13.660854303166",
+      "longitud": "-73.375429023314"
     },
     {
       "ter_id": "675",
@@ -342,17 +328,17 @@
     },
     {
       "ter_id": "7",
-      "nombre": "AREQUIPA / AREQUIPA / AREQUIPA / AV PARRA 379 CO",
+      "nombre": "AREQUIPA / AREQUIPA / AREQUIPA / AV PARRA 379",
       "departamento": "AREQUIPA",
       "provincia": "AREQUIPA",
       "distrito": "AREQUIPA",
       "direccion": "AV. PARRA 379 - Arequipa",
       "referencia": "",
       "telefono": "01 5007878",
-      "horario": "LUNES A VIERNES - 7:00 A.M A 8:00 P.M",
-      "horarioDom": "DOMINGOS - 8:00 AM A 5:00 PM",
-      "latitud": "-16.414719927538005",
-      "longitud": "-71.5477839100329"
+      "horario": "LUNES A VIERNES - 7:00 AM A 8:00 PM",
+      "horarioDom": "DOMINGOS DE 8:00 AM A 5:00 PM",
+      "latitud": "-16.414719927538",
+      "longitud": "-71.547783910033"
     },
     {
       "ter_id": "484",
@@ -363,8 +349,8 @@
       "direccion": "Aeropuerto Internacional Alfredo Rodríguez",
       "referencia": "",
       "telefono": "",
-      "horario": "LUNES A VIERNES - 8AM A 8PM",
-      "horarioDom": "DOMINGOS - 8:00 AM A 5:00 PM",
+      "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
+      "horarioDom": "DOMINGOS DE 8:00 AM A 5:00 PM",
       "latitud": "",
       "longitud": ""
     },
@@ -378,9 +364,9 @@
       "referencia": "",
       "telefono": "(01) 500 7878",
       "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
-      "horarioDom": "DOMINGOS - 8:00 AM A 5:00 PM",
-      "latitud": "-16.410501929707017",
-      "longitud": "-71.51977712946633"
+      "horarioDom": "DOMINGOS DE 8:00 AM A 5:00 PM",
+      "latitud": "-16.410501929707",
+      "longitud": "-71.519777129466"
     },
     {
       "ter_id": "443",
@@ -458,13 +444,13 @@
       "departamento": "AREQUIPA",
       "provincia": "AREQUIPA",
       "distrito": "CERRO COLORADO",
-      "direccion": "asoc. las flores zn.2  mz.j  lt.8  - cerro colorado  -  referencia: AV 54 - A MEDIA CUADRA DE FERRETERÍA GINO",
+      "direccion": "ASOC. VIVIENDA INTERES SOCIAL ALDO MORO MZ. C LT. 21, CERRO COLORADO - AREQUIPA - AREQUIPA, REF. AL LADO DEL SISTEMA ELÉCTRICO EL PROFE",
       "referencia": "",
       "telefono": "01 5007878",
       "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
       "horarioDom": "DOMINGOS DE 8:00 AM A 5:00 PM",
-      "latitud": "-16.327233470874",
-      "longitud": "-71.569310892237"
+      "latitud": "-16.327304045386",
+      "longitud": "-71.569155459829"
     },
     {
       "ter_id": "148",
@@ -475,10 +461,10 @@
       "direccion": "URB. SAN FELIPE AV PUMACAHUA LT 14, CERRO COLORADO AREQUIPA, ref. A DOS CDRAS. ANTES DE LLEGAR AL METRO CENCOSUD / EX NOTARIA CONCHA REVILLA.",
       "referencia": "",
       "telefono": "(01) 500 - 7878",
-      "horario": "LUNES A VIERNES - 8AM A 8PM",
-      "horarioDom": "DOMINGOS - 8:00 AM A 5:00 PM",
-      "latitud": "-16.377530805257493",
-      "longitud": "-71.55688960685174"
+      "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
+      "horarioDom": "DOMINGOS DE 8:00 AM A 5:00 PM",
+      "latitud": "-16.377530805257",
+      "longitud": "-71.556889606852"
     },
     {
       "ter_id": "503",
@@ -517,10 +503,10 @@
       "direccion": "ASOC. URBANIZADORA PERUARBO SECTOR PERU ZONA I MZ. B4 LT. 4 - AUTOPISTA LA JOYA - AREQUIPA, REF. AUTOPISTA AREQUIPA - LA JOYA, A DOS CDRAS. DEL SAUNA CANDAMO",
       "referencia": "",
       "telefono": "(01) 500 7878",
-      "horario": "LUNES A VIERNES - 8:00 A.M A 8:00 P.M.",
-      "horarioDom": "DOMINGOS - 8:00 A.M. A 5:00 P.M.",
-      "latitud": "-16.346111743448198",
-      "longitud": "-71.60602780000015"
+      "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
+      "horarioDom": "DOMINGOS DE 8:00 AM A 5:00 PM",
+      "latitud": "-16.346111743448",
+      "longitud": "-71.6060278"
     },
     {
       "ter_id": "575",
@@ -573,10 +559,10 @@
       "direccion": "CALLE ANCASH N° 202 - MARIANO MELGAR, REF. A LA ALTURA DEL COLISEO DEL NIÑO",
       "referencia": "",
       "telefono": "(01) 500 7878",
-      "horario": "LUNES A VIERNES - 8AM A 8PM",
-      "horarioDom": "DOMINGOS - 8:00 AM A 5:00 PM",
-      "latitud": "-16.40347178489046",
-      "longitud": "-71.5114991875102"
+      "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
+      "horarioDom": "DOMINGOS DE 8:00 AM A 5:00 PM",
+      "latitud": "-16.40347178489",
+      "longitud": "-71.51149918751"
     },
     {
       "ter_id": "162",
@@ -621,6 +607,20 @@
       "longitud": "-71.508945070551"
     },
     {
+      "ter_id": "671",
+      "nombre": "AREQUIPA / AREQUIPA / SACHACA / VARIANTE UCHUMAYO CO",
+      "departamento": "AREQUIPA",
+      "provincia": "AREQUIPA",
+      "distrito": "SACHACA",
+      "direccion": "VARIANTE DE UCHUMAYO KM 4.5 VALLE CHILI SECTOR ALTO CURAL, PARCELA 662, SACHACA - AREQUIPA - AREQUIPA, REF. A 50 MTS. DEL ÓVALO VOLVO VARIANTE UCHUMAYO",
+      "referencia": "",
+      "telefono": "(01) 500 7878",
+      "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
+      "horarioDom": "DOMINGOS DE 8:00 AM A 5:00 PM",
+      "latitud": "-16.406333467232",
+      "longitud": "-71.592028734791"
+    },
+    {
       "ter_id": "155",
       "nombre": "AREQUIPA / AREQUIPA / SOCABAYA / AV SOCABAYA - LOS TORITOS",
       "departamento": "AREQUIPA",
@@ -643,18 +643,18 @@
       "direccion": "ASENTAMIENTO URBANO MUNICIPAL HORACIO ZEBALLOS GAMEZ SECTOR E MZ. 1 LT. 18 SOCABAYA - AREQUIPA, REF. AL COSTADO DEL COLEGIO JOULE Y/O 2 CDRAS. DEL PENAL DE SOCABAYA",
       "referencia": "",
       "telefono": "(01) 500 7878",
-      "horario": "LUNES A VIERNES - 8:00 A.M A 8:00 P.M",
-      "horarioDom": "DOMINGOS - 8:00 A.M. A 5:00 P.M.",
-      "latitud": "-16.485388899999982",
-      "longitud": "-71.50141737055226"
+      "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
+      "horarioDom": "DOMINGOS DE 8:00 AM A 5:00 PM",
+      "latitud": "-16.4853889",
+      "longitud": "-71.501417370552"
     },
     {
       "ter_id": "393",
-      "nombre": "AREQUIPA / AREQUIPA / UCHUMAYO / UCHUMAYO",
+      "nombre": "AREQUIPA / AREQUIPA / UCHUMAYO / CONGATA",
       "departamento": "AREQUIPA",
       "provincia": "AREQUIPA",
       "distrito": "UCHUMAYO",
-      "direccion": "URB. EL CARMEN M. E. LT. 1 CONGATA DEL DISTRITO UCHUMAYO - AREQUIPA, REF. A DOS CDRAS. DE LA COMISARIA CONGATA",
+      "direccion": "URB. EL CARMEN M. E. LT. 1 CONGATA DEL DISTRITO UCHUMAYO  - AREQUIPA, REF. A DOS CDRAS. DE LA COMISARIA CONGATA",
       "referencia": "",
       "telefono": "(01) 500 7878",
       "horario": "LUNES A VIERNES - 8:00 AM A 6:00 PM",
@@ -685,8 +685,8 @@
       "direccion": "CALLE AGUSTÍN GAMARRA N° 451, CERCADO CAMANÁ, REFERENCIA: AL FRENTE DEL DELIVEY CASERITOS",
       "referencia": "",
       "telefono": "(01) 500 7878",
-      "horario": "LUNES A VIERNES - 8AM A 8PM",
-      "horarioDom": "DOMINGOS - 8:00 AM A 5:00 PM",
+      "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
+      "horarioDom": "DOMINGOS DE 8:00 AM A 5:00 PM",
       "latitud": "-16.618666",
       "longitud": "-72.710622"
     },
@@ -700,9 +700,9 @@
       "referencia": "",
       "telefono": "(01) 500 7878",
       "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
-      "horarioDom": "DOMINGOS - 8:00 AM A 5:00 PM",
-      "latitud": "-15.849445506231104",
-      "longitud": "-74.2553071755598"
+      "horarioDom": "DOMINGOS DE 8:00 AM A 5:00 PM",
+      "latitud": "-15.849445506231",
+      "longitud": "-74.25530717556"
     },
     {
       "ter_id": "663",
@@ -756,9 +756,9 @@
       "referencia": "",
       "telefono": "(01) 500 7878",
       "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
-      "horarioDom": "DOMINGOS - 8:00 AM A 5:00 PM",
-      "latitud": "-17.021804037741244",
-      "longitud": "-72.01391689223719"
+      "horarioDom": "DOMINGOS DE 8:00 AM A 5:00 PM",
+      "latitud": "-17.021804037741",
+      "longitud": "-72.013916892237"
     },
     {
       "ter_id": "294",
@@ -769,8 +769,8 @@
       "direccion": "CALLE DEAN VALDIVIA 388 CERCADO, REFERENCIA: ESQUINA CON BLONDEL",
       "referencia": "",
       "telefono": "(01) 500 7878",
-      "horario": "LUNES A VIERNES - 8AM A 8PM",
-      "horarioDom": "DOMINGOS - 8:00 AM A 5:00 PM",
+      "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
+      "horarioDom": "DOMINGOS DE 8:00 AM A 5:00 PM",
       "latitud": "-17.0279153",
       "longitud": "-72.014653"
     },
@@ -798,9 +798,9 @@
       "referencia": "",
       "telefono": "(01) 500 7878",
       "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
-      "horarioDom": "DOMINGOS - 8:00 AM A 5:00 PM",
-      "latitud": "-16.99849950876988",
-      "longitud": "-72.09677705815257"
+      "horarioDom": "DOMINGOS DE 8:00 AM A 5:00 PM",
+      "latitud": "-16.99849950877",
+      "longitud": "-72.096777058153"
     },
     {
       "ter_id": "21",
@@ -815,6 +815,20 @@
       "horarioDom": "DOMINGOS DE 8:00 AM A 5:00 PM",
       "latitud": "-13.1349252",
       "longitud": "-74.2326602"
+    },
+    {
+      "ter_id": "720",
+      "nombre": "AYACUCHO / HUAMANGA / AYACUCHO / AEROPUERTO AYACUCHO",
+      "departamento": "AYACUCHO",
+      "provincia": "HUAMANGA",
+      "distrito": "AYACUCHO",
+      "direccion": "Aeropuerto Internacional Alfredo Mendívil Duarte de Ayacucho",
+      "referencia": "",
+      "telefono": "",
+      "horario": "",
+      "horarioDom": "",
+      "latitud": "",
+      "longitud": ""
     },
     {
       "ter_id": "595",
@@ -840,9 +854,9 @@
       "referencia": "",
       "telefono": "(01) 500 7878",
       "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
-      "horarioDom": "DOMINGOS - 8:00 AM A 5:00 PM",
-      "latitud": "-13.175943594200712",
-      "longitud": "-74.1993244999912"
+      "horarioDom": "DOMINGOS DE 8:00 AM A 5:00 PM",
+      "latitud": "-13.175943594201",
+      "longitud": "-74.199324499991"
     },
     {
       "ter_id": "438",
@@ -867,10 +881,10 @@
       "direccion": "JR. GERVASIO SANTILLANA N°976 - HUANTA - AYACUCHO. REF, CRUCE CON JR. REVOLUCIÓN",
       "referencia": "",
       "telefono": "01 5007878",
-      "horario": "LUNES A VIERNES - 8AM A 8PM",
-      "horarioDom": "DOMINGOS - 8:00 AM A 5:00 PM",
-      "latitud": "-12.937385673234676",
-      "longitud": "-74.25549100579818"
+      "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
+      "horarioDom": "DOMINGOS DE 8:00 AM A 5:00 PM",
+      "latitud": "-12.937385673235",
+      "longitud": "-74.255491005798"
     },
     {
       "ter_id": "12",
@@ -937,10 +951,10 @@
       "direccion": "MZ. A LOTE S/N – BARRIO HUAMBOCANCHA BAJA – CAJAMARCA, REF. A UNA CDRA. DEL PARADERO DE LA P13/AL COSTADO DEL CAMPO DEPORTIVO EL PATRIARCA",
       "referencia": "",
       "telefono": "(01) 500 7878",
-      "horario": "LUNES A VIERNES - 8:00 A.M. A 7:00 P.M",
+      "horario": "LUNES A VIERNES - 8:00 AM A 7:00 PM",
       "horarioDom": "",
-      "latitud": "-7.1184173250979565",
-      "longitud": "-78.52841806481125"
+      "latitud": "-7.118417325098",
+      "longitud": "-78.528418064811"
     },
     {
       "ter_id": "676",
@@ -993,10 +1007,10 @@
       "direccion": "JR. LARA N° 100 ,CAJABAMBA - CAJABAMBA - CAJAMARCA, REF. A UNA CDRA. DEL COMPLEJO DEPORTIVO “SANTA ANA”",
       "referencia": "",
       "telefono": "(01) 500 7878",
-      "horario": "LUNES A VIERNES - 8AM A 8PM",
-      "horarioDom": "DOMINGOS - 8:00 AM A 5:00 PM",
-      "latitud": "-7.626861725562843",
-      "longitud": "-78.04816756092518"
+      "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
+      "horarioDom": "DOMINGOS DE 8:00 AM A 5:00 PM",
+      "latitud": "-7.6268617255628",
+      "longitud": "-78.048167560925"
     },
     {
       "ter_id": "315",
@@ -1007,10 +1021,10 @@
       "direccion": "JR. PEDRO ORTIZ MONTOYA 148, REFERENCIA: ESQUINA CON AV. AMAZONAS",
       "referencia": "",
       "telefono": "(01) 500 7878",
-      "horario": "LUNES A VIERNES - 8AM A 8PM",
-      "horarioDom": "DOMINGOS - 10:00 AM A 2:00 PM",
-      "latitud": "-6.87147955435866",
-      "longitud": "-78.14372690136021"
+      "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
+      "horarioDom": "DOMINGOS DE 10:00 AM A 2:00 PM",
+      "latitud": "-6.8714795543587",
+      "longitud": "-78.14372690136"
     },
     {
       "ter_id": "50",
@@ -1063,8 +1077,8 @@
       "direccion": "av. SALOMÓN VILCHEZ murga  S/N. CDRA 9  REFERENCIA : FRENTE A LA CLÍNICA CUTERVO",
       "referencia": "",
       "telefono": "(01) 500 7878",
-      "horario": "LUNES A VIERNES - 8AM A 8PM",
-      "horarioDom": "DOMINGOS - 8:00 AM A 5:00 PM",
+      "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
+      "horarioDom": "DOMINGOS DE 8:00 AM A 5:00 PM",
       "latitud": "-6.37884",
       "longitud": "-78.812233"
     },
@@ -1084,17 +1098,17 @@
     },
     {
       "ter_id": "28",
-      "nombre": "CAJAMARCA / JAEN / JAEN / JAEN",
+      "nombre": "CAJAMARCA / JAEN / JAEN / JAEN CO",
       "departamento": "CAJAMARCA",
       "provincia": "JAEN",
       "distrito": "JAEN",
       "direccion": "AV. PAKAMMUROS CUADRA 6 S/N - referencia: ESQUINA CON CALLE LIBERTAD N° 490",
       "referencia": "",
       "telefono": "(01) 500 7878",
-      "horario": "LUNES A VIERNES - 8AM A 8PM",
-      "horarioDom": "DOMINGOS - 8:00 AM A 5:00 PM",
-      "latitud": "-5.7098471730857545",
-      "longitud": "-78.80305781962986"
+      "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
+      "horarioDom": "DOMINGOS DE 8:00 AM A 5:00 PM",
+      "latitud": "-5.7098471730858",
+      "longitud": "-78.80305781963"
     },
     {
       "ter_id": "139",
@@ -1105,10 +1119,10 @@
       "direccion": "PASAJE TRES N° 113 URB SANTA ROSA, CAJAMARCA - SAN IGNACIO, REF. FRENTE AL ESTADO MUNICIPAL",
       "referencia": "",
       "telefono": "(01) 500 7878",
-      "horario": "LUNES A VIERNES - 08:00 AM A 08:00 PM",
-      "horarioDom": "DOMINGOS - 10:00 AM A 2:00 PM",
-      "latitud": "-5.142808136460294",
-      "longitud": "-78.99832073809802"
+      "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
+      "horarioDom": "DOMINGOS DE 10:00 AM A 2:00 PM",
+      "latitud": "-5.1428081364603",
+      "longitud": "-78.998320738098"
     },
     {
       "ter_id": "371",
@@ -1119,10 +1133,10 @@
       "direccion": "JR. ADOLFO AMORIN BUENO N° 140 SAN MARCOS – CAJAMARCA, REF. AL  FRENTE DE LA PLAZA AGROPECUARIA",
       "referencia": "",
       "telefono": "(01) 500 7878",
-      "horario": "LUNES A VIERNES - 8:00 A.M. A 8:00 P.M",
-      "horarioDom": "DOMINGOS - 7:00 AM A 2:00 PM",
-      "latitud": "-7.334355550504191",
-      "longitud": "-78.17426193581196"
+      "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
+      "horarioDom": "DOMINGOS DE 7:00 AM A 2:00 PM",
+      "latitud": "-7.3343555505042",
+      "longitud": "-78.174261935812"
     },
     {
       "ter_id": "592",
@@ -1133,10 +1147,10 @@
       "direccion": "JR. BOLOGNESI N° 717 – SAN MIGUEL – CAJAMARCA - CAJAMARCA, REF. AL COSTADO DEL COLISEO Y EL PARADERO DE LLAPA Y COCHÁN.",
       "referencia": "",
       "telefono": "(01) 500 7878",
-      "horario": "LUNES A VIERNES - 8:00 A.M A 8:00 P.M",
-      "horarioDom": "DOMINGOS - 8:00 A.M. A 5:00 P.M.",
-      "latitud": "-7.000779131105248",
-      "longitud": "-78.84975134110684"
+      "horario": "LUNES A VIERNES - 8:00 AM A 7:00 PM",
+      "horarioDom": "DOMINGOS DE 8:00 AM A 5:00 PM",
+      "latitud": "-7.0007791311052",
+      "longitud": "-78.849751341107"
     },
     {
       "ter_id": "593",
@@ -1147,10 +1161,10 @@
       "direccion": "JR. TNT. LORENZO IGLESIA N° 910 - SAN PABLO – CAJAMARCA - CAJAMARCA, REF. A MEDIA CDRA. DEL HOSPITAL SAN PABLO",
       "referencia": "",
       "telefono": "(01) 500 7878",
-      "horario": "LUNES A VIERNES - 8:00 A.M A 8:00 P.M",
-      "horarioDom": "DOMINGOS - 8:00 AM A 1:00 PM",
-      "latitud": "-7.115107999999666",
-      "longitud": "-78.82337200000073"
+      "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
+      "horarioDom": "DOMINGOS DE 8:00 AM A 1:00 PM",
+      "latitud": "-7.1151079999997",
+      "longitud": "-78.823372000001"
     },
     {
       "ter_id": "72",
@@ -1259,10 +1273,10 @@
       "direccion": "AV. LA MARINA 530, URB. BENJAMIN DOIGG LOSSIO, LA PERLA, CALLAO, REF. A 3 CUADRAS DEL ÓVALO DE LA PERLA",
       "referencia": "",
       "telefono": "(01) 500 7878",
-      "horario": "LUNES A VIERNES - 08:00 AM A 8:00 PM",
-      "horarioDom": "DOMINGOS - 8:00 AM A 5:00 PM",
-      "latitud": "-12.068000755732927",
-      "longitud": "-77.11576445275213"
+      "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
+      "horarioDom": "DOMINGOS DE 8:00 AM A 5:00 PM",
+      "latitud": "-12.068000755733",
+      "longitud": "-77.115764452752"
     },
     {
       "ter_id": "104",
@@ -1319,20 +1333,6 @@
       "horarioDom": "DOMINGOS - 8:00 AM A 5:00 PM",
       "latitud": "-11.838273352411672",
       "longitud": "-77.15642144840947"
-    },
-    {
-      "ter_id": "671",
-      "nombre": "CALLAO / CALLAO / VENTANILLA / POR DEFINIR",
-      "departamento": "CALLAO",
-      "provincia": "CALLAO",
-      "distrito": "VENTANILLA",
-      "direccion": "POR DEFINIR",
-      "referencia": "",
-      "telefono": "(01) 500 7878",
-      "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
-      "horarioDom": "DOMINGOS DE 8:00 AM A 5:00 PM",
-      "latitud": "",
-      "longitud": ""
     },
     {
       "ter_id": "638",
@@ -1414,9 +1414,9 @@
       "referencia": "",
       "telefono": "(01) 500 7878",
       "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
-      "horarioDom": "DOMINGOS - 8:00 AM A 5:00 PM",
-      "latitud": "-13.539137908489373",
-      "longitud": "-71.90644367860767"
+      "horarioDom": "DOMINGOS DE 8:00 AM A 5:00 PM",
+      "latitud": "-13.539137908489",
+      "longitud": "-71.906443678608"
     },
     {
       "ter_id": "664",
@@ -1427,10 +1427,10 @@
       "direccion": "AV. EVITAMIENTO S/N UPS CHACAHUAYCO, SAN SEBASTIAN - CUSCO - CUSCO, REF. VÍA EVITAMIENTO EN EL PARADERO HORACIO",
       "referencia": "",
       "telefono": "(01) 500 7878",
-      "horario": "LUNES A VIERNES - 8:00 A.M A 8:00 P.M",
-      "horarioDom": "DOMINGOS - 8:00 A.M. A 5:00 P.M.",
-      "latitud": "-13.54227910382104",
-      "longitud": "-71.91819439999605"
+      "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
+      "horarioDom": "DOMINGOS DE 8:00 AM A 5:00 PM",
+      "latitud": "-13.542279103821",
+      "longitud": "-71.918194399996"
     },
     {
       "ter_id": "213",
@@ -1526,9 +1526,9 @@
       "referencia": "",
       "telefono": "(01) 500 7878",
       "horario": "LUNES A VIERNES - 8:00 AM A 7:00 PM",
-      "horarioDom": "DOMINGOS - 10:00 AM A 2:00 PM",
-      "latitud": "-13.469611752104674",
-      "longitud": "-72.13583397058508"
+      "horarioDom": "DOMINGOS DE 10:00 AM A 2:00 PM",
+      "latitud": "-13.469611752105",
+      "longitud": "-72.135833970585"
     },
     {
       "ter_id": "447",
@@ -1539,10 +1539,10 @@
       "direccion": "AV. VILCANOTA MZ. A LT 4 CALCA - CUSCO, REF. FRENTE AL GRIFO PETRO PERÚ O EL ÓVALO PUMA - ENTRADA DE CALCA",
       "referencia": "",
       "telefono": "(01) 500 7878",
-      "horario": "LUNES A VIERNES - 8AM A 8PM",
-      "horarioDom": "DOMINGOS - 10:00 AM A 2:00 PM",
-      "latitud": "-13.325449054919789",
-      "longitud": "-71.95339242274841"
+      "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
+      "horarioDom": "DOMINGOS DE 10:00 AM A 2:00 PM",
+      "latitud": "-13.32544905492",
+      "longitud": "-71.953392422748"
     },
     {
       "ter_id": "521",
@@ -1554,9 +1554,9 @@
       "referencia": "",
       "telefono": "(01) 500 7878",
       "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
-      "horarioDom": "DOMINGOS - 10:00 AM A 2:00 PM",
-      "latitud": "-13.42350781713356",
-      "longitud": "-71.85281378755049"
+      "horarioDom": "DOMINGOS DE 10:00 AM A 2:00 PM",
+      "latitud": "-13.423507817134",
+      "longitud": "-71.85281378755"
     },
     {
       "ter_id": "34",
@@ -1582,9 +1582,9 @@
       "referencia": "",
       "telefono": "015007878",
       "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
-      "horarioDom": "DOMINGOS - 10:00 AM A 2:00 PM",
-      "latitud": "-14.268306864712855",
-      "longitud": "-71.22783410262176"
+      "horarioDom": "DOMINGOS DE 10:00 AM A 2:00 PM",
+      "latitud": "-14.268306864713",
+      "longitud": "-71.227834102622"
     },
     {
       "ter_id": "511",
@@ -1610,9 +1610,9 @@
       "referencia": "",
       "telefono": "(01) 500 7878",
       "horario": "LUNES A VIERNES - 8:00 AM A 7:00 PM",
-      "horarioDom": "DOMINGOS - 10:00 AM A 2:00 PM",
-      "latitud": "-14.450639460425453",
-      "longitud": "-72.08486002496505"
+      "horarioDom": "",
+      "latitud": "-14.450639460425",
+      "longitud": "-72.084860024965"
     },
     {
       "ter_id": "75",
@@ -1623,10 +1623,10 @@
       "direccion": "CALLE SAN JOSE N° 703 BARRIO PROGRESO, YAURI (ESPINAR) - ESPINAR - CUSCO, REF.  A MEDIA CDRA. DEL GRIFO SAN JOSE / A MEDIA CDRA. DE LA AV. TINTAYA",
       "referencia": "",
       "telefono": "(01) 500 7878",
-      "horario": "LUNES A VIERNES - 8AM A 8PM",
-      "horarioDom": "DOMINGOS - 8:00 AM A 5:00 PM",
-      "latitud": "-14.794805680154179",
-      "longitud": "-71.40547176078962"
+      "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
+      "horarioDom": "DOMINGOS DE 8:00 AM A 5:00 PM",
+      "latitud": "-14.794805680154",
+      "longitud": "-71.40547176079"
     },
     {
       "ter_id": "238",
@@ -1638,9 +1638,23 @@
       "referencia": "",
       "telefono": "(01) 500 7878",
       "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
-      "horarioDom": "DOMINGOS - 8:00 AM A 5:00 PM",
-      "latitud": "-12.867000552802994",
-      "longitud": "-72.69136121254724"
+      "horarioDom": "DOMINGOS DE 8:00 AM A 5:00 PM",
+      "latitud": "-12.867000552803",
+      "longitud": "-72.691361212547"
+    },
+    {
+      "ter_id": "703",
+      "nombre": "CUSCO / LA CONVENCION / PICHARI / PICHARI",
+      "departamento": "CUSCO",
+      "provincia": "LA CONVENCION",
+      "distrito": "PICHARI",
+      "direccion": "ASOC. GRAL. JUAN VELASCO A. MZ. B LT. 2 , PICHARI - LA CONVENCION – CUSCO, REF. AL COSTADO DE TECHO PROPIO",
+      "referencia": "",
+      "telefono": "01 500 7878",
+      "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
+      "horarioDom": "",
+      "latitud": "-12.522202082844",
+      "longitud": "-73.823762832914"
     },
     {
       "ter_id": "520",
@@ -1652,9 +1666,9 @@
       "referencia": "",
       "telefono": "(01) 500 7878",
       "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
-      "horarioDom": "DOMINGOS - 10:00 AM A 2:00 PM",
-      "latitud": "-13.683279585147588",
-      "longitud": "-71.62347340885519"
+      "horarioDom": "DOMINGOS DE 10:00 AM A 2:00 PM",
+      "latitud": "-13.683279585148",
+      "longitud": "-71.623473408855"
     },
     {
       "ter_id": "680",
@@ -1667,8 +1681,8 @@
       "telefono": "(01) 500 7878",
       "horario": "LUNES A VIERNES - 8:00 AM A 6:00 PM",
       "horarioDom": "",
-      "latitud": "-13.62739013969223",
-      "longitud": "-71.38875065729783"
+      "latitud": "-13.627390139692",
+      "longitud": "-71.388750657298"
     },
     {
       "ter_id": "597",
@@ -1681,8 +1695,8 @@
       "telefono": "(01) 500 7878",
       "horario": "LUNES A VIERNES - 8:00 AM A 7:00 PM",
       "horarioDom": "",
-      "latitud": "-13.60005625174351",
-      "longitud": "-71.76866737056005"
+      "latitud": "-13.600056251744",
+      "longitud": "-71.76866737056"
     },
     {
       "ter_id": "235",
@@ -1693,10 +1707,10 @@
       "direccion": "LT. E-3 FRACCIÓN -1, SECTOR PATAHUASI, URUBAMBA – URUBAMBA - CUSCO, REF. A UNA CDRA. DE LA CARRETERA A OLLANTAYTAMBO / A MEDIA CDRA. DEL PARQUE TERESITA",
       "referencia": "",
       "telefono": "(01) 500 7878",
-      "horario": "LUNES A VIERNES - 8AM A 8PM",
-      "horarioDom": "DOMINGOS - 10:00 AM A 2:00 PM",
-      "latitud": "-13.300611752565251",
-      "longitud": "-72.12522152944827"
+      "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
+      "horarioDom": "DOMINGOS DE 10:00 AM A 2:00 PM",
+      "latitud": "-13.300611752565",
+      "longitud": "-72.125221529448"
     },
     {
       "ter_id": "237",
@@ -1707,10 +1721,10 @@
       "direccion": "AV. MATEO PUMACAHUA S/N, CHINCHERO - URUBAMBA - CUSCO, ref AL COSTADO DE LA CAJA CUSCO / EN LA MISMA CARRETERA A URUBAMBA",
       "referencia": "",
       "telefono": "01 5007878",
-      "horario": "LUNES A VIERNES - 08:00 AM A 6:00 PM",
+      "horario": "LUNES A VIERNES - 8:00 AM A 6:00 PM",
       "horarioDom": "",
-      "latitud": "-13.391655799999956",
-      "longitud": "-72.05083612636093"
+      "latitud": "-13.3916558",
+      "longitud": "-72.050836126361"
     },
     {
       "ter_id": "257",
@@ -1721,10 +1735,24 @@
       "direccion": "AV. UNIVERSITARIA 1003 - HUANCAVELICA, REF. A 1 CDRA. DE LA ESCUELA SANTA ANA Y A 3 CDRAS. DEL PUENTE DEL EJÉRCITO (BARRIO SANTA ANA)",
       "referencia": "",
       "telefono": "(01) 500 7878",
-      "horario": "LUNES A VIERNES - 8AM A 8PM",
-      "horarioDom": "DOMINGOS - 8:00 AM A 5:00 PM",
-      "latitud": "-12.783667969688736",
-      "longitud": "-74.96452808704055"
+      "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
+      "horarioDom": "DOMINGOS DE 8:00 AM A 5:00 PM",
+      "latitud": "-12.783667969689",
+      "longitud": "-74.964528087041"
+    },
+    {
+      "ter_id": "718",
+      "nombre": "HUANCAVELICA / HUANCAVELICA / HUANCAVELICA / HUANCAVELICA JR. OROPEZA (POR DEFINIR)",
+      "departamento": "HUANCAVELICA",
+      "provincia": "HUANCAVELICA",
+      "distrito": "HUANCAVELICA",
+      "direccion": "AV. ANDRÉS A. CÁCERES N° 198, HUANCAVELICA – HUANCAVELICA – HUANCAVELICA, REF. A MEDIA CDRA. DE LA PLAZOLETA \"TUPAC AMARU\" Y EN LA ESQUINA CON CALLE OROPEZA (BARRIO YANANACO)",
+      "referencia": "",
+      "telefono": "01 500 7878",
+      "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
+      "horarioDom": "DOMINGOS DE 8:00 AM A 5:00 PM",
+      "latitud": "-12.787446361763",
+      "longitud": "-74.978028470551"
     },
     {
       "ter_id": "27",
@@ -1735,8 +1763,8 @@
       "direccion": "Jr. Aguilar N° 872 -  Huánuco",
       "referencia": "",
       "telefono": "(01) 500 7878",
-      "horario": "LUNES A VIERNES - 8AM A 8PM",
-      "horarioDom": "DOMINGOS - 8:00 AM A 5:00 PM",
+      "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
+      "horarioDom": "DOMINGOS DE 8:00 AM A 5:00 PM",
       "latitud": "-9.933953",
       "longitud": "-76.240018"
     },
@@ -1763,10 +1791,10 @@
       "direccion": "AV. LAS AMERICAS 501, REF. AL FRENTE DEL COLEGIO JUAN JOSÉ CRESPO Y CASTILLO",
       "referencia": "",
       "telefono": "01 5007878",
-      "horario": "LUNES A VIERNES - 8AM A 8PM",
-      "horarioDom": "DOMINGOS - 10:00 AM A 2:00 PM",
-      "latitud": "-10.120588660118518",
-      "longitud": "-76.20669167638694"
+      "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
+      "horarioDom": "DOMINGOS DE 8:00 AM A 5:00 PM",
+      "latitud": "-10.120588660119",
+      "longitud": "-76.206691676387"
     },
     {
       "ter_id": "55",
@@ -1819,8 +1847,8 @@
       "direccion": "Pasaje Grau N° 101 San Joaquin - ICA  REFERENCIA : A 1 cdra de Petro Peru",
       "referencia": "",
       "telefono": "01 5007878",
-      "horario": "LUNES A VIERNES - 8AM A 8PM",
-      "horarioDom": "DOMINGOS - 8:00 AM A 5:00 PM",
+      "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
+      "horarioDom": "DOMINGOS DE 8:00 AM A 5:00 PM",
       "latitud": "-14.0643326",
       "longitud": "-75.7409599"
     },
@@ -1833,10 +1861,10 @@
       "direccion": "MANZANA B, SUB-LOTE 02 DEL FUNDO LA PALMA ICA, REF. CRUCE DE AV. CUTERVO CON AV. J.J ELIAS",
       "referencia": "",
       "telefono": "(01) 500 7878",
-      "horario": "LUNES A VIERNES - 8AM A 8PM",
-      "horarioDom": "DOMINGOS - 8:00 AM A 5:00 PM",
-      "latitud": "-14.073585700850165",
-      "longitud": "-75.73173672944775"
+      "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
+      "horarioDom": "DOMINGOS DE 8:00 AM A 5:00 PM",
+      "latitud": "-14.07358570085",
+      "longitud": "-75.731736729448"
     },
     {
       "ter_id": "417",
@@ -1847,10 +1875,10 @@
       "direccion": "AV. MANUEL SANTANA CHIRI N°359 A1 – ICA, REF. CRUCE CON CALLE BALTAZAR CARAVEDO",
       "referencia": "",
       "telefono": "(01) 500 7878",
-      "horario": "LUNES A VIERNES - 8AM A 8PM",
-      "horarioDom": "DOMINGOS - 8:00 AM A 5:00 PM",
-      "latitud": "-14.075173411544755",
-      "longitud": "-75.72322619012381"
+      "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
+      "horarioDom": "DOMINGOS DE 8:00 AM A 5:00 PM",
+      "latitud": "-14.075173411545",
+      "longitud": "-75.723226190124"
     },
     {
       "ter_id": "403",
@@ -1875,10 +1903,10 @@
       "direccion": "CP. DE PARCONA -CERCADO (PRIMERA ETAPA) MZ. B LOTE 16 PARCONA - ICA, REF. AV. 18 DE FEBRERO Y CRUCE DE AV. NATIVIDAD PACO",
       "referencia": "",
       "telefono": "(01) 500 7878",
-      "horario": "LUNES A VIERNES - 8:00 A.M A 8:00 P.M",
-      "horarioDom": "DOMINGOS - 8:00 A.M. A 5:00 P.M.",
-      "latitud": "-14.047400149199518",
-      "longitud": "-75.70839896038552"
+      "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
+      "horarioDom": "DOMINGOS DE 10:00 AM A 2:00 PM",
+      "latitud": "-14.0474001492",
+      "longitud": "-75.708398960386"
     },
     {
       "ter_id": "404",
@@ -1889,10 +1917,10 @@
       "direccion": "SUB LOTE 01 ZONA PANAMERICANA SUR KM. 293.350, SALAS GUADALUPE -  ICA - ICA, REF. FRENTE AL ESTADIO DE SALAS GUADALUPE",
       "referencia": "",
       "telefono": "(01) 500 7878",
-      "horario": "LUNES A VIERNES - 8AM A 8PM",
-      "horarioDom": "DOMINGOS - 8:00 AM A 5:00 PM",
-      "latitud": "-13.988307260088988",
-      "longitud": "-75.77183299698221"
+      "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
+      "horarioDom": "DOMINGOS DE 10:00 AM A 2:00 PM",
+      "latitud": "-13.988307260089",
+      "longitud": "-75.771832996982"
     },
     {
       "ter_id": "402",
@@ -1903,9 +1931,9 @@
       "direccion": "CENTRO POBLADO SANTIAGO MZ. E, LT. 01 SECTOR II SANTIAGO - ICA - ICA, REF. FRENTE A LA COMISARIA DE SANTIAGO",
       "referencia": "",
       "telefono": "(01) 500 7878",
-      "horario": "LUNES A VIERNES - 8:00 A.M A 8:00 P.M",
-      "horarioDom": "DOMINGOS - 8:00 AM A 5:00 PM",
-      "latitud": "-14.184709950322528",
+      "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
+      "horarioDom": "DOMINGOS DE 8:00 AM A 5:00 PM",
+      "latitud": "-14.184709950323",
       "longitud": "-75.714393999999"
     },
     {
@@ -1918,9 +1946,9 @@
       "referencia": "",
       "telefono": "(01) 500 7878",
       "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
-      "horarioDom": "DOMINGOS - 8:00 AM A 5:00 PM",
-      "latitud": "-14.03522165051946",
-      "longitud": "-75.75583767054998"
+      "horarioDom": "DOMINGOS DE 8:00 AM A 5:00 PM",
+      "latitud": "-14.035221650519",
+      "longitud": "-75.75583767055"
     },
     {
       "ter_id": "23",
@@ -1974,9 +2002,9 @@
       "referencia": "",
       "telefono": "(01) 500 7878",
       "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
-      "horarioDom": "DOMINGOS - 8:00 AM A 5:00 PM",
-      "latitud": "-13.411199184426259",
-      "longitud": "-76.16100100532903"
+      "horarioDom": "DOMINGOS DE 8:00 AM A 5:00 PM",
+      "latitud": "-13.411199184426",
+      "longitud": "-76.161001005329"
     },
     {
       "ter_id": "130",
@@ -1987,8 +2015,8 @@
       "direccion": "EN LA ESQUINA DE LA AV. CIRCUNVALACIÓN CON CALLE S/N, HOY CALLE LAS MERCEDES S/N NASCA - REFERENCIA: AL LADO DE LA IEP JEAN PIAGET",
       "referencia": "",
       "telefono": "01 5007878",
-      "horario": "LUNES A VIERNES - 8AM A 8PM",
-      "horarioDom": "DOMINGOS - 8:00 AM A 5:00 PM",
+      "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
+      "horarioDom": "DOMINGOS DE 8:00 AM A 5:00 PM",
       "latitud": "-14.8252316",
       "longitud": "-74.9463744"
     },
@@ -2001,10 +2029,10 @@
       "direccion": "AV. PRINCIPAL TULIN 204, EL INGENIO - NAZCA - ICA, REF. FREMTE  A A LA PLAZA DE TULIN",
       "referencia": "",
       "telefono": "(01) 500 7878",
-      "horario": "LUNES A VIERNES - 8:00 A.M. A 8:00 P.M",
-      "horarioDom": "DOMINGOS - 10:00 A.M. A 2:00 P.M.",
-      "latitud": "-14.647201061740144",
-      "longitud": "-75.07065165981997"
+      "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
+      "horarioDom": "DOMINGOS DE 10:00 AM A 2:00 PM",
+      "latitud": "-14.64720106174",
+      "longitud": "-75.07065165982"
     },
     {
       "ter_id": "131",
@@ -2012,13 +2040,13 @@
       "departamento": "ICA",
       "provincia": "NAZCA",
       "distrito": "MARCONA",
-      "direccion": "AA.HH. SAN MARTÍN DE PORRES E-4 SAN JUAN DE MARCONA - NAZCA - ICA, REF. CRUCE DE AV. LAS ORQUÍDEAS CON AV. SAN MARTIN DE PORRAS A DOS PUERTAS DEL HOTEL SAN MARTIN",
+      "direccion": "A. H. SAN MARTÍN DE PORRES E-28 SAN JUAN DE MARCONA - NAZCA - ICA, REF. ENTRE EL HOTEL SAN MARTIN Y EL MINIMARKET LANA",
       "referencia": "",
       "telefono": "(01) 500 7878",
       "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
-      "horarioDom": "DOMINGOS - 8:00 AM A 5:00 PM",
-      "latitud": "-15.372099353436036",
-      "longitud": "-75.15679999999986"
+      "horarioDom": "DOMINGOS DE 8:00 AM A 5:00 PM",
+      "latitud": "-15.372110896808",
+      "longitud": "-75.157416478964"
     },
     {
       "ter_id": "669",
@@ -2029,10 +2057,10 @@
       "direccion": "CARRETERA PANAMERICANA SUR N\\u00b0 906, VISTA ALEGRE - NAZCA -\\u00a0ICA, REF. FRENTE AL AEROPUERTO DE VISTA ALEGRE",
       "referencia": "",
       "telefono": "",
-      "horario": "LUNES A VIERNES - 8:00 A.M. A 8:00 P.M",
-      "horarioDom": "DOMINGOS - 8:00 A.M. A 5:00 P.M",
-      "latitud": "-14.850980032038338",
-      "longitud": "-74.95730998650656"
+      "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
+      "horarioDom": "DOMINGOS DE 8:00 AM A 5:00 PM",
+      "latitud": "-14.850980032038",
+      "longitud": "-74.957309986507"
     },
     {
       "ter_id": "56",
@@ -2043,10 +2071,10 @@
       "direccion": "AV. ABRAHAM VALDELOMAR NRO. PUERTA 965 PISCO - PISCO - ICA, REF. A UNA CDRA. POR LA POSTA SAN MARTIN",
       "referencia": "",
       "telefono": "",
-      "horario": "LUNES A VIERNES - 8AM A 8PM",
-      "horarioDom": "DOMINGOS - 8:00 AM A 5:00 PM",
-      "latitud": "-13.717889589276338",
-      "longitud": "-76.20741571922439"
+      "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
+      "horarioDom": "DOMINGOS DE 8:00 AM A 5:00 PM",
+      "latitud": "-13.717889589276",
+      "longitud": "-76.207415719224"
     },
     {
       "ter_id": "472",
@@ -2057,10 +2085,10 @@
       "direccion": "C. P. OBLACION VILLA LOS ANGELES MZ.A LT 13 B LA VILLA PISCO-PISCO-ICA, REF. A 100 METROS CON DIRECCIÓN AL SUR DEDL CRUCE PANAMERICANA ANTIGUA C/N AV. FERMÍN TANGÜIS",
       "referencia": "",
       "telefono": "(01) 500 7878",
-      "horario": "LUNES A VIERNES - 8AM A 8PM",
-      "horarioDom": "DOMINGOS - 8:00 AM A 5:00 PM",
-      "latitud": "-13.714378000000186",
-      "longitud": "-76.15378799999968"
+      "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
+      "horarioDom": "DOMINGOS DE 8:00 AM A 5:00 PM",
+      "latitud": "-13.714378",
+      "longitud": "-76.153788"
     },
     {
       "ter_id": "496",
@@ -2072,9 +2100,9 @@
       "referencia": "",
       "telefono": "(01) 500 7878",
       "horario": "LUNES A VIERNES - 8:00 AM A 7:00 PM",
-      "horarioDom": "DOMINGOS - 8:00 AM A 5:00 PM",
-      "latitud": "-13.68050236680486",
-      "longitud": "-76.15188744562124"
+      "horarioDom": "DOMINGOS DE 8:00 AM A 5:00 PM",
+      "latitud": "-13.680502366805",
+      "longitud": "-76.151887445621"
     },
     {
       "ter_id": "181",
@@ -2085,8 +2113,8 @@
       "direccion": "JR. ICA Nº 1143 - HUANCAYO, REFERENCIA: ENTRE EL JR. ICA Y EL JR. TACNA",
       "referencia": "",
       "telefono": "(01) 500 7878",
-      "horario": "LUNES A VIERNES - 8AM A 8PM",
-      "horarioDom": "DOMINGOS - 8:00 AM A 5:00 PM",
+      "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
+      "horarioDom": "DOMINGOS DE 8:00 AM A 5:00 PM",
       "latitud": "-12.0739582",
       "longitud": "-75.2141862"
     },
@@ -2113,10 +2141,10 @@
       "direccion": "AV. FERROCARRIL S/N - HUANCAYO - COUNTER N° 14, REF. TERMINAL TERRESTRE LOS ANDES, FRENTE AL OPEN PLAZA",
       "referencia": "",
       "telefono": "(01) 500 7878",
-      "horario": "LUNES A VIERNES - 8AM A 8PM",
-      "horarioDom": "DOMINGOS - 8:00 AM A 5:00 PM",
-      "latitud": "-12.061289165518884",
-      "longitud": "-75.20892492022985"
+      "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
+      "horarioDom": "DOMINGOS DE 8:00 AM A 5:00 PM",
+      "latitud": "-12.061289165519",
+      "longitud": "-75.20892492023"
     },
     {
       "ter_id": "440",
@@ -2127,10 +2155,10 @@
       "direccion": "PJ. SAN FERNANDO 209 HUANCAYO - HUANCAYO - JUNIN, REF. ESQUINA DEL JR. SAN FERNANDO Y MÁRTIRES DEL PERIODISMO",
       "referencia": "",
       "telefono": "(01) 500 7878",
-      "horario": "LUNES A VIERNES - 8AM A 8PM",
-      "horarioDom": "DOMINGOS - 8:00 AM A 5:00 PM",
-      "latitud": "-12.054983032704635",
-      "longitud": "-75.20146167055482"
+      "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
+      "horarioDom": "DOMINGOS DE 8:00 AM A 5:00 PM",
+      "latitud": "-12.054983032705",
+      "longitud": "-75.201461670555"
     },
     {
       "ter_id": "214",
@@ -2141,14 +2169,14 @@
       "direccion": "JR. 28 DE JULIO N° 935, REF. ESQUINA 28 DE JULIO Y SANTOS CHOCANO",
       "referencia": "",
       "telefono": "(01) 500 7878",
-      "horario": "LUNES A VIERNES - 8AM A 8PM",
-      "horarioDom": "DOMINGOS - 8:00 AM A 5:00 PM",
-      "latitud": "-12.084192324029463",
-      "longitud": "-75.20269199566754"
+      "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
+      "horarioDom": "DOMINGOS DE 8:00 AM A 5:00 PM",
+      "latitud": "-12.084192324029",
+      "longitud": "-75.202691995668"
     },
     {
       "ter_id": "689",
-      "nombre": "JUNIN / HUANCAYO / CHILCA / CHILCA LEONCIO PRADO CO",
+      "nombre": "JUNIN / HUANCAYO / CHILCA / CHILCA LEONCIO PRADO",
       "departamento": "JUNIN",
       "provincia": "HUANCAYO",
       "distrito": "CHILCA",
@@ -2156,9 +2184,9 @@
       "referencia": "",
       "telefono": "01 5007878",
       "horario": "LUNES A VIERNES - 8:00 AM A 8:00 AM",
-      "horarioDom": "DOMINGOS - 8:00 AM A 5:00 PM",
-      "latitud": "-12.075860337838815",
-      "longitud": "-75.19696216346182"
+      "horarioDom": "DOMINGOS DE 8:00 AM A 5:00 PM",
+      "latitud": "-12.075860337839",
+      "longitud": "-75.196962163462"
     },
     {
       "ter_id": "24",
@@ -2169,8 +2197,8 @@
       "direccion": "AV MARISCAL CASTILLA 2769  RefERENCIA : Frente al colegio Andres bello",
       "referencia": "",
       "telefono": "(01) 500 - 7878",
-      "horario": "LUNES A VIERNES - 8AM A 8PM",
-      "horarioDom": "DOMINGOS - 8:00 AM A 5:00 PM",
+      "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
+      "horarioDom": "DOMINGOS DE 8:00 AM A 5:00 PM",
       "latitud": "-12.0428748",
       "longitud": "-75.2267209"
     },
@@ -2183,10 +2211,10 @@
       "direccion": "AV. HUANCAVELICA 1201, EL TAMBO - HUANCAYO - JUNÍN, REF. ESQUINA CON EL JR. LA VICTORIA",
       "referencia": "",
       "telefono": "(01) 500 7878",
-      "horario": "LUNES A VIERNES - 8:00 A.M A 8:00 P.M",
-      "horarioDom": "DOMINGOS - 8:00AM A 5:00PM",
-      "latitud": "-12.059666604966807",
-      "longitud": "-75.22124426600406"
+      "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
+      "horarioDom": "DOMINGOS DE 8:00 AM A 5:00 PM",
+      "latitud": "-12.059666604967",
+      "longitud": "-75.221244266004"
     },
     {
       "ter_id": "590",
@@ -2198,9 +2226,9 @@
       "referencia": "",
       "telefono": "(01) 500 7878",
       "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
-      "horarioDom": "DOMINGOS - 8:00 AM A 5:00 PM",
-      "latitud": "-12.049266655778926",
-      "longitud": "-75.21046465889546"
+      "horarioDom": "DOMINGOS DE 8:00 AM A 5:00 PM",
+      "latitud": "-12.049266655779",
+      "longitud": "-75.210464658895"
     },
     {
       "ter_id": "634",
@@ -2212,9 +2240,9 @@
       "referencia": "",
       "telefono": "(01) 500 7878",
       "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
-      "horarioDom": "DOMINGOS - 8:00 AM A 5:00 PM",
-      "latitud": "-12.0305326628074",
-      "longitud": "-75.23513525146198"
+      "horarioDom": "DOMINGOS DE 8:00 AM A 5:00 PM",
+      "latitud": "-12.030532662807",
+      "longitud": "-75.235135251462"
     },
     {
       "ter_id": "585",
@@ -2226,9 +2254,9 @@
       "referencia": "",
       "telefono": "(01) 500 7878",
       "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
-      "horarioDom": "DOMINGOS - 8:00 A.M. A 5:00 P.M.",
-      "latitud": "-12.054989295683633",
-      "longitud": "-75.25416184467667"
+      "horarioDom": "DOMINGOS DE 8:00 AM A 5:00 PM",
+      "latitud": "-12.054989295684",
+      "longitud": "-75.254161844677"
     },
     {
       "ter_id": "296",
@@ -2239,10 +2267,24 @@
       "direccion": "CARRETERA CENTRAL KM 7.5 S/N SAN AGUSTIN – HUANCAYO – JUNÍN, REF. FRENTE A LA ENVASADORA SOLGAS",
       "referencia": "",
       "telefono": "(01) 500 7878",
-      "horario": "LUNES A VIERNES - 8AM A 8PM",
-      "horarioDom": "DOMINGOS - 10:00 AM A 2:00 PM",
-      "latitud": "-12.010163420624794",
-      "longitud": "-75.24669507058304"
+      "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
+      "horarioDom": "DOMINGOS DE 10:00 AM A 2:00 PM",
+      "latitud": "-12.010163420625",
+      "longitud": "-75.246695070583"
+    },
+    {
+      "ter_id": "721",
+      "nombre": "JUNIN / HUANCAYO / SAPALLANGA / SAPALLANGA HUANCAYO (POR DEFINIR)",
+      "departamento": "JUNIN",
+      "provincia": "HUANCAYO",
+      "distrito": "SAPALLANGA",
+      "direccion": "CA. CORONEL CISNEROS 598, SAPALLANGA – HUANCAYO – JUNIN, REF. ESQUINA CON AV. MARISCAL CACERES",
+      "referencia": "",
+      "telefono": "01 500 7878",
+      "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
+      "horarioDom": "DOMINGOS DE 8:00 AM A 5:00 PM",
+      "latitud": "-12.142211055552",
+      "longitud": "-75.163969411663"
     },
     {
       "ter_id": "26",
@@ -2254,9 +2296,9 @@
       "referencia": "",
       "telefono": "01 5007878",
       "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
-      "horarioDom": "DOMINGOS - 8:00 AM A 5:00 PM",
-      "latitud": "-11.918185909991992",
-      "longitud": "-75.3220572523639"
+      "horarioDom": "DOMINGOS DE 8:00 AM A 5:00 PM",
+      "latitud": "-11.918185909992",
+      "longitud": "-75.322057252364"
     },
     {
       "ter_id": "166",
@@ -2267,10 +2309,10 @@
       "direccion": "AV. PERU 931 SECTOR PAMPA DEL CARMEN, LA MERCED  -CHANCHAMAYO - JUNÍN, REF. FRENTE A LA COOPERATIVA CHANCHAMAYO",
       "referencia": "",
       "telefono": "01 5007878",
-      "horario": "LUNES A VIERNES - 8AM A 8PM",
-      "horarioDom": "DOMINGOS - 8:00 AM A 5:00 PM",
-      "latitud": "-11.070138136553895",
-      "longitud": "-75.33640673631687"
+      "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
+      "horarioDom": "DOMINGOS DE 8:00 AM A 5:00 PM",
+      "latitud": "-11.070138136554",
+      "longitud": "-75.336406736317"
     },
     {
       "ter_id": "314",
@@ -2281,10 +2323,10 @@
       "direccion": "AV. MARGINAL S/N AA.VV SAN JACINTO - PERENE - CHANCHAMAYO - JUNIN, REF. ANTES DEL ULTIMO ROMPEMUELLE DE SAN JACINTO",
       "referencia": "",
       "telefono": "(01) 500 7878",
-      "horario": "LUNES A VIERNES - 8:00 A.M. A 8:00 P.M",
-      "horarioDom": "DOMINGOS - 10:00 AM A 2:00 PM",
-      "latitud": "-10.949521894978771",
-      "longitud": "-75.22323917109577"
+      "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
+      "horarioDom": "DOMINGOS DE 10:00 AM A 2:00 PM",
+      "latitud": "-10.949521894979",
+      "longitud": "-75.223239171096"
     },
     {
       "ter_id": "167",
@@ -2295,10 +2337,10 @@
       "direccion": "AV. VENUS LT. 20 CIUDAD SATÉLITE - REF. ( A 1 CUADRA Y MEDIA DEL PARQUE DE SATÉLITE)",
       "referencia": "",
       "telefono": "015007878",
-      "horario": "LUNES A VIERNES - 8AM A 8PM",
-      "horarioDom": "DOMINGOS - 8:00 AM A 5:00 PM",
-      "latitud": "-10.919270732704568",
-      "longitud": "-74.878801000000"
+      "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
+      "horarioDom": "DOMINGOS DE 8:00 AM A 5:00 PM",
+      "latitud": "-10.919270732705",
+      "longitud": "-74.878801"
     },
     {
       "ter_id": "165",
@@ -2309,8 +2351,8 @@
       "direccion": "JR. UCAYALI 102 - SAN RAMÓN, REFERENCIA: FRENTE A LA CAJA HUANCAYO Y EL PARQUE EL AVIÓN",
       "referencia": "",
       "telefono": "(01) 500 7878",
-      "horario": "LUNES A VIERNES - 8AM A 8PM",
-      "horarioDom": "DOMINGOS - 8:00 AM A 5:00 PM",
+      "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
+      "horarioDom": "DOMINGOS DE 8:00 AM A 5:00 PM",
       "latitud": "-11.124126",
       "longitud": "-75.355581"
     },
@@ -2324,9 +2366,9 @@
       "referencia": "",
       "telefono": "(01) 500 7878",
       "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
-      "horarioDom": "DOMINGOS - 8:00 AM A 5:00 PM",
-      "latitud": "-11.78562943389464",
-      "longitud": "-75.49385623613146"
+      "horarioDom": "DOMINGOS DE 8:00 AM A 5:00 PM",
+      "latitud": "-11.785629433895",
+      "longitud": "-75.493856236131"
     },
     {
       "ter_id": "692",
@@ -2351,10 +2393,10 @@
       "direccion": "JR. FRANCISCO IRAZOLA 1077 - JUNÍN , REF. FÁBRICA LA SATIPEÑA",
       "referencia": "",
       "telefono": "01 5007878",
-      "horario": "LUNES A VIERNES - 8AM A 8PM",
-      "horarioDom": "DOMINGOS - 8:00 AM A 5:00 PM",
-      "latitud": "-11.259616493651546",
-      "longitud": "-74.6424816515803"
+      "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
+      "horarioDom": "DOMINGOS DE 8:00 AM A 5:00 PM",
+      "latitud": "-11.259616493652",
+      "longitud": "-74.64248165158"
     },
     {
       "ter_id": "455",
@@ -2365,10 +2407,10 @@
       "direccion": "JR. JORGE CHAVEZ NRO 144 LT. 8A JUNÍN - SATIPO– MAZAMARI, REF. CERCA A LA VÍA PRINCIPAL, AL COSTADO DEL HOSPEDAJE LUJÁN 1ER PISO",
       "referencia": "",
       "telefono": "(01) 500 7878",
-      "horario": "LUNES A VIERNES - 8AM A 8PM",
-      "horarioDom": "DOMINGOS - 8:00 AM A 5:00 PM",
-      "latitud": "-11.3281942325421",
-      "longitud": "-74.53286140640363"
+      "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
+      "horarioDom": "DOMINGOS DE 8:00 AM A 5:00 PM",
+      "latitud": "-11.328194232542",
+      "longitud": "-74.532861406404"
     },
     {
       "ter_id": "461",
@@ -2379,10 +2421,10 @@
       "direccion": "AV. MARGINAL S/N NÚMERO VILLA CHAVINI PANGOA - SATIPO - JUNÍN, REF. AL COSTADO DE LA TIENDA HONDA INVERSIONES ARAUCO SAN MARTÍN DE PANGOA",
       "referencia": "",
       "telefono": "(01) 500 7878",
-      "horario": "LUNES A VIERNES - 8AM A 8PM",
-      "horarioDom": "DOMINGOS - 8:00 AM A 5:00 PM",
-      "latitud": "-11.419797368222014",
-      "longitud": "-74.48978791111712"
+      "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
+      "horarioDom": "DOMINGOS DE 8:00 AM A 5:00 PM",
+      "latitud": "-11.419797368222",
+      "longitud": "-74.489787911117"
     },
     {
       "ter_id": "168",
@@ -2393,10 +2435,10 @@
       "direccion": "JR. AMAZONAS NRO. 1164 TARMA - JUNÍN, REF. ENTRE JR. AMAZONAS CON AV. VIENRICH",
       "referencia": "",
       "telefono": "(01) 500 7878",
-      "horario": "LUNES A VIERNES - 08:00 AM A 8:00 PM",
-      "horarioDom": "DOMINGOS - 8:00 AM A 5:00 PM",
-      "latitud": "-11.41777977183818",
-      "longitud": "-75.69302779999909"
+      "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
+      "horarioDom": "DOMINGOS DE 8:00 AM A 5:00 PM",
+      "latitud": "-11.417779771838",
+      "longitud": "-75.693027799999"
     },
     {
       "ter_id": "242",
@@ -2407,8 +2449,8 @@
       "direccion": "AV. ARÉVALO S/N (CARRETERA CENTRAL) - ANEXO EL TAMBO - SANTA ROSA DE SACCO",
       "referencia": "",
       "telefono": "(01) 500 7878",
-      "horario": "LUNES A VIERNES - 8AM A 8PM",
-      "horarioDom": "DOMINGOS - 10:00 AM A 2:00 PM",
+      "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
+      "horarioDom": "DOMINGOS DE 10:00 AM A 2:00 PM",
       "latitud": "-11.5707657",
       "longitud": "-75.9586329"
     },
@@ -2422,9 +2464,9 @@
       "referencia": "",
       "telefono": "(01) 500 7878",
       "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
-      "horarioDom": "DOMINGOS - 8:00 A.M. A 5:00 P.M.",
-      "latitud": "-12.061264754772418",
-      "longitud": "-75.28627290200478"
+      "horarioDom": "DOMINGOS DE 8:00 AM A 5:00 PM",
+      "latitud": "-12.061264754772",
+      "longitud": "-75.286272902005"
     },
     {
       "ter_id": "39",
@@ -2581,6 +2623,20 @@
       "longitud": "-79.004310200334"
     },
     {
+      "ter_id": "715",
+      "nombre": "LA LIBERTAD / TRUJILLO / EL PORVENIR / AV. 12 DE NOVIEMBRE (POR DEFINIR)",
+      "departamento": "LA LIBERTAD",
+      "provincia": "TRUJILLO",
+      "distrito": "EL PORVENIR",
+      "direccion": "AV. 12 DE NOVIEMBRE M. W LOTE 19 MZ. 3A, EL PORVENIR - TRUJILLO - LA LIBERTAD, REF. AL FRENTE DEL COMPLETO DEPORTIVO JOSÉ CAIPO",
+      "referencia": "",
+      "telefono": "01 500 7878",
+      "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
+      "horarioDom": "DOMINGOS DE 8:00 AM A 5:00 PM",
+      "latitud": "-8.0652017214992",
+      "longitud": "-79.022208280762"
+    },
+    {
       "ter_id": "561",
       "nombre": "LA LIBERTAD / TRUJILLO / HUANCHACO / OVALO HUANCHACO CO",
       "departamento": "LA LIBERTAD",
@@ -2670,13 +2726,13 @@
       "departamento": "LA LIBERTAD",
       "provincia": "ASCOPE",
       "distrito": "PAIJAN",
-      "direccion": "AV. PANAMERICANA NORTE N° 1320 - paijan",
+      "direccion": "AV. PANAMERICANA NRO. 2321 LA LIBERTAD - ASCOPE - PAIJAN, REF. A 1 CDRA. DEL ESTADIO MUNICIPAL DE PAIJÁN",
       "referencia": "",
       "telefono": "01 5007878",
-      "horario": "LUNES A VIERNES - 8AM A 8PM",
-      "horarioDom": "DOMINGOS - 10:00 AM A 2:00 PM",
-      "latitud": "-7.7338355",
-      "longitud": "-79.3006298"
+      "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
+      "horarioDom": "DOMINGOS DE 10:00 AM A 2:00 PM",
+      "latitud": "-7.7222500000004",
+      "longitud": "-79.308472200001"
     },
     {
       "ter_id": "632",
@@ -2701,8 +2757,8 @@
       "direccion": "PROLONGACION EZEQUIEL GONZALES CACEDA 193 - SEC. CHEPEN, FRENTE AL COLISEO",
       "referencia": "",
       "telefono": "(01) 500 7878",
-      "horario": "LUNES A VIERNES - 8AM A 8PM",
-      "horarioDom": "DOMINGOS - 8:00 AM A 5:00 PM",
+      "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
+      "horarioDom": "DOMINGOS DE 8:00 AM A 5:00 PM",
       "latitud": "-7.2211028",
       "longitud": "-79.436371"
     },
@@ -2729,8 +2785,8 @@
       "direccion": "AV. ALFREDO GUTIÉRREZ N° 120 - Otuzco - Otuzco - La Libertad.",
       "referencia": "",
       "telefono": "01 5007878",
-      "horario": "LUNES A VIERNES - 8AM A 8PM",
-      "horarioDom": "DOMINGOS - 10:00 AM A 2:00 PM",
+      "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
+      "horarioDom": "DOMINGOS DE 10:00 AM A 2:00 PM",
       "latitud": "-7.9063204",
       "longitud": "-78.5644849"
     },
@@ -2743,10 +2799,10 @@
       "direccion": "AV. VÍA DE EVITAMIENTO N° 407, SAN PEDRO DE LLOC - PACASMAYO - LA LIBERTAD, REF. A MEDIA CDRA. DE LA CALLE LIBERTAD/ A MEDIA CDRA. DEL PARADERO DE LA VIA DE EVITAMIENTO",
       "referencia": "",
       "telefono": "(01) 500 7878",
-      "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
+      "horario": "LUNES A VIERNES - 8:00 AM A 7:00 PM",
       "horarioDom": "",
-      "latitud": "-7.432359975375957",
-      "longitud": "-79.5006674257791"
+      "latitud": "-7.432359975376",
+      "longitud": "-79.500667425779"
     },
     {
       "ter_id": "424",
@@ -2757,10 +2813,10 @@
       "direccion": "MZ. A LT. 01 CPM CIUDAD DE DIOS - SEC. LOS ÁNGELES – GUADALUPE – LA LIBERTAD, REF. AL COSTADO DEL MOLINO SAMÁN Y A DOS CUADRAS DEL CRUCE A CAJAMARCA",
       "referencia": "",
       "telefono": "(01) 500 7878",
-      "horario": "LUNES A VIERNES - 8AM A 8PM",
-      "horarioDom": "DOMINGOS - 8:00 AM A 5:00 PM",
-      "latitud": "-7.307807771909066",
-      "longitud": "-79.48049869580079"
+      "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
+      "horarioDom": "DOMINGOS DE 8:00 AM A 5:00 PM",
+      "latitud": "-7.3078077719091",
+      "longitud": "-79.480498695801"
     },
     {
       "ter_id": "425",
@@ -2771,10 +2827,10 @@
       "direccion": "AV. NILLA CERRUTY N° 299 - GUADALUPE – PACASMAYO – LA LIBERTAD, ref. AL COSTADO DEL GRIFO REPSOL - NEOTECH",
       "referencia": "",
       "telefono": "(01) 500 7878",
-      "horario": "LUNES A VIERNES - 8AM A 8PM",
-      "horarioDom": "DOMINGOS - 10:00 AM A 2:00 PM",
-      "latitud": "-7.246943907157736",
-      "longitud": "-79.46819496901985"
+      "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
+      "horarioDom": "DOMINGOS DE 10:00 AM A 2:00 PM",
+      "latitud": "-7.2469439071577",
+      "longitud": "-79.46819496902"
     },
     {
       "ter_id": "94",
@@ -2785,10 +2841,10 @@
       "direccion": "CTRA. PANAMERICANA NORTE N° MZ. P LT. 4A - A.H. LAS PALMERAS, REFERENCIA: ENTRE AV. SUCRE Y AV. LEONCIO PRADO",
       "referencia": "",
       "telefono": "(01) 500 7878",
-      "horario": "LUNES A VIERNES - 8AM A 8PM",
-      "horarioDom": "DOMINGOS - 8:00 AM A 5:00 PM",
-      "latitud": "-7.3942461776643915",
-      "longitud": "-79.56425083577706"
+      "horario": "LUNES A VIERNES - 8:00 AM A 7:00 PM",
+      "horarioDom": "",
+      "latitud": "-7.3942461776644",
+      "longitud": "-79.564250835777"
     },
     {
       "ter_id": "529",
@@ -2799,10 +2855,10 @@
       "direccion": "AV. GONZALO UGAZ SALCEDO S/N - PACASMAYO - LA LIBERTAD, REF. AL COSTADO DEL ESTADIO MUNICIPAL DE PACASMAYO / A MEDIA CDRA. DEL SUPERMERCADO TOTTUS",
       "referencia": "",
       "telefono": "(01) 500 7878",
-      "horario": "LUNES A VIERNES - 8:00 A.M. A 8:00 P.M",
-      "horarioDom": "DOMINGOS - 8:00 A.M. A 5:00 P.M.",
-      "latitud": "-7.399861949013418",
-      "longitud": "-79.56658362417085"
+      "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
+      "horarioDom": "",
+      "latitud": "-7.3998619490134",
+      "longitud": "-79.566583624171"
     },
     {
       "ter_id": "118",
@@ -2813,10 +2869,10 @@
       "direccion": "JR. SIMON BOLIVAR 763, HUAMACHUCO SANCHEZ CARRION - LA LIBERTAD, REF. ENTRE JR. INDEPENDECIA Y JR. ALFONSO UGARTE",
       "referencia": "",
       "telefono": "",
-      "horario": "LUNES A VIERNES - 8AM A 8PM",
-      "horarioDom": "DOMINGOS - 8:00 AM A 5:00 PM",
-      "latitud": "-7.81237772759052",
-      "longitud": "-78.0495132185843"
+      "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
+      "horarioDom": "DOMINGOS DE 8:00 AM A 5:00 PM",
+      "latitud": "-7.8123777275905",
+      "longitud": "-78.049513218584"
     },
     {
       "ter_id": "421",
@@ -2827,10 +2883,10 @@
       "direccion": "PANAMERICANA NORTE N° 933 PUENTE VIRÚ - VIRÚ - LA LIBERTAD, REF. a MEDIA CDRA. DEL GRIFO ZONA ETNA/MEDIA CDRA. DEL SEMAFORO ZONA ETNA",
       "referencia": "",
       "telefono": "(01) 500 7878",
-      "horario": "LUNES A VIERNES - 8AM A 8PM",
-      "horarioDom": "DOMINGOS - 10:00 AM A 2:00 PM",
-      "latitud": "-8.42833528993143",
-      "longitud": "-78.77838890000288"
+      "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
+      "horarioDom": "DOMINGOS DE 10:00 AM A 2:00 PM",
+      "latitud": "-8.4283352899314",
+      "longitud": "-78.778388900003"
     },
     {
       "ter_id": "512",
@@ -2842,9 +2898,9 @@
       "referencia": "",
       "telefono": "(01) 500 7878",
       "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
-      "horarioDom": "DOMINGOS - 10:00 AM A 2:00 PM",
-      "latitud": "-8.415333885358443",
-      "longitud": "-78.75430648375976"
+      "horarioDom": "DOMINGOS DE 10:00 AM A 2:00 PM",
+      "latitud": "-8.4153338853584",
+      "longitud": "-78.75430648376"
     },
     {
       "ter_id": "112",
@@ -2855,10 +2911,10 @@
       "direccion": "AV. VICTOR RAUL HAYA DE LA TORRE 575 CHAO - VIRU, REF. A MEDIA CDRA. DE LA COMISARÍA DE CHAO",
       "referencia": "",
       "telefono": "(01) 500 7878",
-      "horario": "LUNES A VIERNES - 8AM A 8PM",
-      "horarioDom": "DOMINGOS - 8:00 AM A 5:00 PM",
-      "latitud": "-8.537973927100092",
-      "longitud": "-78.67841296014623"
+      "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
+      "horarioDom": "DOMINGOS DE 8:00 AM A 5:00 PM",
+      "latitud": "-8.5379739271001",
+      "longitud": "-78.678412960146"
     },
     {
       "ter_id": "158",
@@ -2876,17 +2932,17 @@
     },
     {
       "ter_id": "184",
-      "nombre": "LAMBAYEQUE / CHICLAYO / CHICLAYO / MARISCAL NIETO",
+      "nombre": "LAMBAYEQUE / CHICLAYO / CHICLAYO / CALLE TACNA",
       "departamento": "LAMBAYEQUE",
       "provincia": "CHICLAYO",
       "distrito": "CHICLAYO",
-      "direccion": "CALLE MARISCAL NIETO N° 390, REFERENCIA: ENTRE MARISCAL NIETO Y MIGUEL GRAU",
+      "direccion": "CALLE. TACNA N° 1095 -CHICLAYO- CHICLAYO - LAMBAYEQUE, REF. INTERSECCIÓN CON AV. JOSE QUIÑONES / A ESPALDAS DEL SUPERMERCADO MAKRO CHICLAYO",
       "referencia": "",
       "telefono": "(01) 500 7878",
       "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
       "horarioDom": "DOMINGOS DE 8:00 AM A 5:00 PM",
-      "latitud": "-6.7748775",
-      "longitud": "-79.8324065"
+      "latitud": "-6.7740292479815",
+      "longitud": "-79.833500386476"
     },
     {
       "ter_id": "486",
@@ -3038,9 +3094,9 @@
       "referencia": "",
       "telefono": "(01) 500 7878",
       "horario": "LUNES A VIERNES - 8:00 AM A 7:00 PM",
-      "horarioDom": "DOMINGOS - 10:00 AM A 2:00 PM",
-      "latitud": "-6.768084484541531",
-      "longitud": "-79.7807497467334"
+      "horarioDom": "DOMINGOS DE 10:00 AM A 2:00 PM",
+      "latitud": "-6.7680844845415",
+      "longitud": "-79.780749746733"
     },
     {
       "ter_id": "197",
@@ -3065,8 +3121,8 @@
       "direccion": "AV. ANDRÉS A. CÁCERES N°550A, REFERENCIA: AL COSTADO DEL GRIFO PRIMAX",
       "referencia": "",
       "telefono": "01 5007878",
-      "horario": "LUNES A VIERNES - 8AM A 8PM",
-      "horarioDom": "DOMINGOS - 10:00 AM A 2:00 PM",
+      "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
+      "horarioDom": "DOMINGOS DE 10:00 AM A 2:00 PM",
       "latitud": "-6.646179",
       "longitud": "-79.790525"
     },
@@ -3132,13 +3188,13 @@
       "departamento": "LAMBAYEQUE",
       "provincia": "LAMBAYEQUE",
       "distrito": "MOTUPE",
-      "direccion": "CALLE LOS PINOS N°116 - LOTIZACION LA PRIMAVERA  REFERENCIA :  A MEDIA CUADRA DE LA PANAMERICANA CARRETERA FERNANDO BELAUNDE TERRY",
+      "direccion": "AV. EL MAESTRO N° 447 - MOTUPE - LAMBAYEQUE- LAMBAYEQUE, REF. EN LA CARRETERA FERNANDO BELAUNDE TERRY (PANAMERICANA NORTE) / AL FRENTE DEL GRIFO AVA",
       "referencia": "",
       "telefono": "(01) 500 7878",
-      "horario": "LUNES A VIERNES - 8AM A 8PM",
-      "horarioDom": "DOMINGOS - 10:00 AM A 2:00 PM",
-      "latitud": "-6.150471750929664",
-      "longitud": "-79.71138857527656"
+      "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
+      "horarioDom": "DOMINGOS DE 10:00 AM A 2:00 PM",
+      "latitud": "-6.1564451082616",
+      "longitud": "-79.704861209008"
     },
     {
       "ter_id": "157",
@@ -3149,10 +3205,10 @@
       "direccion": "AV. AUGUSTO B. LEGUÍA MZ. 87 LT. 32  - OLMOS - LAMBAYEQUE, REF. AL FRENTE DE LA COMISARIA DE OLMOS.",
       "referencia": "",
       "telefono": "(01) 500 7878",
-      "horario": "LUNES A VIERNES - 8AM A 8PM",
-      "horarioDom": "DOMINGOS - 8:00 AM A 5:00 PM",
-      "latitud": "-5.987192435064271",
-      "longitud": "-79.74301712265942"
+      "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
+      "horarioDom": "DOMINGOS DE 8:00 AM A 5:00 PM",
+      "latitud": "-5.9871924350643",
+      "longitud": "-79.743017122659"
     },
     {
       "ter_id": "288",
@@ -3163,24 +3219,10 @@
       "direccion": "AV. FEDERICO VILLARREAL N° 982 (CTRA. FERNANDO BELAUNDE TERRY), REFERENCIA: A MEDIA CDRA. DEL CEMENTERIO JARDINES DE LA PAZ",
       "referencia": "",
       "telefono": "(01) 500 7878",
-      "horario": "LUNES A VIERNES - 8AM A 8PM",
-      "horarioDom": "DOMINGOS - 10:00 AM A 2:00 PM",
-      "latitud": "-6.504110001290575",
-      "longitud": "-79.85921767055260"
-    },
-    {
-      "ter_id": "209",
-      "nombre": "LIMA / LIMA / CERCADO LIMA / CAJA DISTRIBUCION LIMA",
-      "departamento": "LIMA",
-      "provincia": "LIMA",
-      "distrito": "CERCADO LIMA",
-      "direccion": "",
-      "referencia": "",
-      "telefono": "01 5007878",
-      "horario": "LUNES A VIERNES - 8AM A 8PM",
-      "horarioDom": "DOMINGOS - 8:00 AM A 5:00 PM",
-      "latitud": "",
-      "longitud": ""
+      "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
+      "horarioDom": "DOMINGOS DE 10:00 AM A 2:00 PM",
+      "latitud": "-6.5041100012906",
+      "longitud": "-79.859217670553"
     },
     {
       "ter_id": "220",
@@ -3191,8 +3233,8 @@
       "direccion": "JR. RICARDO TRENEMAN N° 920, REFERENCIA: DENTRO DEL LOCAL FARENET",
       "referencia": "",
       "telefono": "(01) 500 7878",
-      "horario": "LUNES A VIERNES - 8AM A 8PM",
-      "horarioDom": "DOMINGOS - 8:00 AM A 5:00 PM",
+      "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
+      "horarioDom": "DOMINGOS DE 8:00 AM A 5:00 PM",
       "latitud": "-12.046751",
       "longitud": "-77.054634"
     },
@@ -3202,12 +3244,12 @@
       "departamento": "LIMA",
       "provincia": "LIMA",
       "distrito": "CERCADO LIMA",
-      "direccion": "JR. PRESBÍTERO GARCÍA VILLON NRO. 560 CERCADO LIMA - LIMA, REF. A LA ALTURA DE LA CDRA. 5 DE AV. OSCAR R. BENAVIDES (EX AV. COLONIAL), EN MEDIO DE LAS AV. GUILLERMO DANSEY Y AV. OSCAR R. BENAVIDES (EX COLONIAL)",
+      "direccion": "JR. PRESBÍTERO GARCÍA VILLON NRO. 560 CERCADO LIMA - LIMA, REF. A LA ALTURA DE LA CDRA. 5 DE AV. OSCAR R. BENAVIDES (EX AV. COLONIAL), EN MEDIO DE LAS AV. GUILLERMO DANSEY Y AV. OSCAR R. BENAVIDES",
       "referencia": "",
       "telefono": "(01) 500 7878",
-      "horario": "LUNES A VIERNES - 8AM A 8PM",
-      "horarioDom": "DOMINGOS - 8:00 AM A 5:00 PM",
-      "latitud": "-12.04638719584987",
+      "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
+      "horarioDom": "DOMINGOS DE 8:00 AM A 5:00 PM",
+      "latitud": "-12.04638719585",
       "longitud": "-77.049473000003"
     },
     {
@@ -3258,13 +3300,13 @@
       "departamento": "LIMA",
       "provincia": "LIMA",
       "distrito": "ATE-VITARTE",
-      "direccion": "Carretera central km 17 MZ. E LT. 1,  Ref. Entrada de Huaycan al costado del grifo PRIMAX. ex grifo el negro.",
+      "direccion": "AV. ANDRÉS AVELINO CÁCERES MZ G LT. 14, 1ER PISO PROG DE VIV. PHILADELFIA DE ATE IV ETAPA, ATE VITARTE - LIMA - LIMA, REF. A UNA CDRA. DE LA CTRA. CENTRAL, PARADERO EL LAVADERO",
       "referencia": "",
       "telefono": "(01) 500 7878",
-      "horario": "LUNES A VIERNES - 8AM A 8PM",
-      "horarioDom": "DOMINGOS - 8:00 AM A 5:00 PM",
-      "latitud": "-11.9988136",
-      "longitud": "-76.8368031"
+      "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
+      "horarioDom": "DOMINGOS DE 8:00 AM A 5:00 PM",
+      "latitud": "-11.998277984658",
+      "longitud": "-76.834139993339"
     },
     {
       "ter_id": "109",
@@ -3275,10 +3317,10 @@
       "direccion": "AV. MARCO PUENTE LLANOS 309, MZ. A, LT. 03",
       "referencia": "",
       "telefono": "(01) 500 7878",
-      "horario": "LUNES A VIERNES - 8AM A 8PM",
-      "horarioDom": "DOMINGOS - 8:00 AM A 5:00 PM",
-      "latitud": "-12.032176320938673",
-      "longitud": "-76.92178990219485"
+      "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
+      "horarioDom": "DOMINGOS DE 8:00 AM A 5:00 PM",
+      "latitud": "-12.032176320939",
+      "longitud": "-76.921789902195"
     },
     {
       "ter_id": "202",
@@ -3345,10 +3387,10 @@
       "direccion": "AV. ESPERANZA MZ. K LT. 06 LAS AMERICAS - ATE VITARTE - LIMA, REF. PASANDO MERCADO RAUCANA",
       "referencia": "",
       "telefono": "(01) 500 7878",
-      "horario": "LUNES A VIERNES - 8AM A 8PM",
-      "horarioDom": "DOMINGOS - 8:00 AM A 5:00 PM",
-      "latitud": "-12.03197489814294",
-      "longitud": "-76.90489476767831"
+      "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
+      "horarioDom": "DOMINGOS DE 8:00 AM A 5:00 PM",
+      "latitud": "-12.031974898143",
+      "longitud": "-76.904894767678"
     },
     {
       "ter_id": "475",
@@ -3415,10 +3457,10 @@
       "direccion": "AV. VENEZUELA 1670 - BREÑA, REFERENCIA: AL COSTADO DEL POLICLÍNICO DE BREÑA",
       "referencia": "",
       "telefono": "(01) 500 7878",
-      "horario": "LUNES A VIERNES - 8AM A 8PM",
-      "horarioDom": "DOMINGOS - 8:00 AM A 5:00 PM",
-      "latitud": "-12.055384807465686",
-      "longitud": "-77.05571332375156"
+      "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
+      "horarioDom": "DOMINGOS DE 8:00 AM A 5:00 PM",
+      "latitud": "-12.055384807466",
+      "longitud": "-77.055713323752"
     },
     {
       "ter_id": "476",
@@ -3457,10 +3499,10 @@
       "direccion": "AV. TRAPICHE MZ. P LT. 48, URB. TUNGASUCA REFERENCIA: AUX. AV. CHIMPU OCLLO CON AUX. CHILLÓN TRAPICHE, A 1 CUADRA DEL MERCADO QATUNA",
       "referencia": "",
       "telefono": "01 5007878",
-      "horario": "LUNES A VIERNES - 8AM A 8PM",
-      "horarioDom": "DOMINGOS - 8:00 AM A 5:00 PM",
-      "latitud": "-11.891425542921597",
-      "longitud": "-77.04442551681062"
+      "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
+      "horarioDom": "DOMINGOS DE 8:00 AM A 5:00 PM",
+      "latitud": "-11.891425542922",
+      "longitud": "-77.044425516811"
     },
     {
       "ter_id": "300",
@@ -3555,8 +3597,8 @@
       "direccion": "AV. LOS FAISANES 420, REFERENCIA: AL COSTADO DE LA TIENDA JOHN HOLDEN",
       "referencia": "",
       "telefono": "(01) 500 7878",
-      "horario": "LUNES A VIERNES - 8AM A 8PM",
-      "horarioDom": "DOMINGOS - 8:00 AM A 5:00 PM",
+      "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
+      "horarioDom": "DOMINGOS DE 8:00 AM A 5:00 PM",
       "latitud": "-12.176072",
       "longitud": "-76.998107"
     },
@@ -3569,10 +3611,10 @@
       "direccion": "AV. 12 DE OCTUBRE MZ. A - 03, LT. 02, URB. ARIA - LAS DELICIAS DE VILLA, REF. A DOS CUADRAS DE LA AV. DEFENSORES DEL MORRO (EX AV. HUAYLAS)",
       "referencia": "",
       "telefono": "(01) 500 7878",
-      "horario": "LUNES A VIERNES - 8AM A 8PM",
-      "horarioDom": "DOMINGOS - 8:00 AM A 5:00 PM",
-      "latitud": "-12.19588881091088",
-      "longitud": "-76.99802766343377"
+      "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
+      "horarioDom": "DOMINGOS DE 8:00 AM A 5:00 PM",
+      "latitud": "-12.195888810911",
+      "longitud": "-76.998027663434"
     },
     {
       "ter_id": "450",
@@ -3654,9 +3696,9 @@
       "referencia": "",
       "telefono": "(01) 500 7878",
       "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
-      "horarioDom": "DOMINGOS - 8:00 AM A 5:00 PM",
-      "latitud": "-11.915107566733127",
-      "longitud": "-77.04066226893435"
+      "horarioDom": "DOMINGOS DE 8:00 AM A 5:00 PM",
+      "latitud": "-11.915107566733",
+      "longitud": "-77.040662268934"
     },
     {
       "ter_id": "629",
@@ -3668,9 +3710,9 @@
       "referencia": "",
       "telefono": "(01) 500 7878",
       "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
-      "horarioDom": "DOMINGOS - 8:00 AM A 5:00 PM",
-      "latitud": "-11.945312645664846",
-      "longitud": "-77.05054907824643"
+      "horarioDom": "DOMINGOS DE 8:00 AM A 5:00 PM",
+      "latitud": "-11.945312645665",
+      "longitud": "-77.050549078246"
     },
     {
       "ter_id": "652",
@@ -3849,10 +3891,10 @@
       "direccion": "CENTRO COMERCIAL REAL PLAZA SALAVERRY, AV. GRAL. SALAVERRY 2370, JESÚS MARÍA 15076, REF. FRENTE A LA ESCUELA DE POSTGRADO UTP",
       "referencia": "",
       "telefono": "(01) 500 7878",
-      "horario": "LUNES A VIERNES - 11:00 AM A 8:00 PM",
-      "horarioDom": "DOMINGOS - 11:00 AM A 8:00 PM",
-      "latitud": "-12.089813084346348",
-      "longitud": "-77.05264319872401"
+      "horario": "LUNES A VIERNES - 11:00 AM A 7:30 PM",
+      "horarioDom": "DOMINGOS DE 11:00 AM A 7:30 PM",
+      "latitud": "-12.089813084346",
+      "longitud": "-77.052643198724"
     },
     {
       "ter_id": "92",
@@ -3877,9 +3919,9 @@
       "direccion": "AV. LOS FRESNOS 1305 TIENDA 2 - URB. PORTADA DEL SOL I ETAPA - LA MOLINA - LIMA, REF. A 3 CDRAS. DEL ÓVALO DE LOS CÓNDORES",
       "referencia": "",
       "telefono": "(01) 500 7878",
-      "horario": "LUNES A VIERNES - 8AM A 8PM",
-      "horarioDom": "DOMINGOS - 8:00 AM A 5:00 PM",
-      "latitud": "-12.10408461128942",
+      "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
+      "horarioDom": "DOMINGOS DE 8:00 AM A 5:00 PM",
+      "latitud": "-12.104084611289",
       "longitud": "-76.9414167"
     },
     {
@@ -3892,9 +3934,9 @@
       "referencia": "",
       "telefono": "",
       "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
-      "horarioDom": "",
-      "latitud": "-12.085763100386473",
-      "longitud": "-76.91340944193654"
+      "horarioDom": "DOMINGOS DE 10:00 AM A 2:00 PM",
+      "latitud": "-12.085763100386",
+      "longitud": "-76.913409441937"
     },
     {
       "ter_id": "545",
@@ -4003,8 +4045,8 @@
       "direccion": "direccion",
       "referencia": "",
       "telefono": "01 5007878",
-      "horario": "LUNES A VIERNES - 8AM A 8PM",
-      "horarioDom": "DOMINGOS - 8:00 AM A 5:00 PM",
+      "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
+      "horarioDom": "DOMINGOS DE 8:00 AM A 5:00 PM",
       "latitud": "",
       "longitud": ""
     },
@@ -4023,20 +4065,6 @@
       "longitud": ""
     },
     {
-      "ter_id": "667",
-      "nombre": "LIMA / LIMA / LA VICTORIA / SERVICIO LOCAL EXPRESS",
-      "departamento": "LIMA",
-      "provincia": "LIMA",
-      "distrito": "LA VICTORIA",
-      "direccion": "",
-      "referencia": "",
-      "telefono": "",
-      "horario": "",
-      "horarioDom": "",
-      "latitud": "",
-      "longitud": ""
-    },
-    {
       "ter_id": "579",
       "nombre": "LIMA / LIMA / LINCE / JR CASANOVA CON PETIT THOUARS",
       "departamento": "LIMA",
@@ -4046,9 +4074,9 @@
       "referencia": "",
       "telefono": "(01) 500 7878",
       "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
-      "horarioDom": "DOMINGOS - 8:00 A.M. A 5:00 P.M.",
-      "latitud": "-12.089639700017475",
-      "longitud": "-77.0324062705979"
+      "horarioDom": "DOMINGOS DE 8:00 AM A 5:00 PM",
+      "latitud": "-12.089639700017",
+      "longitud": "-77.032406270598"
     },
     {
       "ter_id": "591",
@@ -4087,8 +4115,8 @@
       "direccion": "AV. LOS PRÓCERES MZ. PP2 LT.21, URB. PUERTAS DE PRO - LOS OLIVOS",
       "referencia": "",
       "telefono": "(01) 500 7878",
-      "horario": "LUNES A VIERNES - 8AM A 8PM",
-      "horarioDom": "DOMINGOS - 8:00 AM A 5:00 PM",
+      "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
+      "horarioDom": "DOMINGOS DE 8:00 AM A 5:00 PM",
       "latitud": "-11.9450493",
       "longitud": "-77.0775764"
     },
@@ -4115,10 +4143,10 @@
       "direccion": "AV. PRÓCERES, MZ. 3, LT. 23 A.H. LAURA CALLER - LOS OLIVOS, REFERENCIA: CRUCE ENTRE AV. HUANDOY Y MARAÑÓN",
       "referencia": "",
       "telefono": "(01) 500 7878",
-      "horario": "LUNES A VIERNES - 8AM A 8PM",
-      "horarioDom": "DOMINGOS - 8:00 AM A 5:00 PM",
-      "latitud": "-11.9706780",
-      "longitud": "-77.0803560"
+      "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
+      "horarioDom": "DOMINGOS DE 8:00 AM A 5:00 PM",
+      "latitud": "-11.970678",
+      "longitud": "-77.080356"
     },
     {
       "ter_id": "385",
@@ -4143,10 +4171,10 @@
       "direccion": "CALLE DAVID ALVA MANZANA H LOTE 4 URB. CAJABAMBA LOS OLIVOS - LIMA, REF. ENTRE LA AV. CARLOS IZAGUIRRE CON LA AV. UNIVERSITARIA (FRENTE AL COLEGIO PAMER)",
       "referencia": "",
       "telefono": "(01) 500 7878",
-      "horario": "LUNES A VIERNES - 8AM A 8PM",
-      "horarioDom": "DOMINGOS - 8:00 AM A 5:00 PM",
-      "latitud": "-11.991719564562725",
-      "longitud": "-77.08044440622403"
+      "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
+      "horarioDom": "DOMINGOS DE 8:00 AM A 5:00 PM",
+      "latitud": "-11.991719564563",
+      "longitud": "-77.080444406224"
     },
     {
       "ter_id": "466",
@@ -4177,6 +4205,20 @@
       "longitud": "-77.07594487055076"
     },
     {
+      "ter_id": "701",
+      "nombre": "LIMA / LIMA / LOS OLIVOS / SEGUNDA DE PRO",
+      "departamento": "LIMA",
+      "provincia": "LIMA",
+      "distrito": "LOS OLIVOS",
+      "direccion": "AV. ALFREDO MENDIOLA 8161 URB. PRO, LOS OLIVOS - LIMA - LIMA, REF. A UNA CDRA. DEL COLEGIO JOSÉ MARÍA ARGUEDAS",
+      "referencia": "",
+      "telefono": "01 500 7878",
+      "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
+      "horarioDom": "DOMINGOS DE 8:00 AM A 5:00 PM",
+      "latitud": "-11.933223203028",
+      "longitud": "-77.073028216717"
+    },
+    {
       "ter_id": "147",
       "nombre": "LIMA / LIMA / LURIGANCHO / CD. TALLERES-HUACHIPA",
       "departamento": "LIMA",
@@ -4199,10 +4241,10 @@
       "direccion": "EL SOL 124 (PARQUE ECHENIQUE) LURIGANCHO - CHOSICA",
       "referencia": "",
       "telefono": "(01) 500 7878",
-      "horario": "LUNES A VIERNES - 8AM A 8PM",
-      "horarioDom": "DOMINGOS - 8:00 AM A 5:00 PM",
-      "latitud": "-11.93352928120618",
-      "longitud": "-76.69333509527566"
+      "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
+      "horarioDom": "DOMINGOS DE 8:00 AM A 5:00 PM",
+      "latitud": "-11.933529281206",
+      "longitud": "-76.693335095276"
     },
     {
       "ter_id": "365",
@@ -4213,10 +4255,10 @@
       "direccion": "HUACHIPA ESTE - MANZANA A18 LOTE 1, 2, 3 CALLE B, CALLE 08, CALLE A, REF. AL COSTADO DE INDUSTRIAS ELÉCTRICAS KBA",
       "referencia": "",
       "telefono": "(01) 500 7878",
-      "horario": "LUNES A VIERNES - 8AM A 8PM",
-      "horarioDom": "DOMINGOS - 8:00 AM A 5:00 PM",
-      "latitud": "-11.935550288297467",
-      "longitud": "-76.86833430093904"
+      "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
+      "horarioDom": "DOMINGOS DE 8:00 AM A 5:00 PM",
+      "latitud": "-11.935550288297",
+      "longitud": "-76.868334300939"
     },
     {
       "ter_id": "469",
@@ -4245,6 +4287,20 @@
       "horarioDom": "DOMINGOS DE 8:00 AM A 5:00 PM",
       "latitud": "-11.935550288297",
       "longitud": "-76.868334300939"
+    },
+    {
+      "ter_id": "719",
+      "nombre": "LIMA / LIMA / LURIGANCHO / AV  LAS TORRES",
+      "departamento": "LIMA",
+      "provincia": "LIMA",
+      "distrito": "LURIGANCHO",
+      "direccion": "AV. LAS TORRES SUB. LT. 18A - 1D, FUNDO HUACHIPA, PARCELA MEDIA, LURIGANCHO - LIMA - LIMA, REF. AL FRENTE DEL CRUCE CON AV. MEDIA LUNA",
+      "referencia": "",
+      "telefono": "01 500 7878",
+      "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
+      "horarioDom": "DOMINGOS DE 8:00 AM A 5:00 PM",
+      "latitud": "-11.988873744074",
+      "longitud": "-76.934679070552"
     },
     {
       "ter_id": "122",
@@ -4283,10 +4339,10 @@
       "direccion": "JR. AYACUCHO N° 756, REFERENCIA: A UNA CDRA. DEL MERCADO MODELO DE MAGDALESY A 3 CDRAS. DE LA IGLESIA CÚPULA DE SUCRE",
       "referencia": "",
       "telefono": "(01) 500 7878",
-      "horario": "LUNES A VIERNES - 8AM A 8PM",
-      "horarioDom": "DOMINGOS - 8:00 AM A 5:00 PM",
-      "latitud": "-12.086209998877823",
-      "longitud": "-77.07142297178575"
+      "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
+      "horarioDom": "DOMINGOS DE 8:00 AM A 5:00 PM",
+      "latitud": "-12.086209998878",
+      "longitud": "-77.071422971786"
     },
     {
       "ter_id": "105",
@@ -4297,8 +4353,8 @@
       "direccion": "AV. LA MARINA 1640 - REFERENCIA :  A UNA CUADRA DEL CENTRO COMERCIAL PLAZA SAN MIGUEL",
       "referencia": "",
       "telefono": "(01) 500 7878",
-      "horario": "LUNES A VIERNES - 8AM A 8PM",
-      "horarioDom": "DOMINGOS - 8:00 AM A 5:00 PM",
+      "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
+      "horarioDom": "DOMINGOS DE 8:00 AM A 5:00 PM",
       "latitud": "-12.0775694",
       "longitud": "-77.0799465"
     },
@@ -4327,8 +4383,8 @@
       "telefono": "(01) 500 7878",
       "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
       "horarioDom": "",
-      "latitud": "-12.119319117644974",
-      "longitud": "-77.03435394423252"
+      "latitud": "-12.119319117645",
+      "longitud": "-77.034353944233"
     },
     {
       "ter_id": "226",
@@ -4369,8 +4425,8 @@
       "telefono": "(01) 500 7878",
       "horario": "LUNES A VIERNES - 8:00 AM A 7:00 PM",
       "horarioDom": "",
-      "latitud": "-12.126749176455435",
-      "longitud": "-77.0132233288232"
+      "latitud": "-12.126749176455",
+      "longitud": "-77.013223328823"
     },
     {
       "ter_id": "435",
@@ -4383,8 +4439,8 @@
       "telefono": "(01) 500 7878",
       "horario": "LUNES A VIERNES - 8:00 AM A 7:00 PM",
       "horarioDom": "",
-      "latitud": "-12.116361361085469",
-      "longitud": "-77.03680649389766"
+      "latitud": "-12.116361361085",
+      "longitud": "-77.036806493898"
     },
     {
       "ter_id": "661",
@@ -4443,6 +4499,20 @@
       "longitud": "-76.86432399999713"
     },
     {
+      "ter_id": "716",
+      "nombre": "LIMA / LIMA / PACHACAMAC / EL RETAMAL",
+      "departamento": "LIMA",
+      "provincia": "LIMA",
+      "distrito": "PACHACAMAC",
+      "direccion": "AV. VICTOR MALASQUEZ MZ. B LT. 16 – ASOCIACIÓN DE VIVIENDA “EL SOL DE SAN FERNANDO” ZONA 5 – QUEBRADA DE MANCHAY, PACHACÁMAC - LIMA - LIMA, REF. A 2 CDRAS. DEL CRUCE CON AV. UNIÓN",
+      "referencia": "",
+      "telefono": "01 500 7878",
+      "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
+      "horarioDom": "DOMINGOS DE 8:00 AM A 5:00 PM",
+      "latitud": "-12.147095887089",
+      "longitud": "-76.871512513949"
+    },
+    {
       "ter_id": "73",
       "nombre": "LIMA / LIMA / PUENTE PIEDRA / PUENTE ARICA",
       "departamento": "LIMA",
@@ -4451,8 +4521,8 @@
       "direccion": "PANAMERICANA NORTE  KM 32.5 , A 1/2  CUADRA DEL PUENTE ARICA  - AL COSTADO DEL GRIFO REPSOL",
       "referencia": "",
       "telefono": "(01) 500 7878",
-      "horario": "LUNES A VIERNES - 8AM A 8PM",
-      "horarioDom": "DOMINGOS - 8:00 AM A 5:00 PM",
+      "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
+      "horarioDom": "DOMINGOS DE 8:00 AM A 5:00 PM",
       "latitud": "-11.8531295",
       "longitud": "-77.088719"
     },
@@ -4677,8 +4747,8 @@
       "telefono": "(01) 500 7878",
       "horario": "LUNES A VIERNES - 8:00 AM A 7:00 PM",
       "horarioDom": "",
-      "latitud": "-12.10599889858564",
-      "longitud": "-77.04049877946747"
+      "latitud": "-12.105998898586",
+      "longitud": "-77.040498779467"
     },
     {
       "ter_id": "44",
@@ -4689,10 +4759,10 @@
       "direccion": "Av. Santa Rosa MZ. D1 lote 1 Urb. Los Alamos 2da Etapa  - referencia altura de la cuadra 13 del paradero canto grande",
       "referencia": "",
       "telefono": "(01) 500 7878",
-      "horario": "LUNES A VIERNES - 8AM A 8PM",
-      "horarioDom": "DOMINGOS - 8:00 AM A 5:00 PM",
-      "latitud": "-11.965189930600813",
-      "longitud": "-76.9976939189624"
+      "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
+      "horarioDom": "DOMINGOS DE 8:00 AM A 5:00 PM",
+      "latitud": "-11.965189930601",
+      "longitud": "-76.997693918962"
     },
     {
       "ter_id": "66",
@@ -4703,8 +4773,8 @@
       "direccion": "AV. 13 DE ENERO Nº2057, URB. SAN HILARIÓN, REFERENCIA: CERCA A LA ESTACIÓN LOS POSTES",
       "referencia": "",
       "telefono": "(01) 500 7878",
-      "horario": "LUNES A VIERNES - 8AM A 8PM",
-      "horarioDom": "DOMINGOS - 8:00 AM A 5:00 PM",
+      "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
+      "horarioDom": "DOMINGOS DE 8:00 AM A 5:00 PM",
       "latitud": "-11.997585",
       "longitud": "-77.005279"
     },
@@ -4717,10 +4787,10 @@
       "direccion": "AV. FERNANDO WIESSE MZ. Q LOTE 1 AA.HH. CRUZ DE MOTUPE",
       "referencia": "",
       "telefono": "(01) 500 7878",
-      "horario": "LUNES A VIERNES - 8AM A 8PM",
-      "horarioDom": "DOMINGOS - 8:00 AM A 5:00 PM",
-      "latitud": "-11.938267731665027",
-      "longitud": "-76.97569645009727"
+      "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
+      "horarioDom": "DOMINGOS DE 8:00 AM A 5:00 PM",
+      "latitud": "-11.938267731665",
+      "longitud": "-76.975696450097"
     },
     {
       "ter_id": "159",
@@ -4773,10 +4843,10 @@
       "direccion": "MZ. B1 LT. 25 URBANIZACIÓN LOS PINOS SAN JUAN DE LURIGANCHO, REF. AV. FERNANDO WIESSE - CERCA A LA ESTACIÓN SAN MARTÍN",
       "referencia": "",
       "telefono": "(01) 500 7878",
-      "horario": "LUNES A VIERNES - 8AM A 8PM",
-      "horarioDom": "DOMINGOS - 8:00 AM A 5:00 PM",
-      "latitud": "-11.973859486207944",
-      "longitud": "-76.99913970487502"
+      "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
+      "horarioDom": "DOMINGOS DE 8:00 AM A 5:00 PM",
+      "latitud": "-11.973859486208",
+      "longitud": "-76.999139704875"
     },
     {
       "ter_id": "439",
@@ -4899,8 +4969,8 @@
       "direccion": "AV. DE LOS HÉROES N° 228 - SAN JUAN DE MIRAFLORES - (ESTACIÓN ATOCONGO)",
       "referencia": "",
       "telefono": "(01) 500 7878",
-      "horario": "LUNES A VIERNES - 8AM A 8PM",
-      "horarioDom": "DOMINGOS - 8:00 AM A 5:00 PM",
+      "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
+      "horarioDom": "DOMINGOS DE 8:00 AM A 5:00 PM",
       "latitud": "-12.1518357",
       "longitud": "-76.9781867"
     },
@@ -4913,8 +4983,8 @@
       "direccion": "AV. LOS HÉROES 1140 - SJM, REFERENCIA: UNA CDRA. ANTES DEL HOSPITAL MARÍA AUXILIADORA",
       "referencia": "",
       "telefono": "(01) 500 7878",
-      "horario": "LUNES A VIERNES - 8AM A 8PM",
-      "horarioDom": "DOMINGOS - 8:00 AM A 5:00 PM",
+      "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
+      "horarioDom": "DOMINGOS DE 8:00 AM A 5:00 PM",
       "latitud": "-12.158926",
       "longitud": "-76.960685"
     },
@@ -4970,9 +5040,9 @@
       "referencia": "",
       "telefono": "01 500 7878",
       "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
-      "horarioDom": "DOMINGOS - 8:00 AM A 5:00 PM",
-      "latitud": "-12.187290105722823",
-      "longitud": "-76.9816565929112"
+      "horarioDom": "DOMINGOS DE 8:00 AM A 5:00 PM",
+      "latitud": "-12.187290105723",
+      "longitud": "-76.981656592911"
     },
     {
       "ter_id": "68",
@@ -5004,7 +5074,7 @@
     },
     {
       "ter_id": "107",
-      "nombre": "LIMA / LIMA / SAN MARTIN DE PORRES / AV BERTELLO SMP",
+      "nombre": "LIMA / LIMA / SAN MARTIN DE PORRES / SMP AV BERTELLO",
       "departamento": "LIMA",
       "provincia": "LIMA",
       "distrito": "SAN MARTIN DE PORRES",
@@ -5012,9 +5082,9 @@
       "referencia": "",
       "telefono": "(01) 500 7878",
       "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
-      "horarioDom": "DOMINGOS - 8:00 AM A 5:00 PM",
-      "latitud": "-11.995717209190593",
-      "longitud": "-77.11355059839134"
+      "horarioDom": "DOMINGOS DE 8:00 AM A 5:00 PM",
+      "latitud": "-11.995717209191",
+      "longitud": "-77.113550598391"
     },
     {
       "ter_id": "193",
@@ -5025,10 +5095,10 @@
       "direccion": "AV. PRÓCERES N° 588 URB. COVICEM, REF. A 2 CDRAS. DE TOMÁS VALLE",
       "referencia": "",
       "telefono": "01 5007878",
-      "horario": "LUNES A VIERNES - 8AM A 8PM",
-      "horarioDom": "DOMINGOS - 8:00 AM A 5:00 PM",
-      "latitud": "-12.014500655852052",
-      "longitud": "-77.08699865886146"
+      "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
+      "horarioDom": "DOMINGOS DE 8:00 AM A 5:00 PM",
+      "latitud": "-12.014500655852",
+      "longitud": "-77.086998658861"
     },
     {
       "ter_id": "224",
@@ -5039,8 +5109,8 @@
       "direccion": "Av. Perú 1589, San Martin de Porres -  Lima. Referencia: a dos cuadras del CruCe con la Av. Canadá.",
       "referencia": "",
       "telefono": "01 5007878",
-      "horario": "LUNES A VIERNES - 8AM A 8PM",
-      "horarioDom": "DOMINGOS - 8:00 AM A 5:00 PM",
+      "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
+      "horarioDom": "DOMINGOS DE 8:00 AM A 5:00 PM",
       "latitud": "-12.0327011",
       "longitud": "-77.0626605"
     },
@@ -5095,10 +5165,10 @@
       "direccion": "AV. GERMAN AGUIRRE UGARTE 649 URB. SAN GERMAN - SAN MARTIN DE PORRES, REF. A LA ALTURA DE LA CUADRA 6 DE LA AV. GERMAN AGUIRRE Y A 3 CUADRAS DE AV. TOMAS VALLE",
       "referencia": "",
       "telefono": "(01) 500 7878",
-      "horario": "LUNES A VIERNES - 8AM A 8PM",
-      "horarioDom": "DOMINGOS - 8:00 AM A 5:00 PM",
-      "latitud": "-12.015200628370224",
-      "longitud": "-77.07138320411397"
+      "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
+      "horarioDom": "DOMINGOS DE 8:00 AM A 5:00 PM",
+      "latitud": "-12.01520062837",
+      "longitud": "-77.071383204114"
     },
     {
       "ter_id": "431",
@@ -5123,10 +5193,10 @@
       "direccion": "AV. LOS DOMINICOS 1460 - URB. LOS CIPRESES MZ. Z LT. 4 - SAN MARTÍN DE PORRES, REF. A UNA CDRA. DEL CRUCE CON AV. SANTA ROSA AL LADO DEL MERCADO LOS CIPRESES",
       "referencia": "",
       "telefono": "(01) 500 7878",
-      "horario": "LUNES A VIERNES - 8AM A 8PM",
-      "horarioDom": "DOMINGOS - 8:00 AM A 5:00 PM",
-      "latitud": "-12.000236699984344",
-      "longitud": "-77.10181607059472"
+      "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
+      "horarioDom": "DOMINGOS DE 8:00 AM A 5:00 PM",
+      "latitud": "-12.000236699984",
+      "longitud": "-77.101816070595"
     },
     {
       "ter_id": "462",
@@ -5151,10 +5221,10 @@
       "direccion": "AV. CANTA CALLAO MZ. A LT. 3 ASOC. BRISAS SANTA ROSA 1RA ETAPA, REF. A MEDIA CDRA. DEL COLEGIO AMISTAD Y/O A CUATRO CDRAS. DE LA AV. CARLOS IZAGUIRRE",
       "referencia": "",
       "telefono": "(01) 500 7878",
-      "horario": "LUNES A VIERNES - 8AM A 8PM",
-      "horarioDom": "DOMINGOS - 8:00 AM A 5:00 PM",
-      "latitud": "-11.98568424406709",
-      "longitud": "-77.10206857055218"
+      "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
+      "horarioDom": "DOMINGOS DE 8:00 AM A 5:00 PM",
+      "latitud": "-11.985684244067",
+      "longitud": "-77.102068570552"
     },
     {
       "ter_id": "539",
@@ -5180,9 +5250,37 @@
       "referencia": "",
       "telefono": "01 500 7878",
       "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
-      "horarioDom": "DOMINGOS - 8:00 AM A 5:00 PM",
-      "latitud": "-11.959972288592665",
-      "longitud": "-77.09125227051248"
+      "horarioDom": "DOMINGOS DE 8:00 AM A 5:00 PM",
+      "latitud": "-11.959972288593",
+      "longitud": "-77.091252270512"
+    },
+    {
+      "ter_id": "706",
+      "nombre": "LIMA / LIMA / SAN MARTIN DE PORRES / AV UNIVERSITARIA CON IZAGUIRRE",
+      "departamento": "LIMA",
+      "provincia": "LIMA",
+      "distrito": "SAN MARTIN DE PORRES",
+      "direccion": "AV. UNIVERSITARIA MZ. D LT. 01 ASOCIACIÓN DE VIVIENDA SAN JUAN DE DIOS, SAN MARTÍN DE PORRES - LIMA - LIMA, REF. A 1 CDRA. DEL CRUCE CON AV. CARLOS IZAGUIRRE",
+      "referencia": "",
+      "telefono": "01 500 7878",
+      "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
+      "horarioDom": "DOMINGOS DE 8:00 AM A 5:00 PM",
+      "latitud": "-11.993691495867",
+      "longitud": "-77.08386534618"
+    },
+    {
+      "ter_id": "708",
+      "nombre": "LIMA / LIMA / SAN MARTIN DE PORRES / SMP AV PACASMAYO",
+      "departamento": "LIMA",
+      "provincia": "LIMA",
+      "distrito": "SAN MARTIN DE PORRES",
+      "direccion": "AV. PACASMAYO MZ. A LT. 03 – URB. SANTA FE DE NARANJAL, SAN MARTÍN DE PORRES - LIMA - LIMA, REF. A 3 CDRAS. DEL CRUCE CON AV. EL SOL DE NARANJAL",
+      "referencia": "",
+      "telefono": "01 500 7878",
+      "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
+      "horarioDom": "DOMINGOS DE 8:00 AM A 5:00 PM",
+      "latitud": "-11.971120370669",
+      "longitud": "-77.100521064793"
     },
     {
       "ter_id": "454",
@@ -5195,8 +5293,8 @@
       "telefono": "",
       "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
       "horarioDom": "DOMINGOS DE 8:00 AM A 5:00 PM",
-      "latitud": "-12.041444176806651",
-      "longitud": "-76.9522978000373"
+      "latitud": "-12.041444176807",
+      "longitud": "-76.952297800037"
     },
     {
       "ter_id": "495",
@@ -5228,7 +5326,7 @@
     },
     {
       "ter_id": "653",
-      "nombre": "LIMA / LIMA / SANTA ANITA / JR CESAR VALLEJO",
+      "nombre": "LIMA / LIMA / SANTA ANITA / URB UNIVERSAL",
       "departamento": "LIMA",
       "provincia": "LIMA",
       "distrito": "SANTA ANITA",
@@ -5246,7 +5344,7 @@
       "departamento": "LIMA",
       "provincia": "LIMA",
       "distrito": "SANTA ROSA",
-      "direccion": "MZ. L 23 URB. COOVITIOMAR, ANCON - SANTA ROSA - LIMA, REF. CRUCE DE INGRESO A SANTA ROSA Y/O AL COSTADO DE IMAGEN DE SANTA ROSA",
+      "direccion": "MZ. L 23 URB. COOVITIOMAR,  - SANTA ROSA - LIMA, REF. CRUCE DE INGRESO A SANTA ROSA Y/O AL COSTADO DE IMAGEN DE SANTA ROSA",
       "referencia": "",
       "telefono": "(01) 500 7878",
       "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
@@ -5279,8 +5377,8 @@
       "telefono": "01 5007878",
       "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
       "horarioDom": "",
-      "latitud": "-12.111550551080423",
-      "longitud": "-76.99288637421152"
+      "latitud": "-12.11155055108",
+      "longitud": "-76.992886374212"
     },
     {
       "ter_id": "261",
@@ -5361,8 +5459,8 @@
       "direccion": "AV REPÚBLICA DE PANAMÁ N° 5115, REFERENCIA: costado del grifo Repsol.",
       "referencia": "",
       "telefono": "(01) 500 7878",
-      "horario": "LUNES A VIERNES - 8AM A 8PM",
-      "horarioDom": "DOMINGOS - 8:00 AM A 5:00 PM",
+      "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
+      "horarioDom": "DOMINGOS DE 8:00 AM A 5:00 PM",
       "latitud": "-12.1155255",
       "longitud": "-77.01815066"
     },
@@ -5389,10 +5487,10 @@
       "direccion": "LT. 12 MZ. G, AV. PRINCIPAL 995 (EX AV. UNO) URB. LOS SAUCES 2DA ETAPA, SURQUILLO, REF. CRUCE CON A. MANUEL VILLARÁN",
       "referencia": "",
       "telefono": "(01) 500 7878",
-      "horario": "LUNES A VIERNES - 8AM A 8PM",
-      "horarioDom": "DOMINGOS - 8:00 AM A 5:00 PM",
-      "latitud": "-12.120399751437718",
-      "longitud": "-77.00350324777227"
+      "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
+      "horarioDom": "DOMINGOS DE 8:00 AM A 5:00 PM",
+      "latitud": "-12.120399751438",
+      "longitud": "-77.003503247772"
     },
     {
       "ter_id": "95",
@@ -5451,18 +5549,18 @@
       "longitud": "-76.95645150975598"
     },
     {
-      "ter_id": "673",
-      "nombre": "LIMA / LIMA / VILLA EL SALVADOR / Prueba sistemas qa",
+      "ter_id": "722",
+      "nombre": "LIMA / LIMA / VILLA EL SALVADOR / AV REVOLUCIÓN",
       "departamento": "LIMA",
       "provincia": "LIMA",
       "distrito": "VILLA EL SALVADOR",
-      "direccion": "test sistemas",
+      "direccion": "AV. REVOLUCIÓN MZ. J LT. 19, SECTOR TERCERO, GRUPO RESIDENCIAL 9, PUEBLO JOVEN VILLA EL SALVADOR, VILLA EL SALVADOR - LIMA - LIMA, REF. CERCA AL CRUCE CON AV. JOSE CARLOS MARIATEGUI",
       "referencia": "",
-      "telefono": "(01) 500 7878",
+      "telefono": "01 500 7878",
       "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
-      "horarioDom": "",
-      "latitud": "-16.414719927538",
-      "longitud": "-76.992912529448"
+      "horarioDom": "DOMINGOS DE 8:00 AM A 5:00 PM",
+      "latitud": "-12.21992881072",
+      "longitud": "-76.932644770566"
     },
     {
       "ter_id": "45",
@@ -5501,8 +5599,8 @@
       "direccion": "AV. LIMA 2208 JOSÉ GÁLVEZ- VILLA MARÍA  DEL TRIUNFO, REFERENCIA: A DOS CDRAS. DE LA CURVA JOSÉ GÁLVEZ",
       "referencia": "",
       "telefono": "(01) 500 7878",
-      "horario": "LUNES A VIERNES - 8AM A 8PM",
-      "horarioDom": "DOMINGOS - 8:00 AM A 5:00 PM",
+      "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
+      "horarioDom": "DOMINGOS DE 8:00 AM A 5:00 PM",
       "latitud": "-12.226053",
       "longitud": "-76.908879"
     },
@@ -5533,6 +5631,20 @@
       "horarioDom": "DOMINGOS - 8:00 AM A 5:00 PM",
       "latitud": "-12.167552525986567",
       "longitud": "-76.92398425823932"
+    },
+    {
+      "ter_id": "717",
+      "nombre": "LIMA / LIMA / VILLA MARIA DEL TRIUNFO / LA TABLADA ZONA NUEVA",
+      "departamento": "LIMA",
+      "provincia": "LIMA",
+      "distrito": "VILLA MARIA DEL TRIUNFO",
+      "direccion": "AV. PACHACÚTEC N° 4465, MZ. 36, LT. 18 ZONA NUEVA ESPERANZA - P.J. CÉSAR VALLEJO - VILLA MARÍA DEL TRIUNFO - LIMA - LIMA, REF. AL FRENTE DEL CRUCE CON AV. 01 DE MAYO",
+      "referencia": "",
+      "telefono": "01 500 7878",
+      "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
+      "horarioDom": "DOMINGOS DE 8:00 AM A 5:00 PM",
+      "latitud": "-12.187781031186",
+      "longitud": "-76.938656958167"
     },
     {
       "ter_id": "16",
@@ -5666,13 +5778,13 @@
       "departamento": "LIMA",
       "provincia": "HUARAL",
       "distrito": "HUARAL",
-      "direccion": "AV. JORGE CHAVEZ 647, REFERENCIA: ENTRE LA AV. GRAU Y BOLOGNESI (CERCA AL PARADERO MOTO NATURALES)",
+      "direccion": "HABILITACIÓN URBANA FUNDO ESQUIVEL P-21, MZ. C, LT. 5, 6, 8 y 9 DE LA URB. RESID. EL OLIVAR, CON INT. EN AV. CHANCAY, REF. A 1 M. DEL ESTADIO UNIÓN HUARAL, A 3 CDRAS. DE LOS 3 ARCOS INGRESO A HUARAL",
       "referencia": "",
       "telefono": "",
-      "horario": "LUNES A VIERNES - 8AM A 8PM",
-      "horarioDom": "DOMINGOS - 8:00 AM A 5:00 PM",
-      "latitud": "-11.4922796340686",
-      "longitud": "-77.2052552735911"
+      "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
+      "horarioDom": "DOMINGOS DE 8:00 AM A 5:00 PM",
+      "latitud": "-11.500890214183",
+      "longitud": "-77.221888900027"
     },
     {
       "ter_id": "161",
@@ -5764,27 +5876,27 @@
       "departamento": "LIMA",
       "provincia": "OYON",
       "distrito": "CHURIN",
-      "direccion": "AV. VÍA DE AVITAMIENTO N° N/S CHURÍN - OYÓN - LIMA, REF. A MEDIA CDRA. DE LA PLAZA DE ARMAS Y DE LA MUNICIPALIDAD",
+      "direccion": "AV. VÍA DE EVITAMIENTO N° N/S CHURÍN - OYÓN - LIMA, REF. A MEDIA CDRA. DE LA PLAZA DE ARMAS Y DE LA MUNICIPALIDAD",
       "referencia": "",
       "telefono": "(01) 500 7878",
       "horario": "LUNES A VIERNES - 8:00 AM A 7:00 PM",
       "horarioDom": "",
-      "latitud": "-10.806834617317831",
-      "longitud": "-76.87611109999513"
+      "latitud": "-10.806834617318",
+      "longitud": "-76.876111099995"
     },
     {
       "ter_id": "52",
-      "nombre": "LORETO / MAYNAS / IQUITOS / IQUITOS JR FRANCISCO BOLOGNESI",
+      "nombre": "LORETO / MAYNAS / IQUITOS / IQUITOS JR PABLO ROSSEL",
       "departamento": "LORETO",
       "provincia": "MAYNAS",
       "distrito": "IQUITOS",
-      "direccion": "Jr. Francisco Bolognesi Nro 203 - 215  IQUITOS.  REFERENCIA : esquina con Putumayo",
+      "direccion": "JR PABLO ROSSEL 590 CON NANAY, REF. FRENTE AL CETPRO AMERICAN COMPUTER",
       "referencia": "",
       "telefono": "(01) 500 7878",
       "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
       "horarioDom": "DOMINGOS DE 8:00 AM A 5:00 PM",
-      "latitud": "-3.7468824",
-      "longitud": "-73.2484034"
+      "latitud": "-3.7418759911191",
+      "longitud": "-73.243443036497"
     },
     {
       "ter_id": "364",
@@ -5792,27 +5904,27 @@
       "departamento": "LORETO",
       "provincia": "MAYNAS",
       "distrito": "IQUITOS",
-      "direccion": "",
+      "direccion": ".......",
       "referencia": "",
       "telefono": "",
-      "horario": "LUNES A VIERNES - 8AM A 8PM",
-      "horarioDom": "DOMINGOS - 8:00 AM A 5:00 PM",
+      "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
+      "horarioDom": "DOMINGOS DE 8:00 AM A 5:00 PM",
       "latitud": "",
       "longitud": ""
     },
     {
       "ter_id": "460",
-      "nombre": "LORETO / MAYNAS / IQUITOS / IQUITOS CO JR. PABLO ROSSELL",
+      "nombre": "LORETO / MAYNAS / IQUITOS / IQUITOS CO JR. BOLOGNESI",
       "departamento": "LORETO",
       "provincia": "MAYNAS",
       "distrito": "IQUITOS",
-      "direccion": "JR. PABLO ROSSELL 590 CON NANAY, REF. CRUCE CON AV. NANAY FRENTE AL INSTITUTO CEPRO AMÉRICA COMPUTER",
+      "direccion": "JR. FRANCISCO BOLOGNESI #941 CON JR. BERMÚDEZ, IQUITOS - MAYNAS - LORETO, REF. FRENTE A LA UNIVERSIDAD NACIONAL DE LA AMAZONIA PERUANA",
       "referencia": "",
       "telefono": "(01) 500 7878",
       "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
       "horarioDom": "DOMINGOS DE 8:00 AM A 5:00 PM",
-      "latitud": "-3.7421506375217",
-      "longitud": "-73.24346254642"
+      "latitud": "-3.7541661727549",
+      "longitud": "-73.252084268484"
     },
     {
       "ter_id": "493",
@@ -5907,8 +6019,8 @@
       "direccion": "CALLE JORGE CHÁVEZ N° 300, REFERENCIA: ESQUINA CON PROGRESO, AL COSTADO DE ENAPU",
       "referencia": "",
       "telefono": "(01) 500 7878",
-      "horario": "LUNES A VIERNES - 8AM A 8PM",
-      "horarioDom": "DOMINGOS - 8:00 AM A 5:00 PM",
+      "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
+      "horarioDom": "DOMINGOS DE 8:00 AM A 5:00 PM",
       "latitud": "-5.8863186",
       "longitud": "-76.1105129"
     },
@@ -5918,27 +6030,27 @@
       "departamento": "LORETO",
       "provincia": "ALTO AMAZONAS",
       "distrito": "YURIMAGUAS",
-      "direccion": "",
+      "direccion": "Shalom",
       "referencia": "",
       "telefono": "",
-      "horario": "LUNES A VIERNES - 8AM A 8PM",
-      "horarioDom": "DOMINGOS - 8:00 AM A 5:00 PM",
+      "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
+      "horarioDom": "DOMINGOS DE 8:00 AM A 5:00 PM",
       "latitud": "",
       "longitud": ""
     },
     {
       "ter_id": "280",
-      "nombre": "MADRE DE DIOS / TAMBOPATA / TAMBOPATA / TAMBOPATA AV LA JOYA CO",
+      "nombre": "MADRE DE DIOS / TAMBOPATA / TAMBOPATA / TAMBOPATA AV UCAYALI  CO",
       "departamento": "MADRE DE DIOS",
       "provincia": "TAMBOPATA",
       "distrito": "TAMBOPATA",
-      "direccion": "AV. LA JOYA N° 122 - PTO. MALDONADO, REFERENCIA: FRENTE AL ÓVALO DE LOS OTORONGOS",
+      "direccion": "AV. UCAYALI N° 473 - TAMBOPATA - TAMBOPATA - MADRE DE DIOS, REF. AL COSTADO DE MOTOS SSENDA. AL FRENTE DEL COLEGIO SANTA FE",
       "referencia": "",
       "telefono": "(01) 500 7878",
-      "horario": "LUNES A VIERNES - 8AM A 8PM",
-      "horarioDom": "DOMINGOS - 8:00 AM A 5:00 PM",
-      "latitud": "-12.599565",
-      "longitud": "-69.1949842"
+      "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
+      "horarioDom": "DOMINGOS DE 8:00 AM A 5:00 PM",
+      "latitud": "-12.602639614278",
+      "longitud": "-69.191528153031"
     },
     {
       "ter_id": "487",
@@ -5949,8 +6061,8 @@
       "direccion": "Aeropuerto Internacional Padre Aldamiz",
       "referencia": "",
       "telefono": "",
-      "horario": "LUNES A VIERNES - 8AM A 8PM",
-      "horarioDom": "DOMINGOS - 8:00 AM A 5:00 PM",
+      "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
+      "horarioDom": "DOMINGOS DE 8:00 AM A 5:00 PM",
       "latitud": "",
       "longitud": ""
     },
@@ -5991,10 +6103,10 @@
       "direccion": "AV. LOS PIONEROS, LT. 2 Y 3, INAMBARI – TAMBOPATA - MADRE DE DIOS, REF. AL COSTADO DEL TERMINAL TERRESTRE DE MAZUKO / AL PIE DE LA CARRETERA AL RIO INAMBARI",
       "referencia": "",
       "telefono": "(01) 500 7878",
-      "horario": "LUNES A VIERNES - 8:00 A.M A 8:00 P.M",
-      "horarioDom": "DOMINGOS - 8:00 AM A 5:00 PM",
-      "latitud": "-13.098946521771756",
-      "longitud": "-70.36991732806855"
+      "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
+      "horarioDom": "DOMINGOS DE 8:00 AM A 5:00 PM",
+      "latitud": "-13.098946521772",
+      "longitud": "-70.369917328069"
     },
     {
       "ter_id": "639",
@@ -6033,8 +6145,8 @@
       "direccion": "Av. Santa Fortunata Mz. N5 Lt. 10 Asoc. Villa Moquegua San Antonio. referencia : A una cuadra de la Casa de la Mujer",
       "referencia": "",
       "telefono": "01 5007878",
-      "horario": "LUNES A VIERNES - 8AM A 8PM",
-      "horarioDom": "DOMINGOS - 8:00 AM A 5:00 PM",
+      "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
+      "horarioDom": "DOMINGOS DE 8:00 AM A 5:00 PM",
       "latitud": "-17.2102839",
       "longitud": "-70.9480949"
     },
@@ -6047,10 +6159,10 @@
       "direccion": "CALLE LIMA 190 - MARISCAL NIETO - MOQUEGUA, REF. A DOS CUADRAS DEL PARQUE LOS HÉROES/ALAMEDA",
       "referencia": "",
       "telefono": "(01) 500 7878",
-      "horario": "LUNES A VIERNES - 8AM A 8PM",
-      "horarioDom": "DOMINGOS - 8:00 AM A 5:00 PM",
-      "latitud": "-17.194764722675988",
-      "longitud": "-70.9383486726684"
+      "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
+      "horarioDom": "DOMINGOS DE 8:00 AM A 5:00 PM",
+      "latitud": "-17.194764722676",
+      "longitud": "-70.938348672668"
     },
     {
       "ter_id": "551",
@@ -6061,10 +6173,10 @@
       "direccion": "SECTOR QUEBRADA LAS LECHUZAS MOQUEGUA CALLE N°1 MZ H LT. 04, MOQUEGUA - MARISCAL NIETO - MOQUEGUA, REF. QUEBRADA DE LECHUZAS",
       "referencia": "",
       "telefono": "(01) 500 7878",
-      "horario": "LUNES A VIERNES - 8:00 A.M A 8:00 P.M",
-      "horarioDom": "DOMINGOS - 8:00AM A 5:00PM",
-      "latitud": "-17.196494104692476",
-      "longitud": "-70.94804437674955"
+      "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
+      "horarioDom": "DOMINGOS DE 8:00 AM A 5:00 PM",
+      "latitud": "-17.196494104692",
+      "longitud": "-70.94804437675"
     },
     {
       "ter_id": "642",
@@ -6076,9 +6188,9 @@
       "referencia": "",
       "telefono": "(01) 500 7878",
       "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
-      "horarioDom": "DOMINGOS - 8:00 A.M. A 5:00 P.M.",
-      "latitud": "-17.19916777059667",
-      "longitud": "-70.92247339798664"
+      "horarioDom": "DOMINGOS DE 8:00 AM A 5:00 PM",
+      "latitud": "-17.199167770597",
+      "longitud": "-70.922473397987"
     },
     {
       "ter_id": "20",
@@ -6089,10 +6201,10 @@
       "direccion": "URB. CIUDAD DEL PESCADOR, MZ. J LT. 18-19, REFERENCIA: A DOS CUADRAS DEL PODER JUDICIAL",
       "referencia": "",
       "telefono": "(01) 500 7878",
-      "horario": "LUNES A VIERNES - 8AM A 8PM",
-      "horarioDom": "DOMINGOS - 8:00 AM A 5:00 PM",
-      "latitud": "-17.646726685783417",
-      "longitud": "-71.33250863766686"
+      "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
+      "horarioDom": "DOMINGOS DE 8:00 AM A 5:00 PM",
+      "latitud": "-17.646726685783",
+      "longitud": "-71.332508637667"
     },
     {
       "ter_id": "308",
@@ -6103,10 +6215,10 @@
       "direccion": "JR. CALLAO PROLONGACIÓN MZ. N, LT. 19 - A, REFERENCIA: A MEDIA CDRA. DE LA COOPERATIVA CUAJONE",
       "referencia": "",
       "telefono": "(01) 500 7878",
-      "horario": "LUNES A VIERNES - 8AM A 8PM",
-      "horarioDom": "DOMINGOS - 8:00 AM A 5:00 PM",
-      "latitud": "-17.644710705275386",
-      "longitud": "-71.34212390418006"
+      "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
+      "horarioDom": "DOMINGOS DE 8:00 AM A 5:00 PM",
+      "latitud": "-17.644710705275",
+      "longitud": "-71.34212390418"
     },
     {
       "ter_id": "515",
@@ -6117,10 +6229,10 @@
       "direccion": "AGRUPACIÓN DE FAMILIAS PUEBLO NUEVO M.Z E2 LT. COM2A SECT. II – ILO - MOQUEGUA, REF. AL COSTADO DEL BANCO BCP",
       "referencia": "",
       "telefono": "(01) 500 7878",
-      "horario": "LUNES A VIERNES - 8AM A 8PM",
-      "horarioDom": "DOMINGOS - 8:00 AM A 5:00 PM",
-      "latitud": "-17.614692860029443",
-      "longitud": "-71.33830554805624"
+      "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
+      "horarioDom": "DOMINGOS DE 8:00 AM A 5:00 PM",
+      "latitud": "-17.614692860029",
+      "longitud": "-71.338305548056"
     },
     {
       "ter_id": "11",
@@ -6131,8 +6243,8 @@
       "direccion": "JR. HUARICAPCHA S/N A.H. TUPAC AMARU CHAUPIMARCA, REFERENCIA: FRENTE AL NUEVO TERMINAL",
       "referencia": "",
       "telefono": "(01) 500 7878",
-      "horario": "LUNES A VIERNES - 8AM A 8PM",
-      "horarioDom": "DOMINGOS - 8:00 AM A 5:00 PM",
+      "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
+      "horarioDom": "DOMINGOS DE 8:00 AM A 5:00 PM",
       "latitud": "-10.686749",
       "longitud": "-76.246862"
     },
@@ -6145,8 +6257,8 @@
       "direccion": "calle Lima S/N Barrio Arenales  Huayllay  Pasco   - REFERENCIA: AL COSTADO DEL COLEGIO CESAR VALLEJO",
       "referencia": "",
       "telefono": "(01) 500 7878",
-      "horario": "LUNES A VIERNES - 8AM A 8PM",
-      "horarioDom": "DOMINGOS - 10:00 AM A 2:00 PM",
+      "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
+      "horarioDom": "DOMINGOS DE 10:00 AM A 2:00 PM",
       "latitud": "-11.0007095",
       "longitud": "-76.3672417"
     },
@@ -6173,10 +6285,10 @@
       "direccion": "AV. LEOPOLDO KRAUSSE N° 442 VILLA RICA - OXAPAMPA - PASCO, REF. ENTRE EL JR. POZUZO Y JR. COOPERATIVA, AL COSTADO DE LA NOTARÍA GUERRA Y A 20 METROS DE LA PLAZA PRINCIPAL",
       "referencia": "",
       "telefono": "(01) 500 7878",
-      "horario": "LUNES A VIERNES - 8AM A 8PM",
-      "horarioDom": "DOMINGOS - 10:00 AM A 2:00 PM",
-      "latitud": "-10.735805270592811",
-      "longitud": "-75.26836110007693"
+      "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
+      "horarioDom": "DOMINGOS DE 10:00 AM A 2:00 PM",
+      "latitud": "-10.735805270593",
+      "longitud": "-75.268361100077"
     },
     {
       "ter_id": "200",
@@ -6240,7 +6352,7 @@
       "departamento": "PIURA",
       "provincia": "PIURA",
       "distrito": "CASTILLA",
-      "direccion": "AV. TACNA 509 CASTILLA - PIURA, REFERENCIA: FRENTE A UGEL DE CASTILLA",
+      "direccion": "AV. TACNA 503 CASTILLA - PIURA, REFERENCIA: FRENTE A UGEL DE CASTILLA",
       "referencia": "",
       "telefono": "",
       "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
@@ -6310,13 +6422,13 @@
       "departamento": "PIURA",
       "provincia": "PIURA",
       "distrito": "TAMBO GRANDE",
-      "direccion": "AV. ARÁMBULO SANTÍN N° 100, MZ. D LT. E AA. HH. ANDRÉS RÁZURI REFERENCIA: A DOS CUADRAS DEL ESTADIO DEPORTIVO",
+      "direccion": "AA. HH. EL HUERTO MZ. E LT. 08 TAMBO GRANDE – PIURA - PIURA, REF. ATRÁS DEL COLEGIO INA 54 AGROPECUARIO, A LA ALTURA DEL CAMPO CAMPESTRE RIVERA DEL RÍO",
       "referencia": "",
       "telefono": "01 5007878",
       "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
       "horarioDom": "DOMINGOS DE 8:00 AM A 5:00 PM",
-      "latitud": "-4.9269396952541",
-      "longitud": "-80.343398701298"
+      "latitud": "-4.9350843412188",
+      "longitud": "-80.34533475739"
     },
     {
       "ter_id": "10",
@@ -6523,10 +6635,10 @@
       "direccion": "ASOCIACIÓN CALIFORNIA C - 03 FRENTE A CARRETERA NEGRITOS, TALARA - PARIÑAS, REFERENCIA: AL COSTADO DEL RESTAURANTE MI TORETE",
       "referencia": "",
       "telefono": "01 5007878",
-      "horario": "LUNES A VIERNES - 8AM A 8PM",
-      "horarioDom": "DOMINGOS - 8:00 AM A 5:00 PM",
-      "latitud": "-4.589515632189196",
-      "longitud": "-81.27349917492963"
+      "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
+      "horarioDom": "DOMINGOS DE 8:00 AM A 5:00 PM",
+      "latitud": "-4.5895156321892",
+      "longitud": "-81.27349917493"
     },
     {
       "ter_id": "599",
@@ -6537,10 +6649,10 @@
       "direccion": "MZ. N-10 AA.HH 9 DE OCTUBRE TALARA ALTA, PARIÑAS - TALARA - PIURA, REF. A 1 CDRA. ANTES DE AMECFA",
       "referencia": "",
       "telefono": "(01) 500 7878",
-      "horario": "LUNES A VIERNES - 8:00 A.M A 8:00 P.M",
-      "horarioDom": "DOMINGOS - 8:00 A.M. A 5:00 P.M.",
-      "latitud": "-4.591314005198959",
-      "longitud": "-81.25249567054887"
+      "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
+      "horarioDom": "DOMINGOS DE 8:00 AM A 5:00 PM",
+      "latitud": "-4.591314005199",
+      "longitud": "-81.252495670549"
     },
     {
       "ter_id": "606",
@@ -6552,9 +6664,9 @@
       "referencia": "",
       "telefono": "(01) 500 7878",
       "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
-      "horarioDom": "DOMINGOS - 8:00 AM A 5:00 PM",
-      "latitud": "-4.575510000000982",
-      "longitud": "-81.26861532943082"
+      "horarioDom": "DOMINGOS DE 8:00 AM A 5:00 PM",
+      "latitud": "-4.575510000001",
+      "longitud": "-81.268615329431"
     },
     {
       "ter_id": "133",
@@ -6579,10 +6691,10 @@
       "direccion": "Av. Panamericana Norte P-29 - URB. Cercado zona URBANA,  Referencia al frente de grifo de troncos o grifo San Pedro",
       "referencia": "",
       "telefono": "(01) 500 7878",
-      "horario": "LUNES A VIERNES - 8AM A 8PM",
-      "horarioDom": "DOMINGOS - 10:00 AM A 2:00 PM",
-      "latitud": "-4.174775309542279",
-      "longitud": "-81.12341168487191"
+      "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
+      "horarioDom": "DOMINGOS DE 10:00 AM A 2:00 PM",
+      "latitud": "-4.1747753095423",
+      "longitud": "-81.123411684872"
     },
     {
       "ter_id": "152",
@@ -6593,10 +6705,10 @@
       "direccion": "AV. GRAU NRO. 432 MÁNCORA - TALARA - PIURA, REF. FRENTE AL PARADERO DE AUTOS DE LOS ÓRGANOS EN TODA LA PANAMERICANA NORTE.",
       "referencia": "",
       "telefono": "(01) 500 7878",
-      "horario": "LUNES A VIERNES - 8AM A 8PM",
-      "horarioDom": "DOMINGOS - 8:00 AM A 5:00 PM",
-      "latitud": "-4.106719854952655",
-      "longitud": "-81.0488326331666"
+      "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
+      "horarioDom": "DOMINGOS DE 8:00 AM A 5:00 PM",
+      "latitud": "-4.1067198549527",
+      "longitud": "-81.048832633167"
     },
     {
       "ter_id": "99",
@@ -6604,13 +6716,13 @@
       "departamento": "PIURA",
       "provincia": "SECHURA",
       "distrito": "SECHURA",
-      "direccion": "AV. BAYOVAR N° 311  REFERENCIA : AL COSTADO DE ANTENA 10 RADIO",
+      "direccion": "MZ. B LT. 23 A. H. LOS JARDINES SUR ESTE, SECHURA - SECHURA - PIURA, REF. AL COSTADO DE LA EMPRESA FUNDICION CORONADO SRL",
       "referencia": "",
       "telefono": "(01) 500 7878",
       "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
       "horarioDom": "DOMINGOS DE 8:00 AM A 5:00 PM",
-      "latitud": "-5.5556999",
-      "longitud": "-80.81829"
+      "latitud": "-5.5669187021603",
+      "longitud": "-80.81336177055"
     },
     {
       "ter_id": "33",
@@ -6621,10 +6733,10 @@
       "direccion": "AV. COSTANERA N° 211 CON JR. LOS INCAS - PUNO",
       "referencia": "",
       "telefono": "(01) 500 7878",
-      "horario": "LUNES A VIERNES - 8AM A 8PM",
-      "horarioDom": "DOMINGOS - 8:00 AM A 5:00 PM",
-      "latitud": "-15.834283484814137",
-      "longitud": "-70.01839696894581"
+      "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
+      "horarioDom": "DOMINGOS DE 8:00 AM A 5:00 PM",
+      "latitud": "-15.834283484814",
+      "longitud": "-70.018396968946"
     },
     {
       "ter_id": "547",
@@ -6635,10 +6747,10 @@
       "direccion": "URB. AZIRUNI TEPRO I ETAPA MZ. 18 LT. 52 JR LOS ROSALES – SALCEDO PUNO, REF. A UNA CDRA. DE LA AV. ESTUDIANTE / A DOS CDRAS. DE SENATI PUNO",
       "referencia": "",
       "telefono": "(01) 500 7878",
-      "horario": "LUNES A VIERNES - 8:00 A.M A 8:00 P.M",
-      "horarioDom": "DOMINGOS - 8:00AM A 5:00PM",
-      "latitud": "-15.871121071440841",
-      "longitud": "-69.99658993067256"
+      "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
+      "horarioDom": "DOMINGOS DE 8:00 AM A 5:00 PM",
+      "latitud": "-15.871121071441",
+      "longitud": "-69.996589930673"
     },
     {
       "ter_id": "598",
@@ -6650,9 +6762,9 @@
       "referencia": "",
       "telefono": "(01) 500 7878",
       "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
-      "horarioDom": "DOMINGOS - 8:00 A.M. A 5:00 P.M.",
-      "latitud": "-15.817227035488742",
-      "longitud": "-70.03092219999974"
+      "horarioDom": "DOMINGOS DE 8:00 AM A 5:00 PM",
+      "latitud": "-15.817227035489",
+      "longitud": "-70.0309222"
     },
     {
       "ter_id": "679",
@@ -6664,9 +6776,9 @@
       "referencia": "",
       "telefono": "(01) 500 7878",
       "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
-      "horarioDom": "DOMINGOS - 8:00 AM A 3:00 PM",
-      "latitud": "-15.855167345042021",
-      "longitud": "-70.01577847055121"
+      "horarioDom": "DOMINGOS DE 8:00 AM A 3:00 PM",
+      "latitud": "-15.855167345042",
+      "longitud": "-70.015778470551"
     },
     {
       "ter_id": "506",
@@ -6678,9 +6790,9 @@
       "referencia": "",
       "telefono": "(01) 500 7878",
       "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
-      "horarioDom": "DOMINGOS - 10:00 AM A 2:00 PM",
-      "latitud": "-14.91711240867566",
-      "longitud": "-70.19847195677302"
+      "horarioDom": "DOMINGOS DE 10:00 AM A 2:00 PM",
+      "latitud": "-14.917112408676",
+      "longitud": "-70.198471956773"
     },
     {
       "ter_id": "358",
@@ -6688,13 +6800,13 @@
       "departamento": "PUNO",
       "provincia": "CHUCUITO",
       "distrito": "DESAGUADERO",
-      "direccion": "AV. 28 DE JULIO N° 564 - 566, CHUCUITO REF. A 50 MTRS. DEL BANCO DE LA NACION",
+      "direccion": "AV. PANAMERICANA N° 1158 - 1160, DESAGUADERO - CHUCUITO - PUNO, REF. AL COSTADO DEL GRIFO BARTOLOMÉ",
       "referencia": "",
       "telefono": "(01) 500 7878",
-      "horario": "LUNES A VIERNES - 8AM A 8PM",
-      "horarioDom": "DOMINGOS - 10:00 AM A 2:00 PM",
-      "latitud": "-16.561694166327943",
-      "longitud": "-69.04113822943981"
+      "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
+      "horarioDom": "DOMINGOS DE 10:00 AM A 2:00 PM",
+      "latitud": "-16.554333203811",
+      "longitud": "-69.042694052504"
     },
     {
       "ter_id": "368",
@@ -6706,9 +6818,9 @@
       "referencia": "",
       "telefono": "(01) 500 7878",
       "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
-      "horarioDom": "DOMINGOS - 8:00 AM A 5:00 PM",
-      "latitud": "-16.082861100000834",
-      "longitud": "-69.6447221999635"
+      "horarioDom": "DOMINGOS DE 8:00 AM A 5:00 PM",
+      "latitud": "-16.082861100001",
+      "longitud": "-69.644722199963"
     },
     {
       "ter_id": "456",
@@ -6719,8 +6831,8 @@
       "direccion": "JR. SANTA ROSA PROLONGACIÓN S/N MAGISTERIAL - PUNO - MELGAR - AYAVIRI, REF. A 50 METROS DEL ÓVALO, SALIDA A JULIACA",
       "referencia": "",
       "telefono": "(01) 500 7878",
-      "horario": "LUNES A VIERNES - 8AM A 8PM",
-      "horarioDom": "DOMINGOS - 10:00 AM A 2:00 PM",
+      "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
+      "horarioDom": "DOMINGOS DE 10:00 AM A 2:00 PM",
       "latitud": "-14.886554",
       "longitud": "-70.598362"
     },
@@ -6733,8 +6845,8 @@
       "direccion": "Jr. Mama Ocllo 915 - B ( Cruce con Jr Azángaro )",
       "referencia": "",
       "telefono": "01 5007878",
-      "horario": "LUNES A VIERNES - 8AM A 8PM",
-      "horarioDom": "DOMINGOS - 8:00 AM A 5:00 PM",
+      "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
+      "horarioDom": "DOMINGOS DE 8:00 AM A 5:00 PM",
       "latitud": "-15.490571",
       "longitud": "-70.119498"
     },
@@ -6852,7 +6964,7 @@
     },
     {
       "ter_id": "14",
-      "nombre": "SAN MARTIN / MOYOBAMBA / MOYOBAMBA / OVALO ORQUIDEAS CO",
+      "nombre": "SAN MARTIN / MOYOBAMBA / MOYOBAMBA / MOYOBAMBA  CO",
       "departamento": "SAN MARTIN",
       "provincia": "MOYOBAMBA",
       "distrito": "MOYOBAMBA",
@@ -6888,9 +7000,9 @@
       "referencia": "",
       "telefono": "(01) 500 7878",
       "horario": "LUNES A VIERNES - 8:00 AM A 6:00 PM",
-      "horarioDom": "DOMINGOS - 10:00 AM A 2:00 PM",
-      "latitud": "-6.139861766706353",
-      "longitud": "-77.10383330000002"
+      "horarioDom": "DOMINGOS DE 10:00 AM A 2:00 PM",
+      "latitud": "-6.1398617667064",
+      "longitud": "-77.1038333"
     },
     {
       "ter_id": "359",
@@ -6901,10 +7013,10 @@
       "direccion": "AV. LIMA S/N C-4 MZ 71 – LOTE A – TERCER PISO, BELLAVISTA- BELLAVISTA- SAN MARTIN, REF. ESPALDAS DE FERRETERÍA EL IMAN",
       "referencia": "",
       "telefono": "(01) 500 7878",
-      "horario": "LUNES A VIERNES - 8AM A 8PM",
-      "horarioDom": "DOMINGOS - 8:00 AM A 5:00 PM",
-      "latitud": "-7.057498003584878",
-      "longitud": "-76.59052847055227"
+      "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
+      "horarioDom": "DOMINGOS DE 8:00 AM A 5:00 PM",
+      "latitud": "-7.0574980035849",
+      "longitud": "-76.590528470552"
     },
     {
       "ter_id": "616",
@@ -6930,7 +7042,7 @@
       "referencia": "",
       "telefono": "(01) 500 7878",
       "horario": "LUNES A VIERNES - 8:00 AM A 6:00 PM",
-      "horarioDom": "DOMINGOS DE 10:00 AM A 2:00 PM",
+      "horarioDom": "",
       "latitud": "-6.9342505921754",
       "longitud": "-76.772416367679"
     },
@@ -6957,8 +7069,8 @@
       "direccion": "CARRETERA FERNANDO TERRY KM. 1 S/N REFERENCIA: AL COSTADO DE PARADERO DE AUTOS HUALLAGA EXPRESS",
       "referencia": "",
       "telefono": "01 5007878",
-      "horario": "LUNES A VIERNES - 8AM A 8PM",
-      "horarioDom": "DOMINGOS - 8:00 AM A 5:00 PM",
+      "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
+      "horarioDom": "DOMINGOS DE 8:00 AM A 5:00 PM",
       "latitud": "-7.1779108",
       "longitud": "-76.737078"
     },
@@ -6986,7 +7098,7 @@
       "referencia": "",
       "telefono": "(01) 500 7878",
       "horario": "LUNES A VIERNES - 8:00 AM A 6:00 PM",
-      "horarioDom": "DOMINGOS DE 10:00 AM A 2:00 PM",
+      "horarioDom": "",
       "latitud": "-6.9200547910068",
       "longitud": "-76.33327738221"
     },
@@ -7027,10 +7139,10 @@
       "direccion": "AV. CAJAMARCA NORTE MZ. 51 LT. 15, REFERENCIA: AL COSTADO DE ESSALUD",
       "referencia": "",
       "telefono": "015007878",
-      "horario": "LUNES A VIERNES - 8AM A 8PM",
-      "horarioDom": "DOMINGOS - 8:00 AM A 5:00 PM",
-      "latitud": "-5.9292775948100385",
-      "longitud": "-77.31329812259968"
+      "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
+      "horarioDom": "DOMINGOS DE 8:00 AM A 5:00 PM",
+      "latitud": "-5.92927759481",
+      "longitud": "-77.3132981226"
     },
     {
       "ter_id": "416",
@@ -7153,8 +7265,8 @@
       "direccion": "AV. FERNANDO BELAUNDE C-09 MZ H6 (21), LT. 04, CERCADO DE TOCACHE, REF. FRENTE AL MERCADILLO DE TOCACHE",
       "referencia": "",
       "telefono": "(01) 500 7878",
-      "horario": "LUNES A VIERNES - 8AM A 8PM",
-      "horarioDom": "DOMINGOS - 8:00 AM A 5:00 PM",
+      "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
+      "horarioDom": "DOMINGOS DE 8:00 AM A 5:00 PM",
       "latitud": "-8.186307",
       "longitud": "-76.517989"
     },
@@ -7167,10 +7279,10 @@
       "direccion": "JR. FREDY ALIAGA N°3046 -TOCACHE - TOCACHE - SAN MARTIN, REF. AL COSTADO DEL RECREO CAMPESTRE ESTRAGOS",
       "referencia": "",
       "telefono": "(01) 500 7878",
-      "horario": "LUNES A VIERNES - 8:00 A.M A 8:00 P.M",
-      "horarioDom": "DOMINGOS - 8:00AM A 5:00PM",
-      "latitud": "-8.190082547884403",
-      "longitud": "-76.53547238844254"
+      "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
+      "horarioDom": "DOMINGOS DE 8:00 AM A 5:00 PM",
+      "latitud": "-8.1900825478844",
+      "longitud": "-76.535472388443"
     },
     {
       "ter_id": "573",
@@ -7181,10 +7293,10 @@
       "direccion": "AV. LEONCIO PRADO N°524 - UCHIZA - TOCACHE - SAN MARTIN, REF. A MEDIA CDRA. DE LA PLAZA CENTRAL / FRENTE A COOPACT",
       "referencia": "",
       "telefono": "(01) 500 7878",
-      "horario": "LUNES A VIERNES - 8:00 A.M A 8:00 P.M",
-      "horarioDom": "DOMINGOS - 8:00 AM A 5:00 PM",
-      "latitud": "-8.459945272574574",
-      "longitud": "-76.46208195944595"
+      "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
+      "horarioDom": "DOMINGOS DE 8:00 AM A 5:00 PM",
+      "latitud": "-8.4599452725746",
+      "longitud": "-76.462081959446"
     },
     {
       "ter_id": "36",
@@ -7252,9 +7364,9 @@
       "referencia": "",
       "telefono": "(01) 500 7878",
       "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
-      "horarioDom": "DOMINGOS - 8:00 A.M. A 5:00 P.M.",
-      "latitud": "-18.029249633967783",
-      "longitud": "-70.27433327282664"
+      "horarioDom": "DOMINGOS DE 8:00 AM A 5:00 PM",
+      "latitud": "-18.029249633968",
+      "longitud": "-70.274333272827"
     },
     {
       "ter_id": "643",
@@ -7266,9 +7378,9 @@
       "referencia": "",
       "telefono": "(01) 500 7878",
       "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
-      "horarioDom": "DOMINGOS - 8:00 A.M. A 5:00 P.M.",
-      "latitud": "-17.99327768071331",
-      "longitud": "-70.2184437309437"
+      "horarioDom": "DOMINGOS DE 8:00 AM A 5:00 PM",
+      "latitud": "-17.993277680713",
+      "longitud": "-70.218443730944"
     },
     {
       "ter_id": "442",
@@ -7322,9 +7434,9 @@
       "referencia": "",
       "telefono": "(01) 500 7878",
       "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
-      "horarioDom": "DOMINGOS - 8:00 AM A 5:00 PM",
-      "latitud": "-18.062945787541306",
-      "longitud": "-70.2518600149207"
+      "horarioDom": "DOMINGOS DE 8:00 AM A 5:00 PM",
+      "latitud": "-18.062945787541",
+      "longitud": "-70.251860014921"
     },
     {
       "ter_id": "40",
@@ -7420,7 +7532,7 @@
       "referencia": "",
       "telefono": "(01) 500 7878",
       "horario": "LUNES A VIERNES - 8:00 AM A 6:00 PM",
-      "horarioDom": "",
+      "horarioDom": "DOMINGOS DE 10:00 AM A 2:00 PM",
       "latitud": "-3.6376008662908",
       "longitud": "-80.586921583879"
     },
