@@ -336,26 +336,81 @@ function esquemaDe(v, prof) {
 }
 
 /**
- * Llama a /track y devuelve la FORMA de la respuesta, no su contenido.
- * Herramienta de diagnostico: sirve para escribir el traductor contra el
- * contrato real. Tambien devuelve como lo interpreta hoy el traductor, para
- * ver de un vistazo si acierta.
+ * Trae el catalogo completo de agencias.
  * @param {string} apiKey clave
- * @param {string} orderNumber numero de guia
- * @param {string} orderCode codigo
- * @return {Promise<Object>} {ok, esquema, interpretado}
+ * @return {Promise<Object>} {ok:true, data} o {ok:false, motivo}
  */
-async function esquemaTrack(apiKey, orderNumber, orderCode) {
-  const r = await llamar(apiKey, "/track", {
+async function agencies(apiKey) {
+  return llamar(apiKey, "/agencies");
+}
+
+// ── Que se puede diagnosticar ───────────────────────────────────────────────
+// Un mapa, no un if por endpoint: cada vez que haga falta medir la forma de
+// una respuesta nueva se agrega una linea aqui y ya se puede consultar desde
+// el panel. La documentacion de la API describe que enviar pero no que
+// devuelve, asi que esto se va a necesitar para cada endpoint que integremos.
+const DIAGNOSTICABLES = {
+  track: (apiKey, p) => llamar(apiKey, "/track", {
     method: "POST",
-    body: {orderNumber: String(orderNumber), orderCode: String(orderCode)},
-  });
+    body: {
+      orderNumber: String(p.orderNumber || ""),
+      orderCode: String(p.orderCode || ""),
+    },
+  }),
+  agencies: (apiKey) => llamar(apiKey, "/agencies"),
+  validate: (apiKey) => llamar(apiKey, "/validate"),
+};
+
+/**
+ * Devuelve la FORMA de la respuesta de un endpoint, no su contenido.
+ * Los valores se reemplazan por su tipo, asi que no salen datos de personas.
+ * Para /track incluye ademas como lo interpreta hoy el traductor, para ver de
+ * un vistazo si acierta.
+ * @param {string} apiKey clave
+ * @param {string} de nombre en DIAGNOSTICABLES
+ * @param {Object} params parametros del endpoint (guia y codigo para /track)
+ * @return {Promise<Object>} {ok, esquema, interpretado} o {ok:false, motivo}
+ */
+async function esquema(apiKey, de, params) {
+  const fn = DIAGNOSTICABLES[de];
+  if (!fn) {
+    return {
+      ok: false,
+      motivo: "NO_DIAGNOSTICABLE",
+      disponibles: Object.keys(DIAGNOSTICABLES),
+    };
+  }
+  const r = await fn(apiKey, params || {});
   if (!r.ok) return r;
-  return {
-    ok: true,
-    esquema: esquemaDe(r.data),
-    interpretado: normalizarTrack(r.data),
-  };
+  const out = {ok: true, de: de, esquema: esquemaDe(r.data)};
+  // Cuantos elementos trae, si es una lista: para /agencies es el dato que
+  // decide si el catalogo esta completo o la API pagino.
+  const lista = _listaDe(r.data);
+  if (lista) out.cuantos = lista.length;
+  if (de === "track") out.interpretado = normalizarTrack(r.data);
+  return out;
+}
+
+/**
+ * Encuentra la lista dentro de una respuesta, venga como venga envuelta.
+ * @param {*} data respuesta cruda
+ * @return {Array|null} la lista, o null si no hay
+ */
+function _listaDe(data) {
+  if (Array.isArray(data)) return data;
+  if (!data || typeof data !== "object") return null;
+  const claves = ["agencias", "agencies", "data", "resultados", "results",
+    "items", "terminales"];
+  for (const k of claves) {
+    if (Array.isArray(data[k])) return data[k];
+    // Un nivel mas adentro: {data:{agencies:[...]}}
+    if (data[k] && typeof data[k] === "object") {
+      for (const k2 of claves) {
+        if (Array.isArray(data[k][k2])) return data[k][k2];
+      }
+    }
+  }
+  return null;
 }
 
 module.exports = {
@@ -364,8 +419,10 @@ module.exports = {
   llamar,
   normalizarTrack,
   _pasosDesdeTexto,
+  _listaDe,
   esquemaDe,
-  esquemaTrack,
+  esquema,
+  agencies,
   track,
   validate,
 };

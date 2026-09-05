@@ -52,6 +52,39 @@
     return out;
   }
 
+  /* Primer valor no vacío entre varios nombres posibles. La documentación de
+     la API no describe las respuestas, así que en vez de fijar un nombre y
+     rezar, se aceptan los que ya conocemos del catálogo guardado y sus
+     variantes razonables. Lo que no aparezca queda vacío, y `_sanear` decide
+     si la agencia sirve igual. */
+  function _primero(raw, nombres) {
+    for (var i = 0; i < nombres.length; i++) {
+      var v = raw[nombres[i]];
+      if (v !== undefined && v !== null && String(v).trim() !== '') return _txt(v);
+    }
+    return '';
+  }
+
+  /* Mapea agencia cruda de Shalom al esquema común (el mismo que ya usa el
+     buscador del formulario, así no hay que tocarlo). */
+  function _mapShalom(raw) {
+    if (!raw || typeof raw !== 'object') return {};
+    return {
+      ter_id:       _primero(raw, ['ter_id', 'id', 'terminal_id', 'terminalId']),
+      nombre:       _primero(raw, ['nombre', 'name', 'lugar_over', 'nombre_agencia', 'terminal']),
+      departamento: _primero(raw, ['departamento', 'department', 'dpto']),
+      provincia:    _primero(raw, ['provincia', 'province']),
+      distrito:     _primero(raw, ['distrito', 'district', 'zona']),
+      direccion:    _primero(raw, ['direccion', 'address', 'dir']),
+      referencia:   _primero(raw, ['referencia', 'reference', 'ref']),
+      telefono:     _primero(raw, ['telefono', 'phone', 'celular']),
+      horario:      _primero(raw, ['horario', 'hora_atencion', 'schedule']),
+      horarioDom:   _primero(raw, ['horarioDom', 'hora_domingo', 'horario_domingo']),
+      latitud:      _primero(raw, ['latitud', 'lat', 'latitude']),
+      longitud:     _primero(raw, ['longitud', 'lng', 'lon', 'longitude'])
+    };
+  }
+
   /* Mapea agencia cruda de Olva (department/province/district/lat/lng/horario
      por día) al MISMO esquema común que Shalom, para que la búsqueda del
      formulario funcione idéntico sin importar el courier. */
@@ -87,19 +120,87 @@
   }
 
   /* Un objeto por courier con catálogo propio. Orden = orden en pantalla.
-     Shalom se retiró: su extracción dependía del rastreo viejo. El buscador de
-     agencias del formulario sigue funcionando con el catálogo local guardado
-     (data/agencias-shalom.json, 542 sedes) — eso NO se toca. */
+
+     Cada courier declara CÓMO se traen sus datos, porque no todos se piden
+     igual:
+       · functionUrl → una URL abierta que se consulta directo (Olva).
+       · traer()     → una función propia, para cuando hace falta sesión.
+     Shalom pasa por la puerta única (shalom.js), que adjunta el token del
+     panel; su Cloud Function exige ser administrador, así que un fetch pelado
+     recibiría un 401. Un courier nuevo se agrega con una entrada más, sin
+     tocar el resto del extractor. */
   var COURIERS = [
     {
       key: 'olva', label: 'Olva',
       functionUrl: 'https://us-central1-total-tools-24ce8.cloudfunctions.net/olvaListar',
       outFile: 'agencias-olva.json',
       mapper: _mapOlva
+    },
+    {
+      key: 'shalom', label: 'Shalom',
+      traer: function () {
+        if (!global.Shalom || typeof global.Shalom.agencias !== 'function') {
+          return Promise.resolve({error: true, motivo: 'La puerta de Shalom no está cargada'});
+        }
+        return global.Shalom.agencias();
+      },
+      outFile: 'agencias-shalom.json',
+      jsonActual: './data/agencias-shalom.json', // para comparar antes de reemplazar
+      mapper: _mapShalom
     }
   ];
 
   var _ultimoJSON = {}; // por courier.key
+
+  /* Encuentra la lista dentro de la respuesta, venga como venga envuelta.
+     Cada courier la envuelve distinto y ninguno lo documenta, así que se
+     buscan los nombres habituales en la raíz y un nivel más adentro. */
+  function _listaDe(data) {
+    if (Array.isArray(data)) return data;
+    if (!data || typeof data !== 'object') return null;
+    var claves = ['agencias', 'agencies', 'data', 'resultados', 'results',
+                  'items', 'terminales'];
+    for (var i = 0; i < claves.length; i++) {
+      var v = data[claves[i]];
+      if (Array.isArray(v)) return v;
+      if (v && typeof v === 'object') {
+        for (var j = 0; j < claves.length; j++) {
+          if (Array.isArray(v[claves[j]])) return v[claves[j]];
+        }
+      }
+    }
+    return null;
+  }
+
+  /* Compara lo recién extraído con el catálogo que ya está en uso.
+     Si el nuevo trae MENOS, lo dice con todas las letras: reemplazar a ciegas
+     dejaría sin agencias a clientes que hoy sí pueden elegirlas. No bloquea la
+     descarga —a veces el courier cierra sedes de verdad— pero obliga a mirar. */
+  async function _compararConActual(c, nuevas) {
+    if (!c.jsonActual) return { html: '' };
+    try {
+      var r = await fetch(c.jsonActual, { cache: 'no-store' });
+      if (!r.ok) return { html: '' };
+      var actual = await r.json();
+      var lista = _listaDe(actual);
+      var antes = Array.isArray(lista) ? lista.length : 0;
+      if (!antes) return { html: '' };
+
+      if (nuevas < antes) {
+        return { html:
+          '<br><b style="color:#f59e0b">⚠️ El catálogo actual tiene ' + antes +
+          ' — faltarían ' + (antes - nuevas) + '.</b>' +
+          '<br><span style="font-size:11px;color:#8b949e">Revisa antes de reemplazar: puede que la API omita rutas aéreas o esté paginando.</span>' };
+      }
+      if (nuevas > antes) {
+        return { html: '<br><span style="color:#22c55e">Son ' + (nuevas - antes) +
+                 ' más que las ' + antes + ' actuales.</span>' };
+      }
+      return { html: '<br><span style="color:#8b949e">Mismo total que el catálogo actual (' + antes + ').</span>' };
+    } catch (e) {
+      return { html: '' }; // no poder comparar no debe impedir extraer
+    }
+  }
 
   function _toast(m) { if (typeof global.toast === 'function') global.toast(m); }
 
@@ -125,25 +226,34 @@
     _ultimoJSON[key] = null;
 
     try {
-      // Leer SIEMPRE el cuerpo: la función devuelve el motivo real del fallo
-      // (corte por tiempo, respuesta upstream con su código, o red). Sin esto
-      // solo se ve un "HTTP 500" sin causa.
-      var r = await fetch(c.functionUrl);
-      var data = null;
-      try { data = await r.json(); } catch (e) { data = null; }
-      if (!r.ok) {
-        throw new Error((data && (data.motivo || data.error)) || ('HTTP ' + r.status));
+      var data;
+      if (typeof c.traer === 'function') {
+        // Courier con puerta propia (Shalom): la función adjunta la sesión.
+        var res = await c.traer();
+        if (!res || res.ok === false || res.error) {
+          throw new Error(res && (res.motivo || res.error) || 'sin respuesta');
+        }
+        data = res.data !== undefined ? res.data : res;
+      } else {
+        // Leer SIEMPRE el cuerpo: la función devuelve el motivo real del fallo
+        // (corte por tiempo, respuesta upstream con su código, o red). Sin esto
+        // solo se ve un "HTTP 500" sin causa.
+        var r = await fetch(c.functionUrl);
+        data = null;
+        try { data = await r.json(); } catch (e) { data = null; }
+        if (!r.ok) {
+          throw new Error((data && (data.motivo || data.error)) || ('HTTP ' + r.status));
+        }
+        if (data && data.error) throw new Error(data.motivo || data.error);
       }
-      if (data && data.error) throw new Error(data.motivo || data.error);
 
-      var lista = data.agencias || data.resultados || data.data ||
-                  (Array.isArray(data) ? data : []);
+      var lista = _listaDe(data);
       if (!Array.isArray(lista)) lista = [];
 
       var agencias = _sanear(lista.map(c.mapper).filter(function (a) { return a.nombre; }));
 
       if (!agencias.length) {
-        _setEstado(key, '⚠️ La función respondió pero sin agencias. Revisa el endpoint de origen.', '#f59e0b');
+        _setEstado(key, '⚠️ Respondió pero sin agencias reconocibles. Puede que cambiaran los nombres de los campos.', '#f59e0b');
         return;
       }
 
@@ -152,8 +262,14 @@
         agencias: agencias
       };
 
+      // COMPARAR CON LO QUE YA TIENES antes de dejar reemplazar. Descargar un
+      // catálogo más chico y pisar el bueno deja al cliente sin poder elegir
+      // agencias que antes sí aparecían — y te enterarías por un reclamo, no
+      // por un error. Por eso el aviso es explícito y dice cuántas faltan.
+      var aviso = await _compararConActual(c, agencias.length);
+
       _setEstado(key,
-        '✅ <b style="color:#22c55e">' + agencias.length + ' agencias</b> extraídas correctamente.<br>' +
+        '✅ <b style="color:#22c55e">' + agencias.length + ' agencias</b> extraídas.' + aviso.html + '<br>' +
         '<span style="font-size:11px;color:#8b949e">Descarga el archivo y súbelo a la carpeta <b>data/</b> de tu repo (reemplaza el actual).</span>',
         '#e6edf3'
       );

@@ -708,16 +708,20 @@ exports.shalomApi = onRequest(
           // Diagnostico: devuelve la FORMA de la respuesta de Shalom (tipos,
           // no valores) para poder escribir el traductor contra el contrato
           // real en vez de contra una suposicion. No escribe en ningun pedido.
-          const g = String(
-              cuerpo.orderNumber || req.query.orderNumber || "").trim();
-          const c = String(
-              cuerpo.orderCode || req.query.orderCode || "").trim();
-          if (!g || !c) {
-            res.status(400).json({ok: false, motivo: "Falta guia o codigo"});
-            return;
-          }
-          const r = await shalomApi.esquemaTrack(clave, g, c);
+          // `de` elige el endpoint; los permitidos viven en shalomApi.
+          const de = String(cuerpo.de || req.query.de || "track").trim();
+          const r = await shalomApi.esquema(clave, de, {
+            orderNumber: cuerpo.orderNumber || req.query.orderNumber || "",
+            orderCode: cuerpo.orderCode || req.query.orderCode || "",
+          });
           res.status(200).json(r);
+          return;
+        }
+
+        if (op === "agencias") {
+          // Catalogo completo de agencias, para el extractor del panel.
+          const r = await shalomApi.agencies(clave);
+          res.status(r.ok ? 200 : 502).json(r);
           return;
         }
 

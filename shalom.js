@@ -98,18 +98,29 @@
        campos y tipos, nunca valores) más cómo la interpreta hoy el traductor.
        Existe porque la documentación de la API describe qué enviar pero no qué
        devuelve; en vez de suponer la forma, se mide. No escribe en ningún
-       pedido y no expone datos de personas. */
-    esquema: function (guia, codigo) {
-      if (!guia || !codigo) return Promise.resolve({ok: false, motivo: 'SIN_DATO'});
-      return _llamar('esquema', {orderNumber: String(guia), orderCode: String(codigo)});
+       pedido y no expone datos de personas.
+
+       Shalom.esquema('93802318','9NK9')  → forma de /track
+       Shalom.esquema(null, null, 'agencies') → forma de /agencies          */
+    esquema: function (guia, codigo, de) {
+      return _llamar('esquema', {
+        de: de || 'track',
+        orderNumber: guia ? String(guia) : '',
+        orderCode: codigo ? String(codigo) : ''
+      });
     },
 
     ticket: function () {
       return Promise.resolve(OFF);
     },
+
+    /* Catálogo completo de agencias. Lo usa el extractor del panel para
+       generar el JSON que después lee el formulario del cliente.
+       Devuelve la respuesta cruda de Shalom: quien llama la traduce. */
     agencias: function () {
-      return Promise.resolve(OFF);
+      return _llamar('agencias', {});
     },
+
     registrar: function () {
       return Promise.resolve(OFF);
     }
