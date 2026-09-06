@@ -21,6 +21,13 @@
   var TOKEN_KEY  = 'tt_auth_token';
   var EXPIRY_KEY = 'tt_auth_expiry';
   var EMAIL_KEY  = 'tt_auth_email';
+  var INICIO_KEY = 'tt_auth_inicio';
+
+  /* Duración máxima de una sesión. Hasta ahora la sesión NO vencía nunca: el
+     token se renovaba solo indefinidamente, así que una laptop robada con el
+     panel abierto seguía abierta para siempre. Doce horas cubre una jornada
+     completa —se entra una vez al día— sin dejar la puerta abierta de noche. */
+  var SESION_MAX_MS = 12 * 60 * 60 * 1000;
 
   /* ── CSS ─────────────────────────────────────────────────────────── */
   var style = document.createElement('style');
@@ -199,6 +206,19 @@
     localStorage.setItem(TOKEN_KEY,  token);     // refreshToken para renovar
     localStorage.setItem(EXPIRY_KEY, String(expiry));
     localStorage.setItem(EMAIL_KEY,  email);
+    // El inicio se marca UNA vez, al entrar de verdad. Renovar el token no lo
+    // reinicia: si lo hiciera, la sesión volvería a no vencer nunca, que es
+    // justo lo que se está corrigiendo.
+    if(!localStorage.getItem(INICIO_KEY)){
+      localStorage.setItem(INICIO_KEY, String(Date.now()));
+    }
+  }
+
+  /* ¿Pasaron ya las 12 horas desde que entró? */
+  function _sesionVencida(){
+    var inicio = parseInt(localStorage.getItem(INICIO_KEY)||'0');
+    if(!inicio) return false;   // sesión vieja, sin marca: no se expulsa
+    return (Date.now() - inicio) > SESION_MAX_MS;
   }
   function _saveIdToken(idToken){
     localStorage.setItem('tt_id_token', idToken);
@@ -221,7 +241,9 @@
     localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem(EXPIRY_KEY);
     localStorage.removeItem(EMAIL_KEY);
-    localStorage.removeItem('tt_id_token');
+    localStorage.removeItem(INICIO_KEY);   // sin esto, el próximo ingreso
+    localStorage.removeItem('tt_id_token'); // heredaría la hora vieja y
+                                            // vencería al instante: bucle.
     CLAVES_DATOS.forEach(function(k){
       try { localStorage.removeItem(k); } catch(e){}
     });
@@ -269,6 +291,17 @@
   window.AuthModule = {
 
     async init(){
+      // Sesión de más de 12 h: se cierra, PERO solo si hay red para volver a
+      // entrar. Expulsar sin conexión sería lo peor de los dos mundos: no
+      // podría iniciar sesión (el login necesita internet) y encima perdería
+      // los datos locales justo durante el corte. Sin red se deja seguir y se
+      // vuelve a evaluar cuando la conexión regrese.
+      if(_sesionVencida() && navigator.onLine !== false){
+        _clearSession();
+        _showLogin();
+        _showErr('Tu sesión venció. Ingresa de nuevo.');
+        return;
+      }
       // Si ya tiene sesión válida, mostrar app directamente
       if(_isValidSession()){
         _hideOverlay();
@@ -357,6 +390,10 @@
   /* ── TOKEN VÁLIDO PARA REQUESTS ─────────────────────────────────── */
   // Renovar token automáticamente si está por vencer (menos de 5 min)
   async function _ensureValidToken(){
+    // Si la sesión ya cumplió sus 12 h, no se renueva más. Sin esto, alguien
+    // trabajando sin parar la extendería indefinidamente y el límite no
+    // existiría en la práctica.
+    if(_sesionVencida()) return false;
     var expiry = parseInt(localStorage.getItem(EXPIRY_KEY)||'0');
     var margin = 5 * 60 * 1000; // 5 minutos antes de vencer
     if(Date.now() < expiry - margin) return true; // token válido
