@@ -109,8 +109,14 @@ function _aplicarEstadoShalom(ship, resp, origen){
   }
 
   // 1) Tracking visible: se escribe siempre que el texto cambie.
+  //    `escribio` distingue dos cosas que antes se veían idénticas desde
+  //    afuera: que Shalom haya contestado bien, y que algo haya cambiado. Un
+  //    paquete puede pasar días en el mismo estado; sin este dato el operador
+  //    consulta, todo funciona, nada se mueve en pantalla, y parece roto.
+  var escribio = false;
   if (estadoTexto && ship.trackingStatus !== estadoTexto) {
     _escribirTracking(ship, estadoTexto, resp.fecha, origen);
+    escribio = true;
   }
 
   // 2) La etiqueta NO se mueve. Se retiró el movimiento automático (y con él el
@@ -124,7 +130,10 @@ function _aplicarEstadoShalom(ship, resp, origen){
   else if (autoEstado === 'FINALIZADO')        resultado = 'FINALIZADO';
   else if (autoEstado === 'EN_DESTINO')        resultado = 'EN_DESTINO';
 
-  return {cambio: true, resultado: resultado, estado: estadoTexto};
+  // `cambio` = Shalom contestó con un dato real (se pudo aplicar).
+  // `escribio` = ese dato era distinto al que ya teníamos.
+  return {cambio: true, escribio: escribio, resultado: resultado,
+    estado: estadoTexto};
 }
 
 /* ══════════════════════════════════════════════
@@ -151,9 +160,19 @@ function _saveDestinoAvisados(){
     JSON.stringify(Array.from(_destinoAvisados).slice(-500))); } catch(e){}
 }
 // ¿El pedido está "en destino"? Agnóstico al motor y al modo (etiqueta u observación).
+/* ¿SHALOM dice que llegó a destino?
+   Mira SOLO el tracking, nunca la etiqueta. Antes también devolvía true si el
+   pedido estaba en LLEGÓ A DESTINO o PENDIENTE DE PAGO, y eso tenía sentido
+   cuando la etiqueta la movía el sistema: era otro rastro del mismo hecho.
+   Ya no. Desde que el movimiento automático se retiró, la etiqueta es una
+   decisión del operador, así que leerla acá convertía el aviso en un eco: el
+   operador marcaba "LLEGÓ A DESTINO" a mano y la app se lo anunciaba de vuelta
+   —con la tira apareciendo justo debajo de la tarjeta, como si lo hubiera
+   averiguado la consulta— incluso cuando Shalom seguía diciendo "En tránsito".
+   El aviso existe para contar algo que el operador NO sabía. Si lo puso él, ya
+   lo sabía. */
 function _esDestino(s){
   if (!s || s.status === 'FINALIZADO') return false;
-  if (s.status === 'LLEGÓ A DESTINO' || s.status === 'PENDIENTE DE PAGO') return true;
   return detectarEstadoAuto(s.trackingStatus || '') === 'EN_DESTINO';
 }
 // Vigilante: avisa los que ENTRARON a destino y no se habían avisado. En el primer
@@ -390,14 +409,36 @@ function _estadoChip(ship) {
   else if (u.includes('ERROR')   || u.includes('NO SE'))       { cls='trk-chip-err';  ico='⚠'; }
   else                                                           { cls='trk-chip-pend'; ico='📦'; }
 
-  var last = ship.trackingLastUpdate
-    ? new Date(ship.trackingLastUpdate).toLocaleString('es-PE',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})
-    : '';
+  // La fecha del chip contaba solo CUÁNDO CAMBIÓ el estado. Un paquete puede
+  // pasar días en "En tránsito": consultabas, todo funcionaba, y el chip
+  // seguía diciendo "hace 5 días" — indistinguible de que el botón no hiciera
+  // nada. Por eso, cuando la última consulta es más reciente que el último
+  // cambio, se muestra ella: así tocar Consultar SIEMPRE se nota.
+  var cambio = ship.trackingLastUpdate ? new Date(ship.trackingLastUpdate).getTime() : 0;
+  var visto  = Number(ship.trackingLastAutoCheck) || 0;
+  var sello  = '';
+  if (visto > cambio + 60000) {
+    sello = 'visto ' + _haceCuanto(visto);
+  } else if (cambio) {
+    sello = new Date(cambio).toLocaleString('es-PE',
+        {day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
+  }
 
   return '<div class="trk-chip '+cls+'" onclick="Tracking.verHistorial(\''+_esc(ship.id)+'\')">'+
     ico+' '+_esc(st)+
-    (last?'<span style="opacity:.5;font-size:9px;margin-left:4px">'+last+'</span>':'')+
+    (sello?'<span style="opacity:.5;font-size:9px;margin-left:4px">'+sello+'</span>':'')+
     ' <span style="opacity:.4;font-size:9px">↗</span></div>';
+}
+
+/* "hace 3 min" / "hace 2 h" / "hace 4 d". En minutos hasta la hora, porque el
+   caso que importa es el inmediato: acabo de tocar Consultar, ¿pasó algo? */
+function _haceCuanto(ms){
+  var min = Math.floor((Date.now() - ms) / 60000);
+  if (min < 1)   return 'recién';
+  if (min < 60)  return 'hace ' + min + ' min';
+  var h = Math.floor(min / 60);
+  if (h < 24)    return 'hace ' + h + ' h';
+  return 'hace ' + Math.floor(h / 24) + ' d';
 }
 
 /* ══════════════════════════════════════════════
@@ -594,20 +635,30 @@ Tracking.consultarAhora = async function(shipId) {
 
   var r = await _consultarYAplicar(ship);
   if (r.cambio) {
+    // La hora de consulta se guarda siempre, haya cambiado el estado o no: es
+    // lo que permite que el chip muestre "visto hace un momento" y que tocar
+    // el botón se note aunque el paquete lleve días quieto.
     if (window.save) window.save(ship.id);
     if (window._fbSaveShipmentNow) window._fbSaveShipmentNow(ship); // subida inmediata
     if (window.render) window.render();
     if (window.toast) {
+      var estado = ship.trackingStatus || '—';
       window.toast(
+        !r.escribio                  ? '✓ Sin cambios — sigue ' + estado :
         r.resultado === 'FINALIZADO' ? '✅ Shalom confirma entrega — puedes finalizarlo' :
         r.resultado === 'EN_DESTINO' ? '📍 Llegó a destino — avisar al cliente' :
-        r.resultado === 'RETORNO'    ? '↩️ ' + (ship.trackingStatus || 'Retorno a origen') :
-        '🔄 Estado: ' + (ship.trackingStatus || '—'));
+        r.resultado === 'RETORNO'    ? '↩️ ' + estado :
+        '🔄 Ahora: ' + estado);
     }
   } else {
     if (window.toast) window.toast(_motivoTexto(r.motivo));
-    if (btn) { btn.innerHTML = '⟳ Consultar'; btn.disabled = false; }
   }
+  // Se restaura SIEMPRE, en los dos caminos. Antes solo se hacía en el de
+  // error: el otro confiaba en que render() redibujara la tarjeta, y si el
+  // pedido quedaba fuera del filtro activo o render fallaba, el botón se
+  // quedaba en "Consultando…" para siempre.
+  var btn2 = document.getElementById('btn-consult-' + shipId);
+  if (btn2) { btn2.innerHTML = '⟳ Consultar'; btn2.disabled = false; }
 };
 
 /* ── bulkTrack: masivo desde el ícono 🔄 con selección ───────────── */
