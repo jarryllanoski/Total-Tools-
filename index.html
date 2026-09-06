@@ -4,7 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
 <title>Mi Panel de Envíos</title>
-<script src="firebase-config.js?v=2"></script>
+<script src="firebase-config.js?v=3"></script>
+<script src="appcheck.js?v=1"></script>
 <!-- FIREBASE via REST API — sin SDK, funciona en Brave/Chrome/Firefox/Safari -->
 <script>
 (function(){
@@ -41,21 +42,33 @@
     return null;
   }
 
-  // ── Token de sesión (Firebase Auth) ───────────────────────────────────
-  // Devuelve la cabecera Authorization SOLO si hay un token válido.
-  // Si no hay sesión o el auth está desactivado, devuelve {} → se usa solo
-  // la API key (compatible mientras las reglas estén abiertas).
+  // ── Cabeceras de cada petición a Firestore (punto único) ──────────────
+  // Dos pruebas independientes, cada una con su propio try/catch: que una
+  // falle no debe tumbar a la otra ni a la petición.
+  //   Authorization      → QUIÉN sos (el token de sesión de auth.js).
+  //   X-Firebase-AppCheck → DESDE DÓNDE se llama (appcheck.js). Hoy Firestore
+  //     está en modo Supervisión: si esta cabecera falta, la petición igual
+  //     funciona, solo queda contada como "no verificada" en Firebase. El día
+  //     que se active el bloqueo, ahí sí pasa a ser obligatoria — y para
+  //     entonces ya se habrá confirmado que llega bien desde acá.
   async function _authHeaders(){
+    const headers = {};
     try{
       if(typeof window._authEnsureToken === 'function'){
         const ok = await window._authEnsureToken(); // refresca si está por vencer
         if(ok){
           const tok = localStorage.getItem('tt_id_token') || '';
-          if(tok) return { 'Authorization': 'Bearer ' + tok };
+          if(tok) headers['Authorization'] = 'Bearer ' + tok;
         }
       }
-    }catch(e){ /* sin token → seguir con API key */ }
-    return {};
+    }catch(e){ /* sin token de sesión → seguir sin Authorization */ }
+    try{
+      if(typeof window._appCheckToken === 'function'){
+        const ac = await window._appCheckToken();
+        if(ac) headers['X-Firebase-AppCheck'] = ac;
+      }
+    }catch(e){ /* sin token de App Check → seguir sin esa cabecera */ }
+    return headers;
   }
 
   // ── REST helpers ──────────────────────────────────────────────────────

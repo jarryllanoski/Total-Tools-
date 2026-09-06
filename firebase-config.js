@@ -10,5 +10,11 @@ window.FBConfig = {
   // Firebase Console → Authentication → Google → ID de cliente web.
   // Mientras esté vacío, el botón no aparece y el ingreso por contraseña
   // funciona igual — así activarlo nunca puede dejar a nadie afuera.
-  GOOGLE_CLIENT_ID: ''
+  GOOGLE_CLIENT_ID: '',
+
+  // Identificadores de la app web ante Firebase (App Check los necesita para
+  // saber CUÁL app está pidiendo el token). Ninguno es secreto: son los mismos
+  // que Firebase muestra en cualquier snippet de inicialización público.
+  AUTH_DOMAIN: 'total-tools-24ce8.firebaseapp.com',
+  APP_ID:      '1:256086864182:web:fc00c0745400d6737e8397'
 };
