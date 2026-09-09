@@ -623,6 +623,23 @@
       <div style="max-width:74%"><div class="tgl-n">📱 Mostrar en el link del cliente</div><div class="tgl-s">El cliente ve el estado de Shalom en su link de seguimiento. Apagado = solo tú lo ves en el panel.</div></div>
       <div class="tgl" id="tglTrackingWebCliente" onclick="toggleTrackingWebCliente()"></div>
     </div>
+    <!-- VERIFICAR SESIÓN DE SHALOM PRO
+         Antes de registrar un envio conviene saber si la sesión sigue viva: un
+         aviso claro vale más que diez registros fallidos en fila sin saber por
+         qué. Hoy este botón es un INSTRUMENTO DE MEDICIÓN: muestra la respuesta
+         tal cual la manda Shalom, sin traducirla. La documentación no dice qué
+         devuelve /instances/status, y suponer la forma ya costó caro antes
+         (ver docs/SHALOM.md). Con la respuesta real delante se escribe el
+         traductor y este cuadro pasa a ser un chip de "Conectado". -->
+    <div style="border-top:1px solid var(--bd);margin-top:11px;padding-top:11px">
+      <div style="font-size:11px;color:#8b949e;line-height:1.5;margin-bottom:10px">
+        Comprueba que la sesión de Shalom Pro sigue conectada. No toca ningún pedido ni gasta envíos.</div>
+      <button id="shalomInstBtn" type="button" onclick="verificarInstanciaShalom()"
+        style="width:100%;padding:11px;border-radius:9px;cursor:pointer;font-family:inherit;
+        font-size:13px;font-weight:700;background:rgba(56,139,253,.15);
+        border:1px solid rgba(56,139,253,.35);color:#388bfd">&#128268; Verificar sesión de Shalom Pro</button>
+      <div id="shalomInstEstado" style="display:none;margin-top:10px;font-size:12px;line-height:1.5"></div>
+    </div>
   </div>
 </div>
 
@@ -2024,6 +2041,83 @@ function toggleTrackingWebCliente(){
   save('config');
   toast(on?'📱 El cliente verá el estado de Shalom':'🙈 Estado de Shalom solo en tu panel');
 }
+/* Verificar la sesión de Shalom Pro.
+   MUESTRA LA RESPUESTA CRUDA A PROPÓSITO. Shalom documenta qué mandar a
+   /instances/status pero no qué devuelve, y ya hubo dos vueltas caras por
+   suponer la forma de una respuesta (el traductor de /track buscaba `estados`
+   cuando el campo real era `statuses`). Así que primero se mide y después se
+   traduce: este cuadro enseña tal cual lo que llega, y cuando la forma esté
+   confirmada se reemplaza por un chip verde/rojo de una línea.
+   No escribe en ningún pedido, no gasta envíos y no expone la clave: la clave
+   vive en Secret Manager y quien habla con Shalom es la Cloud Function. */
+function verificarInstanciaShalom(){
+  const btn=document.getElementById('shalomInstBtn');
+  const caja=document.getElementById('shalomInstEstado');
+  if(!btn||!caja) return;
+  if(!window.Shalom||typeof Shalom.estadoInstancia!=='function'){
+    caja.style.display='block';
+    caja.innerHTML='<span style="color:#f87171">No se pudo cargar el módulo de Shalom. Recarga la página.</span>';
+    return;
+  }
+  btn.disabled=true;
+  btn.textContent='⏳ Consultando…';
+  caja.style.display='block';
+  caja.innerHTML='<span style="color:#8b949e">Preguntándole a Shalom…</span>';
+
+  Shalom.estadoInstancia().then(function(r){
+    // Los motivos que sí conocemos son NUESTROS (los inventa la puerta única),
+    // así que esos sí se traducen: no es suponer, es leer nuestro propio código.
+    const nuestros={
+      SIN_RED:'Sin internet. Revisa tu conexión y reintenta.',
+      DESCONECTADO:'Este navegador no puede hacer la consulta.',
+      BLOQUEADO:'Tu sesión del panel no tiene permiso. Vuelve a entrar.',
+      LIMITE:'Se agotó la cuota del plan de Shalom.',
+      ERROR_SHALOM:'Shalom respondió con un error. Reintenta en unos minutos.'
+    };
+    if(r && r.ok===false && nuestros[r.motivo]){
+      caja.innerHTML='<span style="color:#f87171">❌ '+nuestros[r.motivo]+'</span>';
+      return;
+    }
+    const txt=JSON.stringify(r,null,1);
+    caja.innerHTML=
+      '<div style="color:#8b949e;margin-bottom:6px">Respuesta de Shalom (sin traducir todavía):</div>'+
+      '<pre id="shalomInstRaw" style="margin:0;padding:9px;border-radius:8px;background:var(--bg2);'+
+      'border:1px solid var(--bd);color:#e6edf3;font-size:11px;line-height:1.45;'+
+      'max-height:220px;overflow:auto;white-space:pre-wrap;word-break:break-word"></pre>'+
+      '<button type="button" onclick="copiarRespuestaInstancia()" style="width:100%;margin-top:8px;'+
+      'padding:9px;border-radius:9px;cursor:pointer;font-family:inherit;font-size:12px;font-weight:700;'+
+      'background:rgba(163,113,247,.15);border:1px solid rgba(163,113,247,.35);color:#a78bfa">📋 Copiar respuesta</button>';
+    // textContent y no innerHTML: lo que venga de Shalom se muestra como texto,
+    // nunca se interpreta como HTML.
+    document.getElementById('shalomInstRaw').textContent=txt;
+  }).catch(function(e){
+    caja.innerHTML='<span style="color:#f87171">❌ '+String((e&&e.message)||'error')+'</span>';
+  }).then(function(){
+    btn.disabled=false;
+    btn.textContent='🔌 Verificar sesión de Shalom Pro';
+  });
+}
+function copiarRespuestaInstancia(){
+  const pre=document.getElementById('shalomInstRaw');
+  if(!pre) return;
+  const txt=pre.textContent||'';
+  const listo=function(){ toast('📋 Respuesta copiada'); };
+  try{
+    if(navigator.clipboard&&navigator.clipboard.writeText){
+      navigator.clipboard.writeText(txt).then(listo).catch(function(){ _copiarFallback(txt,listo); });
+    }else{ _copiarFallback(txt,listo); }
+  }catch(e){ _copiarFallback(txt,listo); }
+}
+function _copiarFallback(txt,listo){
+  try{
+    const t=document.createElement('textarea');
+    t.value=txt; t.style.position='fixed'; t.style.opacity='0';
+    document.body.appendChild(t); t.select();
+    document.execCommand('copy');
+    document.body.removeChild(t);
+    listo();
+  }catch(e){ toast('No se pudo copiar — selecciona el texto a mano'); }
+}
 /* Resaltar (y centrar) una tarjeta por su id — se usa al crear un pedido nuevo */
 function _highlightCard(id){
   setTimeout(function(){
@@ -3138,7 +3232,7 @@ render();
 <script src="ticket.js?v=4"></script>
 <script src="agencias-extractor.js?v=10"></script>
 <script src="respaldo.js?v=1"></script>
-<script src="ayuda.js?v=2"></script>
+<script src="ayuda.js?v=3"></script>
 <script src="dashboard.js?v=2"></script>
 <script src="voz.js?v=2"></script>
 <script src="cotizacion.js?v=2"></script>

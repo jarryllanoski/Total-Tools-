@@ -324,24 +324,21 @@
     shalomConfig: {
       titulo: 'Rastreo Shalom (Configuración)',
       icono: '🚚',
-      actualizado: '2026-07-17',
+      actualizado: '2026-09-09',
       pasos: [
-        '<b>Motor de rastreo</b>: elige quién consulta Shalom. <b>Mi servidor</b> (recomendado) o <b>API paga</b>. Solo uno funciona a la vez, para que no se pisen.',
-'<b>Cambiar etiquetas automáticamente</b> (3 opciones, valen para ambos motores): <b>Apagado</b> = observación (ves el estado de Shalom sin mover ninguna etiqueta). <b>Automática</b> = mueve todo (En destino → LLEGÓ A DESTINO, con saldo → PENDIENTE DE PAGO, Entregado → <b>FINALIZADO</b>). <b>Semiautomática</b> = mueve todo <b>menos Finalizado</b>: ese lo cierras tú a mano tras confirmar entrega/pago.',
         '<b>Mostrar en el link del cliente</b>: decides si el cliente ve el estado de Shalom en su seguimiento. Apagado = solo tú lo ves en el panel.',
-        '<b>Horas</b>: cada cuántas horas se consulta en tránsito (12) y en destino (24).',
-        '<b>🔄 Sincronizar ahora</b>: fuerza la consulta al instante (sin esperar el ciclo) y rellena las tarjetas que ya tenían dato pero se veían vacías.'
+        '<b>🔌 Verificar sesión de Shalom Pro</b>: comprueba que la conexión con Shalom sigue viva. No toca ningún pedido ni gasta envíos. Úsalo cuando algo deje de responder, antes de pensar que el problema es tuyo.',
+        '<b>🏢 Agencias Olva / Agencias Shalom</b>: descargan el catálogo completo de agencias para que el buscador del formulario funcione sin gastar API en cada búsqueda.'
       ],
       faq: [
-        {q:'¿Por qué veo el estado pero la etiqueta del pedido no cambia?', a:'Porque "Cambiar etiquetas" está en Apagado (observación). Es a propósito: ves lo que dice Shalom sin mover el pedido de columna. Pásalo a Automática o Semiautomática cuando confíes en el rastreo.'},
-        {q:'¿Para qué sirve Semiautomática?', a:'Mueve las etiquetas solo hasta LLEGÓ A DESTINO / PENDIENTE DE PAGO, pero NO marca FINALIZADO automáticamente. Así confirmas tú la entrega y el pago antes de cerrar el pedido.'},
-        {q:'¿Qué es "Mi servidor"?', a:'Tu propia infraestructura que lee la página pública de Shalom, sin depender de la API paga. Corre sola cada cierto tiempo, aunque el panel esté cerrado.'},
+        {q:'¿Por qué la etiqueta del pedido no cambia sola?', a:'Porque ya no cambia sola, a propósito. El estado de Shalom se muestra, pero la etiqueta del pedido la mueves tú. Antes había un cambio automático y movía pedidos por su cuenta; se retiró.'},
         {q:'¿El cliente ve el estado de Shalom?', a:'Solo si activas "Mostrar en el link del cliente". Por defecto está apagado — solo tú lo ves en el panel.'},
-        {q:'Un pedido dice "Sin consultas aún", ¿qué hago?', a:'Presiona 🔄 Sincronizar ahora: fuerza la consulta y rellena la tarjeta al instante.'}
+        {q:'¿Dónde quedó el motor de rastreo y "Sincronizar ahora"?', a:'Se retiraron con el rastreo viejo, que leía la página pública de Shalom. Ahora se consulta la API oficial: no hay motor que elegir ni intervalos que ajustar.'},
+        {q:'La verificación de sesión muestra un texto raro con llaves, ¿está mal?', a:'No. Por ahora enseña la respuesta tal cual la manda Shalom, sin traducir, mientras se confirma su formato exacto. Cuando esté confirmado se reemplaza por un aviso de una línea.'}
       ],
       tips: [
-        'Para validar el motor nuevo unas semanas sin riesgo: déjalo en "Mi servidor" con "Cambiar etiquetas" apagado (observación).',
-        'El botón ⟳ Consultar de cada tarjeta usa el motor que tengas elegido aquí.'
+        'Si un pedido no actualiza su estado, primero revisa que el número de guía y el código sean los del ticket: la mayoría de las consultas fallidas son un dígito cambiado.',
+        'El botón ⟳ de cada tarjeta consulta esa guía contra la API oficial de Shalom.'
       ]
     }
 
