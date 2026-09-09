@@ -2042,12 +2042,21 @@ function toggleTrackingWebCliente(){
   toast(on?'📱 El cliente verá el estado de Shalom':'🙈 Estado de Shalom solo en tu panel');
 }
 /* Verificar la sesión de Shalom Pro.
-   MUESTRA LA RESPUESTA CRUDA A PROPÓSITO. Shalom documenta qué mandar a
-   /instances/status pero no qué devuelve, y ya hubo dos vueltas caras por
-   suponer la forma de una respuesta (el traductor de /track buscaba `estados`
-   cuando el campo real era `statuses`). Así que primero se mide y después se
-   traduce: este cuadro enseña tal cual lo que llega, y cuando la forma esté
-   confirmada se reemplaza por un chip verde/rojo de una línea.
+
+   "Instancia encendida" y "sesión de Shalom viva" NO son lo mismo, y confundirlas
+   sale caro: la pantalla de Instancias puede decir Conectado (el robot corre)
+   mientras la cuenta está deslogueada y el robot quedó parado en /login. Este
+   botón mira la sesión, que es lo que decide si un registro va a funcionar.
+
+   La forma de la respuesta está MEDIDA, no supuesta (ver docs/SHALOM.md):
+     { isLoggedIn: boolean, username: string|null, url: string }
+   Quien la traduce es la Cloud Function; acá solo se pinta.
+
+   Si algún día Shalom cambia esa forma, `sesion.conocido` llega en false y este
+   cuadro vuelve a enseñar la respuesta cruda en vez de inventar un "conectado".
+   Ese camino se deja puesto a propósito: es el que permitió medir esto sin
+   desplegar una versión especial para mirar.
+
    No escribe en ningún pedido, no gasta envíos y no expone la clave: la clave
    vive en Secret Manager y quien habla con Shalom es la Cloud Function. */
 function verificarInstanciaShalom(){
@@ -2064,7 +2073,7 @@ function verificarInstanciaShalom(){
   caja.style.display='block';
   caja.innerHTML='<span style="color:#8b949e">Preguntándole a Shalom…</span>';
 
-  Shalom.estadoInstancia().then(function(r){
+  return Shalom.estadoInstancia().then(function(r){
     // Los motivos que sí conocemos son NUESTROS (los inventa la puerta única),
     // así que esos sí se traducen: no es suponer, es leer nuestro propio código.
     const nuestros={
@@ -2078,24 +2087,74 @@ function verificarInstanciaShalom(){
       caja.innerHTML='<span style="color:#f87171">❌ '+nuestros[r.motivo]+'</span>';
       return;
     }
-    const txt=JSON.stringify(r,null,1);
-    caja.innerHTML=
-      '<div style="color:#8b949e;margin-bottom:6px">Respuesta de Shalom (sin traducir todavía):</div>'+
-      '<pre id="shalomInstRaw" style="margin:0;padding:9px;border-radius:8px;background:var(--bg2);'+
-      'border:1px solid var(--bd);color:#e6edf3;font-size:11px;line-height:1.45;'+
-      'max-height:220px;overflow:auto;white-space:pre-wrap;word-break:break-word"></pre>'+
-      '<button type="button" onclick="copiarRespuestaInstancia()" style="width:100%;margin-top:8px;'+
-      'padding:9px;border-radius:9px;cursor:pointer;font-family:inherit;font-size:12px;font-weight:700;'+
-      'background:rgba(163,113,247,.15);border:1px solid rgba(163,113,247,.35);color:#a78bfa">📋 Copiar respuesta</button>';
-    // textContent y no innerHTML: lo que venga de Shalom se muestra como texto,
-    // nunca se interpreta como HTML.
-    document.getElementById('shalomInstRaw').textContent=txt;
+
+    const ses=r&&r.sesion;
+    if(ses&&ses.conocido){ _pintarSesionShalom(caja,ses); return; }
+
+    // Forma no reconocida: se enseña tal cual y no se afirma nada.
+    _pintarRespuestaCruda(caja,r,
+      'Shalom respondió algo con una forma que no reconozco. No voy a adivinar si la sesión está viva:');
   }).catch(function(e){
     caja.innerHTML='<span style="color:#f87171">❌ '+String((e&&e.message)||'error')+'</span>';
   }).then(function(){
     btn.disabled=false;
     btn.textContent='🔌 Verificar sesión de Shalom Pro';
   });
+}
+
+/* Pinta el resultado cuando la forma SÍ es la conocida. */
+function _pintarSesionShalom(caja,ses){
+  if(ses.conectada){
+    caja.innerHTML=
+      '<div style="padding:10px;border-radius:9px;background:rgba(34,197,94,.1);'+
+      'border:1px solid rgba(34,197,94,.3)">'+
+      '<div style="color:#22c55e;font-weight:700">✅ Sesión conectada</div>'+
+      '<div id="shalomInstUser" style="color:#8b949e;font-size:11.5px;margin-top:4px"></div>'+
+      '</div>';
+    // textContent: el nombre de la cuenta lo manda Shalom, se muestra como
+    // texto y nunca se interpreta como HTML.
+    document.getElementById('shalomInstUser').textContent =
+      ses.usuario ? ('Cuenta: '+ses.usuario+' · el registro automático puede funcionar.')
+                  : 'El registro automático puede funcionar.';
+    return;
+  }
+  caja.innerHTML=
+    '<div style="padding:10px;border-radius:9px;background:rgba(248,113,113,.1);'+
+    'border:1px solid rgba(248,113,113,.3)">'+
+    '<div style="color:#f87171;font-weight:700">⚠️ La sesión de Shalom Pro está caída</div>'+
+    '<div style="color:#8b949e;font-size:11.5px;margin-top:5px;line-height:1.5">'+
+    'La instancia sigue encendida, pero la cuenta se deslogueó: quedó parada en la '+
+    'pantalla de inicio de sesión. Mientras siga así, registrar envíos desde el panel '+
+    'no va a funcionar. Entra a tu cuenta de Shalom Pro y vuelve a presionar este botón.'+
+    '</div>'+
+    '<div id="shalomInstLink" style="margin-top:7px"></div>'+
+    '</div>';
+  // Solo se convierte en enlace si es https. Una URL que llega de afuera no se
+  // mete en un href a ciegas (javascript: sería un agujero).
+  const cont=document.getElementById('shalomInstLink');
+  const url=String(ses.url||'');
+  if(/^https:\/\//.test(url)){
+    const a=document.createElement('a');
+    a.href=url; a.target='_blank'; a.rel='noopener noreferrer';
+    a.textContent='🔗 Abrir Shalom Pro para iniciar sesión';
+    a.style.cssText='color:#388bfd;font-size:11.5px;font-weight:700;text-decoration:none';
+    cont.appendChild(a);
+  }
+}
+
+/* Enseña la respuesta tal cual llegó. Se usa cuando la forma no es la medida:
+   antes de traducir algo que no se entiende, se muestra. */
+function _pintarRespuestaCruda(caja,r,titulo){
+  caja.innerHTML=
+    '<div id="shalomInstTit" style="color:#8b949e;margin-bottom:6px"></div>'+
+    '<pre id="shalomInstRaw" style="margin:0;padding:9px;border-radius:8px;background:var(--bg2);'+
+    'border:1px solid var(--bd);color:#e6edf3;font-size:11px;line-height:1.45;'+
+    'max-height:220px;overflow:auto;white-space:pre-wrap;word-break:break-word"></pre>'+
+    '<button type="button" onclick="copiarRespuestaInstancia()" style="width:100%;margin-top:8px;'+
+    'padding:9px;border-radius:9px;cursor:pointer;font-family:inherit;font-size:12px;font-weight:700;'+
+    'background:rgba(163,113,247,.15);border:1px solid rgba(163,113,247,.35);color:#a78bfa">📋 Copiar respuesta</button>';
+  document.getElementById('shalomInstTit').textContent=titulo;
+  document.getElementById('shalomInstRaw').textContent=JSON.stringify(r,null,1);
 }
 function copiarRespuestaInstancia(){
   const pre=document.getElementById('shalomInstRaw');
@@ -3224,7 +3283,7 @@ render();
 <script src="config.js?v=18"></script>
 <script src="print.js?v=15"></script>
 <script src="notify.js?v=4"></script>
-<script src="shalom.js?v=8"></script>
+<script src="shalom.js?v=9"></script>
 <script src="tracking.js?v=13"></script>
 <script src="floatpanel.js?v=2"></script>
 <script src="delivery.js?v=7"></script>

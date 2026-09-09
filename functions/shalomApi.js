@@ -311,20 +311,52 @@ async function validate(apiKey) {
 }
 
 /**
+ * Interpreta la respuesta de /instances/status.
+ *
+ * FORMA MEDIDA (respuesta real del 2026-09-09, no supuesta):
+ *   { isLoggedIn: boolean, username: string|null, url: string }
+ *
+ * "Instancia encendida" y "sesion de Shalom viva" NO son lo mismo: la pantalla
+ * de Instancias puede decir Conectado (el robot corre) mientras isLoggedIn es
+ * false (la cuenta se deslogueo y el robot quedo parado en /login). Este
+ * traductor mira la sesion, que es lo que decide si un registro va a funcionar.
+ *
+ * Solo afirma algo cuando isLoggedIn es un booleano de verdad. Si Shalom
+ * cambia la forma, devuelve conocido:false y quien llama muestra la respuesta
+ * cruda — nunca un "conectado" que nadie midio. Esa es exactamente la regla
+ * que faltaba cuando el traductor de /track daba por bueno un formato que ya
+ * no existia.
+ * @param {*} data cuerpo devuelto por Shalom
+ * @return {Object} {conocido:false} o {conocido:true, conectada, usuario, url}
+ */
+function interpretarInstancia(data) {
+  const d = data && typeof data === "object" ? data : null;
+  if (!d || typeof d.isLoggedIn !== "boolean") return {conocido: false};
+  return {
+    conocido: true,
+    conectada: d.isLoggedIn,
+    usuario: typeof d.username === "string" && d.username ? d.username : null,
+    url: typeof d.url === "string" ? d.url : "",
+  };
+}
+
+/**
  * ¿La instancia de Shalom Pro sigue con sesion activa? Se llama ANTES de
  * intentar registrar un envio: si la sesion se cayo, es mejor enterarse con
  * un aviso claro que con 10 registros fallidos en fila sin saber por que.
- * Devuelve la respuesta CRUDA — todavia no esta medida la forma real (la
- * documentacion no la muestra), asi que interpretarla es prematuro. Usar
- * esquema(apiKey, 'instanceStatus') para verla antes de escribir el traductor.
+ * Devuelve la respuesta cruda en `data` Y su lectura en `sesion`. Las dos:
+ * la cruda deja diagnosticar el dia que Shalom cambie algo, sin tener que
+ * volver a desplegar una version especial para mirar.
  * @param {string} apiKey clave
- * @return {Promise<Object>} {ok:true, data} o {ok:false, motivo}
+ * @return {Promise<Object>} {ok:true, data, sesion} o {ok:false, motivo}
  */
 async function instanceStatus(apiKey) {
-  return llamar(apiKey, "/instances/status", {
+  const r = await llamar(apiKey, "/instances/status", {
     method: "POST",
     body: {instanceId: INSTANCE_ID},
   });
+  if (!r.ok) return r;
+  return {ok: true, data: r.data, sesion: interpretarInstancia(r.data)};
 }
 
 // ── Diagnostico: la FORMA de una respuesta, nunca su contenido ──────────────
@@ -453,4 +485,5 @@ module.exports = {
   track,
   validate,
   instanceStatus,
+  interpretarInstancia,
 };

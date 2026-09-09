@@ -56,6 +56,53 @@ Este documento explica **por qué** el rastreo automático de Shalom se retiró,
 volver a tocar nada de Shalom: aquí está la razón para no repetir caminos que ya
 sabemos que no funcionan.
 
+## El contrato de `POST /instances/status` — medido, no supuesto
+
+Igual que con `/track`, la documentación dice **qué enviar** pero no **qué
+devuelve**. Se midió con el botón *Verificar sesión de Shalom Pro*
+(Configuración → Configuración Shalom), que enseña la respuesta cruda.
+
+Enviado:
+
+```json
+{"instanceId": "<el id de la instancia>"}
+```
+
+Recibido (respuesta real, 2026-09-09):
+
+```json
+{
+  "isLoggedIn": false,
+  "username": null,
+  "url": "https://pro.shalom.pe/login"
+}
+```
+
+| Campo        | Tipo          | Qué significa                                      |
+|--------------|---------------|----------------------------------------------------|
+| `isLoggedIn` | `boolean`     | La cuenta tiene sesión abierta. **Este es el dato que decide si un registro va a funcionar.** |
+| `username`   | `string\|null` | Con qué cuenta está dentro. `null` cuando está fuera. |
+| `url`        | `string`      | En qué página quedó el robot. `…/login` = se deslogueó. |
+
+### "Instancia encendida" ≠ "sesión viva"
+
+Es la confusión cara de este endpoint. La pantalla de **Instancias** de Shalom
+puede decir **Conectado** —el robot está corriendo— mientras `isLoggedIn` es
+`false`: el robot corre, pero parado en la pantalla de login. Registrar envíos
+en ese estado falla, y falla sin decir por qué.
+
+Por eso el registro automático debe consultar esto **antes** de mandar un lote:
+un aviso claro vale más que diez fallos en fila.
+
+### La regla del traductor
+
+`interpretarInstancia()` (en `functions/shalomApi.js`) solo afirma algo cuando
+`isLoggedIn` es un booleano de verdad. Si Shalom cambia la forma, devuelve
+`{conocido:false}` y el panel vuelve a mostrar la respuesta cruda en lugar de
+inventar un "conectado". Es exactamente la regla que faltaba cuando el
+traductor de `/track` daba por bueno un formato que ya no existía.
+
+
 ## Resumen en una línea
 
 Todo lo de Shalom pasa ahora por una sola puerta — `shalom.js` — que hoy está

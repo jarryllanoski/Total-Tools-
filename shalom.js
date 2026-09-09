@@ -96,9 +96,19 @@
 
     /* ¿Sigue viva la sesión de Shalom Pro? Se llama ANTES de registrar un
        envío: si la sesión se cayó, es mejor un aviso claro que 10 registros
-       fallidos en fila sin saber por qué. Devuelve la respuesta CRUDA — la
-       forma todavía no está medida, así que el panel no la interpreta
-       todavía (ver Shalom.esquema(null,null,'instanceStatus')). */
+       fallidos en fila sin saber por qué.
+
+       OJO: "instancia encendida" ≠ "sesión viva". La pantalla de Instancias
+       puede decir Conectado (el robot corre) mientras la cuenta está
+       deslogueada y el robot quedó parado en /login. Lo que decide si un
+       registro va a funcionar es la sesión, y es lo que mira esto.
+
+       → { ok:true,
+           data:   {…}  respuesta cruda de Shalom, para diagnosticar
+           sesion: { conocido:true, conectada:true|false, usuario, url }
+                   { conocido:false }  si Shalom cambió la forma }
+       Con conocido:false el panel muestra la respuesta cruda en vez de
+       afirmar un estado que nadie midió. */
     estadoInstancia: function () {
       return _llamar('instanceStatus', {});
     },
