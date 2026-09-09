@@ -94,6 +94,15 @@
       return _llamar('validate', {});
     },
 
+    /* ¿Sigue viva la sesión de Shalom Pro? Se llama ANTES de registrar un
+       envío: si la sesión se cayó, es mejor un aviso claro que 10 registros
+       fallidos en fila sin saber por qué. Devuelve la respuesta CRUDA — la
+       forma todavía no está medida, así que el panel no la interpreta
+       todavía (ver Shalom.esquema(null,null,'instanceStatus')). */
+    estadoInstancia: function () {
+      return _llamar('instanceStatus', {});
+    },
+
     /* Diagnóstico: devuelve la FORMA de la respuesta de Shalom (nombres de
        campos y tipos, nunca valores) más cómo la interpreta hoy el traductor.
        Existe porque la documentación de la API describe qué enviar pero no qué

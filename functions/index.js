@@ -725,6 +725,14 @@ exports.shalomApi = onRequest(
           return;
         }
 
+        if (op === "instanceStatus") {
+          // Sesion de Shalom Pro viva o caida. Se llama antes de registrar,
+          // para avisar UNA vez en vez de que fallen 10 registros seguidos.
+          const r = await shalomApi.instanceStatus(clave);
+          res.status(r.ok ? 200 : 502).json(r);
+          return;
+        }
+
         if (op === "track") {
           const guia = String(
               cuerpo.orderNumber || req.query.orderNumber || "").trim();

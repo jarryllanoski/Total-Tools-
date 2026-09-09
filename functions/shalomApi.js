@@ -19,6 +19,14 @@
 const BASE = "https://api.shalom-api.lat";
 const TIMEOUT_MS = 20000;
 
+// La unica instancia de Shalom Pro del negocio (panel Shalom API → Instancias).
+// No es un secreto —identifica CUAL cuenta, no autoriza nada por si sola: sin
+// la API key en la cabecera, no sirve de nada— pero vive aca, no en el
+// navegador: el negocio tiene una sola cuenta, asi que el panel no necesita
+// saber su plomeria interna. Si algun dia hay mas de una instancia, esto pasa
+// a ser un parametro en vez de una constante.
+const INSTANCE_ID = "3524c6ef-99ad-4988-b62d-8f85d22dbe67";
+
 // ── Motivos de error (mismo vocabulario que el frontend en shalom.js) ────────
 const MOTIVO = {
   SIN_CLAVE: "SIN_CLAVE",
@@ -302,6 +310,23 @@ async function validate(apiKey) {
   return llamar(apiKey, "/validate");
 }
 
+/**
+ * ¿La instancia de Shalom Pro sigue con sesion activa? Se llama ANTES de
+ * intentar registrar un envio: si la sesion se cayo, es mejor enterarse con
+ * un aviso claro que con 10 registros fallidos en fila sin saber por que.
+ * Devuelve la respuesta CRUDA — todavia no esta medida la forma real (la
+ * documentacion no la muestra), asi que interpretarla es prematuro. Usar
+ * esquema(apiKey, 'instanceStatus') para verla antes de escribir el traductor.
+ * @param {string} apiKey clave
+ * @return {Promise<Object>} {ok:true, data} o {ok:false, motivo}
+ */
+async function instanceStatus(apiKey) {
+  return llamar(apiKey, "/instances/status", {
+    method: "POST",
+    body: {instanceId: INSTANCE_ID},
+  });
+}
+
 // ── Diagnostico: la FORMA de una respuesta, nunca su contenido ──────────────
 // La documentacion publica describe que enviar pero no que devuelve. En vez de
 // suponer la forma (y escribir un traductor contra una hipotesis), se mide: se
@@ -359,6 +384,7 @@ const DIAGNOSTICABLES = {
   }),
   agencies: (apiKey) => llamar(apiKey, "/agencies"),
   validate: (apiKey) => llamar(apiKey, "/validate"),
+  instanceStatus: (apiKey) => instanceStatus(apiKey),
 };
 
 /**
@@ -416,6 +442,7 @@ function _listaDe(data) {
 module.exports = {
   BASE,
   MOTIVO,
+  INSTANCE_ID,
   llamar,
   normalizarTrack,
   _pasosDesdeTexto,
@@ -425,4 +452,5 @@ module.exports = {
   agencies,
   track,
   validate,
+  instanceStatus,
 };
