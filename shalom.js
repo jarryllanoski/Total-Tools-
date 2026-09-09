@@ -123,6 +123,44 @@
 
     registrar: function () {
       return Promise.resolve(OFF);
+    },
+
+    /* Catálogo de cajas de Shalom (medidas oficiales de su app, ver
+       docs/SHALOM.md). No son rangos: son cajas fijas, así que la regla
+       correcta es "la más chica en la que el paquete entra" — nunca "el rango
+       donde cae la medida más grande". Las dimensiones se guardan YA
+       ordenadas de mayor a menor: comparar así deja elegir cualquier cara
+       como largo/ancho/alto sin perder el ajuste (una caja no distingue de
+       qué lado la acostás). "Sobre" queda afuera a propósito: es una
+       categoría de contenido (documentos), no un tamaño — no hay umbral
+       numérico que lo distinga de un paquete real. */
+    CATALOGO_CAJAS: [
+      {tipo: 'XXS', dims: [15, 10, 10], pesoMaxKg: 0.25},
+      {tipo: 'XS',  dims: [20, 15, 12], pesoMaxKg: 0.5},
+      {tipo: 'S',   dims: [30, 20, 12], pesoMaxKg: 2},
+      {tipo: 'M',   dims: [30, 24, 20], pesoMaxKg: 5},
+      {tipo: 'L',   dims: [42, 30, 23], pesoMaxKg: 10}
+    ],
+
+    /* Clasifica un paquete por sus medidas y peso.
+       → {tipo:'S', etiqueta:'Paquete S'}      la caja donde entra
+       → {tipo:'OTRA', etiqueta:'Otra Medida'} no entra en ninguna (grande o pesada)
+       → null                                  faltan datos: no se puede clasificar
+       Nunca lanza — datos incompletos o inválidos devuelven null, no un error. */
+    clasificarPaquete: function (largo, ancho, alto, peso) {
+      var l = parseFloat(largo), a = parseFloat(ancho),
+          h = parseFloat(alto), p = parseFloat(peso);
+      if (!(l > 0) || !(a > 0) || !(h > 0) || !(p > 0)) return null;
+      var dims = [l, a, h].sort(function (x, y) { return y - x; });
+      var cajas = this.CATALOGO_CAJAS;
+      for (var i = 0; i < cajas.length; i++) {
+        var c = cajas[i];
+        if (dims[0] <= c.dims[0] && dims[1] <= c.dims[1] &&
+            dims[2] <= c.dims[2] && p <= c.pesoMaxKg) {
+          return {tipo: c.tipo, etiqueta: 'Paquete ' + c.tipo};
+        }
+      }
+      return {tipo: 'OTRA', etiqueta: 'Otra Medida'};
     }
   };
 

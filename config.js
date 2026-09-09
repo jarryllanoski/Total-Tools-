@@ -459,6 +459,11 @@ function openForm(id){
       if($('fDlvDriver'))      $('fDlvDriver').value      = s._dlvDriver||'';
       if($('fDlvDriverPhone')) $('fDlvDriverPhone').value = s._dlvDriverPhone||'';
       if($('fDlvRutaLink'))    $('fDlvRutaLink').value    = s._dlvRutaLink||'';
+      if($('fPkgLargo')) $('fPkgLargo').value = s.pkgLargo||'';
+      if($('fPkgAncho')) $('fPkgAncho').value = s.pkgAncho||'';
+      if($('fPkgAlto'))  $('fPkgAlto').value  = s.pkgAlto||'';
+      if($('fPkgPeso'))  $('fPkgPeso').value  = s.pkgPeso||'';
+      if(typeof _pkgClasificar==='function') _pkgClasificar(); // pinta el tipo ya guardado
       _pintarShalomEstado(s.trackingStatus);
     }
   } else {
@@ -468,6 +473,11 @@ function openForm(id){
     if($('fDlvDriver'))      $('fDlvDriver').value      = '';
     if($('fDlvDriverPhone')) $('fDlvDriverPhone').value = '';
     if($('fDlvRutaLink'))    $('fDlvRutaLink').value    = '';
+    if($('fPkgLargo')) $('fPkgLargo').value = '';
+    if($('fPkgAncho')) $('fPkgAncho').value = '';
+    if($('fPkgAlto'))  $('fPkgAlto').value  = '';
+    if($('fPkgPeso'))  $('fPkgPeso').value  = '';
+    if(typeof _pkgClasificar==='function') _pkgClasificar(); // limpia el badge
   }
   _showShalomBlock();
   if($('fPaste')) $('fPaste').value='';
@@ -711,6 +721,17 @@ function saveShipment(){
   const _sCodigo = ($('fShalomCodigo') ? $('fShalomCodigo').value.trim() : '')||'';
   if(_sGuia)  { data.trackingOrderNumber=_sGuia;   data.shalomGuia=_sGuia; }
   if(_sCodigo){ data.trackingOrderCode  =_sCodigo; data.shalomCodigo=_sCodigo; }
+  // ★ MEDIDAS DEL PAQUETE: se guardan tal cual (vacío → '', nunca undefined,
+  // para que "borrar la medida" se propague a la nube igual que cualquier
+  // otro campo). pkgTipo se guarda ya calculado — barato de leer después
+  // (ej. filtrar "quién tiene medidas puestas") sin repetir la cuenta cada vez.
+  const _pkgL=($('fPkgLargo')||{value:''}).value.trim();
+  const _pkgA=($('fPkgAncho')||{value:''}).value.trim();
+  const _pkgH=($('fPkgAlto') ||{value:''}).value.trim();
+  const _pkgP=($('fPkgPeso') ||{value:''}).value.trim();
+  data.pkgLargo=_pkgL; data.pkgAncho=_pkgA; data.pkgAlto=_pkgH; data.pkgPeso=_pkgP;
+  const _pkgClasif=(window.Shalom&&Shalom.clasificarPaquete)?Shalom.clasificarPaquete(_pkgL,_pkgA,_pkgH,_pkgP):null;
+  data.pkgTipo=_pkgClasif?_pkgClasif.tipo:'';
   // (La cola del seguimiento automático se retiró: escribía
   // trackingWebProximaConsulta para el Motor B, que ya no existe. Ver shalom.js.)
   // ★ DELIVERY: motorizado (nombre, teléfono) + link inDriver. Solo se tocan si el

@@ -682,6 +682,27 @@
         <div class="fg"><label class="fl">Número de guía</label><input class="fi" id="fShalomGuia" placeholder="Ej: 82037653" style="font-family:monospace" inputmode="numeric" oninput="if(typeof _updateShalomMic==='function')_updateShalomMic()"></div>
         <div class="fg"><label class="fl">Código</label><input class="fi" id="fShalomCodigo" placeholder="TT9C" style="font-family:monospace;text-transform:uppercase" oninput="this.value=this.value.toUpperCase()" maxlength="8"></div>
       </div>
+      <!-- ★ MEDIDAS DEL PAQUETE: mismo patrón que "📎 Documentos del envío"
+           (clase docs-accordion, genérica). El tipo se calcula al vuelo con
+           Shalom.clasificarPaquete — nada se manda a ningún lado todavía; solo
+           se guarda con el pedido para cuando exista el registro automático. -->
+      <div class="docs-accordion" style="margin-top:9px">
+        <div class="docs-accordion-hdr" onclick="togglePkgAccordion()">
+          <span class="docs-accordion-ttl">📦 Medidas del paquete</span>
+          <span class="docs-accordion-arrow" id="pkgArrow">▾</span>
+        </div>
+        <div class="docs-accordion-body" id="pkgBody">
+          <div class="frow">
+            <div class="fg"><label class="fl">Largo (cm)</label><input class="fi" id="fPkgLargo" type="number" min="0" step="0.5" inputmode="decimal" placeholder="0" oninput="_pkgClasificar()"></div>
+            <div class="fg"><label class="fl">Ancho (cm)</label><input class="fi" id="fPkgAncho" type="number" min="0" step="0.5" inputmode="decimal" placeholder="0" oninput="_pkgClasificar()"></div>
+          </div>
+          <div class="frow" style="margin-top:9px">
+            <div class="fg"><label class="fl">Alto (cm)</label><input class="fi" id="fPkgAlto" type="number" min="0" step="0.5" inputmode="decimal" placeholder="0" oninput="_pkgClasificar()"></div>
+            <div class="fg"><label class="fl">Peso (kg)</label><input class="fi" id="fPkgPeso" type="number" min="0" step="0.05" inputmode="decimal" placeholder="0" oninput="_pkgClasificar()"></div>
+          </div>
+          <div id="pkgTipoResultado" style="display:none;margin-top:10px;padding:9px 12px;border-radius:9px;font-size:12.5px;font-weight:700;text-align:center"></div>
+        </div>
+      </div>
     </div>
     <!-- ★ DELIVERY: bloque motorizado (mismo patrón que Guía Shalom) -->
     <div id="dlvDriverBlock" style="display:none;background:rgba(163,113,247,.06);border:1px solid rgba(163,113,247,.18);border-radius:10px;padding:12px;margin-bottom:11px">
@@ -3106,10 +3127,10 @@ render();
 </script>
 <!-- ★ SHALOM tracking — cargado al final -->
 <script src="storage.js?v=3"></script>
-<script src="config.js?v=17"></script>
+<script src="config.js?v=18"></script>
 <script src="print.js?v=15"></script>
 <script src="notify.js?v=4"></script>
-<script src="shalom.js?v=6"></script>
+<script src="shalom.js?v=7"></script>
 <script src="tracking.js?v=13"></script>
 <script src="floatpanel.js?v=2"></script>
 <script src="delivery.js?v=7"></script>
@@ -3131,6 +3152,31 @@ function toggleDocsAccordion(){
   var isOpen = body.classList.contains('open');
   body.classList.toggle('open', !isOpen);
   arrow.classList.toggle('open', !isOpen);
+}
+
+function togglePkgAccordion(){
+  var body = document.getElementById('pkgBody');
+  var arrow = document.getElementById('pkgArrow');
+  if(!body||!arrow) return;
+  var isOpen = body.classList.contains('open');
+  body.classList.toggle('open', !isOpen);
+  arrow.classList.toggle('open', !isOpen);
+}
+
+/* Lee los 4 campos de medidas y pinta el tipo de caja al instante — sin
+   guardar nada, sin llamar a nadie. Usa la puerta única (Shalom.clasificarPaquete)
+   para que el mismo cálculo sirva acá y en el registro en lote más adelante. */
+function _pkgClasificar(){
+  var el = document.getElementById('pkgTipoResultado'); if(!el) return;
+  var l = ($('fPkgLargo')||{}).value, a = ($('fPkgAncho')||{}).value,
+      h = ($('fPkgAlto')||{}).value,  p = ($('fPkgPeso')||{}).value;
+  var r = (window.Shalom && Shalom.clasificarPaquete) ? Shalom.clasificarPaquete(l,a,h,p) : null;
+  if(!r){ el.style.display='none'; el.textContent=''; return; }
+  var esOtra = r.tipo === 'OTRA';
+  el.style.background = esOtra ? 'rgba(210,153,34,.15)' : 'rgba(46,160,67,.15)';
+  el.style.color      = esOtra ? '#d29922' : 'var(--green,#2ea043)';
+  el.textContent = (esOtra ? '⚠️ ' : '📦 ') + r.etiqueta;
+  el.style.display = 'block';
 }
 
 // Al abrir el form, cerrar el acordeón por defecto
