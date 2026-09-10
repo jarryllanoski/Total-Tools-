@@ -2079,7 +2079,9 @@ function verificarInstanciaShalom(){
     const nuestros={
       SIN_RED:'Sin internet. Revisa tu conexión y reintenta.',
       DESCONECTADO:'Este navegador no puede hacer la consulta.',
-      BLOQUEADO:'Tu sesión del panel no tiene permiso. Vuelve a entrar.',
+      SIN_SESION:'Tu sesión del panel venció. Cierra sesión y vuelve a entrar.',
+      SIN_PERMISO:'Entraste bien, pero tu cuenta no está autorizada para esto.',
+      BLOQUEADO:'Shalom rechazó la clave de la API o el plan venció.',
       LIMITE:'Se agotó la cuota del plan de Shalom.',
       ERROR_SHALOM:'Shalom respondió con un error. Reintenta en unos minutos.'
     };
@@ -3283,8 +3285,8 @@ render();
 <script src="config.js?v=18"></script>
 <script src="print.js?v=15"></script>
 <script src="notify.js?v=4"></script>
-<script src="shalom.js?v=9"></script>
-<script src="tracking.js?v=13"></script>
+<script src="shalom.js?v=10"></script>
+<script src="tracking.js?v=14"></script>
 <script src="floatpanel.js?v=2"></script>
 <script src="delivery.js?v=7"></script>
 <script src="qrtracking.js?v=3"></script>

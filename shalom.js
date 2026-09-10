@@ -26,9 +26,15 @@
  *   registrar(pedido)      → { ok:true, guia:'…', codigo:'…' }
  *
  *   En error, todos: { ok:false, motivo:CODIGO }
- *     DESCONECTADO · NO_ENCONTRADO · BLOQUEADO (clave/plan) · SIN_DATO
- *     · ERROR_SHALOM (tropiezo temporal del lado de Shalom, no del dato)
- *     · LIMITE (cuota agotada) · FORMATO_DESCONOCIDO (respuesta no reconocida)
+ *     Del lado de SHALOM:
+ *       NO_ENCONTRADO · BLOQUEADO (su clave o su plan) · LIMITE (cuota agotada)
+ *       · ERROR_SHALOM (tropiezo temporal suyo, no del dato)
+ *       · FORMATO_DESCONOCIDO (respondió algo que no reconocemos)
+ *     Del lado del PANEL (nada que ver con Shalom, y por eso van aparte):
+ *       SIN_SESION (tu sesión venció) · SIN_PERMISO (tu cuenta no está en la
+ *       lista de administradores) · SIN_RED · DESCONECTADO · SIN_DATO
+ *   Mezclar los dos lados manda a revisar la cuenta de Shalom cuando el
+ *   problema es la sesión del panel. Ya pasó una vez; por eso están separados.
  *   REGLA DE ORO: jamás ok:true sin dato real. Sin estado → ok:false. (La
  *   lección más cara: el éxito falso ocultó días de fallo.)
  */
@@ -67,8 +73,25 @@
         body: JSON.stringify(cuerpo || {})
       });
     }).then(function (r) {
+      /* 401 y 403 acá son de NUESTRA función, no de Shalom: es la puerta del
+         panel diciendo "no sé quién eres" o "no estás en la lista". Antes los
+         dos se traducían a BLOQUEADO, que en pantalla se lee como "la clave de
+         la API no es válida o el plan venció" — y mandaba a revisar la cuenta
+         de Shalom cuando lo único que pasaba era que la sesión del panel había
+         vencido. Dos causas distintas, dos arreglos distintos, un solo aviso:
+         eso es lo que hace perder una tarde.
+           401 → tu sesión del panel venció o no llegó el token.
+           403 → entraste bien, pero tu cuenta no está autorizada. */
       if (r.status === 401 || r.status === 403) {
-        return {ok: false, motivo: 'BLOQUEADO'};
+        var esPermiso = r.status === 403;
+        return r.json().catch(function () { return {}; }).then(function (b) {
+          return {
+            ok: false,
+            motivo: esPermiso ? 'SIN_PERMISO' : 'SIN_SESION',
+            http: r.status,
+            detalle: (b && b.motivo) || ''
+          };
+        });
       }
       return r.json().catch(function () {
         return {ok: false, motivo: 'ERROR_SHALOM'};

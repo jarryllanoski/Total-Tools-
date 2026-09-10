@@ -55,14 +55,39 @@ function detectarEstadoAuto(estadoTexto) {
 /* Traduce un código de motivo a un aviso en español (honesto, nunca mudo).
    Cada motivo dice qué pasó Y qué hacer: un aviso que no orienta obliga a
    adivinar, y adivinar sobre un envío de un cliente sale caro. */
-function _motivoTexto(motivo){
+/* Pega la explicación de Shalom al aviso, si la dio. Se recorta porque un
+   aviso flotante que no se alcanza a leer no sirve, y se limpia el HTML
+   porque el texto viene de afuera. */
+function _conDetalle(detalle){
+  var d = String(detalle == null ? '' : detalle).replace(/<[^>]*>/g, '').trim();
+  if (!d) return '';
+  if (d.length > 90) d = d.slice(0, 89) + '…';
+  return ' (' + d + ')';
+}
+
+function _motivoTexto(motivo, detalle){
   switch (motivo) {
     case 'DESCONECTADO':  return '🔧 Rastreo Shalom en reconstrucción';
     case 'NO_ENCONTRADO': return '⚠️ Shalom no encontró esa guía — verifica número y código';
-    case 'BLOQUEADO':     return '🔑 La clave de la API no es válida o el plan venció — revisa tu panel de Shalom API';
+    // Estos dos son del PANEL, no de Shalom. Antes los dos caían en BLOQUEADO
+    // y mandaban a revisar la cuenta de Shalom cuando lo único que pasaba era
+    // que la sesión había vencido: media tarde perdida mirando el lugar
+    // equivocado. El aviso tiene que apuntar al arreglo correcto.
+    case 'SIN_SESION':    return '🔒 Tu sesión del panel venció — cierra sesión y vuelve a entrar';
+    case 'SIN_PERMISO':   return '🚫 Tu cuenta entró bien, pero no está autorizada para consultar Shalom';
+    // De acá para abajo el problema es de Shalom. Cuando Shalom explica por
+    // qué falló, su explicación se repite TAL CUAL entre paréntesis: sin eso,
+    // "error temporal" se ve igual el día que es un tropiezo de un minuto y el
+    // día que su sesión está caída y nada va a andar hasta que vuelvas a
+    // entrar. La misma frase para dos mundos distintos es lo que hace
+    // reintentar veinte veces sin avanzar.
+    case 'BLOQUEADO':     return '🔑 Shalom rechazó la clave o el plan venció' +
+      _conDetalle(detalle) + ' — revisa tu panel de Shalom API';
     case 'LIMITE':        return '⏳ Se agotó la cuota del plan por ahora — reintenta más tarde';
-    case 'SIN_DATO':      return '⚠️ Shalom no devolvió estado — reintenta en un momento';
-    case 'ERROR_SHALOM':  return '⚠️ Shalom tuvo un error temporal — reintenta en un momento';
+    case 'SIN_DATO':      return '⚠️ Shalom no devolvió estado' + _conDetalle(detalle) +
+      ' — reintenta en un momento';
+    case 'ERROR_SHALOM':  return '⚠️ Shalom tuvo un error' + _conDetalle(detalle) +
+      ' — reintenta en un momento';
     case 'SIN_RED':       return '📡 Sin conexión — revisa tu internet y reintenta';
     // La respuesta llegó pero no se reconoció su forma. NO se inventa un
     // estado: se avisa para poder ajustar el traductor con el dato real.
@@ -92,7 +117,16 @@ function _escribirTracking(ship, estado, fecha, origen){
    Mueve la etiqueta respetando el modo (off/semi/auto) y sin retroceder jamás. */
 function _aplicarEstadoShalom(ship, resp, origen){
   ship.trackingLastAutoCheck = Date.now();
-  if (!resp || !resp.ok) return {cambio: false, motivo: (resp && resp.motivo) || 'SIN_DATO'};
+  if (!resp || !resp.ok) {
+    // `detalle` viaja junto al motivo: cuando Shalom explica el rechazo,
+    // el aviso repite su explicación en vez de inventar una. Si no explicó
+    // nada, va el código HTTP: es poco, pero es un hecho — y un hecho corto
+    // vale más que un "error temporal" que no distingue nada.
+    return {cambio: false,
+            motivo: (resp && resp.motivo) || 'SIN_DATO',
+            detalle: (resp && resp.detalle) ||
+                     (resp && resp.http ? 'HTTP ' + resp.http : '')};
+  }
 
   // El estado semántico viene de la barra de pasos (más robusto) o, si no, del
   // texto. pasos: 0 origen · 1 tránsito · 2 destino · 3 entregado.
@@ -651,7 +685,7 @@ Tracking.consultarAhora = async function(shipId) {
         '🔄 Ahora: ' + estado);
     }
   } else {
-    if (window.toast) window.toast(_motivoTexto(r.motivo));
+    if (window.toast) window.toast(_motivoTexto(r.motivo, r.detalle));
   }
   // Se restaura SIEMPRE, en los dos caminos. Antes solo se hacía en el de
   // error: el otro confiaba en que render() redibujara la tarjeta, y si el
@@ -670,18 +704,18 @@ Tracking.bulkTrack = async function(ids) {
   });
   if (!ships.length) { if (window.toast) window.toast('Nada Shalom para consultar'); return; }
   if (window.toast) window.toast('⏳ Consultando ' + ships.length + ' Shalom...');
-  var ok = 0, err = 0, changed = [], ultimoMotivo = null;
+  var ok = 0, err = 0, changed = [], ultimoMotivo = null, ultimoDetalle = '';
   for (var i = 0; i < ships.length; i++) {
     var r = await _consultarYAplicar(ships[i]);
     if (r.cambio) { ok++; changed.push(ships[i].id); }
-    else { err++; ultimoMotivo = r.motivo; }
+    else { err++; ultimoMotivo = r.motivo; ultimoDetalle = r.detalle; }
     if (i < ships.length - 1) await new Promise(function(res){ setTimeout(res, 700); });
   }
   if (changed.length && window.save) window.save(changed);
   if (window.render) window.render();
   if (window.toast) {
     // Si NINGUNO respondió, di el motivo (p.ej. desconectado); si algunos sí, resume.
-    if (!ok && ultimoMotivo) window.toast(_motivoTexto(ultimoMotivo));
+    if (!ok && ultimoMotivo) window.toast(_motivoTexto(ultimoMotivo, ultimoDetalle));
     else window.toast('✅ ' + ok + ' consultado' + (ok!==1?'s':'') + (err ? ' · ' + err + ' sin dato' : ''));
   }
 };
