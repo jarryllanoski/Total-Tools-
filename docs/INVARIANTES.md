@@ -66,6 +66,53 @@ datos no aporta nada, pero **ya nadie los lee**.
 
 ---
 
+## 2 bis. Un envío no desanda el camino
+
+**Invariante (11 sep 2026): `ship.trackingStatus` nunca retrocede solo.**
+
+El recorrido tiene un orden y es de una sola dirección:
+
+```
+0 origen · registrado → 1 tránsito → 2 destino · reparto → 3 entregado
+```
+
+La **etiqueta** (`ship.status`) llevaba años con esta protección. El **texto
+del tracking** no la tenía, y por eso una respuesta peor podía pisar una
+buena. Pasó dos veces en la vida real (ver `docs/SHALOM.md`): una guía
+Entregada volvió a mostrarse como "Demora de envíos", y otra que ya estaba En
+destino se quedó en "En tránsito".
+
+**Dónde vive la guarda** — en los dos sitios que escriben, porque son dos
+caminos distintos hacia el mismo campo:
+
+| Quién escribe | Dónde | Qué hace al detectar un retroceso |
+|---|---|---|
+| El panel (botón ⟳, masivo) | `tracking.js:_aplicarEstadoShalom` | no escribe; el aviso lo dice |
+| El webhook de Shalom | `functions/index.js:shalomWebhook` | no escribe; lo anota como `RETROCESO_BLOQUEADO` |
+
+**Reglas de la guarda** (las tres importan):
+
+1. **Solo bloquea el retroceso demostrable.** Los dos textos tienen que ser
+   reconocibles y el nuevo estrictamente anterior. Un texto que no se sabe
+   clasificar **nunca** bloquea — si no, los pedidos hoy mal guardados
+   quedarían congelados para siempre en el estado equivocado.
+2. **El operador es la excepción.** Un estado puesto a mano (`origen ===
+   'manual'`) pasa siempre. La guarda existe para atajar datos, no personas.
+3. **Nunca es silenciosa.** Bloquear y callar sería peor que el bug original:
+   el panel dice qué llegó y por qué no se aplicó.
+
+**El vocabulario está duplicado a propósito**: `_idxDeTexto` en
+`functions/shalomApi.js` (servidor) y `_rangoDeTexto` en `tracking.js`
+(navegador). Uno no puede importar al otro. **Si cambias las palabras de uno,
+cámbialas en el otro** — hay una prueba que compara las dos listas.
+
+> **Ojo con la demora.** "Demora de envíos" devuelve `null` en las dos copias,
+> a propósito: no es un punto del recorrido, es algo que le pasa a un envío en
+> camino. Tratarla como punto es exactamente lo que la dejaba pisar un
+> "Entregado".
+
+---
+
 ## 3. Cómo se lee lo que dice Shalom
 
 `tracking.js:detectarEstadoAuto` y su copia en `shalomWebSync.js`.

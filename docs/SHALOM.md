@@ -36,9 +36,52 @@ Siete claves. Cada una es `null` mientras no ocurra, y un objeto con `fecha`
 | `entregado` | 3 | |
 | `demora` | — | **no es un paso**: es una condición que se superpone |
 
+### Quién manda: el recorrido, no la redacción
+
 `statuses.message` trae la redacción del propio Shalom ("En tránsito",
-"Entregado"). **Se prefiere sobre nuestro texto**: es lo que el cliente ve en
-la web de Shalom, y que el panel dijera otra cosa sería confuso al comparar.
+"Entregado"). Durante un tiempo esta página decía que `message` **se prefiere
+sobre nuestro texto**, y el traductor lo cumplía al pie de la letra: el
+`message` pisaba siempre al paso encontrado. Esa regla estaba mal y costó dos
+fallos reales, con la misma forma:
+
+| Guía | Shalom en su web | El panel mostraba |
+|---|---|---|
+| `94790771` | Entregado (08/09, 17:15) | **Demora de envíos** |
+| `95046118` | En destino (11/09, 08:34) | **En tránsito** |
+
+En los dos casos el árbol de pasos estaba **bien** y `message` estaba
+atrasado o describía otra cosa. La regla correcta:
+
+> **El árbol de pasos es un hecho fechado; `message` es una frase.
+> Cuando se contradicen, gana el hecho.**
+
+En concreto, `normalizarTrack` clasifica el `message` con el mismo vocabulario
+que los pasos (`_idxDeTexto`) y decide:
+
+| Situación | Qué se muestra |
+|---|---|
+| `message` concuerda con el paso | **`message`** — es la palabra que el cliente ve en la web |
+| `message` contradice al paso | **el texto del paso**, y se anota `discrepancia` |
+| `message` no se puede clasificar | **`message`** — una frase desconocida no contradice nada |
+| `message` vacío | el texto del paso |
+
+Lo que **no** se hace es callar la contradicción: el campo `discrepancia`
+viaja en la respuesta para que se pueda medir si Shalom cambió algo.
+
+#### La demora es una condición, no un estado
+
+`demora` solo se muestra cuando el tramo más avanzado es `transito` o
+anterior (`idx <= 1`). Un envío que ya llegó a la agencia no está "demorado":
+está listo para recoger, y decir otra cosa manda al cliente a buscar un
+paquete que ya está ahí. El dato no se pierde — viaja como `demorado:true`.
+
+#### `search.data.entregado` ya no se guarda para nada
+
+Ese booleano se recogía y no se miraba, que es justo el dato que habría
+delatado el primer fallo. Ahora se usa, y **solo hacia adelante**: si Shalom
+afirma que se entregó y el árbol todavía no lo registra, se cree la
+afirmación (`ascendido:"search.entregado"`). Al revés no — un paso fechado
+pesa más que un booleano, así que un `false` nunca deshace un `entregado`.
 
 ### `search.data` — detalles del envío
 

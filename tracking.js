@@ -116,8 +116,11 @@ function _escribirTracking(ship, estado, fecha, origen){
      { cambio:false, motivo }   ← sin dato real: NO toca el pedido (nunca finge)
    Mueve la etiqueta respetando el modo (off/semi/auto) y sin retroceder jamás. */
 function _aplicarEstadoShalom(ship, resp, origen){
-  ship.trackingLastAutoCheck = Date.now();
   if (!resp || !resp.ok) {
+    // La hora de consulta se estampa SOLO si la consulta sirvió. Antes se
+    // estampaba en la primera línea, antes de mirar la respuesta: una consulta
+    // fallida también quedaba marcada como "visto", que es decir que se miró
+    // cuando no se pudo ver nada.
     // `detalle` viaja junto al motivo: cuando Shalom explica el rechazo,
     // el aviso repite su explicación en vez de inventar una. Si no explicó
     // nada, va el código HTTP: es poco, pero es un hecho — y un hecho corto
@@ -127,6 +130,7 @@ function _aplicarEstadoShalom(ship, resp, origen){
             detalle: (resp && resp.detalle) ||
                      (resp && resp.http ? 'HTTP ' + resp.http : '')};
   }
+  ship.trackingLastAutoCheck = Date.now();
 
   // El estado semántico viene de la barra de pasos (más robusto) o, si no, del
   // texto. pasos: 0 origen · 1 tránsito · 2 destino · 3 entregado.
@@ -141,6 +145,33 @@ function _aplicarEstadoShalom(ship, resp, origen){
   if (!estadoTexto && autoEstado == null) {
     return {cambio: false, motivo: 'SIN_DATO'}; // ni texto ni barra → no inventamos
   }
+
+  /* ── GUARDA DE NO RETROCESO ────────────────────────────────────────────
+     Un envío no desanda el camino. La etiqueta del pedido ya tenía esta
+     protección; el texto del tracking no, y por eso una respuesta peor podía
+     pisar una buena: una guía Entregada volvió a mostrarse como "Demora de
+     envíos" y otra En destino se quedó en "En tránsito".
+
+     Solo bloquea cuando se puede DEMOSTRAR el retroceso: ambos textos tienen
+     que ser reconocibles y el nuevo estrictamente anterior. Un texto que no
+     sabemos clasificar nunca bloquea — así los pedidos que hoy están mal
+     guardados (por ejemplo, con "Demora de envíos" encima de un Entregado)
+     se pueden corregir con una consulta, en vez de quedar congelados.
+
+     El operador es la excepción: si el estado lo pone a mano (origen
+     'manual'), manda él. La guarda existe para atajar datos, no personas. */
+  var rangoNuevo = (typeof resp.pasos === 'number') ? resp.pasos
+                                                    : _rangoDeTexto(estadoTexto);
+  var rangoViejo = _rangoDeTexto(ship.trackingStatus);
+  var esManual = origen === 'manual';
+  if (!esManual && rangoNuevo !== null && rangoViejo !== null &&
+      rangoNuevo < rangoViejo) {
+    return {cambio: true, escribio: false, avanzo: false, retroceso: true,
+            resultado: 'ok', estado: ship.trackingStatus,
+            intento: estadoTexto};
+  }
+  var avanzo = (rangoNuevo !== null && rangoViejo !== null &&
+                rangoNuevo > rangoViejo);
 
   // 1) Tracking visible: se escribe siempre que el texto cambie.
   //    `escribio` distingue dos cosas que antes se veían idénticas desde
@@ -164,10 +195,39 @@ function _aplicarEstadoShalom(ship, resp, origen){
   else if (autoEstado === 'FINALIZADO')        resultado = 'FINALIZADO';
   else if (autoEstado === 'EN_DESTINO')        resultado = 'EN_DESTINO';
 
-  // `cambio` = Shalom contestó con un dato real (se pudo aplicar).
+  // `cambio`   = Shalom contestó con un dato real (se pudo aplicar).
   // `escribio` = ese dato era distinto al que ya teníamos.
-  return {cambio: true, escribio: escribio, resultado: resultado,
-    estado: estadoTexto};
+  // `avanzo`   = el paquete llegó más lejos que la última vez. Es lo que
+  //              decide si hay algo que CONTAR, y no puede depender de
+  //              `escribio`: un envío puede avanzar de "En tránsito" a
+  //              "En destino" con el mismo texto guardado, y ese caso —
+  //              justo el que se nos escapó con la guía 95046118 — se
+  //              anunciaba como "sin cambios".
+  return {cambio: true, escribio: escribio, avanzo: avanzo,
+    resultado: resultado, estado: estadoTexto};
+}
+
+/* Lee un texto de estado y dice en qué punto del recorrido cae:
+     0 origen · 1 tránsito · 2 destino · 3 entregado · null = no se reconoce
+   "Demora de envíos" devuelve null A PROPÓSITO: una demora no es un punto del
+   recorrido, es algo que le pasa a un envío en camino. Tratarla como punto es
+   lo que hacía que pisara un "Entregado".
+
+   ⚠️ Espejo de `_idxDeTexto` en functions/shalomApi.js. Son dos copias porque
+   una vive en el navegador y la otra en el servidor; si cambias el vocabulario
+   en una, cámbialo en la otra. Las pruebas comparan las dos. */
+function _rangoDeTexto(t){
+  var u = String(t || '').toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+  if (!u.trim()) return null;
+  if (u.indexOf('DEMORA') >= 0 || u.indexOf('RETRAS') >= 0) return null;
+  if (u.indexOf('ENTREGAD') >= 0) return 3;
+  if (u.indexOf('REPART') >= 0) return 2;
+  if (u.indexOf('DESTINO') >= 0 || u.indexOf('AGENCIA') >= 0 ||
+      u.indexOf('RECOJO') >= 0 || u.indexOf('RECOGER') >= 0) return 2;
+  if (u.indexOf('TRANSITO') >= 0 || u.indexOf('CAMINO') >= 0 ||
+      u.indexOf('RUTA') >= 0) return 1;
+  if (u.indexOf('ORIGEN') >= 0 || u.indexOf('REGISTRAD') >= 0) return 0;
+  return null;
 }
 
 /* ══════════════════════════════════════════════
@@ -443,20 +503,21 @@ function _estadoChip(ship) {
   else if (u.includes('ERROR')   || u.includes('NO SE'))       { cls='trk-chip-err';  ico='⚠'; }
   else                                                           { cls='trk-chip-pend'; ico='📦'; }
 
-  // La fecha del chip contaba solo CUÁNDO CAMBIÓ el estado. Un paquete puede
-  // pasar días en "En tránsito": consultabas, todo funcionaba, y el chip
-  // seguía diciendo "hace 5 días" — indistinguible de que el botón no hiciera
-  // nada. Por eso, cuando la última consulta es más reciente que el último
-  // cambio, se muestra ella: así tocar Consultar SIEMPRE se nota.
-  var cambio = ship.trackingLastUpdate ? new Date(ship.trackingLastUpdate).getTime() : 0;
-  var visto  = Number(ship.trackingLastAutoCheck) || 0;
-  var sello  = '';
-  if (visto > cambio + 60000) {
-    sello = 'visto ' + _haceCuanto(visto);
-  } else if (cambio) {
-    sello = new Date(cambio).toLocaleString('es-PE',
-        {day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
-  }
+  /* FECHA DEL CAMBIO, SIEMPRE. Hubo una vuelta acá que conviene no repetir:
+     por un tiempo el chip mostró "visto hace X" (la hora de la última
+     consulta) en lugar de la fecha del cambio. Resolvía una queja real —
+     un paquete puede pasar días en "En tránsito" y presionar Consultar
+     parecía no hacer nada— pero la resolvía tirando el dato: para trabajar
+     sirve saber CUÁNDO se movió el paquete, no cuándo lo miré.
+     Que la consulta se note es trabajo del aviso ("✓ Sin cambios — sigue
+     En tránsito"), que sale en cada clic. La hora de la última consulta
+     sigue guardada y se ve en el Historial, donde hay sitio. */
+  var sello = ship.trackingLastUpdate ?
+    new Date(ship.trackingLastUpdate).toLocaleString('es-PE',
+      {day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}) : '';
+  // Una fecha ilegible es peor que ninguna: si el dato guardado no es una
+  // fecha válida, el chip va sin sello en vez de decir "Invalid Date".
+  if (sello && /invalid/i.test(sello)) sello = '';
 
   return '<div class="trk-chip '+cls+'" onclick="Tracking.verHistorial(\''+_esc(ship.id)+'\')">'+
     ico+' '+_esc(st)+
@@ -651,6 +712,30 @@ async function _consultarYAplicar(ship){
   return _aplicarEstadoShalom(ship, resp);
 }
 
+/* El aviso de una consulta, en un solo sitio.
+
+   EL ORDEN IMPORTA, y es la parte que estaba mal: antes lo primero que se
+   preguntaba era si el TEXTO había cambiado, y si no, se decía "sin cambios"
+   y se acababa ahí. Eso tapaba el caso que de verdad importa — el paquete
+   avanzó pero Shalom lo redacta igual. Pasó con la guía 95046118: llegó a
+   destino a las 08:34, el panel lo supo (pasos = 2) y respondió "sin cambios".
+   Ahora se pregunta primero si AVANZÓ. */
+function _avisoConsulta(ship, r){
+  var estado = ship.trackingStatus || '—';
+  // Un retroceso bloqueado no es un fallo ni un cambio: se dice lo que hay y
+  // lo que se rechazó, para que nunca sea una decisión silenciosa.
+  if (r.retroceso) {
+    return '🛡️ Sigue ' + estado + ' — Shalom devolvió "' +
+           (r.intento || '—') + '", que es anterior; no se aplicó';
+  }
+  if (r.resultado === 'FINALIZADO') return '✅ Shalom confirma entrega — puedes finalizarlo';
+  if (r.resultado === 'EN_DESTINO') return '📍 Llegó a destino — avisar al cliente';
+  if (r.resultado === 'RETORNO')    return '↩️ ' + estado;
+  if (r.avanzo)                     return '🔄 Avanzó — ahora ' + estado;
+  if (r.escribio)                   return '🔄 Ahora: ' + estado;
+  return '✓ Sin cambios — sigue ' + estado;
+}
+
 /* ── consultarAhora: botón ⟳ por tarjeta ─────────────────────────── */
 Tracking.consultarAhora = async function(shipId) {
   var ship = _findShip(shipId);
@@ -675,15 +760,7 @@ Tracking.consultarAhora = async function(shipId) {
     if (window.save) window.save(ship.id);
     if (window._fbSaveShipmentNow) window._fbSaveShipmentNow(ship); // subida inmediata
     if (window.render) window.render();
-    if (window.toast) {
-      var estado = ship.trackingStatus || '—';
-      window.toast(
-        !r.escribio                  ? '✓ Sin cambios — sigue ' + estado :
-        r.resultado === 'FINALIZADO' ? '✅ Shalom confirma entrega — puedes finalizarlo' :
-        r.resultado === 'EN_DESTINO' ? '📍 Llegó a destino — avisar al cliente' :
-        r.resultado === 'RETORNO'    ? '↩️ ' + estado :
-        '🔄 Ahora: ' + estado);
-    }
+    if (window.toast) window.toast(_avisoConsulta(ship, r));
   } else {
     if (window.toast) window.toast(_motivoTexto(r.motivo, r.detalle));
   }
@@ -704,10 +781,18 @@ Tracking.bulkTrack = async function(ids) {
   });
   if (!ships.length) { if (window.toast) window.toast('Nada Shalom para consultar'); return; }
   if (window.toast) window.toast('⏳ Consultando ' + ships.length + ' Shalom...');
-  var ok = 0, err = 0, changed = [], ultimoMotivo = null, ultimoDetalle = '';
+  var ok = 0, err = 0, avanzaron = 0, changed = [], ultimoMotivo = null, ultimoDetalle = '';
   for (var i = 0; i < ships.length; i++) {
     var r = await _consultarYAplicar(ships[i]);
-    if (r.cambio) { ok++; changed.push(ships[i].id); }
+    if (r.cambio) {
+      ok++;
+      // Solo se marca para guardar lo que realmente cambió: un retroceso
+      // bloqueado no escribió nada, y marcarlo sucio sería una escritura
+      // en Firestore por un pedido que quedó igual.
+      if (r.escribio) changed.push(ships[i].id);
+      if (r.avanzo || r.resultado === 'EN_DESTINO' ||
+          r.resultado === 'FINALIZADO') avanzaron++;
+    }
     else { err++; ultimoMotivo = r.motivo; ultimoDetalle = r.detalle; }
     if (i < ships.length - 1) await new Promise(function(res){ setTimeout(res, 700); });
   }
@@ -716,7 +801,9 @@ Tracking.bulkTrack = async function(ids) {
   if (window.toast) {
     // Si NINGUNO respondió, di el motivo (p.ej. desconectado); si algunos sí, resume.
     if (!ok && ultimoMotivo) window.toast(_motivoTexto(ultimoMotivo, ultimoDetalle));
-    else window.toast('✅ ' + ok + ' consultado' + (ok!==1?'s':'') + (err ? ' · ' + err + ' sin dato' : ''));
+    else window.toast('✅ ' + ok + ' consultado' + (ok!==1?'s':'') +
+      (avanzaron ? ' · 📍 ' + avanzaron + ' avanzó' + (avanzaron!==1?'n':'') : '') +
+      (err ? ' · ' + err + ' sin dato' : ''));
   }
 };
 
@@ -744,6 +831,9 @@ Tracking.verHistorial = function(shipId) {
       ship.trackingOrigen  ? '<div style="font-size:11px;color:#8b949e;margin-top:4px">🏙 Origen: '+_esc(ship.trackingOrigen)+'</div>' : '',
       ship.trackingDestino ? '<div style="font-size:11px;color:#8b949e">📍 Destino: '+_esc(ship.trackingDestino)+'</div>' : '',
       ship.trackingLastUpdate ? '<div style="font-size:10px;color:#8b949e;margin-top:4px">Actualizado: '+new Date(ship.trackingLastUpdate).toLocaleString('es-PE')+'</div>' : '',
+      // La hora de la última consulta vive acá y no en el chip: en el chip
+      // desplazaba a la fecha del cambio, que es el dato con el que se trabaja.
+      ship.trackingLastAutoCheck ? '<div style="font-size:10px;color:#8b949e">Última consulta: '+_esc(_haceCuanto(Number(ship.trackingLastAutoCheck)))+'</div>' : '',
       '</div>'
     ].join('') : '',
 

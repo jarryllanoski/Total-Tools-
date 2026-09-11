@@ -1001,6 +1001,26 @@ exports.shalomWebhook = onRequest(
         // Solo se escribe si el texto CAMBIO. Repetir el mismo estado
         // ensuciaria el historial con entradas identicas.
         const s = pedido.datos;
+
+        // MISMA GUARDA QUE EL PANEL: un envio no desanda el camino. El webhook
+        // escribe sin que nadie lo mire, asi que si llegara un evento atrasado
+        // o repetido fuera de orden, sin esta guarda pisaria un estado bueno
+        // con uno viejo y nadie se enteraria hasta que un cliente reclamara.
+        // Solo bloquea el retroceso DEMOSTRABLE: si alguno de los dos textos no
+        // se reconoce, se deja pasar (un texto desconocido no prueba nada).
+        const rNuevo = shalomApi._idxDeTexto(d.estado);
+        const rViejo = shalomApi._idxDeTexto(s.trackingStatus);
+        const esNum = (x) => typeof x === "number";
+        if (esNum(rNuevo) && esNum(rViejo) && rNuevo < rViejo) {
+          await _anotarDiagnostico({
+            cuando: new Date().toISOString(),
+            resultado: "RETROCESO_BLOQUEADO",
+            de: rViejo, a: rNuevo,
+          });
+          res.status(200).json({ok: true, motivo: "Retroceso ignorado"});
+          return;
+        }
+
         if (d.estado && s.trackingStatus !== d.estado) {
           const iso = new Date().toISOString();
           const hist = Array.isArray(s.trackingHistory) ?

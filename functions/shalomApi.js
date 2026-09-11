@@ -129,6 +129,33 @@ const PASOS = [
   {clave: "registrado", idx: 0, texto: "Registrado"},
 ];
 
+// Vocabulario UNICO para leer un texto de estado y decir en que punto del
+// recorrido cae. Vive aca, junto a PASOS, para que no existan dos listas de
+// palabras que se desincronicen: el panel importa esta misma idea.
+//
+// Devuelve: 0..3 (punto de la barra) · "condicion" (demora: no es un punto)
+//           · null (no se reconoce — y entonces no contradice a nadie)
+/**
+ * @param {string} t texto de estado
+ * @return {number|string|null} indice, "condicion", o null
+ */
+function _idxDeTexto(t) {
+  const u = String(t || "").toUpperCase()
+      .normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  if (!u.trim()) return null;
+  // El orden importa: "demora" se comprueba primero porque una frase puede
+  // mezclar condicion y tramo ("demora en transito") y la condicion manda.
+  if (u.includes("DEMORA") || u.includes("RETRAS")) return "condicion";
+  if (u.includes("ENTREGAD")) return 3;
+  if (u.includes("REPART")) return 2;
+  if (u.includes("DESTINO") || u.includes("AGENCIA") ||
+      u.includes("RECOJO") || u.includes("RECOGER")) return 2;
+  if (u.includes("TRANSITO") || u.includes("CAMINO") ||
+      u.includes("RUTA")) return 1;
+  if (u.includes("ORIGEN") || u.includes("REGISTRAD")) return 0;
+  return null;
+}
+
 /**
  * @param {*} v valor del paso
  * @return {boolean} si el paso tiene dato real
@@ -171,34 +198,80 @@ function normalizarTrack(crudo) {
   if (st && typeof st === "object") {
     const arbol = (st.data && typeof st.data === "object") ? st.data : {};
     // `message` es la redaccion del propio Shalom ("En tránsito", "Entregado").
-    // Se prefiere sobre nuestro texto: es lo que ve el cliente en su web, y que
-    // el panel diga otra cosa que Shalom seria confuso al comparar.
     const msg = String(st.message || "").trim();
 
+    // ── QUIEN MANDA: EL RECORRIDO, NO LA REDACCION ────────────────────────
+    // Antes `message` pisaba SIEMPRE al paso encontrado. Costo dos fallos
+    // reales, con la misma forma:
+    //   · guia entregada que el panel mostraba como "Demora de envios"
+    //   · guia En destino que el panel mostraba como "En transito" (95046118,
+    //     11/09/2026: Shalom mostraba En destino en su web desde las 08:34 y
+    //     el panel decia En transito con "visto recien")
+    // El arbol de pasos es un hecho fechado; `message` es una frase que puede
+    // venir atrasada. Cuando se contradicen, gana el hecho.
+    //
+    // Pero `message` no se tira: cuando CONCUERDA con el paso se prefiere, que
+    // es la redaccion que el cliente ve en la web de Shalom. Y cuando no se
+    // puede clasificar (una frase que no reconocemos) tampoco contradice nada,
+    // asi que se respeta. Solo se descarta la contradiccion demostrable.
+    const idxMsg = _idxDeTexto(msg);
+
     // "demora" no es un paso del recorrido: es una condicion que se superpone.
-    // Un envio demorado sigue en transito. Se refleja en el texto, sin mover
-    // la barra hacia atras.
     const demorado = _pasoCumplido(arbol.demora);
 
     for (const p of PASOS) {
-      if (_pasoCumplido(arbol[p.clave])) {
-        let texto = msg || p.texto;
-        if (demorado && !/demor/i.test(texto)) texto = "Demora de envíos";
-        const r = {
-          ok: true,
-          estado: texto.trim(),
-          pasos: p.idx,
-          fecha: _fechaDe(arbol[p.clave]),
-        };
-        // Confirmacion independiente: el bloque `search` trae un booleano
-        // `entregado`. Sirve de contraste con la barra — si algun dia se
-        // contradicen, es senal de que Shalom cambio algo.
-        const det = (crudo.search && crudo.search.data) || null;
-        if (det && typeof det.entregado === "boolean") {
-          r.entregado = det.entregado;
-        }
-        return r;
+      if (!_pasoCumplido(arbol[p.clave])) continue;
+
+      let texto;
+      let discrepancia = "";
+      if (!msg) {
+        texto = p.texto;
+      } else if (idxMsg === null) {
+        texto = msg; // no clasificable: no contradice, se respeta
+      } else if (idxMsg === "condicion") {
+        // Una condicion (demora) no puede ser el estado de un envio que ya
+        // llego. Solo describe un tramo en curso.
+        texto = p.idx <= 1 ? msg : p.texto;
+        if (p.idx > 1) discrepancia = "message=condicion vs paso=" + p.clave;
+      } else if (idxMsg === p.idx) {
+        texto = msg; // concuerda: gana la redaccion de Shalom
+      } else {
+        texto = p.texto; // contradice: gana el arbol
+        discrepancia = "message=idx" + idxMsg + " vs paso=" + p.clave;
       }
+
+      // La demora solo describe un envio EN CAMINO. Una vez que llego a
+      // destino (o se entrego), el retraso es historia: informarlo como
+      // estado actual manda a buscar un paquete que ya esta en la agencia.
+      if (demorado && p.idx <= 1 && !/demor/i.test(texto)) {
+        texto = "Demora de envíos";
+      }
+
+      const r = {
+        ok: true,
+        estado: String(texto).trim(),
+        pasos: p.idx,
+        fecha: _fechaDe(arbol[p.clave]),
+      };
+      if (discrepancia) r.discrepancia = discrepancia;
+      if (demorado) r.demorado = true;
+
+      // Confirmacion independiente: `search.data.entregado`. Antes se guardaba
+      // y no se miraba — justo el dato que habria delatado el bug de la guia
+      // entregada. Ahora se usa, y SOLO HACIA ADELANTE: si Shalom afirma que
+      // se entrego y el arbol todavia no lo registra, se cree la afirmacion.
+      // Al reves no: un paso fechado pesa mas que un booleano, asi que un
+      // `false` nunca deshace un `entregado` del arbol.
+      const det = (crudo.search && crudo.search.data) || null;
+      if (det && typeof det.entregado === "boolean") {
+        r.entregado = det.entregado;
+        if (det.entregado === true && p.idx < 3) {
+          r.pasos = 3;
+          r.estado = "Entregado";
+          r.ascendido = "search.entregado";
+        }
+      }
+      return r;
     }
     // Estructura reconocida pero ningun paso cumplido: la guia existe y aun no
     // registra movimiento. No es un fallo, pero tampoco hay estado que mostrar.
@@ -486,4 +559,5 @@ module.exports = {
   validate,
   instanceStatus,
   interpretarInstancia,
+  _idxDeTexto,
 };
