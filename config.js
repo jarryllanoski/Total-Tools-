@@ -45,7 +45,7 @@ function checkPin(){
   }
 }
 function onTrashBtnTap(){
-  const sel=S.shipments.filter(x=>x.sel);
+  const sel=Seleccion.marcados();
   if(sel.length===1){ openDel(sel[0].id); return; }
   if(sel.length>1){ toast('⚠️ Para borrar, selecciona solo un pedido a la vez'); return; }
   openTrash();
@@ -81,7 +81,10 @@ function openTrash(){
 
 function restoreTrash(i){
   const item=S.trash[i];if(!item)return;
-  item.shipment.sel=false;
+  // Restaurar de la papelera NO devuelve la selección: es estado de pantalla,
+  // no del pedido, y vive en seleccion.js. Se limpia el campo por si el
+  // pedido se archivó cuando `sel` todavía se guardaba dentro.
+  delete item.shipment.sel;
   S.shipments.push(item.shipment);
   S.trash.splice(i,1);
   save(item.shipment.id);render();openTrash();toast(`✅ ${item.shipment.name} recuperado`); // recrea ese pedido + trash (config), no los 170

@@ -129,7 +129,7 @@ window.PrintModule = {
     const S = window.S;
     if(!S||!S.shipments||!S.shipments.length){ window.toast&&toast('Sin envíos'); return; }
 
-    const sel = S.shipments.filter(x=>x.sel);
+    const sel = Seleccion.marcados();
     const newOnes = S.shipments.filter(x=>x.status==='NUEVO PEDIDO'&&!x.printed);
 
     // Decidir scope inicial
@@ -165,7 +165,7 @@ window.PrintModule = {
   },
 
   // Imprime una LISTA específica de pedidos (por id) — independiente de la
-  // selección del panel (x.sel). La usa Compartir para imprimir etiquetas
+  // selección del panel (Seleccion). La usa Compartir para imprimir etiquetas
   // de los envíos vinculados a tokens usados, sin tocar nada de Envíos.
   openList(ids){
     _injectModal();
@@ -231,7 +231,7 @@ window.PrintModule = {
   setScope(key){
     const S = window.S;
     _scope = key;
-    if(key==='sel') _list = S.shipments.filter(x=>x.sel);
+    if(key==='sel') _list = Seleccion.marcados();
     else if(key==='new') _list = S.shipments.filter(x=>x.status==='NUEVO PEDIDO'&&!x.printed);
     else _list = S.shipments;
 

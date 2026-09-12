@@ -104,7 +104,7 @@
 
     // Aplicar — mismo patrón que applyStatus() del panel: incremental
     s.status = destino;
-    s.sel = false;
+    if (window.Seleccion) Seleccion.quitar(s.id);
     _save(s.id);   // ← SOLO este pedido sube a Firebase
     _render();
     decir(s.name + ' ahora está en ' + destino);

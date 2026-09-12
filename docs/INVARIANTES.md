@@ -113,6 +113,51 @@ cámbialas en el otro** — hay una prueba que compara las dos listas.
 
 ---
 
+## 2 ter. La selección es del dispositivo, no del pedido
+
+**Invariante (12 sep 2026): `seleccion.js` es el único dueño de qué pedidos
+están marcados, y eso nunca sale de este navegador.**
+
+Antes la selección era un campo del pedido (`ship.sel`). Parece inofensivo y no
+lo es: **el pedido es la cosa que se sincroniza.**
+
+| Puerta | Qué hacía |
+|---|---|
+| `slimShipment` copia el pedido entero | `sel` subía de acarreo en cualquier guardado |
+| `_mergeRemote` reemplaza los pedidos cada 5 s | el `sel` remoto pisaba el local |
+
+Resultado: desmarcabas algo y cinco segundos después volvía solo, o veías
+marcado lo que marcó otro vendedor en su pantalla.
+
+**Y no era solo molesto.** `delSelected` leía la selección **dos veces** —una al
+abrir el aviso para contar, otra al confirmar para quitar de la pantalla— y
+entre las dos cabía un latido. Si la selección cambiaba en medio, desaparecía
+de la pantalla un pedido que **nunca entró a la papelera ni se borró de
+Firestore**, y el aviso decía otro número.
+
+**Las tres reglas que lo sostienen:**
+
+1. **`sel` no existe en el pedido.** `slimShipment` lo quita en la puerta de
+   subida (por si alguien lo vuelve a poner), y `_mergeRemote` suelta el que
+   venga de Firestore.
+2. **Una acción destructiva lee la selección UNA vez.** `delSelected` congela
+   los ids al abrir y usa esa lista para todo: papelera, borrado remoto,
+   pantalla y mensaje final.
+3. **Marcar no rehace la lista.** `Seleccion` cambia una clase y un carácter en
+   la tarjeta que cambió. Medido con 1039 pedidos: 7,5 ms → 0,02 ms de JS, y
+   0,54 MB menos a localStorage por clic.
+
+**Los `sel:true` que quedaron guardados en Firestore no se limpiaron.** Son
+inertes —ya nadie los lee— y borrarlos de verdad costaría reescribir un millar
+de documentos de golpe, que es la tanda que deja el indicador de Firebase en
+rojo. Se sueltan en memoria al cargar.
+
+> **La regla para cualquier dato nuevo:**
+> ¿de esto depende un cliente o un pedido? → **compartido**, en Firestore.
+> ¿solo cambia lo que ves tú en tu pantalla? → **local**, como esto.
+
+---
+
 ## 3. Cómo se lee lo que dice Shalom
 
 `tracking.js:detectarEstadoAuto` y su copia en `shalomWebSync.js`.

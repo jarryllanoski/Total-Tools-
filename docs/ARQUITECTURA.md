@@ -78,6 +78,7 @@ Consecuencias que hay que tener presentes al tocar cualquier cosa:
 | `agencias-extractor.js` | 261 | Extractor de catálogos de agencias |
 | `respaldo.js` | 259 | Respaldo y restauración |
 | `ticket.js` | 223 | Ticket de Shalom en PNG |
+| `seleccion.js` | 159 | Qué pedidos están marcados, **solo en este dispositivo** |
 | `firebase-config.js` | 7 | Claves del proyecto |
 
 > ⚠️ **`config.js` no es configuración.** Dentro conviven: PIN de seguridad,

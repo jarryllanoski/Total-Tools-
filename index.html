@@ -154,7 +154,13 @@
     return {t:doc.t, n:doc.n, d:'[img]'};
   }
   function slimShipment(s){
-    return{...s,
+    // `sel` (pedido marcado) NO sube. Es estado de pantalla de ESTE
+    // dispositivo y vive en seleccion.js; si viajara dentro del pedido, otro
+    // dispositivo lo recibiría y vería marcado lo que marcaste tú. Se quita
+    // acá, en la puerta de subida, porque el spread de arriba copia el objeto
+    // entero y cualquier campo nuevo se colaría igual.
+    const {sel, ...limpio} = s;
+    return{...limpio,
       docGuia:    _slimDoc(s.docGuia),
       docEmbalado:_slimDoc(s.docEmbalado),
       docTicket:  _slimDoc(s.docTicket)
@@ -445,7 +451,7 @@
     <div class="tb-top">
       <div class="tb-search" style="flex:1">
         <span style="cursor:pointer" onclick="clearSearch()">🔍</span>
-        <input id="fSearch" placeholder="Buscar nombre, tel, dirección..." oninput="render()">
+        <input id="fSearch" placeholder="Buscar nombre, tel, dirección..." oninput="buscarDebounce()">
         <button id="advSearchBtn" onclick="openAdvSearch()" style="background:none;border:none;cursor:pointer;font-size:15px;padding:0 2px;color:var(--text2)" title="Búsqueda avanzada">⚙️</button>
       </div>
       <button class="qr-scan-btn" onclick="openQR()" title="Escanear QR">📷</button>
@@ -1487,6 +1493,12 @@ window._mergeRemote = (remote) => {
     _S_TS = remote.ts;
   }
 
+  // Los pedidos que vienen de Firestore pueden traer `sel` guardado de cuando
+  // la selección vivía dentro del pedido. Se suelta acá, ANTES de guardar en
+  // local, para que no se cuele de vuelta por la puerta de atrás. La selección
+  // de ESTE dispositivo (seleccion.js) no se toca: el latido de otro
+  // dispositivo ya no puede desmarcarte nada.
+  if(window.Seleccion) Seleccion._olvidarHeredado();
   lsSet('dpanel', JSON.stringify(window._slimStateForLocal ? window._slimStateForLocal(S) : S)); // ★ Mejora 3: local sin base64 pesadas
   render();
   renderChips();
@@ -1706,7 +1718,7 @@ function updateAdvBar(){
 
 /* BULK STATUS CHANGE */
 function bulkChangeStatus(){
-  const sel=S.shipments.filter(x=>x.sel);
+  const sel=Seleccion.marcados();
   if(!sel.length){ toast('No hay clientes seleccionados'); return; }
   openPin(()=>{
     $('bulkStatusInfo').textContent=`Selecciona el nuevo estado para ${sel.length} cliente${sel.length>1?'s':''}`;
@@ -1719,9 +1731,10 @@ function bulkChangeStatus(){
 }
 
 function applyBulkStatus(st){
-  const sel=S.shipments.filter(x=>x.sel);
+  const sel=Seleccion.marcados();
   // Marcar como sucio solo cada pedido cambiado (no reescribir los ~170).
-  sel.forEach(s=>{ s.status=st; s.sel=false; save(s.id); });
+  sel.forEach(s=>{ s.status=st; save(s.id); });
+  Seleccion.limpiar();
   render();
   closeOverlay('bulkStatusOverlay');
   toast(`✅ ${sel.length} cliente${sel.length>1?'s':''} → ${stIcon(st)} ${st}`);
@@ -1801,9 +1814,8 @@ function render(){
   // de estado; hook explícito, sin monkey-patch. Idempotente (avisa una vez).
   if(window.Tracking&&Tracking.checkDestinoAlerts)Tracking.checkDestinoAlerts();
   updateStats(); updateAdvBar(); _qrMoveIndicator();
-  const sel=S.shipments.filter(x=>x.sel);
   // Resaltar en azul el botón "seleccionar todo" si hay algún pedido seleccionado
-  const _selBtn=$('selAllBtn'); if(_selBtn) _selBtn.classList.toggle('sel-on', sel.length>0);
+  Seleccion._pintarBoton();
   let data=visibleShipments();   // etiqueta + búsqueda + avanzados (fuente única)
 
   // Ordenar por fecha de registro — más reciente primero
@@ -1867,7 +1879,7 @@ function _courierIcon(name){
 // courier, NO imprime nada y guía con un aviso (evita el "imprime todo" que
 // confundía y también el no-op silencioso). Reusa PrintModule.openList.
 function printGroup(courier){
-  let sel=visibleShipments().filter(s=>s.courier===courier && s.sel);
+  let sel=visibleShipments().filter(s=>s.courier===courier && Seleccion.tiene(s.id));
   if(!sel.length){ if(window.toast) toast('Selecciona pedidos de '+courier+' para imprimir 🖨️'); return; }
   // DELIVERY: imprimir las etiquetas en el MISMO orden que la ruta (fuente única).
   if(courier&&courier.toUpperCase().includes('DELIVERY')&&window.DeliveryModule&&DeliveryModule.sortForRoute){
@@ -1904,7 +1916,7 @@ function cardHTML(s){
   const pvtNote=s.privateNote||'';
   return `<div class="card" data-id="${s.id}">
     <div class="card-top">
-      <div class="chk ${s.sel?'on':''}" onclick="toggleSel('${s.id}')">${s.sel?'✓':''}</div>
+      <div class="chk ${Seleccion.tiene(s.id)?'on':''}" onclick="toggleSel('${s.id}')">${Seleccion.tiene(s.id)?'✓':''}</div>
       <div class="cname" 
         onclick="togglePvtNote('${s.id}')" 
         ondblclick="event.stopPropagation();openPrivateNote('${s.id}')"
@@ -1988,19 +2000,33 @@ function cardDocs(s,gChk,tChk,eChk){
 // Firestore. Antes, save() sin id reescribía los ~170 pedidos por cada click
 // de checkbox (causa del pico de escrituras). saveLocal() no toca Firestore.
 function saveLocal(){ try{ lsSet('dpanel', JSON.stringify(window._slimStateForLocal ? window._slimStateForLocal(S) : S)); }catch(e){} }
-function toggleSel(id){const s=S.shipments.find(x=>x.id===id);if(!s)return;s.sel=!s.sel;saveLocal();render()}
+/* Marcar una casilla NO cambia la lista: cambia una casilla. Antes esto
+   llamaba a saveLocal() + render(), es decir, serializaba el estado completo
+   (~0,7 MB con 1039 pedidos) y reconstruía las ~1039 tarjetas con innerHTML.
+   Por un clic. Ahora Seleccion pinta esa casilla y el botón de "todos", y
+   nada más se mueve. */
+function toggleSel(id){ Seleccion.alternar(id); }
 function selAll(){
   // DESELECCIONAR es GLOBAL: si hay CUALQUIER selección (en esta etiqueta o en
   // otra), un toque limpia TODO, sin importar dónde se marcó. SELECCIONAR es
-  // contextual: solo si no hay nada seleccionado en ningún lado, marca lo VISIBLE
-  // de la etiqueta actual. La selección es estado efímero de UI → saveLocal
-  // (nunca escribe en Firestore).
-  if(S.shipments.some(x=>x.sel)){
-    S.shipments.forEach(x=>{ x.sel=false; });   // deselección total
-  } else {
-    visibleShipments().forEach(x=>{ x.sel=true; }); // selección contextual
-  }
-  saveLocal();render();
+  // contextual: solo si no hay nada seleccionado en ningún lado, marca lo
+  // VISIBLE de la etiqueta actual.
+  if(Seleccion.hayAlguno()) Seleccion.limpiar();
+  else Seleccion.marcar(visibleShipments().map(x=>x.id));
+  // Sin render(): Seleccion repinta las casillas que hay en pantalla. Con 1039
+  // pedidos, render() rehace ~50 000 nodos; esto toca una clase por tarjeta.
+}
+
+/* Buscar: se espera a que dejes de escribir.
+   Cada render() con TODOS reconstruye ~1039 tarjetas (~50 000 nodos) y obliga
+   al navegador a recalcular el layout entero. Atado a `oninput` sin freno, eso
+   pasaba una vez POR TECLA: escribir "mariano" eran siete reconstrucciones
+   completas, y por eso la lupa se sentía trabada. 150 ms es el punto en que ya
+   no se acumulan pulsaciones y todavía se siente inmediato. */
+let _buscarTimer=null;
+function buscarDebounce(){
+  clearTimeout(_buscarTimer);
+  _buscarTimer=setTimeout(render, 150);
 }
 
 /* DOC TOGGLE */
@@ -2350,7 +2376,7 @@ function _shalomVozBeginStage(){
 
 /* Ícono 🔄: CON selección → tracking Shalom de las seleccionadas; SIN selección → refrescar */
 function onTrackBtn(){
-  const sel=S.shipments.filter(x=>x.sel);
+  const sel=Seleccion.marcados();
   if(!sel.length){ render(); return; }
   if(window.Tracking && Tracking.bulkTrack){ Tracking.bulkTrack(sel.map(x=>x.id)); }
   else { render(); }
@@ -2914,7 +2940,7 @@ function deletePvtNote(){
 /* STATUS */
 let _stId=null;
 function openStatus(id){
-  if(S.shipments.filter(x=>x.sel).length>1){ toast('⚠️ Selecciona un solo pedido para cambiar etiqueta'); return; }
+  if(Seleccion.cantidad()>1){ toast('⚠️ Selecciona un solo pedido para cambiar etiqueta'); return; }
   if(!_filt){ toast('⚠️ Filtra por una etiqueta primero'); return; }
   openPin(()=>{ _doOpenStatus(id); });
 }
@@ -2922,7 +2948,7 @@ function openStatus(id){
 function _doOpenStatus(id){
   _stId=id;
   const s=S.shipments.find(x=>x.id===id);if(!s)return;
-  const sel=S.shipments.filter(x=>x.sel);
+  const sel=Seleccion.marcados();
   const all=allStatuses();
   const curIdx=all.indexOf(s.status);
   $('stClientName').textContent= sel.length>1
@@ -2956,14 +2982,15 @@ function _doOpenStatus(id){
 }
 function applyStatus(st){
   const s=S.shipments.find(x=>x.id===_stId);if(!s)return;
-  const sel=S.shipments.filter(x=>x.sel);
+  const sel=Seleccion.marcados();
   if(sel.length>1){
     // Apply to all selected
-    sel.forEach(x=>{ x.status=st; x.sel=false; save(x.id); }); // incremental: solo los seleccionados
+    sel.forEach(x=>{ x.status=st; save(x.id); }); // incremental: solo los seleccionados
+    Seleccion.limpiar();
     render(); closeOverlay('statusOverlay');
     toast(`${stIcon(st)} ${st} → ${sel.length} clientes`);
   } else {
-    s.status=st; s.sel=false;
+    s.status=st;
     save(s.id); render(); closeOverlay('statusOverlay'); // ★ incremental: solo este pedido
     toast(`${stIcon(st)} ${st}`);
     // Hook Cotización: al pasar a EN PROCESO, ofrece enviar los faltantes a un proveedor.
@@ -2997,19 +3024,33 @@ function openDel(id){
   openOverlay('delOverlay');
 }
 function delSelected(){
-  const sel=S.shipments.filter(x=>x.sel);if(!sel.length){toast('Selecciona envíos');return}
+  const sel=Seleccion.marcados();if(!sel.length){toast('Selecciona envíos');return}
+  /* SE CONGELA LA LISTA ACÁ, Y ES LA ÚNICA QUE MANDA.
+     Antes esto leía la selección dos veces: una al abrir el aviso (para contar)
+     y otra al confirmar (para quitar de la pantalla). Entre las dos caben
+     segundos, y en esos segundos el latido de Firebase reemplaza los pedidos.
+     Si la selección cambiaba en medio, se quitaba de la pantalla un pedido que
+     NO se había mandado a la papelera ni borrado de Firestore: desaparecía sin
+     estar borrado, y el aviso decía otro número. Una acción destructiva no
+     puede preguntar dos veces y confiar en que le respondan igual. */
+  const ids=new Set(sel.map(s=>String(s.id)));
   $('delMsg').textContent=`¿Mover ${sel.length} envío(s) a la papelera?`;
   $('delYes').style.background='var(--red)';
   $('delYes').textContent='Mover a papelera';
   $('delYes').disabled=false;   // botón siempre habilitado al abrir (evita que quede trabado)
   $('delYes').onclick=()=>{
-    sel.forEach(s=>{
+    // Se resuelven los objetos AHORA, contra la lista viva: si el latido los
+    // reemplazó, la papelera tiene que guardar la versión buena, no la que se
+    // capturó hace treinta segundos.
+    const aBorrar=S.shipments.filter(s=>ids.has(String(s.id)));
+    aBorrar.forEach(s=>{
       S.trash.push({shipment:s, deletedAt:Date.now()});
       // Borrar de Firestore inmediatamente
       if(window._fbDeleteShipment) window._fbDeleteShipment(s.id);
     });
-    S.shipments=S.shipments.filter(x=>!x.sel);
-    save('config');render();closeOverlay('delOverlay');toast(`🗑️ ${sel.length} movidos a papelera`); // solo config (trash): los pedidos ya se borraron de Firestore
+    S.shipments=S.shipments.filter(x=>!ids.has(String(x.id)));
+    Seleccion.quitar(Array.from(ids));
+    save('config');render();closeOverlay('delOverlay');toast(`🗑️ ${aBorrar.length} movidos a papelera`); // solo config (trash): los pedidos ya se borraron de Firestore
   };
   openOverlay('delOverlay');
 }
@@ -3282,8 +3323,12 @@ render();
 </script>
 <!-- ★ SHALOM tracking — cargado al final -->
 <script src="storage.js?v=3"></script>
-<script src="config.js?v=18"></script>
-<script src="print.js?v=15"></script>
+<!-- seleccion.js va PRIMERO: config.js, print.js y voz.js preguntan por
+     los pedidos marcados. El orden de carga de estos archivos es un contrato
+     (ver docs/ARQUITECTURA.md). -->
+<script src="seleccion.js?v=1"></script>
+<script src="config.js?v=19"></script>
+<script src="print.js?v=16"></script>
 <script src="notify.js?v=4"></script>
 <script src="shalom.js?v=10"></script>
 <script src="tracking.js?v=15"></script>
@@ -3295,7 +3340,7 @@ render();
 <script src="respaldo.js?v=1"></script>
 <script src="ayuda.js?v=3"></script>
 <script src="dashboard.js?v=2"></script>
-<script src="voz.js?v=2"></script>
+<script src="voz.js?v=3"></script>
 <script src="cotizacion.js?v=2"></script>
 <script>
 updateShareLink();
