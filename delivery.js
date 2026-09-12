@@ -372,7 +372,12 @@ DeliveryModule._confirmar=async function(){
   DeliveryModule._confirming=false;
   if(btn){btn.disabled=false;btn.textContent=btnTxt;}
   DeliveryModule._closeConf();_render();
-  if(typeof global.toast==='function')global.toast('✅ Entregado — '+recep);
+  // Confirmar la entrega deja el pedido en FINALIZADO, así que en la vista
+  // de activos la tarjeta desaparece. Se avisa con las mismas palabras que
+  // el resto del panel en vez de que parezca que se borró.
+  var _sale = (typeof global._avisoSaleDeActivos==='function')
+    ? global._avisoSaleDeActivos('FINALIZADO') : '';
+  if(typeof global.toast==='function')global.toast('✅ Entregado — '+recep+_sale);
 };
 
 /* ── Triple tap ──────────────────────────────────────────────────── */

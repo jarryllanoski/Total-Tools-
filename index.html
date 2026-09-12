@@ -1654,18 +1654,25 @@ function renderStatsAsSuppliers(){
 
 function openAllLabels(){
   const all=allStatuses();
+  // UNA pasada sobre los pedidos, no una por etiqueta. Antes esto recorría
+  // los 1039 pedidos once veces (una por etiqueta) para contar y sumar.
+  const porEtiqueta={};
+  S.shipments.forEach(x=>{
+    const g=porEtiqueta[x.status]||(porEtiqueta[x.status]={cnt:0,deuda:0});
+    g.cnt++; g.deuda+=(parseFloat(x.cost)||0);
+  });
   const _fmtSoles=n=>'S/ '+(Math.round((n||0)*100)/100).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
   $('allLabelsList').innerHTML=[
     `<button class="sopt" style="background:rgba(56,139,253,.1);border-color:rgba(56,139,253,.4);color:var(--blue)" onclick="setFilt('');closeOverlay('allLabelsOverlay')">📋 TODOS</button>`,
     ...all.map((st,i)=>{
-      const items=S.shipments.filter(x=>x.status===st);
-      const cnt=items.length;
+      const g=porEtiqueta[st]||{cnt:0,deuda:0};
+      const cnt=g.cnt;
       // Solo estados ACTIVOS (antes de FINALIZADO) muestran deuda. Finalizado y
       // lo que va después → como antes (solo el conteo). Monto centrado; conteo
       // a la derecha (su posición de siempre).
       const finIdx=all.indexOf('FINALIZADO');
       const activo=(finIdx<0)||(i<finIdx);
-      const deuda=items.reduce((a,x)=>a+(parseFloat(x.cost)||0),0);
+      const deuda=g.deuda;
       const monto = activo
         ? `<span style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);font-size:11px;font-weight:700;color:${deuda>0?'#f59e0b':'var(--text2)'}">${_fmtSoles(deuda)}</span>`
         : '';
@@ -1737,10 +1744,16 @@ function applyBulkStatus(st){
   Seleccion.limpiar();
   render();
   closeOverlay('bulkStatusOverlay');
-  toast(`✅ ${sel.length} cliente${sel.length>1?'s':''} → ${stIcon(st)} ${st}`);
+  toast(`✅ ${sel.length} cliente${sel.length>1?'s':''} → ${stIcon(st)} ${st}` + _avisoSaleDeActivos(st));
 }
 
-function clearSearch(){ $('fSearch').value=''; $('fSearch').focus(); render(); }
+function clearSearch(){
+  const inp=$('fSearch');
+  if(!inp.value){ inp.focus(); return; }   // ya estaba vacío: nada que repintar
+  inp.value=''; inp.focus();
+  clearTimeout(_buscarTimer);              // que no llegue después el render del freno
+  render();
+}
 
 /* FILTER CHIPS */
 let _filt='';
@@ -1762,6 +1775,10 @@ function renderChips(){
 function setFilt(v){
   // Cambiar a otro estado apaga el modo "cambiar etiqueta por QR".
   if(_qrMove.on && v!==_qrMove.status){ _qrMoveClearTimer(); _qrMove.on=false; _qrMove.status=''; _qrMove.last=null; _qrMove.shown=null; }
+  // Tocar el chip que YA está activo no cambia nada: no hay por qué
+  // reconstruir la lista. Es lo que hacía que el doble clic en TODOS
+  // costara dos reconstrucciones antes de abrir el listado de etiquetas.
+  if(v === _filt) return;
   _filt=v;renderChips();render();
 }
 
@@ -1791,10 +1808,25 @@ function setChipSort(v){
    etiqueta activa (_filt), la búsqueda y los filtros avanzados. La usan
    render() (lo que se pinta) y selAll() (lo que se selecciona), para que
    nunca se desincronicen. No ordena (el orden es solo visual). */
+/* ¿Está la vista mostrando SOLO los activos?
+   TODOS quiere decir "lo que tengo entre manos", no "todo lo que existió".
+   924 de 1040 pedidos están FINALIZADO: mostrarlos en la vista de trabajo
+   son 9 veces más tarjetas para ver 9 veces menos de lo que importa.
+
+   LA EXCEPCIÓN, y es la que hace que esto funcione: BUSCAR BUSCA EN TODO.
+   Consultar un pedido viejo por teléfono es justo para lo que se usa la
+   lupa; si la búsqueda respetara el filtro, buscar dejaría de encontrar
+   precisamente lo que se busca. En cuanto hay texto —o filtros avanzados—
+   los finalizados vuelven a entrar. */
+function _soloActivos(){
+  return !_filt && !$('fSearch').value.trim() && !_advActive;
+}
+
 function visibleShipments(){
   const srch=$('fSearch').value.toLowerCase();
   let data=S.shipments;
   if(_filt) data=data.filter(x=>x.status===_filt);
+  else if(_soloActivos()) data=data.filter(x=>x.status!=='FINALIZADO');
   if(srch) data=data.filter(x=>x.name.toLowerCase().includes(srch)||x.phone.includes(srch)||(x.dni&&x.dni.includes(srch))||x.address.toLowerCase().includes(srch)||x.courier.toLowerCase().includes(srch));
   if(_advActive){
     if(_adv.dateFrom) data=data.filter(x=>x.date&&x.date>=_adv.dateFrom);
@@ -1809,7 +1841,36 @@ function visibleShipments(){
   return data;
 }
 
+/* ══════════════════════════════════════════════════════════════════════
+   REPINTAR — una sola puerta
+   ══════════════════════════════════════════════════════════════════════
+   `render()` reconstruye TODAS las tarjetas. Con 1039 pedidos son ~37 400
+   elementos (36 por tarjeta) que el navegador tiene que parsear, estilar y
+   maquetar. Es la operación más cara del panel, y hay 87 sitios que la
+   llaman — muchos en cadena: `save(); render();` y dos líneas después otro
+   `render()`. Cada eslabón pagaba el precio completo.
+
+   El caso que lo delató: el chip TODOS lleva `onclick` Y `ondblclick`. El
+   navegador dispara click, click, dblclick — así que abrir el listado de
+   etiquetas costaba DOS reconstrucciones completas antes de que el modal
+   apareciera.
+
+   Ahora `render()` no pinta: apunta. Todas las llamadas del mismo tick se
+   juntan en una sola pasada en el siguiente frame. Los 87 sitios quedan
+   arreglados sin tocar ninguno, y los que se escriban mañana también.
+
+   `renderYa()` existe para el caso raro que necesite el DOM al instante.
+   Hoy no lo usa nadie: se revisaron las 87 llamadas y ninguna lee el DOM
+   inmediatamente después. */
+let _renderPedido = false;
 function render(){
+  if(_renderPedido) return;
+  _renderPedido = true;
+  requestAnimationFrame(()=>{ _renderPedido = false; _renderAhora(); });
+}
+function renderYa(){ _renderPedido = false; _renderAhora(); }
+
+function _renderAhora(){
   // Vigilante "llegó a destino" (agnóstico al motor A/B). Avisa por transición
   // de estado; hook explícito, sin monkey-patch. Idempotente (avisa una vez).
   if(window.Tracking&&Tracking.checkDestinoAlerts)Tracking.checkDestinoAlerts();
@@ -1848,12 +1909,35 @@ function render(){
   const groups={};
   data.forEach(x=>{if(!groups[x.courier])groups[x.courier]=[];groups[x.courier].push(x)});
   const area=$('cardsArea');
-  if(!data.length){area.innerHTML='<div class="empty-st"><div style="font-size:36px">📭</div><p style="margin-top:10px">Sin envíos. Presiona ➕</p></div>';return}
+  if(!data.length){
+    const fin = _soloActivos()
+      ? S.shipments.filter(x=>x.status==='FINALIZADO').length : 0;
+    area.innerHTML = fin
+      ? `<div class="empty-st"><div style="font-size:36px">🎉</div>
+         <p style="margin-top:10px">Nada pendiente — todo al día.</p>
+         <p style="margin-top:6px;font-size:12px;color:#8b949e;cursor:pointer"
+            onclick="setFilt('FINALIZADO')">🏁 Ver los <b>${fin}</b> finalizados →</p></div>`
+      : '<div class="empty-st"><div style="font-size:36px">📭</div><p style="margin-top:10px">Sin envíos. Presiona ➕</p></div>';
+    return;
+  }
+  // Los finalizados escondidos se ANUNCIAN. Una lista que oculta cosas sin
+  // decirlo se siente rota; con el número delante y un toque para llegar a
+  // ellos, es una decisión visible.
+  const _ocultos = _soloActivos()
+    ? S.shipments.filter(x=>x.status==='FINALIZADO').length : 0;
+  const _pieOcultos = _ocultos
+    ? `<div onclick="setFilt('FINALIZADO')" style="margin:14px auto 4px;padding:11px;
+        max-width:420px;text-align:center;cursor:pointer;border-radius:10px;
+        background:rgba(34,197,94,.06);border:1px solid rgba(34,197,94,.18);
+        font-size:12px;color:#8b949e">
+        🏁 <b style="color:#22c55e">${_ocultos}</b> finalizado${_ocultos===1?'':'s'} oculto${_ocultos===1?'':'s'}
+        <span style="color:var(--blue);font-weight:700;margin-left:6px">ver →</span></div>`
+    : '';
   area.innerHTML=Object.entries(groups).map(([courier,items])=>`
     <div class="cgroup">
       <div class="cgroup-hdr"><div class="cgroup-bar"></div><span>${_courierIcon(courier)}</span><div class="cgroup-name">${escH(courier)}</div><div class="cgroup-spacer"></div><button class="cgroup-btn" title="Imprimir ${escH(courier)}" onclick="printGroup('${escJs(courier)}')">🖨️</button><div class="cgroup-spacer"></div><div class="cgroup-actions"><button class="cgroup-btn" title="Tarjeta anterior" onclick="scrollCard(-1)">▲</button><button class="cgroup-btn" title="Tarjeta siguiente" onclick="scrollCard(1)">▼</button></div><div class="cgroup-cnt">${items.length}</div></div>
       ${items.map(s=>cardHTML(s)).join('')}
-    </div>`).join('');
+    </div>`).join('') + _pieOcultos;
 }
 
 /* Sanitización XSS: datos de pedidos vienen del formulario público */
@@ -2980,6 +3064,16 @@ function _doOpenStatus(id){
   }).join('');
   openOverlay('statusOverlay');
 }
+/* Marcar algo como FINALIZADO desde TODOS hace que la tarjeta desaparezca de
+   la lista. Es correcto —ya no es un pendiente— pero sorprende si nadie lo
+   dice: se ve igual que si se hubiera borrado. */
+function _avisoSaleDeActivos(st){
+  return (st==='FINALIZADO' && _soloActivos()) ? ' · sale de la lista de activos' : '';
+}
+// delivery.js finaliza por su cuenta al confirmar una entrega y también hace
+// desaparecer la tarjeta: necesita poder decirlo con las mismas palabras.
+window._avisoSaleDeActivos = _avisoSaleDeActivos;
+
 function applyStatus(st){
   const s=S.shipments.find(x=>x.id===_stId);if(!s)return;
   const sel=Seleccion.marcados();
@@ -2988,11 +3082,11 @@ function applyStatus(st){
     sel.forEach(x=>{ x.status=st; save(x.id); }); // incremental: solo los seleccionados
     Seleccion.limpiar();
     render(); closeOverlay('statusOverlay');
-    toast(`${stIcon(st)} ${st} → ${sel.length} clientes`);
+    toast(`${stIcon(st)} ${st} → ${sel.length} clientes` + _avisoSaleDeActivos(st));
   } else {
     s.status=st;
     save(s.id); render(); closeOverlay('statusOverlay'); // ★ incremental: solo este pedido
-    toast(`${stIcon(st)} ${st}`);
+    toast(`${stIcon(st)} ${st}` + _avisoSaleDeActivos(st));
     // Hook Cotización: al pasar a EN PROCESO, ofrece enviar los faltantes a un proveedor.
     if(window.Cotizacion && Cotizacion.onEstado) Cotizacion.onEstado(s.id, st);
   }
@@ -3333,7 +3427,7 @@ render();
 <script src="shalom.js?v=10"></script>
 <script src="tracking.js?v=15"></script>
 <script src="floatpanel.js?v=2"></script>
-<script src="delivery.js?v=7"></script>
+<script src="delivery.js?v=8"></script>
 <script src="qrtracking.js?v=3"></script>
 <script src="ticket.js?v=4"></script>
 <script src="agencias-extractor.js?v=10"></script>

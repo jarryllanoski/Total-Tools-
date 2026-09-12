@@ -158,6 +158,76 @@ rojo. Se sueltan en memoria al cargar.
 
 ---
 
+## 2 quater. Qué significa TODOS, y por qué buscar es la excepción
+
+**Invariante (12 sep 2026): `visibleShipments()` es el único sitio que decide
+qué pedidos se ven, y `render()` el único que repinta.**
+
+### TODOS = pedidos activos
+
+924 de 1040 pedidos están en `FINALIZADO`. Mostrarlos en la vista de trabajo
+son nueve veces más tarjetas para ver nueve veces menos de lo que importa —
+y cada tarjeta cuesta 36 elementos en el DOM (1040 × 36 ≈ **37 400**).
+
+Con `_filt === ''`, los `FINALIZADO` no se listan. **1040 → 116 tarjetas.**
+
+### ⚠️ La excepción que hace que esto funcione: buscar busca en TODO
+
+En cuanto hay texto en el buscador —o filtros avanzados activos— los
+finalizados **vuelven a entrar**.
+
+Consultar un pedido viejo por teléfono es justo para lo que se usa la lupa. Si
+la búsqueda respetara el filtro, buscar dejaría de encontrar precisamente lo
+que se busca. Es el escenario que decide si esta función sirve o estorba.
+
+La regla vive en `_soloActivos()`:
+
+```js
+!_filt && !$('fSearch').value.trim() && !_advActive
+```
+
+### Ocultar sin decirlo se siente roto
+
+Dos avisos, y no son adorno:
+
+1. **Al pie de la lista**: `🏁 924 finalizados ocultos — ver →`, que lleva a su
+   chip. Con cero activos, en vez de "Sin envíos" dice *"Nada pendiente — todo
+   al día"* con la misma puerta.
+2. **Al finalizar un pedido**, la tarjeta desaparece de la vista. Es correcto,
+   pero se ve igual que si se hubiera borrado, así que el aviso lo dice: *"sale
+   de la lista de activos"*. Está en los **cuatro** caminos que finalizan:
+   estado individual, por lote (dos paneles) y confirmar entrega
+   (`delivery.js`).
+
+### Lo que NO cambia
+
+Estadísticas de cabecera, listado de etiquetas, CSV e impresión leen
+`S.shipments` o la selección, **nunca la lista visible**. El total sigue
+diciendo 1040.
+
+### Seleccionar todo sale gratis
+
+`selAll()` marca `visibleShipments()`. En TODOS marca solo activos; en el chip
+FINALIZADO marca los 924. **Una regla, dos efectos** — no hizo falta tocar la
+selección. Cuando un cambio se consigue sin código nuevo, es señal de que la
+regla estaba en el sitio correcto.
+
+### Una sola puerta para repintar
+
+`render()` reconstruye todas las tarjetas y hay **87 sitios** que la llaman,
+muchos en cadena. Ahora no pinta: apunta, y todas las llamadas del mismo tick
+se juntan en una pasada (`requestAnimationFrame`). Los 87 quedan arreglados sin
+tocar ninguno, y los que se escriban mañana también.
+
+> El caso que lo delató: el chip TODOS lleva `onclick` **y** `ondblclick`. El
+> navegador dispara click, click, dblclick — abrir el listado de etiquetas
+> costaba **dos reconstrucciones completas** antes de que el modal apareciera.
+
+`renderYa()` queda para el caso raro que necesite el DOM al instante. Hoy no lo
+usa nadie: se revisaron las 87 llamadas y ninguna lee el DOM justo después.
+
+---
+
 ## 3. Cómo se lee lo que dice Shalom
 
 `tracking.js:detectarEstadoAuto` y su copia en `shalomWebSync.js`.
