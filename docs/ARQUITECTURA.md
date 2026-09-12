@@ -81,6 +81,38 @@ Consecuencias que hay que tener presentes al tocar cualquier cosa:
 | `seleccion.js` | 159 | Qué pedidos están marcados, **solo en este dispositivo** |
 | `firebase-config.js` | 7 | Claves del proyecto |
 
+### Nota · El carrusel de etiquetas (`floatpanel.js:_fixChipsScroll`)
+
+Las flechas `‹ ›` de la fila de etiquetas avanzan **una etiqueta por toque**:
+se mide dónde empieza cada una y se salta a la primera que quede más allá de
+la posición actual. Antes eran **120 px fijos**, que no tienen relación con el
+ancho de una etiqueta —van de `TODOS` (~60 px) a `RECLAMOS, DEVOLUCIONES,
+GARANT` (~230 px)— y dejaban medias etiquetas cortadas.
+
+**Por qué no `::scroll-button()`** (revisado el 2026-09-12): hace exactamente
+esto sin JavaScript y es lo que recomiendan los artículos de este año, pero
+**solo funciona en Chrome/Edge 135+ — no es Baseline**. En un navegador sin
+soporte las flechas no existirían y nadie sabría por qué. Cuando alcance
+Baseline, `_fixChipsScroll` se puede borrar casi entero.
+
+Lo que sí se usa es la mitad universal: **CSS Scroll Snap** (`panel.css`), que
+alinea también el deslizamiento con el dedo. Con `proximity`, **no**
+`mandatory`: una etiqueta más ancha que la pantalla puede atrapar el
+desplazamiento con `mandatory` y dejarte sin poder pasar.
+
+Tres reglas que no se rompen:
+
+1. **Mientras navegas con las flechas manda el objetivo, no la pantalla.** La
+   animación suave dura ~400 ms; si se recalculara desde `scrollLeft` durante
+   ella, tres toques rápidos no avanzarían tres etiquetas. El dedo y la rueda
+   devuelven el mando (`wheel`, `touchstart`).
+2. **Las posiciones se miden con rectángulos, no con `offsetLeft`.**
+   `offsetLeft` cuenta desde el ancestro posicionado: basta un `position` nuevo
+   en el CSS de al lado para que empiece a devolver otra cosa, sin error.
+3. **Las flechas viven sobre el carrusel, no sobre la fila.** Estaban sobre la
+   fila entera y la izquierda tapaba los ~25 px iniciales del chip TODOS, que
+   ahí dejaba de responder.
+
 > ⚠️ **`config.js` no es configuración.** Dentro conviven: PIN de seguridad,
 > papelera, WhatsApp, documentos adjuntos, enlaces y deuda, reconocimiento de
 > cliente, Excel/CSV, links compartidos… y **`openForm()` + `saveShipment()`**,

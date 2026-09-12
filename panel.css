@@ -48,7 +48,13 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);max
 .qr-scan-btn{background:var(--bg2);border:1px solid var(--blue);border-radius:7px;width:36px;height:36px;cursor:pointer;color:var(--blue);font-size:17px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
 
 /* CHIPS */
-.chips-wrap{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;margin-bottom:8px;scrollbar-width:none}
+/* scroll-snap-type: PROXIMITY, no mandatory. Con `mandatory`, una etiqueta
+   más ancha que la pantalla —"RECLAMOS, DEVOLUCIONES, GARANT" en un
+   teléfono lo es— puede ATRAPAR el desplazamiento y dejarte sin poder
+   pasar de ahí. `proximity` alinea cuando estás cerca y nunca traba; las
+   flechas apuntan exacto igual (ver _fixChipsScroll en floatpanel.js). */
+.chips-wrap{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;margin-bottom:8px;scrollbar-width:none;scroll-snap-type:x proximity}
+.chip{scroll-snap-align:start}
 .chips-wrap::-webkit-scrollbar{display:none}
 .chip{display:inline-flex;align-items:center;padding:6px 13px;border-radius:20px;font-size:11px;font-weight:700;cursor:pointer;border:1.5px solid var(--bd);background:var(--bg2);color:var(--text2);white-space:nowrap;flex-shrink:0}
 .chip.active{background:var(--blue);border-color:var(--blue);color:#fff}

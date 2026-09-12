@@ -410,7 +410,7 @@
   window._fbReady=true;
 })();
 </script>
-<link rel="stylesheet" href="panel.css?v=4">
+<link rel="stylesheet" href="panel.css?v=5">
 </head>
 <body>
 
@@ -1771,6 +1771,10 @@ function renderChips(){
       ondblclick="openChipSort('${v}')"
     >${stIcon(v)} ${v}${sortIcon?` <span style="font-size:9px">${sortIcon}</span>`:''}</div>`;
   }).join('');
+  // Si la etiqueta activa quedó fuera del carrusel —al elegirla desde el
+  // listado completo, por ejemplo— se trae a la vista. Solo mueve el
+  // carrusel, nunca la página.
+  if(window.ChipsNav) ChipsNav.verActivo();
 }
 function setFilt(v){
   // Cambiar a otro estado apaga el modo "cambiar etiqueta por QR".
@@ -3426,7 +3430,7 @@ render();
 <script src="notify.js?v=4"></script>
 <script src="shalom.js?v=10"></script>
 <script src="tracking.js?v=15"></script>
-<script src="floatpanel.js?v=2"></script>
+<script src="floatpanel.js?v=3"></script>
 <script src="delivery.js?v=8"></script>
 <script src="qrtracking.js?v=3"></script>
 <script src="ticket.js?v=4"></script>

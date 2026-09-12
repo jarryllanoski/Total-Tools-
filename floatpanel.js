@@ -501,63 +501,186 @@
     }
   }
 
+  /* ── CARRUSEL DE ETIQUETAS · las flechas ‹ › ─────────────────────────
+     Las flechas avanzaban 120 px fijos. Las etiquetas miden desde "TODOS"
+     (~60 px) hasta "RECLAMOS, DEVOLUCIONES, GARANT" (~230 px), así que ese
+     salto no tenía relación con dónde empieza o acaba ninguna: a veces
+     pasaba casi dos y a veces dejaba media cortada.
+
+     Ahora la flecha va a la etiqueta SIGUIENTE: se miden dónde empiezan y
+     se salta a la primera que esté más allá de donde estás.
+
+     POR QUÉ NO `::scroll-button()` (2026-09): existe, hace esto sin una
+     línea de JavaScript y es lo que recomiendan los artículos de este año,
+     pero solo funciona en Chrome/Edge 135+ — no es Baseline. En los
+     navegadores sin soporte las flechas simplemente no existirían y nadie
+     sabría por qué. Cuando sea Baseline, esto se puede borrar casi entero.
+     Lo que sí se usa es la mitad universal: CSS Scroll Snap (panel.css).  */
   function _fixChipsScroll(){
-    var container = document.getElementById('filterChips');
-    if(!container) return;
+    var carrusel = document.getElementById('filterChips');
+    if(!carrusel) return;
+    if(document.getElementById('chipsNav')) return;   // no duplicar flechas
+    var fila = carrusel.parentElement;
+    if(!fila) return;
 
-    // Crear flechas
-    var wrap = container.parentElement;
-    if(!wrap) return;
+    /* Envoltura propia para el carrusel. Antes las flechas se posicionaban
+       sobre TODA la fila, y la izquierda tapaba los ~25 px iniciales del
+       chip TODOS: ahí dejaba de responder al toque. Ahora `left:0` es el
+       borde del carrusel, no el de la fila. */
+    var nav = document.createElement('div');
+    nav.id = 'chipsNav';
+    nav.style.cssText = 'position:relative;flex:1;min-width:0;display:flex';
+    fila.insertBefore(nav, carrusel);
+    nav.appendChild(carrusel);
+    carrusel.style.flex = '1';
+    carrusel.style.minWidth = '0';
+    carrusel.style.margin = '0';
 
-    // Poner el wrap en posición relativa
-    wrap.style.position = 'relative';
+    var btnL = _flecha('chipScrollL', '&#8249;', 'left',
+      'Etiqueta anterior', 'to right', '#8b949e');
+    var btnR = _flecha('chipScrollR', '&#8250;', 'right',
+      'Etiqueta siguiente', 'to left', '#e6edf3');
+    nav.appendChild(btnL);
+    nav.appendChild(btnR);
 
-    // Flecha izquierda
-    var btnL = document.createElement('button');
-    btnL.innerHTML = '&#8249;';
-    btnL.style.cssText = 'position:absolute;left:0;top:50%;transform:translateY(-50%);'+
-      'z-index:10;background:linear-gradient(to right,var(--bg,#0d1117) 60%,transparent);'+
-      'border:none;color:#8b949e;font-size:22px;font-weight:900;cursor:pointer;'+
-      'padding:0 8px 0 2px;height:100%;display:none;align-items:center;line-height:1;font-family:inherit';
-    btnL.id = 'chipScrollL';
+    /* Dónde empieza cada etiqueta DENTRO del contenido desplazable.
+       Se mide con rectángulos y no con `offsetLeft` a propósito:
+       `offsetLeft` cuenta desde el ancestro posicionado, y basta que
+       alguien cambie un `position` en el CSS de al lado para que empiece a
+       devolver otra cosa —sin error, solo mal. Son ~11 etiquetas: medirlas
+       no cuesta nada. */
+    function _inicios(){
+      var base = carrusel.getBoundingClientRect().left - carrusel.scrollLeft;
+      var out = [];
+      for(var i=0;i<carrusel.children.length;i++){
+        out.push(carrusel.children[i].getBoundingClientRect().left - base);
+      }
+      return out;
+    }
 
-    // Flecha derecha
-    var btnR = document.createElement('button');
-    btnR.innerHTML = '&#8250;';
-    btnR.style.cssText = 'position:absolute;right:0;top:50%;transform:translateY(-50%);'+
-      'z-index:10;background:linear-gradient(to left,var(--bg,#0d1117) 60%,transparent);'+
-      'border:none;color:#e6edf3;font-size:22px;font-weight:900;cursor:pointer;'+
-      'padding:0 2px 0 8px;height:100%;display:flex;align-items:center;line-height:1;font-family:inherit';
-    btnR.id = 'chipScrollR';
+    function _tope(){
+      return Math.max(0, carrusel.scrollWidth - carrusel.clientWidth);
+    }
 
-    wrap.appendChild(btnL);
-    wrap.appendChild(btnR);
+    /* El objetivo en vuelo. Sin esto, pulsar tres veces rápido calcularía
+       desde una posición EN MOVIMIENTO (la animación suave dura ~400 ms) y
+       no avanzaría tres etiquetas, sino lo que saliera. Mientras navegas
+       con las flechas manda el objetivo; en cuanto tocas con el dedo o la
+       rueda, vuelve a mandar la pantalla. */
+    var _obj = null, _objTimer = null;
+    function _soltarObjetivo(){ _obj = null; clearTimeout(_objTimer); }
 
-    // Click en flechas
-    btnL.addEventListener('click', function(){ container.scrollLeft -= 120; });
-    btnR.addEventListener('click', function(){ container.scrollLeft += 120; });
+    function _suave(){
+      try{
+        return !(window.matchMedia &&
+                 matchMedia('(prefers-reduced-motion: reduce)').matches);
+      }catch(e){ return true; }
+    }
 
-    // Mostrar/ocultar flechas según posición del scroll
+    function mover(dir){
+      var desde = (_obj !== null) ? _obj : carrusel.scrollLeft;
+      var destino = ChipsNav._destinoDesde(_inicios(), desde, _tope(), dir);
+      if(destino === null) return;
+      _obj = destino;
+      clearTimeout(_objTimer);
+      _objTimer = setTimeout(_soltarObjetivo, 600);
+      carrusel.scrollTo({left: destino, behavior: _suave() ? 'smooth' : 'auto'});
+      updateArrows();
+    }
+
+    btnL.addEventListener('click', function(){ mover(-1); });
+    btnR.addEventListener('click', function(){ mover(1); });
+
     function updateArrows(){
-      var canLeft  = container.scrollLeft > 5;
-      var canRight = container.scrollLeft < container.scrollWidth - container.clientWidth - 5;
+      var canLeft  = carrusel.scrollLeft > 5;
+      var canRight = carrusel.scrollLeft < _tope() - 5;
       btnL.style.display = canLeft  ? 'flex' : 'none';
       btnR.style.display = canRight ? 'flex' : 'none';
     }
 
-    container.addEventListener('scroll', updateArrows);
+    carrusel.addEventListener('scroll', updateArrows);
     window.addEventListener('resize', updateArrows);
-    setTimeout(updateArrows, 300);
 
-    // Rueda del mouse también funciona
-    container.addEventListener('wheel', function(e){
+    /* Las flechas también hay que re-evaluarlas cuando CAMBIAN las
+       etiquetas —agregar una en Config, o cualquier renderChips()— porque
+       ahí cambia el ancho del contenido sin que nadie haga scroll ni
+       redimensione. Antes solo escuchaban scroll y resize, así que podía
+       quedar la flecha derecha escondida habiendo más etiquetas. */
+    try{
+      new MutationObserver(function(){ updateArrows(); ChipsNav.verActivo(); })
+        .observe(carrusel, {childList:true});
+      new ResizeObserver(updateArrows).observe(carrusel);
+    }catch(e){ /* navegador viejo: quedan scroll y resize */ }
+
+    // El dedo y la rueda devuelven el mando a la pantalla.
+    carrusel.addEventListener('wheel', function(e){
+      _soltarObjetivo();
       if(Math.abs(e.deltaY) > Math.abs(e.deltaX)){
         e.preventDefault();
-        container.scrollLeft += e.deltaY;
+        carrusel.scrollLeft += e.deltaY;
         updateArrows();
       }
     }, {passive:false});
+    carrusel.addEventListener('touchstart', _soltarObjetivo, {passive:true});
+
+    /* Trae el chip activo a la vista si se quedó fuera —por ejemplo al
+       elegir una etiqueta desde el listado completo—. Mueve SOLO el
+       carrusel: `scrollIntoView` habría podido desplazar la página entera
+       hacia arriba o abajo, que no es lo que nadie pidió. */
+    ChipsNav.verActivo = function(){
+      var act = carrusel.querySelector('.chip.active');
+      if(!act) return;
+      var r = act.getBoundingClientRect(), c = carrusel.getBoundingClientRect();
+      var d = 0;
+      if(r.left  < c.left)  d = (r.left  - c.left)  - 8;
+      else if(r.right > c.right) d = (r.right - c.right) + 8;
+      if(!d) return;   // ya se ve entera: no se mueve nada
+      _soltarObjetivo();
+      carrusel.scrollTo({left: Math.max(0, Math.min(_tope(), carrusel.scrollLeft + d)),
+                         behavior: _suave() ? 'smooth' : 'auto'});
+    };
+
+    setTimeout(function(){ updateArrows(); ChipsNav.verActivo(); }, 300);
   }
+
+  function _flecha(id, glifo, lado, etiqueta, degradado, color){
+    var b = document.createElement('button');
+    b.type = 'button';
+    b.id = id;
+    b.innerHTML = glifo;
+    b.setAttribute('aria-label', etiqueta);
+    b.title = etiqueta;
+    b.style.cssText = 'position:absolute;' + lado + ':0;top:0;bottom:0;' +
+      'z-index:10;background:linear-gradient(' + degradado +
+      ',var(--bg,#0d1117) 60%,transparent);border:none;color:' + color + ';' +
+      'font-size:22px;font-weight:900;cursor:pointer;' +
+      'padding:0 ' + (lado === 'left' ? '8px 0 2px' : '2px 0 8px') + ';' +
+      'display:none;align-items:center;line-height:1;font-family:inherit';
+    return b;
+  }
+
+  /* La decisión, sin DOM de por medio: dadas las posiciones donde empieza
+     cada etiqueta, dónde estoy y hasta dónde se puede desplazar, ¿a qué
+     posición hay que ir? Separada para poder probarla entera. */
+  var ChipsNav = {
+    _destinoDesde: function(inicios, x, tope, dir){
+      var EPS = 2, i;
+      if(dir > 0){
+        if(x >= tope - 1) return null;              // ya está al final
+        for(i = 0; i < inicios.length; i++){
+          if(inicios[i] > x + EPS) return Math.min(inicios[i], tope);
+        }
+        return null;
+      }
+      var prev = null;
+      for(i = 0; i < inicios.length; i++){
+        if(inicios[i] < x - EPS) prev = inicios[i]; else break;
+      }
+      return prev;
+    },
+    verActivo: function(){}   // lo reemplaza _fixChipsScroll al montarse
+  };
+  window.ChipsNav = ChipsNav;
 
   if(document.readyState === 'loading'){
     document.addEventListener('DOMContentLoaded', function(){
