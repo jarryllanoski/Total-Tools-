@@ -1774,7 +1774,7 @@ function renderChips(){
   // Si la etiqueta activa quedó fuera del carrusel —al elegirla desde el
   // listado completo, por ejemplo— se trae a la vista. Solo mueve el
   // carrusel, nunca la página.
-  if(window.ChipsNav) ChipsNav.verActivo();
+  if(window.ChipsNav) window.ChipsNav.verActivo();
 }
 function setFilt(v){
   // Cambiar a otro estado apaga el modo "cambiar etiqueta por QR".
@@ -1784,6 +1784,56 @@ function setFilt(v){
   // costara dos reconstrucciones antes de abrir el listado de etiquetas.
   if(v === _filt) return;
   _filt=v;renderChips();render();
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   NAVEGAR ENTRE ETIQUETAS con las flechas ‹ › del carrusel
+   ══════════════════════════════════════════════════════════════════════
+   Las flechas ya no desplazan la fila: cambian la etiqueta activa, una por
+   toque. Desplazarla era un botón caro para algo que el dedo ya hace; en
+   cambio "etiqueta anterior / siguiente" no tenía atajo — había que buscar
+   el chip con la vista y apuntarle. La fila se mueve igual, pero como
+   CONSECUENCIA: renderChips() trae el chip activo a la vista.
+
+   El recorrido vive ACÁ y no en floatpanel.js a propósito: `_filt` y
+   `S.labels` son de este archivo. Que el carrusel tuviera que alcanzar un
+   `let` de otro script para decidir sería el tipo de acoplamiento que se
+   rompe en silencio (ver la comprobación de window.X en el CI).
+
+   TODOS es la primera posición: es el filtro vacío. */
+function _secuenciaFiltros(){ return ['', ...allStatuses()]; }
+
+/* ¿Hay etiqueta hacia ese lado? Lo usa el carrusel para mostrar u ocultar
+   cada flecha. Sin dar la vuelta: de la última no se salta a TODOS. El chip
+   TODOS está siempre visible y a un toque, así que dar once vueltas para
+   volver no aporta — y que la flecha desaparezca es la señal más clara de
+   que llegaste al final. */
+function filtroPuedeIr(dir){
+  const sec=_secuenciaFiltros();
+  let i=sec.indexOf(_filt); if(i<0) i=0;   // etiqueta borrada en Config
+  const j=i+dir;
+  return j>=0 && j<sec.length;
+}
+
+let _navFiltroTimer=null;
+function navFiltro(dir){
+  const sec=_secuenciaFiltros();
+  let i=sec.indexOf(_filt); if(i<0) i=0;
+  const j=i+dir;
+  if(j<0 || j>=sec.length) return;
+  const destino=sec[j];
+  // Mismo apagado del modo "cambiar etiqueta por QR" que setFilt.
+  if(_qrMove.on && destino!==_qrMove.status){ _qrMoveClearTimer(); _qrMove.on=false; _qrMove.status=''; _qrMove.last=null; _qrMove.shown=null; }
+  _filt=destino;
+  // Los chips, al instante: son 12 elementos y es la respuesta que esperas
+  // ver al tocar. La LISTA espera a que dejes de presionar — ir de TODOS a
+  // ENVIADO son cinco toques, y montar cinco listas de las que solo miras
+  // la última es trabajo tirado. Importa sobre todo al pasar de largo por
+  // FINALIZADO, que son 924 tarjetas.
+  renderChips();
+  if(window.ChipsNav) window.ChipsNav.actualizarFlechas();
+  clearTimeout(_navFiltroTimer);
+  _navFiltroTimer=setTimeout(render, 120);
 }
 
 function openChipSort(label){
@@ -3430,7 +3480,7 @@ render();
 <script src="notify.js?v=4"></script>
 <script src="shalom.js?v=10"></script>
 <script src="tracking.js?v=15"></script>
-<script src="floatpanel.js?v=3"></script>
+<script src="floatpanel.js?v=4"></script>
 <script src="delivery.js?v=8"></script>
 <script src="qrtracking.js?v=3"></script>
 <script src="ticket.js?v=4"></script>

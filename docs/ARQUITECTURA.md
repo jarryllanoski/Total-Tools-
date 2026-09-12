@@ -81,13 +81,40 @@ Consecuencias que hay que tener presentes al tocar cualquier cosa:
 | `seleccion.js` | 159 | Qué pedidos están marcados, **solo en este dispositivo** |
 | `firebase-config.js` | 7 | Claves del proyecto |
 
-### Nota · El carrusel de etiquetas (`floatpanel.js:_fixChipsScroll`)
+### Nota · Las flechas `‹ ›` de la fila de etiquetas
 
-Las flechas `‹ ›` de la fila de etiquetas avanzan **una etiqueta por toque**:
-se mide dónde empieza cada una y se salta a la primera que quede más allá de
-la posición actual. Antes eran **120 px fijos**, que no tienen relación con el
-ancho de una etiqueta —van de `TODOS` (~60 px) a `RECLAMOS, DEVOLUCIONES,
-GARANT` (~230 px)— y dejaban medias etiquetas cortadas.
+**Cambian la etiqueta activa, una por toque. No desplazan la fila.**
+
+```
+‹  ← TODOS · NUEVO PEDIDO · EN PROCESO · … · AVISAR CUANDO LLEGUE →  ›
+```
+
+Desplazar era un botón caro para algo que el dedo ya hace. En cambio "etiqueta
+anterior / siguiente" no tenía atajo: había que buscar el chip con la vista y
+apuntarle. **La fila se mueve igual, pero como consecuencia** —
+`renderChips()` llama a `ChipsNav.verActivo()`, que trae el chip activo a la
+vista.
+
+**Quién decide vive en `index.html`** (`navFiltro`, `filtroPuedeIr`,
+`_secuenciaFiltros`), porque ahí están `_filt` y `S.labels`. `floatpanel.js`
+solo pone los botones y los muestra u oculta. Que el carrusel tuviera que
+alcanzar un `let` de otro script para decidir sería el acoplamiento que se
+rompe en silencio (ver la comprobación de `window.X` en el CI).
+
+Tres decisiones:
+
+- **`TODOS` es la primera posición** del recorrido: es el filtro vacío.
+- **Sin dar la vuelta.** De la última no se salta a `TODOS`: el chip `TODOS`
+  está siempre visible y a un toque, y que la flecha desaparezca es la señal
+  más clara de que llegaste al final.
+- **Los chips se pintan al instante; la lista espera 120 ms.** Ir de `TODOS` a
+  `ENVIADO` son cinco toques, y montar cinco listas de las que solo miras la
+  última es trabajo tirado — sobre todo al pasar de largo por `FINALIZADO`,
+  que son 924 tarjetas.
+
+*(Historia: antes las flechas movían 120 px fijos, un número sin relación con
+el ancho de ninguna etiqueta —van de ~60 px a ~230 px—, así que dejaban medias
+etiquetas cortadas en el borde.)*
 
 **Por qué no `::scroll-button()`** (revisado el 2026-09-12): hace exactamente
 esto sin JavaScript y es lo que recomiendan los artículos de este año, pero
@@ -100,18 +127,13 @@ alinea también el deslizamiento con el dedo. Con `proximity`, **no**
 `mandatory`: una etiqueta más ancha que la pantalla puede atrapar el
 desplazamiento con `mandatory` y dejarte sin poder pasar.
 
-Tres reglas que no se rompen:
+Dos reglas que no se rompen:
 
-1. **Mientras navegas con las flechas manda el objetivo, no la pantalla.** La
-   animación suave dura ~400 ms; si se recalculara desde `scrollLeft` durante
-   ella, tres toques rápidos no avanzarían tres etiquetas. El dedo y la rueda
-   devuelven el mando (`wheel`, `touchstart`).
-2. **Las posiciones se miden con rectángulos, no con `offsetLeft`.**
-   `offsetLeft` cuenta desde el ancestro posicionado: basta un `position` nuevo
-   en el CSS de al lado para que empiece a devolver otra cosa, sin error.
-3. **Las flechas viven sobre el carrusel, no sobre la fila.** Estaban sobre la
-   fila entera y la izquierda tapaba los ~25 px iniciales del chip TODOS, que
-   ahí dejaba de responder.
+1. **Cada flecha se ve si hay etiqueta hacia ese lado**, no según si se puede
+   desplazar. En `TODOS` no hay `‹`; en la última etiqueta no hay `›`.
+2. **Las flechas viven sobre el carrusel, no sobre la fila.** Estaban sobre la
+   fila entera y la izquierda tapaba los ~25 px iniciales del chip `TODOS`, que
+   ahí dejaba de responder al toque.
 
 > ⚠️ **`config.js` no es configuración.** Dentro conviven: PIN de seguridad,
 > papelera, WhatsApp, documentos adjuntos, enlaces y deuda, reconocimiento de

@@ -516,6 +516,26 @@
      navegadores sin soporte las flechas simplemente no existirían y nadie
      sabría por qué. Cuando sea Baseline, esto se puede borrar casi entero.
      Lo que sí se usa es la mitad universal: CSS Scroll Snap (panel.css).  */
+  /* ── CARRUSEL DE ETIQUETAS · las flechas ‹ › ─────────────────────────
+     Las flechas CAMBIAN LA ETIQUETA ACTIVA, una por toque — no desplazan la
+     fila. Desplazar era un botón caro para algo que el dedo ya hace; en
+     cambio "etiqueta anterior / siguiente" no tenía atajo: había que buscar
+     el chip con la vista y apuntarle. La fila se mueve igual, pero como
+     consecuencia (`verActivo` trae el chip activo a la vista).
+
+     Quién decide a qué etiqueta ir vive en index.html (`navFiltro`,
+     `filtroPuedeIr`): ahí están `_filt` y `S.labels`. Este archivo solo pone
+     los botones y los muestra u oculta.
+
+     Antes las flechas movían 120 px fijos. Las etiquetas miden de ~60 px
+     ("TODOS") a ~230 px ("RECLAMOS, DEVOLUCIONES, GARANT"), así que ese
+     salto dejaba medias etiquetas cortadas en el borde.
+
+     Del CSS se conserva Scroll Snap (panel.css), que alinea el deslizamiento
+     con el dedo. Se descartó `::scroll-button()` —hace esto sin JavaScript—
+     porque en 2026-09 solo funciona en Chrome/Edge 135+ y no es Baseline:
+     donde no hubiera soporte, las flechas no existirían y nadie sabría por
+     qué. Ver docs/ARQUITECTURA.md.                                        */
   function _fixChipsScroll(){
     var carrusel = document.getElementById('filterChips');
     if(!carrusel) return;
@@ -543,32 +563,44 @@
     nav.appendChild(btnL);
     nav.appendChild(btnR);
 
-    /* Dónde empieza cada etiqueta DENTRO del contenido desplazable.
-       Se mide con rectángulos y no con `offsetLeft` a propósito:
-       `offsetLeft` cuenta desde el ancestro posicionado, y basta que
-       alguien cambie un `position` en el CSS de al lado para que empiece a
-       devolver otra cosa —sin error, solo mal. Son ~11 etiquetas: medirlas
-       no cuesta nada. */
-    function _inicios(){
-      var base = carrusel.getBoundingClientRect().left - carrusel.scrollLeft;
-      var out = [];
-      for(var i=0;i<carrusel.children.length;i++){
-        out.push(carrusel.children[i].getBoundingClientRect().left - base);
+    btnL.addEventListener('click', function(){ _ir(-1); });
+    btnR.addEventListener('click', function(){ _ir(1); });
+
+    function _ir(dir){
+      if(typeof window.navFiltro === 'function') window.navFiltro(dir);
+    }
+
+    /* Cada flecha se ve si hay etiqueta hacia ese lado — no según si se
+       puede desplazar, que es lo que miraban antes. En TODOS no hay ‹; en la
+       última etiqueta no hay ›. */
+    function actualizarFlechas(){
+      var puede = window.filtroPuedeIr;
+      if(typeof puede !== 'function'){
+        btnL.style.display = btnR.style.display = 'none';
+        return;
       }
-      return out;
+      btnL.style.display = puede(-1) ? 'flex' : 'none';
+      btnR.style.display = puede(1)  ? 'flex' : 'none';
     }
+    ChipsNav.actualizarFlechas = actualizarFlechas;
 
-    function _tope(){
-      return Math.max(0, carrusel.scrollWidth - carrusel.clientWidth);
-    }
+    window.addEventListener('resize', actualizarFlechas);
 
-    /* El objetivo en vuelo. Sin esto, pulsar tres veces rápido calcularía
-       desde una posición EN MOVIMIENTO (la animación suave dura ~400 ms) y
-       no avanzaría tres etiquetas, sino lo que saliera. Mientras navegas
-       con las flechas manda el objetivo; en cuanto tocas con el dedo o la
-       rueda, vuelve a mandar la pantalla. */
-    var _obj = null, _objTimer = null;
-    function _soltarObjetivo(){ _obj = null; clearTimeout(_objTimer); }
+    /* Cuando cambian las etiquetas —agregar una en Config, o cualquier
+       renderChips()— hay que rehacer las cuentas. `navFiltro` ya avisa
+       directo; esto cubre los demás caminos. */
+    try{
+      new MutationObserver(function(){ actualizarFlechas(); ChipsNav.verActivo(); })
+        .observe(carrusel, {childList:true});
+    }catch(e){ /* navegador viejo: quedan resize y el aviso de navFiltro */ }
+
+    // La rueda del ratón sigue desplazando la fila (sin cambiar el filtro).
+    carrusel.addEventListener('wheel', function(e){
+      if(Math.abs(e.deltaY) > Math.abs(e.deltaX)){
+        e.preventDefault();
+        carrusel.scrollLeft += e.deltaY;
+      }
+    }, {passive:false});
 
     function _suave(){
       try{
@@ -577,54 +609,7 @@
       }catch(e){ return true; }
     }
 
-    function mover(dir){
-      var desde = (_obj !== null) ? _obj : carrusel.scrollLeft;
-      var destino = ChipsNav._destinoDesde(_inicios(), desde, _tope(), dir);
-      if(destino === null) return;
-      _obj = destino;
-      clearTimeout(_objTimer);
-      _objTimer = setTimeout(_soltarObjetivo, 600);
-      carrusel.scrollTo({left: destino, behavior: _suave() ? 'smooth' : 'auto'});
-      updateArrows();
-    }
-
-    btnL.addEventListener('click', function(){ mover(-1); });
-    btnR.addEventListener('click', function(){ mover(1); });
-
-    function updateArrows(){
-      var canLeft  = carrusel.scrollLeft > 5;
-      var canRight = carrusel.scrollLeft < _tope() - 5;
-      btnL.style.display = canLeft  ? 'flex' : 'none';
-      btnR.style.display = canRight ? 'flex' : 'none';
-    }
-
-    carrusel.addEventListener('scroll', updateArrows);
-    window.addEventListener('resize', updateArrows);
-
-    /* Las flechas también hay que re-evaluarlas cuando CAMBIAN las
-       etiquetas —agregar una en Config, o cualquier renderChips()— porque
-       ahí cambia el ancho del contenido sin que nadie haga scroll ni
-       redimensione. Antes solo escuchaban scroll y resize, así que podía
-       quedar la flecha derecha escondida habiendo más etiquetas. */
-    try{
-      new MutationObserver(function(){ updateArrows(); ChipsNav.verActivo(); })
-        .observe(carrusel, {childList:true});
-      new ResizeObserver(updateArrows).observe(carrusel);
-    }catch(e){ /* navegador viejo: quedan scroll y resize */ }
-
-    // El dedo y la rueda devuelven el mando a la pantalla.
-    carrusel.addEventListener('wheel', function(e){
-      _soltarObjetivo();
-      if(Math.abs(e.deltaY) > Math.abs(e.deltaX)){
-        e.preventDefault();
-        carrusel.scrollLeft += e.deltaY;
-        updateArrows();
-      }
-    }, {passive:false});
-    carrusel.addEventListener('touchstart', _soltarObjetivo, {passive:true});
-
-    /* Trae el chip activo a la vista si se quedó fuera —por ejemplo al
-       elegir una etiqueta desde el listado completo—. Mueve SOLO el
+    /* Trae el chip activo a la vista si se quedó fuera. Mueve SOLO el
        carrusel: `scrollIntoView` habría podido desplazar la página entera
        hacia arriba o abajo, que no es lo que nadie pidió. */
     ChipsNav.verActivo = function(){
@@ -632,15 +617,15 @@
       if(!act) return;
       var r = act.getBoundingClientRect(), c = carrusel.getBoundingClientRect();
       var d = 0;
-      if(r.left  < c.left)  d = (r.left  - c.left)  - 8;
+      if(r.left < c.left) d = (r.left - c.left) - 8;
       else if(r.right > c.right) d = (r.right - c.right) + 8;
       if(!d) return;   // ya se ve entera: no se mueve nada
-      _soltarObjetivo();
-      carrusel.scrollTo({left: Math.max(0, Math.min(_tope(), carrusel.scrollLeft + d)),
+      var tope = Math.max(0, carrusel.scrollWidth - carrusel.clientWidth);
+      carrusel.scrollTo({left: Math.max(0, Math.min(tope, carrusel.scrollLeft + d)),
                          behavior: _suave() ? 'smooth' : 'auto'});
     };
 
-    setTimeout(function(){ updateArrows(); ChipsNav.verActivo(); }, 300);
+    setTimeout(function(){ actualizarFlechas(); ChipsNav.verActivo(); }, 300);
   }
 
   function _flecha(id, glifo, lado, etiqueta, degradado, color){
@@ -659,27 +644,9 @@
     return b;
   }
 
-  /* La decisión, sin DOM de por medio: dadas las posiciones donde empieza
-     cada etiqueta, dónde estoy y hasta dónde se puede desplazar, ¿a qué
-     posición hay que ir? Separada para poder probarla entera. */
-  var ChipsNav = {
-    _destinoDesde: function(inicios, x, tope, dir){
-      var EPS = 2, i;
-      if(dir > 0){
-        if(x >= tope - 1) return null;              // ya está al final
-        for(i = 0; i < inicios.length; i++){
-          if(inicios[i] > x + EPS) return Math.min(inicios[i], tope);
-        }
-        return null;
-      }
-      var prev = null;
-      for(i = 0; i < inicios.length; i++){
-        if(inicios[i] < x - EPS) prev = inicios[i]; else break;
-      }
-      return prev;
-    },
-    verActivo: function(){}   // lo reemplaza _fixChipsScroll al montarse
-  };
+  /* Lo reemplaza _fixChipsScroll al montarse; los huecos evitan que quien
+     llame antes de tiempo se encuentre con un undefined. */
+  var ChipsNav = { verActivo: function(){}, actualizarFlechas: function(){} };
   window.ChipsNav = ChipsNav;
 
   if(document.readyState === 'loading'){
