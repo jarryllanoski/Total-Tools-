@@ -385,6 +385,49 @@ desglose solo se paga al fallar.
 | El camino rápido se apaga **solo si, uno por uno, entraron TODOS** | Entonces no había ningún documento malo: el problema era el endpoint. Si alguno falló también suelto, el culpable era ese documento y `:commit` sigue sirviendo para los demás. |
 | Y solo ante un **4xx que no sea 429** | Un 5xx o un 429 son pasajeros; un corte de red no debe degradar el resto de la sesión. |
 
+### El latido no puede llevarse lo que solo existe aquí
+
+`_mergeRemote` termina con un **reemplazo completo**: `S[k] = remote[k]`. Un
+pedido creado en este dispositivo que todavía no llegó a subir **no viene en
+`remote`**, así que desaparecía — de la pantalla y del respaldo local, sin
+aviso. No hacía falta cerrar la pestaña: bastaba con que la subida fallara y
+llegara el latido de los 5 s.
+
+Ahora se rescatan los locales que **están marcados como sucios**.
+
+> ⚠️ **El filtro por sucios no es un detalle, es lo que impide resucitar
+> muertos.** Si se rescatara todo lo local que no está en la nube, un pedido
+> borrado desde otro dispositivo volvería a aparecer en cada latido. Sin marcar
+> = aquí no hay nada pendiente = su ausencia en la nube es la verdad.
+
+### `_dirtyAll` arranca APAGADO
+
+Arrancaba en `true` con el argumento de "no sé qué quedó pendiente, subo todo".
+Eso tenía sentido cuando nadie anotaba qué había quedado sin subir. Con
+`dpanel_dirty` ya se sabe con nombre y apellido, y dejarlo en `true` convertía
+**cada arranque con algo pendiente en una subida de los 971**.
+
+Solo dos sitios lo encienden, y los dos a propósito:
+
+| Quién | Cuándo |
+|---|---|
+| `save()` **sin argumento** | importar Excel (`config.js`), restaurar respaldo (`respaldo.js`) |
+| `_initFirebase` | primer arranque real: la nube responde **vacía** y hay datos locales |
+
+### Un pedido se escribe UNA vez
+
+`saveForm()` hacía `_fbSaveShipmentNow(pedido)` **y** `save(id)`: el mismo
+documento se escribía dos veces, una suelta al instante y otra 800 ms después
+dentro de la tanda. Estaba puesto para que un pedido nuevo no se perdiera si
+cerrabas la pestaña antes del debounce.
+
+Ya no hace falta, **pero el orden importó**: primero hubo que cerrar el agujero
+de verdad (rescate en `_mergeRemote` + subida al arrancar). Quitarlo antes
+habría abierto exactamente el hueco que tapaba.
+
+> Los otros cuatro usos de `_fbSaveShipmentNow` (seguimiento y reparto) **se
+> quedan**: ahí no hay un `save()` detrás, así que no duplican nada.
+
 ### `dpanel_pending` tiene que ponerse en `'1'`
 
 Esta bandera se **leía** en dos sitios y **nadie la escribía nunca** en `'1'`.

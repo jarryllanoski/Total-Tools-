@@ -25,9 +25,13 @@ function bloqueCon(marca) {
 }
 
 const FIREBASE = bloqueCon('window._fbSave =');
-const PERSIST  = E.trozo('index.html', "const DIRTY_KEY = 'dpanel_dirty';", '_recuperarSucios();');
+const PERSIST  = E.trozo('index.html', 'let _dirtyShips = new Set();', '_recuperarSucios();');
 const REINTENTO = E.trozo('index.html', 'async function _fbSaveWithRetry(data, attempt){',
                                         '// Sin modo offline');
+const MERGE = E.trozo('index.html', 'window._mergeRemote = (remote) => {',
+                                    '// On Firebase ready');
+const INIT  = E.trozo('index.html', 'const _initFirebase = async (intento) => {',
+                                    'if(window._fbReady) {');
 
 /* ── Un Firestore de mentira ──────────────────────────────────────────────
    Cuenta peticiones, guarda los cuerpos y puede fallar a voluntad: por
@@ -106,18 +110,19 @@ function montarPersistencia(op) {
   op = op || {};
   const almacen = op.almacen || {};
   const ctx = {
-    _dirtyShips: op.ships || new Set(),
-    _dirtySupps: op.supps || new Set(),
-    _dirtyAll: !!op.all,
     lsSet: (k, v) => { almacen[k] = String(v); },
     lsGet: (k) => (k in almacen ? almacen[k] : null),
     salida: {}
   };
   const codigo = PERSIST +
     '\nsalida.guardar = _guardarSucios; salida.recuperar = _recuperarSucios;' +
-    '\nsalida.estado = function(){ return { all: _dirtyAll, ships: _dirtyShips, supps: _dirtySupps }; };';
+    '\nsalida.estado = function(){ return { all: _dirtyAll, ships: _dirtyShips,' +
+    ' supps: _dirtySupps, hubo: _huboSuciosGuardados }; };' +
+    '\nsalida.marcar = function(s, p, all){ (s||[]).forEach(function(x){_dirtyShips.add(x);});' +
+    ' (p||[]).forEach(function(x){_dirtySupps.add(x);}); if(all) _dirtyAll = true; };';
   const n = Object.keys(ctx);
   new Function(...n, codigo)(...n.map((k) => ctx[k]));
+  if (op.ships || op.supps || op.all) ctx.salida.marcar(op.ships, op.supps, op.all);
   return { api: ctx.salida, almacen };
 }
 
@@ -144,6 +149,59 @@ function montarReintento(op) {
   new Function(...n, codigo)(...n.map((k) => ctx[k]));
   const drenar = async () => { while (pendientes.length) await pendientes.shift(); };
   return { api: ctx.salida, win, almacen, drenar };
+}
+
+/* ── El merge del latido, aislado ─────────────────────────────────────── */
+
+function montarMerge(op) {
+  op = op || {};
+  const S = { shipments: op.locales || [], suppliers: op.localesP || [], labels: [], config: {} };
+  const win = { _isSaving: !!op.guardando };
+  const almacen = {};
+  const ctx = {
+    window: win, S,
+    FIXED_LABELS: ['NUEVO PEDIDO', 'ENVIADO', 'FINALIZADO'],
+    _dirtyShips: op.ships || new Set(),
+    _dirtySupps: op.supps || new Set(),
+    _S_TS: 0,
+    lsSet: (k, v) => { almacen[k] = String(v); },
+    render: () => {}, renderChips: () => {}, toast: () => {},
+    salida: {}
+  };
+  const codigo = MERGE + '\nsalida.merge = window._mergeRemote;';
+  const n = Object.keys(ctx);
+  new Function(...n, codigo)(...n.map((k) => ctx[k]));
+  return { S, api: ctx.salida, win };
+}
+
+const ped = (id, extra) => Object.assign({ id, name: 'C' + id, status: 'ENVIADO' }, extra || null);
+const ids = (lista) => (lista || []).map((x) => x.id).sort().join(',');
+
+/* ── El arranque, aislado ─────────────────────────────────────────────── */
+
+function montarInit(op) {
+  op = op || {};
+  const almacen = op.almacen || {};
+  const subidas = [];
+  const S = { shipments: op.locales || [], suppliers: [], config: { name: op.nombre || 'Mi Negocio' } };
+  const win = { _fbLoad: async () => op.remoto, _mergeRemote: () => {}, _fbListen: () => {} };
+  const ctx = {
+    window: win, S,
+    document: { getElementById: () => null },
+    lsGet: (k) => (k in almacen ? almacen[k] : null),
+    _fbSaveWithRetry: (d, i) => { subidas.push(i); },
+    _dirtyAll: false,
+    _huboSuciosGuardados: !!op.recuperoSucios,
+    console: { warn: () => {} },
+    toast: () => {},
+    setTimeout: () => {},
+    salida: {}
+  };
+  const codigo = INIT + '\nsalida.init = _initFirebase;' +
+                 '\nsalida.dirtyAll = function(){ return _dirtyAll; };';
+  const n = Object.keys(ctx);
+  new Function(...n, codigo)(...n.map((k) => ctx[k]));
+  return { api: ctx.salida, subidas };
 }
 
 /* ═══════════════════════════════════════════════════════════════════════ */
@@ -261,9 +319,63 @@ module.exports = async function ({ bloque, ok }) {
   ok(m12.red.commit.length >= 2,
      '2 pedidos gordos no caben en una petición: se parten aunque no lleguen a 500');
 
+  bloque('El latido ya no se lleva por delante lo que solo existe aquí');
+
+  const g1 = montarMerge({ locales: [ped('p1'), ped('nuevo')], ships: new Set(['nuevo']) });
+  g1.api.merge({ shipments: [ped('p1'), ped('p2')] });
+  ok(ids(g1.S.shipments) === 'nuevo,p1,p2',
+     'un pedido creado aquí y aún sin subir sobrevive al latido');
+
+  const g2 = montarMerge({ locales: [ped('p1'), ped('borrado')], ships: new Set() });
+  g2.api.merge({ shipments: [ped('p1')] });
+  ok(ids(g2.S.shipments) === 'p1',
+     'pero lo que otro dispositivo borró NO resucita: sin marcar, su ausencia es la verdad');
+
+  const g3 = montarMerge({ locales: [ped('p1', { name: 'MÍO' })], ships: new Set(['p1']) });
+  g3.api.merge({ shipments: [ped('p1', { name: 'NUBE' })] });
+  ok(g3.S.shipments[0].name === 'MÍO',
+     'y un pedido sucio que sí está en la nube conserva la versión local');
+
+  const g4 = montarMerge({ localesP: [{ id: 's1' }, { id: 'sNuevo' }], supps: new Set(['sNuevo']) });
+  g4.api.merge({ suppliers: [{ id: 's1' }] });
+  ok(ids(g4.S.suppliers) === 's1,sNuevo', 'con los proveedores pasa lo mismo');
+
+  const g5 = montarMerge({ locales: [ped('p1')], ships: new Set(['p1']), guardando: true });
+  g5.api.merge({ shipments: [ped('p9')] });
+  ok(ids(g5.S.shipments) === 'p1', 'con un guardado en curso no se mergea nada');
+
+  bloque('El arranque sube lo que quedó pendiente');
+
+  const i1 = montarInit({ remoto: { shipments: [] }, recuperoSucios: true });
+  await i1.api.init();
+  ok(i1.subidas.length === 1, 'si la sesión anterior dejó algo sin subir, se sube al arrancar');
+  ok(i1.api.dirtyAll() === false, 'y se suben ESOS, no los 971: _dirtyAll sigue apagado');
+
+  const i2 = montarInit({ remoto: { shipments: [] }, recuperoSucios: false });
+  await i2.api.init();
+  ok(i2.subidas.length === 0, 'sin nada pendiente, arrancar no escribe en la nube');
+
+  const i3 = montarInit({ remoto: { shipments: [] }, almacen: { dpanel_pending: '1' } });
+  await i3.api.init();
+  ok(i3.subidas.length === 1, 'la bandera de pendiente sigue disparando la resubida');
+
+  const i4 = montarInit({ remoto: null, locales: [ped('p1')] });
+  await i4.api.init();
+  ok(i4.subidas.length === 1 && i4.api.dirtyAll() === true,
+     'nube vacía con datos locales: primer arranque real, ahí sí se enciende _dirtyAll a mano');
+
+  const i5 = montarInit({ remoto: null, locales: [] });
+  await i5.api.init();
+  ok(i5.subidas.length === 0, 'nube vacía y nada local: no se sube nada');
+
   bloque('Lo que no subió sobrevive al cierre de la pestaña');
 
-  const p1 = montarPersistencia({ ships: new Set(['a', 'b']), supps: new Set(['s1']) });
+  const p0 = montarPersistencia({});
+  ok(p0.api.estado().all === false,
+     '_dirtyAll arranca APAGADO: arrancar en true convertía cada recuperación en subir los 971');
+  ok(p0.api.estado().ships.size === 0, 'y sin nada marcado');
+
+  const p1 = montarPersistencia({ ships: ['a', 'b'], supps: ['s1'] });
   p1.api.guardar();
   const crudo = JSON.parse(p1.almacen.dpanel_dirty);
   ok(crudo.s.length === 2 && crudo.p.length === 1, 'se anota qué quedó sin subir');
@@ -275,7 +387,7 @@ module.exports = async function ({ bloque, ok }) {
      'al volver a abrir, los pedidos sin subir se reconocen otra vez');
   ok(p2.api.estado().supps.has('s1'), 'los proveedores también');
 
-  const p3 = montarPersistencia({ ships: new Set(), all: false });
+  const p3 = montarPersistencia({});
   p3.api.guardar();
   ok(p3.almacen.dpanel_dirty === '', 'sin nada pendiente no se deja basura guardada');
   const p4 = montarPersistencia({ almacen: { dpanel_dirty: '{{{roto' } });
@@ -286,6 +398,26 @@ module.exports = async function ({ bloque, ok }) {
   const p5 = montarPersistencia({ almacen: { dpanel_dirty: JSON.stringify({ all: true, s: [], p: [] }) } });
   p5.api.recuperar();
   ok(p5.api.estado().all === true, '"subir todo" también sobrevive al cierre');
+
+  const p6 = montarPersistencia({ almacen: p1.almacen });
+  p6.api.recuperar();
+  ok(p6.api.estado().hubo === true,
+     'y queda constancia de que había algo pendiente: es lo que dispara la subida al arrancar');
+  const p7 = montarPersistencia({ almacen: {} });
+  p7.api.recuperar();
+  ok(p7.api.estado().hubo === false, 'si no había nada, no se marca nada');
+
+  bloque('Un pedido no se escribe dos veces');
+
+  /* Esta es estructural, no de comportamiento: probar saveForm() entero pediría
+     medio formulario de mentira. Lo que se guarda es que no vuelva a colarse el
+     patrón exacto que duplicaba —guardado inmediato seguido de save() del mismo
+     pedido— que es como estaba escrito y como volvería a escribirse. */
+  const CFG = E.leer('config.js');
+  ok(!/_fbSaveShipmentNow\([^)]*\);\s*(\/\/[^\n]*\n\s*)*save\(/.test(CFG),
+     'en config.js ya no hay un guardado inmediato seguido de save() del mismo pedido');
+  ok(CFG.indexOf('save(data.id)') >= 0 && CFG.indexOf('save(_editId)') >= 0,
+     'pero save() sigue ahí: quitar el duplicado no puede dejar el pedido sin guardar');
 
   bloque('El aviso de pendiente por fin existe');
 

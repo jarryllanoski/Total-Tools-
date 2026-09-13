@@ -768,15 +768,19 @@ function saveShipment(){
       if(prev[k]!==undefined&&!data[k]) data[k]=prev[k];
     });
     S.shipments[idx]={...prev,...data, _localTs: Date.now()};
-    // Guardar inmediatamente en Firebase (sin esperar debounce)
-    if(window._fbSaveShipmentNow) window._fbSaveShipmentNow(S.shipments[idx]);
+    // ★ Aquí había además un _fbSaveShipmentNow(): el mismo pedido se escribía
+    // DOS veces, una suelta al instante y otra 800 ms después dentro de la
+    // tanda de save(). Estaba para que un cambio no se perdiera si cerrabas la
+    // pestaña antes del debounce. Ya no hace falta: save() persiste en el acto
+    // qué quedó sin subir (dpanel_dirty), _mergeRemote no se lo lleva por
+    // delante y el arranque lo sube solo. Ver INVARIANTES §7.
     save(_editId);closeOverlay('formOverlay');render(); // ★ incremental: solo este pedido
     if(window.DeliveryModule&&DeliveryModule.refrescar)DeliveryModule.refrescar(); // ruta al día si está abierta
     toast('✅ Actualizado');}
   else{
     data.id='id_'+Date.now();data.createdAt=new Date().toISOString();data._localTs=Date.now();S.shipments.push(data);
-    // Guardar inmediatamente en Firebase
-    if(window._fbSaveShipmentNow) window._fbSaveShipmentNow(data);
+    // ★ Sin _fbSaveShipmentNow(): ver el comentario de arriba. Un pedido nuevo
+    // que aún no subió ya sobrevive al latido y al cierre de la pestaña.
     save(data.id);closeOverlay('formOverlay');
     // Mostrar el pedido nuevo en SU etiqueta (sin scroll) + resaltarlo
     if(typeof setFilt==='function') setFilt(data.status); else render();

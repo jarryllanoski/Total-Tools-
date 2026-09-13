@@ -1558,7 +1558,15 @@ let _fbSaveTimer = null;
 // save(id) marca solo ese pedido para subir. save() sin id = subir todo (seguro).
 let _dirtyShips = new Set();
 let _dirtySupps = new Set();   // proveedores modificados: save('supp:'+id) marca solo ese
-let _dirtyAll = true; // true = subir todo (config/suppliers/masivo); arranque seguro
+/* ★ Arranca en FALSE, no en true.
+   Arrancar en true significaba "no sé qué quedó pendiente, sube los 971". Eso
+   tenía sentido cuando nadie anotaba qué había quedado sin subir; ahora
+   `dpanel_dirty` lo dice con nombre y apellido, y dejarlo en true convertía
+   cada arranque con algo pendiente en una subida completa.
+   Los dos sitios que de verdad necesitan subirlo todo lo encienden a
+   propósito: `save()` sin argumento (importar Excel, restaurar respaldo) y el
+   primer arranque real con la nube vacía. */
+let _dirtyAll = false;
 let _dirtyConfigOnly = false; // true = subir SOLO config (toggles de Config)
 
 /* ★ LOS SUCIOS SOBREVIVEN AL CIERRE DE LA PESTAÑA
@@ -1569,6 +1577,7 @@ let _dirtyConfigOnly = false; // true = subir SOLO config (toggles de Config)
    Guardando qué quedó sucio, _mergeRemote reconoce esos pedidos al arrancar y
    conserva la versión local hasta que suba de verdad. */
 const DIRTY_KEY = 'dpanel_dirty';
+let _huboSuciosGuardados = false; // ¿la sesión anterior dejó algo sin subir?
 function _guardarSucios(){
   try{
     if(_dirtyAll || _dirtyShips.size || _dirtySupps.size){
@@ -1590,6 +1599,7 @@ function _recuperarSucios(){
     (o.s||[]).forEach(id => _dirtyShips.add(id));
     (o.p||[]).forEach(id => _dirtySupps.add(id));
     if(o.all) _dirtyAll = true;
+    _huboSuciosGuardados = !!(o.all || (o.s||[]).length || (o.p||[]).length);
   }catch(e){ /* dato corrupto: se ignora, _dirtyAll ya cubre el caso */ }
 }
 _recuperarSucios();
@@ -1726,6 +1736,29 @@ window._mergeRemote = (remote) => {
       return rs;
     });
   }
+  /* ★ LOS PEDIDOS QUE SOLO EXISTEN AQUÍ
+     La línea de abajo reemplaza S ENTERO con lo que trae la nube. Un pedido
+     creado en este dispositivo que todavía no llegó a subir NO viene en
+     `remote`, así que desaparecía: de la pantalla y del respaldo local, sin
+     aviso y sin forma de recuperarlo. No hacía falta cerrar la pestaña —
+     bastaba con que la subida fallara y llegara el latido de los 5 s.
+
+     Se rescatan SOLO los que están marcados como sucios. Ese filtro es lo que
+     impide resucitar lo que otro dispositivo borró a propósito: si un pedido
+     no está marcado, es que aquí no hay nada pendiente sobre él y su ausencia
+     en la nube es la verdad, no una pérdida. */
+  if(remote.shipments && typeof _dirtyShips !== 'undefined'){
+    const enNube = new Set(remote.shipments.map(r => r && r.id));
+    (S.shipments || []).forEach(l => {
+      if(l && l.id && _dirtyShips.has(l.id) && !enNube.has(l.id)) remote.shipments.push(l);
+    });
+  }
+  if(remote.suppliers && typeof _dirtySupps !== 'undefined'){
+    const enNubeP = new Set(remote.suppliers.map(r => r && r.id));
+    (S.suppliers || []).forEach(l => {
+      if(l && l.id && _dirtySupps.has(l.id) && !enNubeP.has(l.id)) remote.suppliers.push(l);
+    });
+  }
   // Full replace — not just assign — so arrays like labels/couriers sync correctly
   Object.keys(remote).forEach(k => { S[k] = remote[k]; });
 
@@ -1770,14 +1803,22 @@ const _initFirebase = async (intento) => {
     if(remote && Object.keys(remote).length > 0){
       // Firebase tiene datos → Firebase manda
       window._mergeRemote(remote);
-      // Si había datos pendientes de subir, subirlos ahora que confirmamos conexión
-      if(lsGet('dpanel_pending')==='1') _fbSaveWithRetry(S, 0);
+      /* ★ Subir lo que quedó pendiente, ahora que hay conexión confirmada.
+         Antes solo miraba `dpanel_pending`, que se enciende al agotar los
+         reintentos — o sea, nunca cuando la pestaña se cierra de golpe. Con
+         `dpanel_dirty` sabemos qué quedó sin subir aunque el navegador se
+         cerrara a media escritura, y RECONOCERLO no bastaba: había que
+         subirlo. `_dirtyAll` sigue en false, así que sube exactamente esos y
+         no los 971. */
+      if(lsGet('dpanel_pending')==='1' || _huboSuciosGuardados) _fbSaveWithRetry(S, 0);
     } else {
       // remote === null SOLO cuando Firebase confirmó (respuestas OK) que está vacío.
       // Solo en ese caso es seguro subir lo local (primer arranque real).
       const tieneLocal = S.shipments.length > 0 || S.suppliers.length > 0 ||
                          (S.config && S.config.name && S.config.name !== 'Mi Negocio');
-      if(tieneLocal) _fbSaveWithRetry(S, 0);
+      // Primer arranque real: la nube está vacía y todo lo local es nuevo para
+      // ella. Este es uno de los dos sitios que encienden _dirtyAll a mano.
+      if(tieneLocal){ _dirtyAll = true; _fbSaveWithRetry(S, 0); }
     }
   } catch(e) {
     // ★ La carga FALLÓ (no es "vacío"). NO tocar la nube: jamás subir local aquí.
@@ -3730,7 +3771,7 @@ render();
      los pedidos marcados. El orden de carga de estos archivos es un contrato
      (ver docs/ARQUITECTURA.md). -->
 <script src="seleccion.js?v=1"></script>
-<script src="config.js?v=19"></script>
+<script src="config.js?v=20"></script>
 <script src="print.js?v=16"></script>
 <script src="notify.js?v=4"></script>
 <script src="shalom.js?v=11"></script>
