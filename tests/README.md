@@ -24,6 +24,21 @@ rompió de verdad** y no queremos que vuelva:
 | `chips.test.js` | Las flechas movían 120 px fijos, un número sin relación con el ancho de ninguna etiqueta |
 | `tracking.test.js` | Una guía Entregada mostrada como "Demora de envíos", y otra En destino que se quedó en "En tránsito" |
 | `shalom.test.js` | Que la integración desconectada deje alguna pantalla muda, o que vuelva a colarse una llamada directa a la API saltándose la puerta |
+| `guardado.test.js` | Guardar disparaba 971 peticiones a la vez: Firestore devolvía 429, el reintento las repetía enteras y la conexión se caía. Y un cambio que no lograba subir se perdía al cerrar la pestaña |
+
+## Que la prueba pueda fallar no se supone: se comprueba
+
+Las 42 primeras pruebas de `guardado.test.js` salieron verdes a la primera. Se
+rompió el código a propósito en cinco sitios para ver cuáles se ponían rojas —
+y **una mutación sobrevivió**: borrar el descuento de los documentos que sí
+entraron no hizo fallar nada, porque en esa prueba el conjunto de sucios
+empezaba vacío y borrar de un conjunto vacío no se nota.
+
+La prueba parecía cubrir el arreglo y no lo cubría. Se rehízo arrancando **con**
+sucios y fallando **uno**, que es el caso real.
+
+> Antes de dar por buena una prueba de algo que arreglaste: rompe el arreglo y
+> mira si se pone roja. Si sigue verde, la prueba no es del arreglo.
 
 ## Cómo escribir una
 

@@ -131,6 +131,138 @@
     });
     if(!r.ok) throw new Error(await r.text());
   }
+  /* ── ESCRITURA POR TANDAS ────────────────────────────────────────────
+     Antes, guardar todo era `Promise.all` de un fsPatch por documento: con
+     971 pedidos eso son 971 peticiones sueltas a la vez. Firestore devolvía
+     429 a buena parte, `Promise.all` se rompía con la primera y el reintento
+     volvía a mandar las 971 — unas 4.000 escrituras en medio minuto. Eso era
+     el punto rojo.
+
+     `documents:batchWrite` acepta hasta 500 escrituras en UNA petición, cada
+     una con su propio updateMask (o sea, la misma fusión por campos de antes:
+     un dispositivo con copia vieja sigue sin poder pisar trackingStatus).
+     971 documentos pasan de 971 peticiones a 2.
+
+     Se eligió batchWrite y no :commit a propósito: batchWrite NO es atómico y
+     devuelve el estado de CADA escritura. Eso es justo lo que hace falta para
+     que el éxito parcial cuente — si fallan 3 de 500, el reintento manda esos
+     3 y no los 971. Con :commit no habría forma de saber cuáles fueron.
+     Son documentos independientes: que 497 entren y 3 no, no rompe nada. */
+  const LOTE_MAX   = 500;             // tope duro de Firestore por batchWrite
+  const LOTE_BYTES = 4 * 1024 * 1024; // techo propio, holgado bajo el de 10 MiB
+
+  const _docName = (path) => `projects/${PRJ}/databases/(default)/documents/${path}`;
+
+  // Un {path,obj} → un Write de la API. Devuelve null si no hay campos: misma
+  // guarda que fsPatch, un write sin fields borraría el documento entero.
+  function _aWrite(path, obj){
+    const keys = Object.keys(obj);
+    if(!keys.length) return null;
+    const fields = {};
+    keys.forEach(k => { fields[k] = toFs(obj[k]); });
+    return {
+      update: { name: _docName(path), fields },
+      // Mismo escapado con backticks que fsPatch: la sintaxis de field path es
+      // la misma en la URL y en el cuerpo, y admite cualquier nombre de campo.
+      updateMask: { fieldPaths: keys.map(k => '`' + k.replace(/([\\`])/g,'\\$1') + '`') }
+    };
+  }
+
+  // Reparte respetando a la vez el tope de 500 y un techo de bytes:
+  // `trackingHistory` crece con cada consulta y una tanda de 500 pedidos con
+  // mucho historial no debe acercarse al límite de la petición.
+  function _tandas(lista){
+    const out = []; let cur = []; let bytes = 0;
+    for(const x of lista){
+      const b = JSON.stringify(x.write).length;
+      if(cur.length && (cur.length >= LOTE_MAX || bytes + b > LOTE_BYTES)){
+        out.push(cur); cur = []; bytes = 0;
+      }
+      cur.push(x); bytes += b;
+    }
+    if(cur.length) out.push(cur);
+    return out;
+  }
+
+  // items: [{clave, path, obj}] → {ok:[clave], fail:[clave]}
+  // Lanza solo si falla el TRANSPORTE (la tanda entera). Un documento que
+  // Firestore rechaza no lanza: vuelve en `fail`.
+  async function fsBatchWrite(items){
+    const ok = [], fail = [], conWrite = [];
+    for(const it of items){
+      const w = _aWrite(it.path, it.obj);
+      if(w) conWrite.push({ clave: it.clave, write: w });
+      else ok.push(it.clave); // 0 campos: nada que escribir, cuenta como hecho
+    }
+    for(const tanda of _tandas(conWrite)){
+      const h = await _authHeaders();
+      h['Content-Type'] = 'application/json';
+      const r = await fetch(`${BASE}:batchWrite?key=${KEY}`, {
+        method: 'POST', headers: h,
+        body: JSON.stringify({ writes: tanda.map(x => x.write) })
+      });
+      if(!r.ok){
+        const err = new Error('batchWrite ' + r.status + ' ' + await r.text());
+        err.http = r.status; // lo mira _escribirVarios para decidir si reintentar
+        throw err;
+      }
+      const j  = await r.json();
+      const st = j.status || [];
+      const wr = j.writeResults || [];
+      // Si la respuesta no trae un resultado por escritura no se puede saber
+      // qué entró. Antes de inventarlo, se cae al camino de uno en uno.
+      if(st.length !== tanda.length && wr.length !== tanda.length){
+        throw new Error('batchWrite devolvió ' + st.length + '/' + wr.length +
+                        ' resultados para ' + tanda.length + ' escrituras');
+      }
+      tanda.forEach((x, i) => {
+        const s = st[i];
+        // google.rpc.Status: el éxito llega como objeto vacío (sin `code`).
+        if(!s || !s.code) ok.push(x.clave); else fail.push(x.clave);
+      });
+    }
+    return { ok, fail };
+  }
+
+  // Camino de respaldo: uno por uno, pero con tope de peticiones simultáneas.
+  // Nunca lanza; cada documento cae en ok o en fail por su cuenta.
+  async function _patchLimitado(items, tope){
+    const ok = [], fail = [];
+    let i = 0;
+    const obrero = async () => {
+      while(i < items.length){
+        const it = items[i++];
+        try { await fsPatch(it.path, it.obj); ok.push(it.clave); }
+        catch(e){ fail.push(it.clave); }
+      }
+    };
+    const n = Math.min(tope || 6, items.length);
+    await Promise.all(Array.from({length: n}, obrero));
+    return { ok, fail };
+  }
+
+  // Si batchWrite no sirve en este proyecto, no se vuelve a intentar en toda
+  // la sesión. Solo se apaga ante un fallo ESTRUCTURAL (4xx que no sea 429):
+  // un corte de red o un 500 son pasajeros y no deben degradar la sesión.
+  let _batchApagado = false;
+
+  async function _escribirVarios(items){
+    if(!items.length) return { ok: [], fail: [] };
+    if(!_batchApagado){
+      try { return await fsBatchWrite(items); }
+      catch(e){
+        const est = e && e.http;
+        if(est && est !== 429 && est < 500) _batchApagado = true;
+        console.warn('batchWrite falló, se escribe uno por uno:', e && e.message);
+        try{ window.Errores && window.Errores.anotar('fs.batchWrite', e, {
+          documentos: items.length, apagado: _batchApagado
+        }); }catch(_){}
+      }
+    }
+    // Peor caso = el comportamiento de antes, pero de 6 en 6 y no de mil.
+    return _patchLimitado(items, 6);
+  }
+
   async function fsDel(path){
     const h=await _authHeaders();
     const r=await fetch(`${BASE}/${path}?key=${KEY}`,{method:'DELETE',headers:h});
@@ -219,13 +351,18 @@
     // no se sube ningún pedido (idsASubir = set vacío).
     const nadaEspecifico = _dirtyShips.size === 0 && _dirtySupps.size === 0;
     const soloConfig = _dirtyConfigOnly && nadaEspecifico && !_dirtyAll;
-    const subirTodos = !soloConfig && (_dirtyAll || nadaEspecifico);
+    // ★ "Nada marcado" ya NO significa "sube los 971". Si nadie marcó nada es
+    // que nada cambió: sube solo config. El único que ordena subir todo es
+    // _dirtyAll, que se enciende a propósito (arranque sin saber qué quedó
+    // pendiente, respaldo restaurado, cambio masivo).
+    const subirTodos = !soloConfig && _dirtyAll;
     const idsASubir   = soloConfig ? new Set() : (subirTodos ? null : new Set(_dirtyShips));
     const suppsASubir = soloConfig ? new Set() : (subirTodos ? null : new Set(_dirtySupps));
     const saveTs = Date.now(); // capturar antes de writes para que _S_TS coincida exactamente
     try {
-      const saves=[];
-      saves.push(fsPatch(cfgPath(),{
+      // Cada escritura lleva una `clave` para poder casar la respuesta de
+      // Firestore con el documento exacto que la produjo.
+      const items = [{ clave: 'config', path: cfgPath(), obj: {
         couriers:data.couriers||[],
         extraFields:data.extraFields||[],
         labels:data.labels||[],
@@ -236,27 +373,55 @@
         config:data.config||{},
         trash:data.trash||[],
         ts:saveTs // usar saveTs fijo para que _S_TS y config.ts coincidan tras la escritura
-      }));
+      }}];
       for(const s of(data.shipments||[])){
         // Incremental: subir solo los pedidos marcados como sucios (o todos)
         if(idsASubir && !idsASubir.has(s.id)) continue;
-        saves.push(fsPatch(shipPath(s.id),slimShipment(s)));
+        items.push({ clave:'ship:'+s.id, path: shipPath(s.id), obj: slimShipment(s) });
       }
       // Suppliers: incremental igual que los pedidos (suppsASubir=null → todos).
       for(const sup of(data.suppliers||[])){
         if(suppsASubir && !suppsASubir.has(sup.id)) continue;
-        saves.push(fsPatch(suppPath(sup.id),slimSupplier(sup)));
+        items.push({ clave:'supp:'+sup.id, path: suppPath(sup.id), obj: slimSupplier(sup) });
       }
-      await Promise.all(saves);
-      window._S_TS = saveTs; // ★ actualizar al ts REAL escrito → evita que _poll recargue datos propios
+
+      const res = await _escribirVarios(items);
+      const hechos = new Set(res.ok);
+
+      // config es lo que fija el reloj compartido: solo si ENTRÓ se puede
+      // adelantar _S_TS, o _poll recargaría creyendo que hay datos nuevos.
+      if(hechos.has('config')) window._S_TS = saveTs;
+
+      // ★ El éxito parcial cuenta. Se descuenta lo que Firestore confirmó,
+      // documento por documento. Antes la limpieza estaba toda al final: un
+      // solo fallo dejaba sucios los 971 y el reintento los mandaba de nuevo.
+      res.ok.forEach(k => {
+        if(k.indexOf('ship:') === 0) _dirtyShips.delete(k.slice(5));
+        else if(k.indexOf('supp:') === 0) _dirtySupps.delete(k.slice(5));
+      });
+
+      if(res.fail.length){
+        // Lo que falló queda marcado uno por uno y se apaga _dirtyAll: el
+        // reintento manda ESOS documentos, no la lista entera otra vez.
+        _dirtyAll = false;
+        res.fail.forEach(k => {
+          if(k.indexOf('ship:') === 0) _dirtyShips.add(k.slice(5));
+          else if(k.indexOf('supp:') === 0) _dirtySupps.add(k.slice(5));
+        });
+        window._guardarSucios && window._guardarSucios();
+        window._fbStatus&&window._fbStatus('err');
+        throw new Error('quedaron '+res.fail.length+' de '+items.length+' documentos sin guardar');
+      }
+
       window._fbStatus&&window._fbStatus('ok');
       // Backup en localStorage con timestamp de último sync exitoso
       lsSet('dpanel_last_sync', String(saveTs));
-      // ★ Éxito: limpiar el registro de sucios
+      // ★ Éxito completo: limpiar el registro de sucios
       _dirtyShips.clear();
       _dirtySupps.clear();
       _dirtyAll = false;
       _dirtyConfigOnly = false;
+      window._guardarSucios && window._guardarSucios();
     } catch(e){
       console.warn('Firebase save error:',e);
       window._fbStatus&&window._fbStatus('err');
@@ -1252,7 +1417,7 @@
 
 <div class="toast" id="toastEl"></div>
 
-<script src="auth.js?v=4"></script>
+<script src="auth.js?v=5"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
 <script>
@@ -1382,6 +1547,39 @@ let _dirtySupps = new Set();   // proveedores modificados: save('supp:'+id) marc
 let _dirtyAll = true; // true = subir todo (config/suppliers/masivo); arranque seguro
 let _dirtyConfigOnly = false; // true = subir SOLO config (toggles de Config)
 
+/* ★ LOS SUCIOS SOBREVIVEN AL CIERRE DE LA PESTAÑA
+   Sin esto había una pérdida silenciosa: cambias algo → la subida falla los 4
+   intentos → cierras la pestaña. Al volver, _dirtyShips está vacío (vive en
+   memoria), así que _mergeRemote deja mandar a la nube y tu cambio desaparece
+   sin dejar rastro — ni aviso, ni forma de recuperarlo.
+   Guardando qué quedó sucio, _mergeRemote reconoce esos pedidos al arrancar y
+   conserva la versión local hasta que suba de verdad. */
+const DIRTY_KEY = 'dpanel_dirty';
+function _guardarSucios(){
+  try{
+    if(_dirtyAll || _dirtyShips.size || _dirtySupps.size){
+      lsSet(DIRTY_KEY, JSON.stringify({
+        all: _dirtyAll,
+        s: Array.from(_dirtyShips),
+        p: Array.from(_dirtySupps)
+      }));
+    } else {
+      lsSet(DIRTY_KEY, '');
+    }
+  }catch(e){ /* localStorage lleno o bloqueado: no vale romper el guardado */ }
+}
+function _recuperarSucios(){
+  try{
+    const raw = lsGet(DIRTY_KEY);
+    if(!raw) return;
+    const o = JSON.parse(raw);
+    (o.s||[]).forEach(id => _dirtyShips.add(id));
+    (o.p||[]).forEach(id => _dirtySupps.add(id));
+    if(o.all) _dirtyAll = true;
+  }catch(e){ /* dato corrupto: se ignora, _dirtyAll ya cubre el caso */ }
+}
+_recuperarSucios();
+
 const save = (shipId) => {
   // Lista vacía = no cambió nada. Sin esta guarda caería en "sin id" y subiría
   // los ~700 pedidos por gusto.
@@ -1413,6 +1611,7 @@ const save = (shipId) => {
     _dirtyConfigOnly = false;
   }
   lsSet('dpanel', JSON.stringify(window._slimStateForLocal ? window._slimStateForLocal(S) : S)); // ★ Mejora 3: local sin base64 pesadas
+  _guardarSucios(); // qué quedó sin subir viaja con el respaldo, no solo en memoria
   clearTimeout(_fbSaveTimer);
   _fbSaveTimer = setTimeout(() => { _fbSaveWithRetry(S, 0); }, 800);
 };
@@ -1429,13 +1628,22 @@ async function _fbSaveWithRetry(data, attempt){
   try {
     await window._fbSave(data);
     lsSet('dpanel_pending', '0'); // sync exitoso
+    // Repintar: el aviso de pendiente se lee de localStorage, y _fbSave ya
+    // había pintado 'ok' ANTES de que esta línea limpiara la bandera.
+    window._fbStatus && window._fbStatus('ok');
   } catch(e) {
     if(attempt < 3){
       const delay = [3000, 8000, 20000][attempt];
       setTimeout(() => _fbSaveWithRetry(data, attempt+1), delay);
     } else {
-      // Después de 3 intentos fallidos, dejar marcado como pendiente
-      // Se subirá cuando vuelva la conexión
+      /* ★ Agotados los intentos: marcar pendiente DE VERDAD.
+         Esta bandera se leía en dos sitios pero NADIE la ponía nunca en '1'.
+         Consecuencia: el aviso "⚠️ Datos pendientes de sincronizar" no
+         aparecía jamás, y la resubida al reconectar —que ya estaba escrita en
+         _initFirebase— no llegaba a dispararse nunca. El comentario decía
+         "se subirá cuando vuelva la conexión" y no era cierto. */
+      lsSet('dpanel_pending', '1');
+      window._fbStatus && window._fbStatus('err');
       console.warn('Firebase save failed after 3 attempts, will retry on reconnect');
     }
   }

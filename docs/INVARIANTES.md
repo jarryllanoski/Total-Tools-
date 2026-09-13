@@ -341,10 +341,50 @@ Hay **tres** formas de escribir, y no son intercambiables:
 - `save([id1, id2])` → **esos pedidos, con una sola escritura local**
 - `save()` **sin argumento** → marca `_dirtyAll` y **sube los ~700 pedidos**
 
-> ⚠️ **`save()` sin id es carísimo.** Solo tiene sentido tras una restauración
-> de respaldo. Para varios pedidos usa **siempre la lista**: llamar `save(id)`
-> en un bucle de 700 congela el panel **6,5 segundos**, porque cada llamada
-> reserializa el estado completo. Con la lista: **8 ms**.
+> ⚠️ **`save()` sin id sigue siendo caro.** Solo tiene sentido tras una
+> restauración de respaldo. Para varios pedidos usa **siempre la lista**:
+> llamar `save(id)` en un bucle de 700 congela el panel **6,5 segundos**,
+> porque cada llamada reserializa el estado completo. Con la lista: **8 ms**.
+
+**"Nada marcado" NO significa "sube todo".** Si nadie marcó nada es que nada
+cambió: se sube solo `config`. El único que ordena subir la lista entera es
+`_dirtyAll`, y se enciende **a propósito** — arranque sin saber qué quedó
+pendiente, respaldo restaurado, cambio masivo.
+
+### Se escribe por tandas, y el éxito parcial cuenta
+
+Guardar todo era `Promise.all` de un `fsPatch` por documento: con 971 pedidos,
+**971 peticiones sueltas a la vez**. Firestore devolvía 429 a buena parte,
+`Promise.all` se rompía con la primera y el reintento volvía a mandar las 971
+— unas **4.000 escrituras en medio minuto**. Ese era el punto rojo.
+
+Ahora se usa `documents:batchWrite`: hasta **500 escrituras por petición**,
+cada una con **su propio `updateMask`** (la fusión por campos no se pierde, así
+que un dispositivo con copia vieja sigue sin poder pisar `trackingStatus`).
+971 documentos = **2 peticiones**.
+
+| Invariante | Por qué |
+|---|---|
+| Se usa `batchWrite`, **no** `:commit` | `batchWrite` no es atómico y devuelve el estado de **cada** escritura. Con `:commit` no habría forma de saber cuáles entraron. |
+| Solo se descuenta de los sucios **lo que Firestore confirmó** | Si fallan 3 de 500, el reintento manda **esos 3**. Antes la limpieza estaba toda al final: un fallo dejaba sucios los 971. |
+| Las tandas se parten por **cantidad y por peso** | `trackingHistory` crece con cada consulta; 500 pedidos con mucho historial no deben acercarse al límite de la petición. |
+| Si `batchWrite` falla, se cae a `fsPatch` **con tope de 6 a la vez** | El peor caso es el comportamiento de antes, **nunca la avalancha**. |
+| Un 4xx (que no sea 429) apaga el camino rápido toda la sesión; un 5xx o un 429 **no** | Un fallo estructural no se reintenta mil veces; un corte de red no debe degradar la sesión entera. |
+
+### `dpanel_pending` tiene que ponerse en `'1'`
+
+Esta bandera se **leía** en dos sitios y **nadie la escribía nunca** en `'1'`.
+Consecuencia real: el aviso *"⚠️ Datos pendientes de sincronizar"* no aparecía
+jamás, y la resubida al reconectar —que ya estaba escrita en `_initFirebase`—
+no llegaba a dispararse nunca.
+
+Y con ella, `dpanel_dirty`: **qué quedó sin subir se guarda en localStorage**.
+Sin eso había una pérdida silenciosa — cambias algo, la subida falla los 4
+intentos, cierras la pestaña; al volver `_dirtyShips` está vacío, `_mergeRemote`
+deja mandar a la nube y **tu cambio desaparece sin dejar rastro**.
+
+> Las dos claves se borran al cerrar sesión (`CLAVES_DATOS` en `auth.js`), como
+> `dpanel`: llevan ids de pedidos del negocio.
 
 **Y `save` se declara con `const`**, así que no llega a `window` sola. La línea
 `window.save = save` al final de su declaración es obligatoria — sin ella,

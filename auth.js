@@ -235,7 +235,7 @@
      no respaldaban.
      El modo sin conexión se conserva mientras la sesión está viva, que es
      cuando de verdad hace falta; al cerrarla no queda rastro. */
-  var CLAVES_DATOS = ['dpanel', 'dpanel_pending', 'dpanel_last_sync'];
+  var CLAVES_DATOS = ['dpanel', 'dpanel_pending', 'dpanel_last_sync', 'dpanel_dirty'];
 
   function _clearSession(){
     localStorage.removeItem(TOKEN_KEY);
