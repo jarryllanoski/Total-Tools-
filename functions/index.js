@@ -690,8 +690,12 @@ exports.extraerComprobante = onRequest(
 // de sesion se leyera como "tu plan vencio".
 //
 // Operaciones de hoy:
-//   {op:"validate"}            → {ok, valida, limite, usado, restante}
-//   {op:"esquema", de:"validate"} → la FORMA de la respuesta, sin valores
+//   {op:"validate"}                        → {ok, valida, limite, usado, …}
+//   {op:"esquema", de:"validate"}          → la FORMA, sin valores
+//   {op:"esquema", de:"track", datos:{…}}  → idem, para medir /track
+//
+// `track` esta en la lista pero marcado `soloMedir`: se puede medir y todavia
+// no usar. Pedirlo como operacion normal responde SIN_TRADUCTOR.
 exports.shalomPuerta = onRequest(
     {region: "us-central1", secrets: [SHALOM_API_KEY], timeoutSeconds: 60},
     async (req, res) => {
@@ -735,7 +739,7 @@ exports.shalomPuerta = onRequest(
             forma: shalomPuerta.forma(r.json)});
           return;
         }
-        res.status(200).json(shalomPuerta.traducirValidate(r.json));
+        res.status(200).json(shalomPuerta.traducir(destino, r.json));
       } catch (e) {
         console.error("shalomPuerta error:", e);
         res.status(200).json({

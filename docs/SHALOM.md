@@ -192,11 +192,18 @@ de Shalom:
 | Endpoint | Estado | Dónde |
 |---|---|---|
 | `GET /validate` | ✅ **conectado** | `functions/shalomPuerta.js` · `Shalom.validar()` |
-| `POST /track` | dormido | forma ya medida, arriba |
+| `POST /track` | 🔎 **medible, no conectado** (`soloMedir`) | forma de 2026-08-31 arriba, pendiente de remedir |
 | `POST /track/batch` | dormido | — |
 | `GET /agencies` | dormido | — |
 | `POST /instances/status` | dormido | forma ya medida, arriba |
 | alta de envío | dormido | — |
+
+> **`soloMedir` es el estado intermedio de cada endpoint: medible antes que
+> conectado.** Se puede preguntar su forma con `esquema`, pero pedirlo como
+> operación normal responde `SIN_TRADUCTOR`. Sin esa guarda, un endpoint recién
+> añadido devolvería su JSON crudo por la puerta del traductor de otro — que es
+> exactamente cómo una forma mal entendida llega a la pantalla como si fuera un
+> dato bueno.
 
 `Shalom.DISPONIBLE` **sigue en false**. Lo miran el auto-check y el extractor
 de agencias, y lo que ellos necesitan es `consultarGuia` y `agencias`.

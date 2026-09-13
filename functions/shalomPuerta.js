@@ -32,6 +32,11 @@ const TIEMPO_MAX_MS = 20000;
  */
 const PERMITIDAS = {
   validate: {metodo: "GET", ruta: "/validate"},
+  // `soloMedir` = se puede consultar con `esquema` pero NO usar todavía: su
+  // respuesta aún no está traducida. Pedirla como operación normal responde
+  // SIN_TRADUCTOR en vez de devolver algo a medio entender. Es el estado
+  // intermedio de cada endpoint: medible antes que conectado.
+  track: {metodo: "POST", ruta: "/track", soloMedir: true},
 };
 
 /**
@@ -238,10 +243,28 @@ async function barreras(entrada, deps) {
   if (!Object.prototype.hasOwnProperty.call(PERMITIDAS, destino)) {
     return cortar(200, "NO_PERMITIDO");
   }
+  // Medible sí, usable todavía no. Sin esta guarda, un endpoint recién
+  // añadido devolvería su JSON crudo por la puerta de otro traductor.
+  if (!diagnostico && PERMITIDAS[destino].soloMedir) {
+    return cortar(200, "SIN_TRADUCTOR");
+  }
 
   // 4 · recién ahora quien llama puede usar la clave
   return {ok: true, destino: destino, diagnostico: diagnostico,
     datos: cuerpo.datos, correo: correo};
+}
+
+/**
+ * Traduce la respuesta cruda del endpoint que sea. Un endpoint sin traductor
+ * NO devuelve su JSON: eso es justo lo que hace que una forma mal entendida
+ * llegue a la pantalla como si fuera un dato bueno.
+ * @param {string} op operación
+ * @param {*} json cuerpo devuelto por Shalom
+ * @return {Object} respuesta del contrato
+ */
+function traducir(op, json) {
+  if (op === "validate") return traducirValidate(json);
+  return {ok: false, motivo: "SIN_TRADUCTOR"};
 }
 
 module.exports = {
@@ -251,6 +274,7 @@ module.exports = {
   motivoDeHttp,
   forma,
   traducirValidate,
+  traducir,
   barreras,
   llamar,
 };

@@ -26,6 +26,7 @@ rompió de verdad** y no queremos que vuelva:
 | `shalom.test.js` | Que la integración desconectada deje alguna pantalla muda, o que vuelva a colarse una llamada directa a la API saltándose la puerta |
 | `guardado.test.js` | Guardar disparaba 971 peticiones a la vez: Firestore devolvía 429, el reintento las repetía enteras y la conexión se caía. Y un cambio que no lograba subir se perdía al cerrar la pestaña. Incluye que el endpoint sea `:commit` y nunca `:batchWrite`, que da 403 desde el navegador |
 | `shalom-puerta.test.js` | La puerta del servidor: que la clave no salga ni dentro de un mensaje de error, que solo se pueda pedir lo de la lista blanca, y que a un desconocido no se le confirme qué operaciones existen |
+| `guias.test.js` | Una guía con un dígito de más lleva semanas sin rastrearse y nadie se entera: un número mal escrito no da error, da silencio. Y la misma guía en dos pedidos, que unas veces es a propósito y otras un tipeo |
 
 ## Que la prueba pueda fallar no se supone: se comprueba
 

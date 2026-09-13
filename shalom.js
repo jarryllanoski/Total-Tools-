@@ -147,7 +147,9 @@
        valor dentro. Es la herramienta con la que se escribe cada contrato
        contra lo que la API devuelve de verdad — la documentación y la
        realidad ya se contradijeron seis veces. */
-    esquema: function (de) { return _pedir({op: 'esquema', de: de || 'validate'}); },
+    esquema: function (de, datos) {
+      return _pedir({op: 'esquema', de: de || 'validate', datos: datos});
+    },
 
     /* Catálogo de cajas de Shalom (medidas oficiales de su app, ver
        docs/SHALOM.md). No son rangos: son cajas fijas, así que la regla

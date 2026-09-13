@@ -647,6 +647,10 @@ Tracking.abrirEdicion = function(shipId) {
     '</div>',
   ].join('');
   ov.classList.add('open');
+  // Avisos del número de guía (formato y repetida). Va DESPUÉS del innerHTML:
+  // el modal se reconstruye entero cada vez que se abre, así que el campo que
+  // había antes ya no existe.
+  if (window.Guias) window.Guias.vigilar('trkOrdNum', shipId);
 };
 
 /* ── _guardarEdicion ─────────────────────────────────────────────── */

@@ -107,6 +107,29 @@ paga solo.
 
 Los cuatro cambian juntos, o no cambia ninguno.
 
+### Nota · Avisos del número de guía (`guias.js`)
+
+Dos avisos, los dos salidos de mirar los 971 pedidos reales:
+
+| Aviso | Por qué existe |
+|---|---|
+| **El formato** | 484 de 487 guías tienen 8 dígitos. Tres están mal escritas y una, `939726661`, estaba EN TRÁNSITO: su seguimiento llevaba semanas muerto y nadie lo sabía. Un número mal escrito no da error, da silencio. |
+| **La guía repetida** | Tres números están en dos pedidos. Dos son el mismo cliente en un solo paquete; el tercero son dos clientes distintos, o sea un tipeo. |
+
+> **Avisan, no impiden.** Repetir una guía es algo que el negocio hace a
+> propósito — un retorno a origen reutiliza la misma. Bloquear rompería la
+> forma de trabajar; callarse deja pasar el error. Avisar respeta las dos.
+
+`revisar()` es lógica pura y se prueba sola; `vigilar()` es lo que pinta. Va
+enganchado en **los dos** sitios donde se escribe una guía (`fShalomGuia` del
+formulario y `trkOrdNum` del modal de seguimiento): con uno solo, se cuela por
+el otro.
+
+⚠️ El oyente se engancha **una vez** por campo, así que `pintar` lee el id del
+pedido **del propio campo** y no de la variable de `vigilar`. Con la variable,
+al abrir un segundo pedido se excluiría al equivocado y se avisaría de que la
+guía está repetida consigo misma.
+
 ### Nota · Registro de errores (`errores.js`)
 
 Varios vendedores usan el panel desde equipos distintos. Sin esto, un fallo en

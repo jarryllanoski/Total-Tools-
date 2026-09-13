@@ -454,10 +454,13 @@ function openForm(id){
     if(typeof _updateShalomMic==='function') _updateShalomMic();
   };
   $('fCourier').onchange = _showShalomBlock;
+  // Pedido nuevo: el mismo vigilante, con id vacío (no hay pedido que excluir).
+  if(window.Guias && !id) Guias.vigilar('fShalomGuia', '');
   if(id){
     const s=S.shipments.find(x=>x.id===id);
     if(s){
       if($('fShalomGuia'))   $('fShalomGuia').value   = s.trackingOrderNumber||s.shalomGuia||'';
+      if(window.Guias) Guias.vigilar('fShalomGuia', id); // avisos: formato y guía repetida
       if($('fShalomCodigo')) $('fShalomCodigo').value = s.trackingOrderCode||s.shalomCodigo||'';
       if($('fDlvDriver'))      $('fDlvDriver').value      = s._dlvDriver||'';
       if($('fDlvDriverPhone')) $('fDlvDriverPhone').value = s._dlvDriverPhone||'';

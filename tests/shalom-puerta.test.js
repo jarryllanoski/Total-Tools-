@@ -66,8 +66,20 @@ module.exports = async ({bloque, ok}) => {
   ok(!P.PERMITIDAS['instances'] && !P.PERMITIDAS['webhooks'] &&
      !P.PERMITIDAS['tracking/subscriptions'],
      'ninguno de los endpoints destructivos está en la lista');
-  ok(Object.keys(P.PERMITIDAS).join(',') === 'validate',
-     'hoy solo hay uno: cada endpoint entra cuando su forma está medida');
+  ok(Object.keys(P.PERMITIDAS).join(',') === 'validate,track',
+     'hoy hay dos, y en el orden en que se reconstruyen');
+  ok(P.PERMITIDAS.track.soloMedir === true,
+     'track está marcado soloMedir: se puede medir pero todavía no usar');
+  ok(!P.PERMITIDAS.validate.soloMedir, 'validate sí está conectado del todo');
+
+  bloque('Medible no es lo mismo que conectado');
+
+  ok(P.traducir('validate', {valid: true, limit: 5, currentUsage: 1,
+    remaining: 4}).ok === true, 'validate tiene traductor');
+  ok(P.traducir('track', {lo: 'que sea'}).motivo === 'SIN_TRADUCTOR',
+     'track NO: su JSON crudo no sale por la puerta de otro traductor');
+  ok(P.traducir('inventado', {}).motivo === 'SIN_TRADUCTOR',
+     'ni ningún otro que no lo tenga');
 
   {
     const f = conFetch(resp(200, {valid: true}));
@@ -88,6 +100,18 @@ module.exports = async ({bloque, ok}) => {
     ok(f.opciones.headers['x-api-key'] === 'sk_x',
        'la clave viaja en x-api-key, no en la URL: una URL queda en los registros');
     ok(!!f.opciones.signal, 'con corte por tiempo: Shalom colgado no cuelga la función');
+  }
+
+  {
+    const f = conFetch(resp(200, {search: {}, statuses: {}}));
+    await P.llamar('track', 'sk_x', {orderNumber: '82037653', orderCode: 'TT9C'});
+    f.restaurar();
+    ok(f.url === 'https://api.shalom-api.lat/track', 'track va a su propia ruta');
+    ok(f.opciones.method === 'POST', 'y es POST, no GET');
+    ok(f.opciones.headers['Content-Type'] === 'application/json',
+       'con su Content-Type: sin él, Shalom no lee el cuerpo');
+    ok(JSON.parse(f.opciones.body).orderNumber === '82037653',
+       'y los datos viajan en el cuerpo');
   }
 
   bloque('Cada fallo de Shalom con su nombre');
@@ -209,6 +233,13 @@ module.exports = async ({bloque, ok}) => {
     const r = await pasar({cuerpo: {op: 'validate'}});
     ok(r.ok === true && r.destino === 'validate' && r.diagnostico === false,
        'admin + operación de la lista: pasa');
+  }
+  ok(motivo(await pasar({cuerpo: {op: 'track'}})) === 'SIN_TRADUCTOR',
+     'pedir track como operación normal se corta: aún no está traducido');
+  {
+    const r = await pasar({cuerpo: {op: 'esquema', de: 'track'}});
+    ok(r.ok === true && r.destino === 'track',
+       'pero medirlo sí se puede: es como se averigua su forma');
   }
   {
     const r = await pasar({cuerpo: {op: 'esquema', de: 'validate'}});
