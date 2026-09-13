@@ -41,7 +41,7 @@ const PERMITIDAS = {
   // respuesta aún no está traducida. Pedirla como operación normal responde
   // SIN_TRADUCTOR en vez de devolver algo a medio entender. Es el estado
   // intermedio de cada endpoint: medible antes que conectado.
-  track: {metodo: "POST", ruta: "/track", soloMedir: true},
+  track: {metodo: "POST", ruta: "/track"},
 };
 
 /**
@@ -77,6 +77,38 @@ function motivoDeHttp(status) {
  * @param {number} [prof] profundidad actual
  * @return {*} descripción de tipos
  */
+/* Solo dígitos y separadores, empezando por un dígito. Un nombre nunca entra
+   (tiene letras); una fecha o un monto, sí. */
+const _SOLO_NUMEROS = /^[0-9][0-9\-/: .TZ+]*$/;
+
+/**
+ * El tipo de un texto — y si parece una fecha o un número, TAMBIÉN su forma,
+ * con los dígitos tapados: "2026-08-19 16:10" sale como "####-##-## ##:##".
+ *
+ * Hace falta: el formato de fecha decide si se puede ordenar y mostrar bien, y
+ * no está documentado. Sin esto habría que pedir un valor real — o sea, un
+ * dato de un cliente pasando por el chat.
+ *
+ * Solo se destapa la forma de lo que es puro número: cualquier texto con
+ * letras (un nombre, una dirección) sale como "string" a secas.
+ * @param {string} s texto
+ * @return {string} descripción
+ */
+function _formaTexto(s) {
+  if (s.length <= 40 && _SOLO_NUMEROS.test(s)) {
+    return "string(" + s.replace(/[0-9]/g, "#") + ")";
+  }
+  return "string";
+}
+
+/**
+ * La FORMA de un valor, sin un solo valor dentro. Es la herramienta de
+ * diagnóstico: deja escribir el contrato contra lo que la API devuelve de
+ * verdad sin que ningún dato de un cliente salga del servidor.
+ * @param {*} v valor a describir
+ * @param {number} [prof] profundidad actual
+ * @return {*} descripción de tipos
+ */
 function forma(v, prof) {
   prof = prof || 0;
   if (v === null) return "null";
@@ -86,6 +118,7 @@ function forma(v, prof) {
       (v.length ? JSON.stringify(forma(v[0], prof + 1)) : "?");
   }
   const t = typeof v;
+  if (t === "string") return _formaTexto(v);
   if (t !== "object") return t;
   if (prof >= PROF_MAX) return "objeto";
   const o = {};
@@ -205,6 +238,104 @@ async function llamar(op, clave, cuerpo) {
   return {ok: true, json: json};
 }
 
+/* ── /track ───────────────────────────────────────────────────────────────
+   FORMA REAL MEDIDA el 13 sep 2026 con `esquema`:
+
+     statuses.data → registrado · origen · transito · destino
+                     · reparto · entregado · demora
+
+   Cada rama es `null` mientras no ocurre y un objeto con `fecha` cuando
+   ocurre. `transito` trae además `carguero`, `completo` y `cargueros[]`;
+   `entregado` trae `cliente:{nombre,documento}` — QUIÉN recibió el paquete.
+
+   ⚠️ `statuses` es un OBJETO. La documentación lo pinta como array. */
+
+// El orden de esta lista ES el avance del envío. Gana el ÚLTIMO que tenga
+// fecha, no el de número más alto: `destino` y `reparto` comparten pasos:2 y
+// aun así reparto va después.
+const PASOS = [
+  {clave: "registrado", texto: "En origen", pasos: 0},
+  {clave: "origen", texto: "En origen", pasos: 0},
+  {clave: "transito", texto: "En tránsito", pasos: 1},
+  {clave: "destino", texto: "En destino", pasos: 2},
+  {clave: "reparto", texto: "En reparto", pasos: 2},
+  {clave: "entregado", texto: "Entregado", pasos: 3},
+];
+
+/**
+ * La fecha de una rama del árbol, o null si esa rama no ha ocurrido.
+ * @param {*} rama valor de la rama
+ * @return {?string} fecha tal cual la manda Shalom
+ */
+function _fechaDe(rama) {
+  if (!rama || typeof rama !== "object" || Array.isArray(rama)) return null;
+  const f = rama.fecha;
+  return (typeof f === "string" && f.trim()) ? f.trim() : null;
+}
+
+/**
+ * Traduce `POST /track`.
+ *
+ * ⚠️ `demora` NO ES UN PASO, y por eso no está en PASOS. Es una bandera que
+ * viaja aparte. Aquí está la lección más cara de este proyecto: cuando la
+ * demora podía convertirse en el estado, un paquete ENTREGADO se mostraba
+ * como "Demora de envíos" — el envío desandaba el camino y había que
+ * explicárselo al cliente. Con demora fuera de la lista de pasos, eso no es
+ * que esté arreglado: es que no se puede escribir.
+ *
+ * La fecha se devuelve TAL CUAL la manda Shalom. No se parsea: su formato no
+ * está medido todavía, y adivinarlo es como se ordenan mal los historiales.
+ * @param {*} j cuerpo JSON de Shalom
+ * @return {Object} respuesta del contrato
+ */
+function traducirTrack(j) {
+  const raro = {ok: false, motivo: "FORMATO_DESCONOCIDO"};
+  if (!j || typeof j !== "object" || Array.isArray(j)) return raro;
+  const st = j.statuses;
+  if (!st || typeof st !== "object" || Array.isArray(st)) return raro;
+  if (st.success === false) {
+    return {ok: false, motivo: "NO_ENCONTRADO", detalle: sanear(st.message)};
+  }
+  const d = st.data;
+  if (!d || typeof d !== "object" || Array.isArray(d)) return raro;
+
+  const arbol = {};
+  let alcanzado = null;
+  PASOS.forEach((p) => {
+    const f = _fechaDe(d[p.clave]);
+    if (f) {
+      arbol[p.clave] = f;
+      alcanzado = p; // el último con fecha manda
+    }
+  });
+  // REGLA DE ORO: sin un paso real, no hay éxito. Un árbol entero en null es
+  // una guía que Shalom aún no registró — no un error, pero tampoco un dato.
+  if (!alcanzado) return {ok: false, motivo: "SIN_DATO"};
+
+  const ent = d.entregado;
+  const cli = (ent && typeof ent === "object") ? ent.cliente : null;
+  const recibio = (cli && typeof cli === "object" && !Array.isArray(cli)) ? {
+    nombre: typeof cli.nombre === "string" ? cli.nombre : null,
+    documento: typeof cli.documento === "string" ? cli.documento : null,
+  } : null;
+  const demora = _fechaDe(d.demora);
+
+  return {
+    ok: true,
+    estado: alcanzado.texto,
+    // Se llama `pasos` y no `paso` porque ese es el nombre del contrato que ya
+    // existe (ver la cabecera de shalom.js) y el que lee el aplicador de
+    // tracking.js para su guarda de no-retroceso. Dos nombres para lo mismo es
+    // como una guarda deja de guardar.
+    pasos: alcanzado.pasos,
+    fecha: arbol[alcanzado.clave],
+    demora: demora ? {fecha: demora} : null,
+    // Quién recibió: solo tiene sentido si de verdad se entregó.
+    recibio: alcanzado.clave === "entregado" ? recibio : null,
+    arbol: arbol,
+  };
+}
+
 /**
  * Las cuatro barreras, en orden y como función pura.
  *
@@ -269,6 +400,7 @@ async function barreras(entrada, deps) {
  */
 function traducir(op, json) {
   if (op === "validate") return traducirValidate(json);
+  if (op === "track") return traducirTrack(json);
   return {ok: false, motivo: "SIN_TRADUCTOR"};
 }
 
@@ -279,6 +411,8 @@ module.exports = {
   motivoDeHttp,
   forma,
   traducirValidate,
+  traducirTrack,
+  PASOS,
   traducir,
   barreras,
   llamar,

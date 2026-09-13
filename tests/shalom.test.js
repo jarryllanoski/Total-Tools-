@@ -22,12 +22,12 @@ module.exports = async (t) => {
   bloque('Lo que aún no se ha reconstruido responde igual a todo');
   {
     ok(S.DISPONIBLE === false,
-        'DISPONIBLE sigue en false aunque validar ya funcione: lo que miran ' +
-        'el auto-check y el extractor es consultarGuia y agencias');
-    const dormidos = ['consultarGuia', 'ticket', 'agencias',
-      'estadoInstancia', 'registrar'];
+        'DISPONIBLE sigue en false aunque consultarGuia ya funcione: el botón ' +
+        '⟳ no la mira y el barrido automático sí — a mano se calibra, en masa ' +
+        'se confía en un traductor sin comprobar');
+    const dormidos = ['ticket', 'agencias', 'estadoInstancia', 'registrar'];
     ok(dormidos.every((m) => typeof S[m] === 'function'),
-        'los 5 que faltan existen: nadie explota al llamarlos');
+        'los 4 que faltan existen: nadie explota al llamarlos');
     // Se llaman DE VERDAD y se espera su respuesta. Comprobar solo que la
     // función existe dejaría pasar una que devuelve undefined.
     const respuestas = await Promise.all(dormidos.map((m) => S[m]()));
@@ -36,7 +36,7 @@ module.exports = async (t) => {
       return !(r && r.ok === false && r.motivo === 'DESCONECTADO');
     });
     ok(malas.length === 0,
-        'los 5 devuelven {ok:false, motivo:"DESCONECTADO"}' +
+        'los 4 devuelven {ok:false, motivo:"DESCONECTADO"}' +
         (malas.length ? ' — fallan: ' + malas.join(', ') : ''));
     ok(respuestas.every((r) => !r.ok), 'ninguno devuelve ok:true sin dato real');
   }
@@ -109,6 +109,28 @@ module.exports = async (t) => {
       const m = montar({noEsJson: true});
       ok((await m.S.validar()).motivo === 'FORMATO_DESCONOCIDO',
           'una respuesta que no se puede leer no es un éxito');
+    }
+    {
+      const m = montar({});
+      await m.S.consultarGuia('82037653', 'TT9C');
+      ok(m.red.cuerpo.op === 'track', 'consultarGuia pide track');
+      ok(m.red.cuerpo.datos.orderNumber === '82037653' &&
+         m.red.cuerpo.datos.orderCode === 'TT9C',
+          'con la guía y el código en los nombres que espera la API');
+      ok(String(m.red.url).indexOf('shalom-api.lat') < 0,
+          'y también por la puerta, nunca directo');
+    }
+    {
+      const m = montar({});
+      const r = await m.S.consultarGuia('  ', 'TT9C');
+      ok(r.motivo === 'SIN_DATO', 'sin guía no se consulta nada');
+      ok(m.red.llamadas === 0, 'ni se gasta una llamada del plan');
+    }
+    {
+      const m = montar({});
+      await m.S.consultarGuia('  82037653  ', '  tt9c  ');
+      ok(m.red.cuerpo.datos.orderNumber === '82037653',
+          'los espacios de un copiar-pegar no llegan a Shalom');
     }
     {
       const m = montar({});

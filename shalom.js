@@ -117,10 +117,12 @@
 
     /* Interruptor maestro. Lo miran el auto-check y el extractor de agencias
        para no intentar siquiera.
-       SIGUE EN FALSE a propósito aunque `validar` ya funcione: lo que esos
-       dos necesitan es `consultarGuia` y `agencias`, y esos siguen apagados.
-       Se enciende cuando el seguimiento vuelva, no antes — encenderlo ahora
-       haría que el auto-check intentara consultar y fallara en cada tarjeta. */
+       SIGUE EN FALSE aunque `consultarGuia` ya funcione, y es a propósito:
+       el botón ⟳ de cada tarjeta NO mira esta bandera, así que ya se puede
+       usar a mano — que es justo como se calibra, guía por guía, contra lo
+       que muestra la web de Shalom. El barrido automático SÍ la mira, y no
+       se enciende hasta que la calibración esté hecha. Encenderlo antes es
+       soltar 484 consultas confiando en un traductor sin comprobar. */
     DISPONIBLE: false,
 
     /* ── Los métodos, en el orden en que se van a reconstruir ────────────
@@ -128,7 +130,20 @@
        en docs/SHALOM.md, que conserva las formas REALES ya medidas de
        /track y /instances/status — eso no se vuelve a medir. */
 
-    consultarGuia: _off,     // 1 · POST /track
+    /* ✅ CONECTADO · POST /track — 2026-09-13
+       El árbol de 7 ramas de Shalom traducido al contrato de siempre.
+       → {ok:true, estado, pasos, fecha, demora, recibio, arbol}
+       `demora` viaja como bandera y NUNCA como estado: un paquete entregado
+       no puede volver a mostrarse como "Demora de envíos". */
+    consultarGuia: function (guia, codigo) {
+      var g = String(guia || '').trim();
+      if (!g) return Promise.resolve({ok: false, motivo: 'SIN_DATO'});
+      return _pedir({op: 'track', datos: {
+        orderNumber: g,
+        orderCode: String(codigo || '').trim()
+      }});
+    },
+
     ticket: _off,            // 2 · el PNG del ticket
     agencias: _off,          // 3 · GET /agencies
     estadoInstancia: _off,   // 5 · POST /instances/status

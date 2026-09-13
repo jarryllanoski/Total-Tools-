@@ -192,7 +192,7 @@ de Shalom:
 | Endpoint | Estado | Dónde |
 |---|---|---|
 | `GET /validate` | ✅ **conectado** | `functions/shalomPuerta.js` · `Shalom.validar()` |
-| `POST /track` | 🔎 **medible, no conectado** (`soloMedir`) | forma de 2026-08-31 arriba, pendiente de remedir |
+| `POST /track` | ✅ **conectado** | remedido el 13 sep 2026 |
 | `POST /track/batch` | dormido | — |
 | `GET /agencies` | dormido | — |
 | `POST /instances/status` | dormido | forma ya medida, arriba |
@@ -285,6 +285,43 @@ Una clave rechazada (`valid:false`) se traduce a `BLOQUEADO`, no a un éxito con
 `valida:false`: para quien llama es lo mismo que estar bloqueado, y así hay una
 sola forma que manejar.
 
+### El contrato de `POST /track` — remedido el 13 sep 2026
+
+`statuses.data` es un **objeto** con **7 ramas** (la documentación lo pinta
+como array). Cada rama es `null` mientras no ocurre, y un objeto con `fecha`
+cuando ocurre.
+
+| Rama | Texto que produce | `pasos` |
+|---|---|:---:|
+| `registrado` | En origen | 0 |
+| `origen` | En origen | 0 |
+| `transito` | En tránsito | 1 |
+| `destino` | En destino | 2 |
+| `reparto` | **En reparto** | 2 |
+| `entregado` | Entregado | 3 |
+| `demora` | — *(no es un paso)* | — |
+
+Extras medidos: `transito` trae `carguero`, `completo` y `cargueros[]`;
+**`entregado` trae `cliente:{nombre, documento}`** — quién recibió el paquete.
+
+**Gana el ÚLTIMO de la lista que tenga fecha, no el del número más alto.**
+`destino` y `reparto` comparten `pasos:2` y aun así reparto va después.
+
+> ⛔ **`demora` NO ESTÁ EN LA LISTA DE PASOS, y esa ausencia es el arreglo.**
+> Cuando la demora podía convertirse en el estado, un paquete **entregado** se
+> mostraba como *"Demora de envíos"*: el envío desandaba el camino y había que
+> explicárselo al cliente. Viaja aparte, como bandera. No es que el bug esté
+> arreglado — es que ya no se puede escribir.
+
+La **fecha se devuelve tal cual** la manda Shalom. No se parsea: su formato no
+está medido, y adivinarlo es como se ordenan mal los historiales.
+
+`Shalom.DISPONIBLE` sigue en **false**. El botón ⟳ no la mira, así que ya se
+puede consultar a mano — que es como se calibra, guía por guía. El barrido
+automático sí la mira, y no se enciende hasta que la calibración esté hecha:
+encenderlo antes es soltar 484 consultas confiando en un traductor sin
+comprobar.
+
 ### Cómo se mide el siguiente endpoint
 
 Desde el entorno donde se desarrolla **no se puede llamar a `shalom-api.lat`**
@@ -295,7 +332,12 @@ await Shalom.esquema('validate')   // en la consola del panel
 ```
 
 Devuelve la **forma** de la respuesta —qué campos vienen y de qué tipo— y **ni
-un solo valor**. Con eso se escribe el contrato contra lo que la API devuelve
+un solo valor**. Con una excepción medida a propósito: los textos que son
+**puro número** (fechas, montos) revelan su patrón con los dígitos tapados —
+`"2026-09-08 15:30"` sale como `"string(####-##-## ##:##)"`. Hacía falta: el
+formato de fecha decide si se puede ordenar bien y no está documentado.
+Cualquier texto con letras —un nombre, una dirección— sale como `"string"` a
+secas. Con eso se escribe el contrato contra lo que la API devuelve
 de verdad, sin que ningún dato de un cliente salga del servidor. La
 documentación y la realidad ya se contradijeron **seis veces**; esta es la
 herramienta para no volver a creerle a la documentación.

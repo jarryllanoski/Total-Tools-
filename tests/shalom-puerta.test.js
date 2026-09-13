@@ -68,18 +68,18 @@ module.exports = async ({bloque, ok}) => {
      'ninguno de los endpoints destructivos está en la lista');
   ok(Object.keys(P.PERMITIDAS).join(',') === 'validate,track',
      'hoy hay dos, y en el orden en que se reconstruyen');
-  ok(P.PERMITIDAS.track.soloMedir === true,
-     'track está marcado soloMedir: se puede medir pero todavía no usar');
-  ok(!P.PERMITIDAS.validate.soloMedir, 'validate sí está conectado del todo');
+  ok(!P.PERMITIDAS.track.soloMedir,
+     'track ya no es solo medible: su forma se midió y se tradujo');
 
-  bloque('Medible no es lo mismo que conectado');
+  bloque('Cada endpoint por su traductor, nunca por el de otro');
 
   ok(P.traducir('validate', {valid: true, limit: 5, currentUsage: 1,
-    remaining: 4}).ok === true, 'validate tiene traductor');
-  ok(P.traducir('track', {lo: 'que sea'}).motivo === 'SIN_TRADUCTOR',
-     'track NO: su JSON crudo no sale por la puerta de otro traductor');
+    remaining: 4}).ok === true, 'validate por el suyo');
+  ok(P.traducir('track', {statuses: {data: {origen: {fecha: 'x'}}}}).estado ===
+     'En origen', 'track por el suyo');
   ok(P.traducir('inventado', {}).motivo === 'SIN_TRADUCTOR',
-     'ni ningún otro que no lo tenga');
+     'y uno sin traductor no devuelve su JSON crudo: eso es como una forma mal ' +
+     'entendida llega a la pantalla haciéndose pasar por un dato bueno');
 
   {
     const f = conFetch(resp(200, {valid: true}));
@@ -234,12 +234,9 @@ module.exports = async ({bloque, ok}) => {
     ok(r.ok === true && r.destino === 'validate' && r.diagnostico === false,
        'admin + operación de la lista: pasa');
   }
-  ok(motivo(await pasar({cuerpo: {op: 'track'}})) === 'SIN_TRADUCTOR',
-     'pedir track como operación normal se corta: aún no está traducido');
   {
-    const r = await pasar({cuerpo: {op: 'esquema', de: 'track'}});
-    ok(r.ok === true && r.destino === 'track',
-       'pero medirlo sí se puede: es como se averigua su forma');
+    const r = await pasar({cuerpo: {op: 'track'}});
+    ok(r.ok === true && r.destino === 'track', 'track ya pasa como operación normal');
   }
   {
     const r = await pasar({cuerpo: {op: 'esquema', de: 'validate'}});
@@ -294,6 +291,99 @@ module.exports = async ({bloque, ok}) => {
   ok(tv({valid: true, limit: 5, currentUsage: 1, remaining: 4}).mensaje === null,
      'y si no manda message, se dice null en vez de inventar un texto');
 
+  bloque('Traducir /track — el árbol de 7 ramas');
+
+  const tt = P.traducirTrack;
+  // La forma REAL, tal como la midió `esquema` contra la API el 13 sep 2026.
+  const arbolReal = (extra) => ({statuses: {success: true, message: 'ok',
+    data: Object.assign({
+      registrado: {fecha: '2026-09-05 10:00'},
+      origen: {fecha: '2026-09-05 12:00'},
+      transito: {fecha: '2026-09-06 08:00', carguero: 'X', completo: true,
+        cargueros: ['a', 'b']},
+      destino: {fecha: '2026-09-07 09:00'},
+      reparto: null,
+      entregado: {fecha: '2026-09-08 15:30', completo: true,
+        cliente: {nombre: 'Ana', documento: '12345678'}},
+      demora: null
+    }, extra || {})}});
+
+  {
+    const r = tt(arbolReal());
+    ok(r.ok === true && r.estado === 'Entregado' && r.pasos === 3,
+       'gana el paso más avanzado que tenga fecha');
+    ok(r.fecha === '2026-09-08 15:30',
+       'la fecha se devuelve TAL CUAL: parsear un formato sin medir es como se ' +
+       'ordenan mal los historiales');
+    ok(r.recibio && r.recibio.nombre === 'Ana' && r.recibio.documento === '12345678',
+       'y quién recibió el paquete, que es lo que le dices al cliente que reclama');
+    ok(Object.keys(r.arbol).length === 5,
+       'el árbol completo queda para el historial, sin las ramas que no pasaron');
+  }
+
+  {
+    // LA PRUEBA QUE EXISTE POR EL BUG MÁS CARO DE ESTE PROYECTO.
+    // Un paquete ENTREGADO se mostraba como "Demora de envíos": el envío
+    // desandaba el camino y había que explicárselo al cliente.
+    const r = tt(arbolReal({demora: {fecha: '2026-09-06 20:00'}}));
+    ok(r.estado === 'Entregado',
+       'con demora Y entregado, el estado sigue siendo Entregado');
+    ok(r.demora && r.demora.fecha === '2026-09-06 20:00',
+       'la demora no se pierde: viaja aparte, como bandera');
+    ok(P.PASOS.every((p) => p.clave !== 'demora'),
+       'y demora NO está en la lista de pasos — no es que el bug esté ' +
+       'arreglado, es que no se puede escribir');
+  }
+  {
+    const r = tt(arbolReal({entregado: null, destino: null, reparto: null,
+      demora: {fecha: '2026-09-06 20:00'}}));
+    ok(r.estado === 'En tránsito' && r.pasos === 1,
+       'sin entregar, la demora tampoco reemplaza al paso real');
+    ok(r.demora !== null, 'pero se avisa igual');
+  }
+
+  {
+    const r = tt(arbolReal({entregado: null, reparto: {fecha: '2026-09-08 08:00'}}));
+    ok(r.estado === 'En reparto' && r.pasos === 2,
+       'reparto va DESPUÉS de destino aunque compartan paso: manda el orden, ' +
+       'no el número');
+  }
+  {
+    const r = tt(arbolReal({entregado: null, reparto: null}));
+    ok(r.estado === 'En destino', 'sin reparto se queda en destino');
+  }
+  {
+    const r = tt({statuses: {success: true, data: {registrado: {fecha: 'x'},
+      origen: null, transito: null, destino: null, reparto: null,
+      entregado: null, demora: null}}});
+    ok(r.estado === 'En origen' && r.pasos === 0, 'una guía recién registrada');
+  }
+
+  bloque('/track — jamás ok:true sin dato real');
+
+  ok(tt({statuses: {success: true, data: {registrado: null, origen: null,
+    transito: null, destino: null, reparto: null, entregado: null,
+    demora: null}}}).motivo === 'SIN_DATO',
+     'el árbol entero en null no es un éxito: es una guía que Shalom no registró');
+  ok(tt({statuses: {success: true, data: {origen: {fecha: '   '}}}}).motivo ===
+     'SIN_DATO', 'una fecha en blanco tampoco cuenta como paso');
+  ok(tt({statuses: {success: false, message: 'no existe'}}).motivo ===
+     'NO_ENCONTRADO', 'success:false es una guía que no existe');
+  ok(tt({}).motivo === 'FORMATO_DESCONOCIDO', 'sin statuses no sabemos qué nos dijeron');
+  ok(tt({statuses: [{}]}).motivo === 'FORMATO_DESCONOCIDO',
+     'y si llegara como ARRAY —que es lo que dice la documentación— tampoco: ' +
+     'lo medido es un objeto, y aceptar las dos formas es adivinar');
+  ok(tt(null).motivo === 'FORMATO_DESCONOCIDO', 'ni con null');
+  {
+    const r = tt(arbolReal({entregado: {fecha: '2026-09-08 15:30'}}));
+    ok(r.ok === true && r.recibio === null,
+       'entregado sin datos del cliente: se entregó, pero no se inventa quién');
+  }
+  {
+    const r = tt(arbolReal({entregado: null}));
+    ok(r.recibio === null, 'y si no se entregó, no hay quién recibió');
+  }
+
   bloque('El esquema describe la forma, sin un solo valor');
 
   {
@@ -317,6 +407,24 @@ module.exports = async ({bloque, ok}) => {
        'llega hasta statuses.data.entregado.cliente, que es donde hacía falta');
     ok(f.indexOf('123') < 0 && f.indexOf('"x"') < 0, 'y sigue sin traer valores');
   }
+  {
+    // El formato de fecha decide si se puede ordenar y mostrar bien, y no está
+    // documentado. Se destapa la FORMA tapando los dígitos — sin pedir un
+    // valor real, o sea sin que un dato de un cliente pase por el chat.
+    const f = P.forma({fecha: '2026-09-08 15:30', nombre: 'Ana Perez',
+      monto: '45.50', guia: '82037653', cod: 'TT9C',
+      direccion: 'Av. Bayovar 311'});
+    ok(f.fecha === 'string(####-##-## ##:##)', 'una fecha revela su formato');
+    ok(f.monto === 'string(##.##)', 'y un monto también');
+    ok(f.nombre === 'string' && f.direccion === 'string',
+       'pero un nombre o una dirección NO: cualquier texto con letras sale a secas');
+    ok(f.cod === 'string', 'ni un código que empieza por letra');
+    ok(JSON.stringify(f).indexOf('Ana') < 0 &&
+       JSON.stringify(f).indexOf('Bayovar') < 0, 'no se escapa ni una palabra');
+  }
+  ok(P.forma({x: '1'.repeat(60)}).x === 'string',
+     'un texto larguísimo de puros dígitos no se destapa: no es una fecha');
+
   ok(JSON.stringify(P.forma({a: {b: {c: {d: {e: {f: {g: {h: {i: 1}}}}}}}}}))
       .indexOf('objeto') > 0, 'pero tiene fondo: no se hunde para siempre');
 };
