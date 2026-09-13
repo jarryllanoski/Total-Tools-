@@ -114,4 +114,28 @@ module.exports = (t) => {
     ok(/Nada pendiente — todo al día/.test(html),
         'con cero activos no dice "sin envíos": dice la verdad');
   }
+
+  bloque('El orden de carga es un contrato, no una casualidad');
+  {
+    /* El script en línea de index.html llama a `Seleccion._pintarBoton()` en
+       cada repintado. Cuando seleccion.js se cargaba al final del body había
+       una ventana real —un repintado en el primer frame, antes de que el
+       archivo llegara— en la que eso lanzaba ReferenceError y abortaba el
+       render entero: cero tarjetas. Pasó en una recarga forzada. */
+    const html = E.leer('index.html');
+    const posArchivo = html.indexOf('src="seleccion.js');
+    let posUso = -1;
+    const re = /<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/g;
+    let m;
+    while ((m = re.exec(html))) {
+      const i = m[1].indexOf('Seleccion.');
+      if (i >= 0) { posUso = m.index + i; break; }
+    }
+    ok(posArchivo > 0, 'seleccion.js se carga');
+    ok(posUso > 0, 'y el script en línea lo usa');
+    ok(posArchivo < posUso,
+        'se carga ANTES del script en línea que lo llama, no al final del body');
+    ok(/if\(window\.Seleccion\)\s*Seleccion\._pintarBoton\(\)/.test(html),
+        'y aun así la llamada va con guarda: pintar un botón no puede tumbar el render');
+  }
 };

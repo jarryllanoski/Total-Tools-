@@ -8,6 +8,14 @@
 <!-- errores.js va PRONTO: engancha window.onerror, así que cuanto antes
      cargue, más fallos atrapa. No depende de nada. -->
 <script src="errores.js?v=1"></script>
+<!-- seleccion.js TAMBIÉN va pronto, y no por gusto: el script en línea de
+     más abajo llama a Seleccion._pintarBoton() en cada repintado. Cargándolo
+     al final del body había una ventana real —un repintado en el primer
+     frame, antes de que el archivo llegara— en la que eso lanzaba
+     ReferenceError y ABORTABA EL RENDER ENTERO: cero tarjetas. Pasó en una
+     recarga forzada, con todo bajando de red a la vez.
+     No depende de nada al cargar: solo define window.Seleccion. -->
+<script src="seleccion.js?v=1"></script>
 <script src="appcheck.js?v=1"></script>
 <!-- FIREBASE via REST API — sin SDK, funciona en Brave/Chrome/Firefox/Safari -->
 <script>
@@ -2225,8 +2233,11 @@ function _renderAhora(){
   // de estado; hook explícito, sin monkey-patch. Idempotente (avisa una vez).
   if(window.Tracking&&Tracking.checkDestinoAlerts)Tracking.checkDestinoAlerts();
   updateStats(); updateAdvBar(); _qrMoveIndicator();
-  // Resaltar en azul el botón "seleccionar todo" si hay algún pedido seleccionado
-  Seleccion._pintarBoton();
+  // Resaltar en azul el botón "seleccionar todo" si hay algún pedido
+  // seleccionado. Va con guarda A PROPÓSITO: es cosmético, y que un botón sin
+  // colorear impida ver los 1044 pedidos sería absurdo. Es literalmente lo que
+  // pasaba — un ReferenceError aquí abortaba _renderAhora entero.
+  if(window.Seleccion) Seleccion._pintarBoton();
   let data=visibleShipments();   // etiqueta + búsqueda + avanzados (fuente única)
 
   // Ordenar por fecha de registro — más reciente primero
@@ -3767,10 +3778,10 @@ render();
 </script>
 <!-- ★ SHALOM tracking — cargado al final -->
 <script src="storage.js?v=3"></script>
-<!-- seleccion.js va PRIMERO: config.js, print.js y voz.js preguntan por
-     los pedidos marcados. El orden de carga de estos archivos es un contrato
+<!-- seleccion.js ya se cargó en la cabecera, ANTES del script en línea que
+     lo usa. config.js, print.js y voz.js preguntan por los pedidos marcados,
+     así que siguen yendo detrás. El orden de carga es un contrato
      (ver docs/ARQUITECTURA.md). -->
-<script src="seleccion.js?v=1"></script>
 <script src="config.js?v=20"></script>
 <script src="print.js?v=16"></script>
 <script src="notify.js?v=4"></script>
