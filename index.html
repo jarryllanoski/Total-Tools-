@@ -138,17 +138,24 @@
      volvía a mandar las 971 — unas 4.000 escrituras en medio minuto. Eso era
      el punto rojo.
 
-     `documents:batchWrite` acepta hasta 500 escrituras en UNA petición, cada
-     una con su propio updateMask (o sea, la misma fusión por campos de antes:
-     un dispositivo con copia vieja sigue sin poder pisar trackingStatus).
+     `documents:commit` acepta hasta 500 escrituras en UNA petición, cada una
+     con su propio updateMask (o sea, la misma fusión por campos de antes: un
+     dispositivo con copia vieja sigue sin poder pisar trackingStatus).
      971 documentos pasan de 971 peticiones a 2.
 
-     Se eligió batchWrite y no :commit a propósito: batchWrite NO es atómico y
-     devuelve el estado de CADA escritura. Eso es justo lo que hace falta para
-     que el éxito parcial cuente — si fallan 3 de 500, el reintento manda esos
-     3 y no los 971. Con :commit no habría forma de saber cuáles fueron.
-     Son documentos independientes: que 497 entren y 3 no, no rompe nada. */
-  const LOTE_MAX   = 500;             // tope duro de Firestore por batchWrite
+     ⚠️ NO USAR `documents:batchWrite`. Se probó y devuelve 403
+     PERMISSION_DENIED "Missing or insufficient permissions." desde el
+     navegador, con las mismas credenciales con las que un PATCH suelto entra
+     sin problema: las reglas de seguridad no se evalúan para ese método, así
+     que lo rechaza siempre. `:commit` es el que usa el SDK oficial por debajo
+     para writeBatch(), y sí pasa por reglas.
+
+     El precio de `:commit` es que la tanda es TODO-O-NADA y no dice cuál
+     documento la tumbó. Por eso, cuando una tanda falla, esa tanda —y solo
+     esa— se rehace documento por documento: es la única forma de saber con
+     exactitud qué quedó fuera, y así el reintento manda 3 y no 971. El camino
+     bueno sigue costando 2 peticiones; el desglose solo se paga al fallar. */
+  const LOTE_MAX   = 500;             // tope duro de Firestore por commit
   const LOTE_BYTES = 4 * 1024 * 1024; // techo propio, holgado bajo el de 10 MiB
 
   const _docName = (path) => `projects/${PRJ}/databases/(default)/documents/${path}`;
@@ -184,48 +191,9 @@
     return out;
   }
 
-  // items: [{clave, path, obj}] → {ok:[clave], fail:[clave]}
-  // Lanza solo si falla el TRANSPORTE (la tanda entera). Un documento que
-  // Firestore rechaza no lanza: vuelve en `fail`.
-  async function fsBatchWrite(items){
-    const ok = [], fail = [], conWrite = [];
-    for(const it of items){
-      const w = _aWrite(it.path, it.obj);
-      if(w) conWrite.push({ clave: it.clave, write: w });
-      else ok.push(it.clave); // 0 campos: nada que escribir, cuenta como hecho
-    }
-    for(const tanda of _tandas(conWrite)){
-      const h = await _authHeaders();
-      h['Content-Type'] = 'application/json';
-      const r = await fetch(`${BASE}:batchWrite?key=${KEY}`, {
-        method: 'POST', headers: h,
-        body: JSON.stringify({ writes: tanda.map(x => x.write) })
-      });
-      if(!r.ok){
-        const err = new Error('batchWrite ' + r.status + ' ' + await r.text());
-        err.http = r.status; // lo mira _escribirVarios para decidir si reintentar
-        throw err;
-      }
-      const j  = await r.json();
-      const st = j.status || [];
-      const wr = j.writeResults || [];
-      // Si la respuesta no trae un resultado por escritura no se puede saber
-      // qué entró. Antes de inventarlo, se cae al camino de uno en uno.
-      if(st.length !== tanda.length && wr.length !== tanda.length){
-        throw new Error('batchWrite devolvió ' + st.length + '/' + wr.length +
-                        ' resultados para ' + tanda.length + ' escrituras');
-      }
-      tanda.forEach((x, i) => {
-        const s = st[i];
-        // google.rpc.Status: el éxito llega como objeto vacío (sin `code`).
-        if(!s || !s.code) ok.push(x.clave); else fail.push(x.clave);
-      });
-    }
-    return { ok, fail };
-  }
-
-  // Camino de respaldo: uno por uno, pero con tope de peticiones simultáneas.
-  // Nunca lanza; cada documento cae en ok o en fail por su cuenta.
+  // Uno por uno, pero con tope de peticiones simultáneas. Nunca lanza: cada
+  // documento cae en ok o en fail por su cuenta, que es lo que hace falta para
+  // saber exactamente qué quedó sin guardar.
   async function _patchLimitado(items, tope){
     const ok = [], fail = [];
     let i = 0;
@@ -241,26 +209,72 @@
     return { ok, fail };
   }
 
-  // Si batchWrite no sirve en este proyecto, no se vuelve a intentar en toda
-  // la sesión. Solo se apaga ante un fallo ESTRUCTURAL (4xx que no sea 429):
-  // un corte de red o un 500 son pasajeros y no deben degradar la sesión.
-  let _batchApagado = false;
+  // Si `:commit` no sirve en este proyecto, no se vuelve a intentar en toda la
+  // sesión. Ver abajo cómo se distingue "el endpoint no sirve" de "un
+  // documento concreto está mal": no es lo mismo y no se apaga por lo segundo.
+  let _commitApagado = false;
 
+  // items: [{clave, path, obj}] → {ok:[clave], fail:[clave]}. No lanza.
   async function _escribirVarios(items){
     if(!items.length) return { ok: [], fail: [] };
-    if(!_batchApagado){
-      try { return await fsBatchWrite(items); }
-      catch(e){
-        const est = e && e.http;
-        if(est && est !== 429 && est < 500) _batchApagado = true;
-        console.warn('batchWrite falló, se escribe uno por uno:', e && e.message);
-        try{ window.Errores && window.Errores.anotar('fs.batchWrite', e, {
-          documentos: items.length, apagado: _batchApagado
+
+    const ok = [], fail = [], conWrite = [];
+    for(const it of items){
+      const w = _aWrite(it.path, it.obj);
+      if(w) conWrite.push({ clave: it.clave, path: it.path, obj: it.obj, write: w });
+      else ok.push(it.clave); // 0 campos: nada que escribir, cuenta como hecho
+    }
+
+    if(_commitApagado){
+      const r = await _patchLimitado(conWrite, 6);
+      return { ok: ok.concat(r.ok), fail: r.fail };
+    }
+
+    for(const tanda of _tandas(conWrite)){
+      let fallo = null;
+      try {
+        const h = await _authHeaders();
+        h['Content-Type'] = 'application/json';
+        const r = await fetch(`${BASE}:commit?key=${KEY}`, {
+          method: 'POST', headers: h,
+          body: JSON.stringify({ writes: tanda.map(x => x.write) })
+        });
+        if(!r.ok){
+          const e = new Error('commit ' + r.status + ' ' + await r.text());
+          e.http = r.status; // se mira abajo para decidir si apagar el camino
+          throw e;
+        }
+        const j  = await r.json();
+        const wr = j.writeResults || [];
+        // Si no vuelve un resultado por escritura no se puede afirmar que
+        // entraron todas. Antes de inventarlo, se rehace de uno en uno.
+        if(wr.length !== tanda.length){
+          throw new Error('commit devolvió ' + wr.length + ' resultados para ' +
+                          tanda.length + ' escrituras');
+        }
+        tanda.forEach(x => ok.push(x.clave)); // commit es atómico: entró entera
+      } catch(e){ fallo = e; }
+
+      if(fallo){
+        console.warn('commit falló, se rehace la tanda uno por uno:', fallo && fallo.message);
+        const r = await _patchLimitado(tanda, 6);
+        r.ok.forEach(k => ok.push(k));
+        r.fail.forEach(k => fail.push(k));
+        /* Cómo se distingue una cosa de la otra:
+           si uno por uno entraron TODOS, no había ningún documento malo — el
+           problema era el endpoint, y solo entonces se apaga el camino rápido.
+           Si alguno falló también suelto, el culpable era ese documento y el
+           camino rápido sigue sirviendo para los demás.
+           Y solo se apaga ante un 4xx: un 5xx o un 429 son pasajeros y no
+           deben degradar el resto de la sesión. */
+        const est = fallo.http;
+        if(!r.fail.length && est && est !== 429 && est < 500) _commitApagado = true;
+        try{ window.Errores && window.Errores.anotar('fs.commit', fallo, {
+          documentos: tanda.length, sueltosFallidos: r.fail.length, apagado: _commitApagado
         }); }catch(_){}
       }
     }
-    // Peor caso = el comportamiento de antes, pero de 6 en 6 y no de mil.
-    return _patchLimitado(items, 6);
+    return { ok, fail };
   }
 
   async function fsDel(path){

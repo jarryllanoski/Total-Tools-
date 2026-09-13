@@ -24,7 +24,7 @@ rompió de verdad** y no queremos que vuelva:
 | `chips.test.js` | Las flechas movían 120 px fijos, un número sin relación con el ancho de ninguna etiqueta |
 | `tracking.test.js` | Una guía Entregada mostrada como "Demora de envíos", y otra En destino que se quedó en "En tránsito" |
 | `shalom.test.js` | Que la integración desconectada deje alguna pantalla muda, o que vuelva a colarse una llamada directa a la API saltándose la puerta |
-| `guardado.test.js` | Guardar disparaba 971 peticiones a la vez: Firestore devolvía 429, el reintento las repetía enteras y la conexión se caía. Y un cambio que no lograba subir se perdía al cerrar la pestaña |
+| `guardado.test.js` | Guardar disparaba 971 peticiones a la vez: Firestore devolvía 429, el reintento las repetía enteras y la conexión se caía. Y un cambio que no lograba subir se perdía al cerrar la pestaña. Incluye que el endpoint sea `:commit` y nunca `:batchWrite`, que da 403 desde el navegador |
 
 ## Que la prueba pueda fallar no se supone: se comprueba
 

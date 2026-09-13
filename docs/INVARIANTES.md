@@ -358,18 +358,32 @@ Guardar todo era `Promise.all` de un `fsPatch` por documento: con 971 pedidos,
 `Promise.all` se rompía con la primera y el reintento volvía a mandar las 971
 — unas **4.000 escrituras en medio minuto**. Ese era el punto rojo.
 
-Ahora se usa `documents:batchWrite`: hasta **500 escrituras por petición**,
-cada una con **su propio `updateMask`** (la fusión por campos no se pierde, así
-que un dispositivo con copia vieja sigue sin poder pisar `trackingStatus`).
+Ahora se usa `documents:commit`: hasta **500 escrituras por petición**, cada
+una con **su propio `updateMask`** (la fusión por campos no se pierde, así que
+un dispositivo con copia vieja sigue sin poder pisar `trackingStatus`).
 971 documentos = **2 peticiones**.
+
+> ⛔ **`documents:batchWrite` NO sirve desde el navegador.** Se probó contra el
+> proyecto real y devuelve **403 `PERMISSION_DENIED` — "Missing or insufficient
+> permissions."**, con las mismas credenciales con las que un `PATCH` suelto
+> entra con 200 en la misma sesión. Las reglas de seguridad no se evalúan para
+> ese método, así que lo rechaza siempre y no hay regla que lo arregle.
+> No es App Check: si lo fuera, fallaría también el `PATCH`.
+> `:commit` es el que usa el SDK oficial por debajo para `writeBatch()`.
+
+**El precio de `:commit`: la tanda es todo-o-nada y no dice cuál documento la
+tumbó.** Por eso, cuando una tanda falla, **esa tanda —y solo esa— se rehace
+documento por documento** con tope de 6 a la vez. Es la única forma de saber
+con exactitud qué quedó fuera. El camino bueno sigue costando 2 peticiones; el
+desglose solo se paga al fallar.
 
 | Invariante | Por qué |
 |---|---|
-| Se usa `batchWrite`, **no** `:commit` | `batchWrite` no es atómico y devuelve el estado de **cada** escritura. Con `:commit` no habría forma de saber cuáles entraron. |
-| Solo se descuenta de los sucios **lo que Firestore confirmó** | Si fallan 3 de 500, el reintento manda **esos 3**. Antes la limpieza estaba toda al final: un fallo dejaba sucios los 971. |
+| Solo se descuenta de los sucios **lo que Firestore confirmó** | Si falla 1 de 500, el reintento manda **ese 1**. Antes la limpieza estaba toda al final: un fallo dejaba sucios los 971. |
 | Las tandas se parten por **cantidad y por peso** | `trackingHistory` crece con cada consulta; 500 pedidos con mucho historial no deben acercarse al límite de la petición. |
-| Si `batchWrite` falla, se cae a `fsPatch` **con tope de 6 a la vez** | El peor caso es el comportamiento de antes, **nunca la avalancha**. |
-| Un 4xx (que no sea 429) apaga el camino rápido toda la sesión; un 5xx o un 429 **no** | Un fallo estructural no se reintenta mil veces; un corte de red no debe degradar la sesión entera. |
+| El desglose va **con tope de 6 a la vez** | El peor caso es el comportamiento de antes, **nunca la avalancha**. |
+| El camino rápido se apaga **solo si, uno por uno, entraron TODOS** | Entonces no había ningún documento malo: el problema era el endpoint. Si alguno falló también suelto, el culpable era ese documento y `:commit` sigue sirviendo para los demás. |
+| Y solo ante un **4xx que no sea 429** | Un 5xx o un 429 son pasajeros; un corte de red no debe degradar el resto de la sesión. |
 
 ### `dpanel_pending` tiene que ponerse en `'1'`
 
