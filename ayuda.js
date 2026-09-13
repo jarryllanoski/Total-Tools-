@@ -324,21 +324,21 @@
     shalomConfig: {
       titulo: 'Rastreo Shalom (Configuración)',
       icono: '🚚',
-      actualizado: '2026-09-09',
+      actualizado: '2026-09-13',
       pasos: [
         '<b>Mostrar en el link del cliente</b>: decides si el cliente ve el estado de Shalom en su seguimiento. Apagado = solo tú lo ves en el panel.',
-        '<b>🔌 Verificar sesión de Shalom Pro</b>: comprueba que la conexión con Shalom sigue viva. No toca ningún pedido ni gasta envíos. Úsalo cuando algo deje de responder, antes de pensar que el problema es tuyo.',
+        '<b>🔌 Verificar sesión de Shalom Pro</b>: comprobará que la conexión con Shalom sigue viva, sin tocar ningún pedido ni gastar envíos. Hoy avisa "en reconstrucción".',
         '<b>🏢 Agencias Olva / Agencias Shalom</b>: descargan el catálogo completo de agencias para que el buscador del formulario funcione sin gastar API en cada búsqueda.'
       ],
       faq: [
         {q:'¿Por qué la etiqueta del pedido no cambia sola?', a:'Porque ya no cambia sola, a propósito. El estado de Shalom se muestra, pero la etiqueta del pedido la mueves tú. Antes había un cambio automático y movía pedidos por su cuenta; se retiró.'},
         {q:'¿El cliente ve el estado de Shalom?', a:'Solo si activas "Mostrar en el link del cliente". Por defecto está apagado — solo tú lo ves en el panel.'},
-        {q:'¿Dónde quedó el motor de rastreo y "Sincronizar ahora"?', a:'Se retiraron con el rastreo viejo, que leía la página pública de Shalom. Ahora se consulta la API oficial: no hay motor que elegir ni intervalos que ajustar.'},
-        {q:'La verificación de sesión muestra un texto raro con llaves, ¿está mal?', a:'No. Por ahora enseña la respuesta tal cual la manda Shalom, sin traducir, mientras se confirma su formato exacto. Cuando esté confirmado se reemplaza por un aviso de una línea.'}
+        {q:'¿Dónde quedó el motor de rastreo y "Sincronizar ahora"?', a:'Se retiraron con el rastreo viejo, que leía la página pública de Shalom. La integración nueva se está rehaciendo endpoint por endpoint; mientras tanto los botones avisan "en reconstrucción".'},
+        {q:'¿Por qué todo lo de Shalom dice "en reconstrucción"?', a:'La integración se está rehaciendo desde cero, endpoint por endpoint, con la clave nueva. Lo que ya estaba guardado —guías, estados, el catálogo de agencias y el link del cliente— se sigue viendo con normalidad.'}
       ],
       tips: [
         'Si un pedido no actualiza su estado, primero revisa que el número de guía y el código sean los del ticket: la mayoría de las consultas fallidas son un dígito cambiado.',
-        'El botón ⟳ de cada tarjeta consulta esa guía contra la API oficial de Shalom.'
+        'El botón ⟳ de cada tarjeta consultará esa guía contra la API de Shalom. Hoy avisa "en reconstrucción": los estados que ya tenías guardados se siguen viendo.'
       ]
     }
 

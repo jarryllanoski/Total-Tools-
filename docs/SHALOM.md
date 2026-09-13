@@ -148,9 +148,10 @@ traductor de `/track` daba por bueno un formato que ya no existía.
 
 ## Resumen en una línea
 
-Todo lo de Shalom pasa ahora por una sola puerta — `shalom.js` — que hoy está
-**desconectada a propósito**. La integración nueva irá contra el portal de
-empresa `pro.shalom.pe` con la cuenta del negocio.
+Todo lo de Shalom pasa por una sola puerta — `shalom.js` — que hoy está
+**desconectada a propósito**: la integración se rehace endpoint por endpoint
+(ver el plan más abajo). Las dos formas medidas de arriba son el punto de
+partida, no se vuelven a medir.
 
 ## Por qué se retiró lo anterior
 
@@ -186,84 +187,97 @@ de Shalom:
 <script src="https://www.google.com/recaptcha/api.js?render=6LeGp5Et..."></script>
 ```
 
-## Cómo quedó el código (estado actual)
+## Estado: desconectada, se reconstruye endpoint por endpoint (13 sep 2026)
 
-### La puerta única — `shalom.js`
+Se retiró **toda** la lógica de API: el cliente (`functions/shalomApi.js`), los
+dos endpoints del backend (`shalomApi`, `shalomWebhook`) y la llamada directa
+que quedaba en `ticket.js`. La clave anterior se rota — estuvo en capturas.
 
-`window.Shalom` con cuatro capacidades. Hoy todas responden
-`{ok:false, motivo:'DESCONECTADO'}` y avisan al operador con un toast honesto:
+**Lo medido de arriba NO se borra.** Volver a medir lo que ya está medido sería
+pagar dos veces: la forma real de `/track` y de `/instances/status` es el punto
+de partida del endpoint 1 y del 5.
 
-| Método | Para qué | Futuro (pro.shalom.pe) |
+### Por qué se rehace en vez de parchear
+
+Dos fallos con la misma raíz costaron días, y los dos venían de traducir sin
+contrato: `statuses.message` pisando el árbol de pasos, y una demora tapando un
+`Entregado`. El traductor se escribió contra **una** respuesta medida y se dio
+por bueno. Eso no se arregla con otro parche: se arregla con un método.
+
+### El seam que hace posible desconectar sin romper nada
+
+`shalom.js` es la **puerta única**: la interfaz no sabe que Shalom existe, le
+habla a la puerta. Con los métodos devolviendo `DESCONECTADO`, cada pantalla ya
+sabe qué decir sin tocar una línea:
+
+| Pantalla | Qué muestra hoy |
+|---|---|
+| ⟳ Consultar (tarjeta y masivo) | 🔧 Rastreo Shalom en reconstrucción |
+| 🧾 Jalar ticket | 🔧 Jalar ticket en reconstrucción |
+| 🏢 Extraer agencias Shalom | En reconstrucción — el catálogo actual sigue sirviendo |
+| 🔌 Verificar sesión de Shalom Pro | La integración se está rehaciendo |
+
+**Reconectar = rellenar los métodos de `shalom.js`.** Nada más.
+
+### Lo que sigue funcionando sin Shalom
+
+- Las guías, códigos y estados **ya guardados** en cada pedido
+- El **link de seguimiento** del cliente (lee lo guardado, no consulta)
+- El **catálogo de 550 agencias** en `data/agencias-shalom.json` y su buscador
+- Las **medidas del paquete** y el clasificador de cajas (es local)
+- El auto-check ya estaba apagado (`AUTO_CHECK_ACTIVO = false`)
+
+---
+
+## El plan de reconstrucción
+
+Cada endpoint se cierra por completo antes de empezar el siguiente. Un endpoint
+está **hecho** cuando cumple los seis pasos:
+
+| | Paso | Por qué |
 |---|---|---|
-| `consultarGuia(guia, codigo)` | estado de un envío | Operaciones → Seguimiento de envíos |
-| `ticket(guia, codigo)` | guía de remisión / ticket | Operaciones → Comprobantes |
-| `agencias()` | catálogo de sedes | portal PRO |
-| `registrar(pedido)` | crear un envío | Registro individual / masivo |
+| 1 | **Leer** la sección de la documentación y **copiarla** a `docs/SHALOM-API.md` | Ya se perdió una vez |
+| 2 | **Medir** la respuesta real con `esquema` (tipos, nunca valores) | La documentación dice qué enviar, no qué devuelve |
+| 3 | **Escribir el contrato** en este archivo, con la fecha | Es lo que faltaba |
+| 4 | **Traducir** contra el contrato, con pruebas de cada forma | No contra una hipótesis |
+| 5 | **Calibrar**: guías reales de cada estado, comparadas con la web de Shalom | El traductor deja de ser mi criterio |
+| 6 | **Conectar** el método de `shalom.js` y probarlo en el panel | La puerta se abre al final |
 
-**Cuando la integración esté lista, se rellenan estos 4 métodos y toda la UI se
-enciende sola** — sin tocar un solo botón del panel ni del formulario.
+### El orden, y por qué
 
-### Quién llama a la puerta
+| # | Endpoint | Qué desbloquea | Riesgo |
+|---|---|---|---|
+| 1 | `GET /validate` | Que la clave nueva sirve y cuánto plan queda | Ninguno: no toca pedidos |
+| 2 | `POST /track` | El botón ⟳ — el que más usas | Medio: es el que falló dos veces |
+| 3 | `POST /instances/status` | Saber si la sesión de Shalom Pro está viva | Ninguno |
+| 4 | `GET /agencies` | Actualizar el catálogo offline | Bajo |
+| 5 | Ticket (PNG) | El botón 🧾 | Bajo |
+| 6 | **Webhook** | Que el panel se entere **solo** | Alto: escribe sin que nadie mire |
+| 7 | Registro de envíos | Alta automática con las medidas | Alto: gasta dinero real |
 
-- `tracking.js` — ⟳ Consultar y 🔄 masivo → `Shalom.consultarGuia`.
-- `ticket.js` — 🧾 Jalar ticket → `Shalom.ticket`.
-- `agencias-extractor.js` — Extraer agencias Shalom → aviso; **Olva sigue igual**.
-- `index.html` — Sincronizar / Reprogramar → avisos honestos (cubre también los
-  botones de "Estado del sistema" de `alertas.js`, que llaman a esos envoltorios).
-- `formulario.html` — el buscador de agencias Shalom usa **solo el catálogo local**
-  (`data/agencias-shalom.json`, 542 sedes); ya no hay respaldo en vivo.
+**`/validate` primero** porque valida la clave sin tocar nada: si algo está mal
+—clave, plan, red— se sabe en la primera llamada y no en la quinta.
 
-### Qué se borró
+**El webhook antes que el registro** porque consultar nunca es *fresco*: tu dato
+es tan viejo como tu último clic. La frescura solo la da el webhook.
 
-- Backend: las 7 Cloud Functions Shalom + sus ayudantes + `functions/shalomWebSync.js`.
-- Worker: la carpeta `shalomweb-tracker/` (Cloud Run).
-- Frontend: el Motor A/B de `tracking.js` (~460 líneas) y la lógica de cola en
-  `config.js`.
+### Reglas que no se negocian
 
-### Qué se conservó (no es Shalom o es agnóstico al motor)
+1. **La clave vive en Secret Manager.** Nunca en el navegador, nunca en el
+   repositorio, nunca en una captura.
+2. **Tres barreras** antes de hablar con Shalom: token de Firebase Auth válido,
+   correo en la lista de administradores (la misma de `firestore.rules`), y
+   lista blanca de operaciones. No un proxy ciego.
+3. **Jamás `ok:true` sin dato real.** El éxito falso ocultó días de fallo.
+4. **Un envío no desanda el camino** (`docs/INVARIANTES.md`, § 2 bis).
+5. **La etiqueta del pedido no se mueve sola** (§ 2). Informar sí, decidir no.
+6. **El error dice su causa**, y las causas del panel van separadas de las de
+   Shalom: mandar a revisar la factura cuando lo que venció fue tu sesión es lo
+   que hace perder una tarde.
+7. **Reintentos con espera creciente y jitter**, y timeout en toda llamada.
+8. **Idempotencia en lo que cuesta dinero.** Registrar un envío dos veces se
+   paga dos veces: clave de idempotencia por pedido, verificada en el servidor.
+9. **El webhook**: firma sobre el **cuerpo crudo**, comparación en tiempo
+   constante, deduplicación con un `create()` atómico.
+10. **Medir antes de traducir.** Siempre.
 
-- `formApi` (formulario público + seguimiento del cliente).
-- `agenciasOlva` y `olvaListar` (Olva, sin clave, sin captcha).
-- `extraerComprobante` (lee comprobantes apisale).
-- El vigilante "llegó a destino" (`detectarEstadoAuto` + `_esDestino` +
-  `_checkDestinoAlerts`) y todo el registro manual de estado.
-
-## Para reconectar — la integración nueva (pro.shalom.pe)
-
-`pro.shalom.pe` es el portal de empresa, distinto de la web pública. Es una
-aplicación Vue; el HTML inicial es solo un cascarón (`<div id="app">`), así que
-**Ctrl+U no sirve** — hay que mirar la pestaña **Network** del navegador.
-
-Datos ya observados en el HTML del portal (con sesión iniciada):
-
-- `<meta name="csrf-token">` — token CSRF por sesión.
-- `<meta name="response-key">` — **clave para descifrar las respuestas**, entregada
-  por sesión. (En la web pública esta clave estaba oculta; aquí, un cliente
-  autenticado la recibe. Ese es el desbloqueo que no existía antes.)
-- `<meta name="api-secret">` — secreto HMAC para **firmar las peticiones**.
-- reCAPTCHA v3 marcado como **"necesario para los flujos que envían SMS/correo"** —
-  es decir, **no** para rastrear ni registrar. El login podría pedirlo.
-
-**Lo que falta capturar** (pestaña Network, sin pegar secretos en ningún chat):
-la URL, método, forma del payload y forma de la respuesta de *Seguimiento de
-envíos* — para saber si la respuesta llega en JSON legible (integración rápida
-sin navegador) o cifrada (navegador real leyendo la barra de 4 pasos).
-
-### Opciones, de mejor a peor
-
-1. **Acceso oficial de Shalom.** Su central: **01 5007878**. Es la vía estable y
-   consentida; incluiría registrar pedidos y tickets. Preguntar el precio antes
-   de descartar por costo.
-2. **Asistente en la PC del operador.** Corre en el navegador del usuario (su IP,
-   su nota de reCAPTCHA), a ritmo humano y poco volumen. Solo con la PC encendida.
-   No engaña a nadie: es lo que el operador haría a mano.
-3. **Pelear contra el detector** (IP residencial, huellas). **No se hará.**
-
-## Reglas que no se rompen
-
-- **Nunca** falsificar el token firmado de Shalom ni resolver/evadir su reCAPTCHA.
-- **Nunca** declarar `ok:true` sin un dato real: si no hay estado, `ok:false` con
-  un motivo. (La lección más cara: el éxito falso ocultó días de fallo.)
-- La contraseña de Shalom Pro va **solo** en Secret Manager, nunca en el
-  navegador, el repositorio ni un chat.
-- Un solo dueño por capacidad: la regla vive en `shalom.js`, no repartida.

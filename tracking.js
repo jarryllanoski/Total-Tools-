@@ -213,9 +213,10 @@ function _aplicarEstadoShalom(ship, resp, origen){
    recorrido, es algo que le pasa a un envío en camino. Tratarla como punto es
    lo que hacía que pisara un "Entregado".
 
-   ⚠️ Espejo de `_idxDeTexto` en functions/shalomApi.js. Son dos copias porque
-   una vive en el navegador y la otra en el servidor; si cambias el vocabulario
-   en una, cámbialo en la otra. Las pruebas comparan las dos. */
+   Hubo una copia gemela en el servidor (`_idxDeTexto`), que se fue con la
+   integración el 2026-09-13. Cuando el webhook vuelva, va a necesitar la misma
+   decisión: si se escribe otra copia, las dos tienen que cambiar juntas — y la
+   prueba que las compara vuelve con ella. */
 function _rangoDeTexto(t){
   var u = String(t || '').toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
   if (!u.trim()) return null;

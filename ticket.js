@@ -1,8 +1,8 @@
 /**
  * ticket.js — Jalar ticket de Shalom (PNG) v1
  * ============================================
- * Llama a POST /api/ticket-image con orderNumber + orderCode,
- * recibe un PNG y lo coloca en el slot GUÍA / TICKET (agencia) del formulario.
+ * Pide el ticket por la puerta única (shalom.js) con orderNumber + orderCode
+ * y lo coloca en el slot GUÍA / TICKET (agencia) del formulario.
  *
  *   orderNumber = trackingOrderNumber / shalomGuia   (campo fShalomGuia)
  *   orderCode   = trackingOrderCode   / shalomCodigo (campo fShalomCodigo)
@@ -19,25 +19,21 @@
  * Orden de carga: DESPUÉS de delivery.js (openForm / refreshSlot / _docs / _editId)
  *                 y DESPUÉS de storage.js (window.StorageModule).
  *
- * Por defecto USE_PROXY = true → llama a la Cloud Function "shalomTicket"
- * (la API key NO viaja en el navegador). Pon USE_PROXY = false + API_KEY solo
- * para pruebas locales antes de desplegar la función.
+ * ESTADO (2026-09-13): el botón está puesto pero la descarga NO — la
+ * integración con Shalom se rehace endpoint por endpoint. Este módulo pide el
+ * ticket por la puerta única (shalom.js), que hoy responde DESCONECTADO, y
+ * avisa "Jalar ticket en reconstrucción". Cuando la puerta devuelva
+ * {ok:true, url|dataUrl}, se reescribe aquí la parte que lo guarda.
  */
 (function (global) {
   'use strict';
 
-  /* ── CONFIG ──────────────────────────────────────────────────────── */
-  var SHALOM = {
-    // true  = llama a tu Cloud Function (la API key vive en el servidor) ← PRODUCCIÓN
-    // false = llama directo a shalom-api.lat con la key en el cliente   ← solo pruebas
-    USE_PROXY:    true,
-    FUNCTION_URL: 'https://us-central1-total-tools-24ce8.cloudfunctions.net/shalomTicket',
-
-    // Solo se usan si USE_PROXY === false
-    BASE_URL: 'https://shalom-api.lat',
-    ENDPOINT: '/api/ticket-image',
-    API_KEY:  '' // déjala vacía en producción; con USE_PROXY la key va en el proxy
-  };
+  /* Sin CONFIG de red: quién habla con Shalom es shalom.js, la puerta única.
+     Aquí vivía una URL a shalom-api.lat con una ranura para la API key en el
+     navegador ("solo pruebas"). Una ranura así no es una prueba: es la clave
+     del negocio a un descuido de estar en el código que se publica. Y el
+     proxy al que apuntaba la otra rama (`shalomTicket`) ni siquiera existía
+     en el backend, así que ese camino llevaba meses muerto. */
 
   /* ── HELPERS ─────────────────────────────────────────────────────── */
   function _toast(msg) {
@@ -63,56 +59,6 @@
     return { orderNumber: String(g).trim(), orderCode: String(c).trim() };
   }
 
-  /* Descargar el PNG del ticket desde la API de Shalom (proxy o directo) */
-  async function _fetchTicketPNG(orderNumber, orderCode) {
-    var url, opts;
-    if (SHALOM.USE_PROXY) {
-      // Vía Cloud Function: la key NO viaja en el navegador
-      url  = SHALOM.FUNCTION_URL;
-      opts = {
-        method:  'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ orderNumber: orderNumber, orderCode: orderCode })
-      };
-    } else {
-      // Directo a shalom-api.lat (solo pruebas; expone la key)
-      url  = SHALOM.BASE_URL + SHALOM.ENDPOINT;
-      opts = {
-        method:  'POST',
-        headers: { 'x-api-key': SHALOM.API_KEY, 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ orderNumber: orderNumber, orderCode: orderCode })
-      };
-    }
-
-    var r = await fetch(url, opts);
-
-    if (!r.ok) {
-      var txt = '';
-      try { txt = await r.text(); } catch (e) {}
-      throw new Error('HTTP ' + r.status + (txt ? ' — ' + txt.slice(0, 120) : ''));
-    }
-
-    var ct   = (r.headers.get('content-type') || '').toLowerCase();
-    var blob = await r.blob();
-
-    // Si la API devolvió un JSON de error con status 200
-    if (ct.indexOf('image') === -1 && (blob.type || '').indexOf('image') === -1) {
-      var msg = '';
-      try { msg = await blob.text(); } catch (e) {}
-      throw new Error('La API no devolvió una imagen' + (msg ? ' — ' + msg.slice(0, 120) : ''));
-    }
-    return blob;
-  }
-
-  function _blobToDataUrl(blob) {
-    return new Promise(function (resolve, reject) {
-      var fr = new FileReader();
-      fr.onload  = function () { resolve(fr.result); };
-      fr.onerror = function () { reject(new Error('No se pudo leer la imagen')); };
-      fr.readAsDataURL(blob);
-    });
-  }
-
   /* ── API PÚBLICA ─────────────────────────────────────────────────── */
   var TicketModule = {};
 
@@ -127,55 +73,21 @@
     // la puerta devuelve {ok:false} y aquí avisamos honesto. Cuando la
     // integración (pro.shalom.pe → Comprobantes) esté lista, devolverá
     // {ok:true, url|dataUrl} y este botón cargará el ticket en el slot guía.
-    if (global.Shalom && typeof global.Shalom.ticket === 'function') {
-      var rt = await global.Shalom.ticket(data.orderNumber, data.orderCode);
-      if (!rt || !rt.ok) {
-        _toast(rt && rt.motivo === 'NO_ENCONTRADO' ?
-          '⚠️ Shalom no encontró esa guía' : '🔧 Jalar ticket en reconstrucción');
-        return;
-      }
-      // (Futuro) aplicar rt.url / rt.dataUrl al slot guía. Por ahora no llega aquí.
+    if (!global.Shalom || typeof global.Shalom.ticket !== 'function') {
+      _toast('🔧 Jalar ticket en reconstrucción');
       return;
     }
-
-    var btn     = document.getElementById('btnJalarTicket');
-    var prevTxt = btn ? btn.textContent : '';
-    if (btn) { btn.disabled = true; btn.textContent = '⏳ Generando...'; }
-    _toast('⏳ Generando ticket de Shalom...');
-
-    try {
-      var blob     = await _fetchTicketPNG(data.orderNumber, data.orderCode);
-      var fileName = 'ticket-shalom-' + data.orderNumber + '.png';
-      var shipId   = (typeof _editId !== 'undefined') ? _editId : null;
-      var docObj;
-
-      // El ticket de Shalom ES el documento de la agencia → va al slot 'guia'
-      // (etiqueta "Guía / Ticket"), no al de Boleta/Factura del cliente.
-      if (shipId && global.StorageModule &&
-          typeof global.StorageModule.uploadFile === 'function') {
-        // Pedido existente → subir directo a Firebase Storage (URL persistente)
-        var file = new File([blob], fileName, { type: 'image/png' });
-        docObj   = await global.StorageModule.uploadFile(file, shipId, 'guia');
-      } else {
-        // Pedido nuevo → base64 temporal (storage.js lo migra a Storage al guardar)
-        var dataUrl = await _blobToDataUrl(blob);
-        docObj = { d: dataUrl, n: fileName, t: 'image/png' };
-      }
-
-      if (typeof _docs !== 'undefined')        _docs.guia = docObj;
-      if (typeof refreshSlot === 'function')   refreshSlot('guia');
-      // Cargar el ticket ya NO mueve la etiqueta: el estado lo cambias tú.
-
-      _toast('🚚 Guía / Ticket cargado ✓ — Guarda el pedido para conservarlo');
-    } catch (e) {
-      console.warn('[Ticket] Error:', e.message);
-      _toast('⚠️ No se pudo generar el ticket: ' + e.message);
-    } finally {
-      if (btn) {
-        btn.disabled    = false;
-        btn.textContent = prevTxt || '🧾 Jalar ticket de Shalom';
-      }
+    var rt = await global.Shalom.ticket(data.orderNumber, data.orderCode);
+    if (!rt || !rt.ok) {
+      _toast(rt && rt.motivo === 'NO_ENCONTRADO' ?
+        '⚠️ Shalom no encontró esa guía' : '🔧 Jalar ticket en reconstrucción');
+      return;
     }
+    // Cuando la puerta devuelva {ok:true, url|dataUrl}, el ticket se carga en
+    // el slot "Guía / Ticket" y se sube a Storage — ese código se reescribe
+    // junto al endpoint, no antes.
+
+    _toast('🔧 Jalar ticket en reconstrucción');
   };
 
   /* ── INYECTAR BOTÓN EN EL SLOT GUÍA / TICKET (agencia) ───────────── */

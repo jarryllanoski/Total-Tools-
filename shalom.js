@@ -4,18 +4,35 @@
  * TODO lo que habla con Shalom pasa por aquí: consultar una guía, jalar el
  * ticket, traer agencias y registrar pedidos. Un solo dueño, un solo contrato.
  *
+ * ══════════════════════════════════════════════════════════════════════════
+ * DESCONECTADA A PROPÓSITO — 2026-09-13
+ * ══════════════════════════════════════════════════════════════════════════
+ * La integración se está rehaciendo desde cero, endpoint por endpoint. Se
+ * retiró el cliente entero (functions/shalomApi.js) y los dos endpoints del
+ * backend (shalomApi, shalomWebhook). La clave anterior se rota.
+ *
+ * Y ESTE ARCHIVO ES EL MOTIVO DE QUE NO SE ROMPA NADA. La interfaz —el botón
+ * ⟳ de cada tarjeta, el masivo, el extractor de agencias, el ticket, el
+ * verificador de sesión— no sabe que Shalom existe: le habla a esta puerta.
+ * Con las respuestas en DESCONECTADO, cada pantalla ya sabe qué decir
+ * ("Rastreo Shalom en reconstrucción") sin que haya que tocar una línea.
+ *
+ * RECONECTAR = rellenar los métodos de abajo. Nada más.
+ *
+ * ══════════════════════════════════════════════════════════════════════════
+ *
  * ES I/O PURO: no toca la UI (nada de toasts ni DOM). Devuelve datos; quien
  * llama decide qué mostrar. Así la misma puerta sirve para el botón manual, el
  * auto-check del panel o un Cloud Scheduler, sin acoplarse a ninguno.
  *
- * CÓMO LLEGA A SHALOM (y por qué no directo):
- *   navegador → Cloud Function `shalomApi` → api.shalom-api.lat
+ * CÓMO LLEGARÁ A SHALOM (y por qué nunca directo):
+ *   navegador → Cloud Function → API de Shalom
  * La API key es un secreto y vive en Secret Manager, del lado del servidor. Si
  * viajara al navegador, cualquiera con F12 la vería y gastaría el plan del
  * negocio. La función además exige que seas administrador y solo permite las
  * operaciones de una lista blanca — no es un proxy ciego.
  *
- * CONTRATO (lo que devuelve cada método; una promesa):
+ * CONTRATO (lo que devolverá cada método; una promesa):
  *   consultarGuia(guia, codigo) → {
  *       ok:true, estado:'En destino', fecha:'2026-08-19T16:10:00Z', pasos:2 }
  *     · estado : texto tal cual de Shalom (se muestra al operador y al cliente)
@@ -35,137 +52,37 @@
  *       lista de administradores) · SIN_RED · DESCONECTADO · SIN_DATO
  *   Mezclar los dos lados manda a revisar la cuenta de Shalom cuando el
  *   problema es la sesión del panel. Ya pasó una vez; por eso están separados.
+ *
  *   REGLA DE ORO: jamás ok:true sin dato real. Sin estado → ok:false. (La
  *   lección más cara: el éxito falso ocultó días de fallo.)
  */
 (function (global) {
   'use strict';
 
-  var FUNC = 'https://us-central1-total-tools-24ce8.cloudfunctions.net/shalomApi';
+  /* Mientras la integración se rehace, TODA llamada responde lo mismo. No es
+     un fallo: es el estado honesto del sistema, y la interfaz lo sabe leer. */
   var OFF = {ok: false, motivo: 'DESCONECTADO'};
-
-  /* Token del panel. Mismo patrón que cotizacion.js: renueva si hace falta y
-     lee el que guarda auth.js. Sin token, la función responde 401. */
-  function _token() {
-    var p = Promise.resolve();
-    try {
-      if (typeof global._authEnsureToken === 'function') {
-        p = Promise.resolve(global._authEnsureToken());
-      }
-    } catch (e) { /* sin auth: seguimos y la función dirá 401 */ }
-    return p.then(function () {
-      try { return localStorage.getItem('tt_id_token') || ''; } catch (e) { return ''; }
-    });
-  }
-
-  /* Llama a la Cloud Function. Nunca lanza: cualquier tropiezo se traduce al
-     vocabulario de motivos, para que quien llama siempre pueda avisar algo
-     honesto en vez de quedarse mudo. */
-  function _llamar(op, cuerpo) {
-    if (!global.fetch) return Promise.resolve(OFF);
-    return _token().then(function (tok) {
-      return fetch(FUNC + '?op=' + encodeURIComponent(op), {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': tok ? ('Bearer ' + tok) : ''
-        },
-        body: JSON.stringify(cuerpo || {})
-      });
-    }).then(function (r) {
-      /* 401 y 403 acá son de NUESTRA función, no de Shalom: es la puerta del
-         panel diciendo "no sé quién eres" o "no estás en la lista". Antes los
-         dos se traducían a BLOQUEADO, que en pantalla se lee como "la clave de
-         la API no es válida o el plan venció" — y mandaba a revisar la cuenta
-         de Shalom cuando lo único que pasaba era que la sesión del panel había
-         vencido. Dos causas distintas, dos arreglos distintos, un solo aviso:
-         eso es lo que hace perder una tarde.
-           401 → tu sesión del panel venció o no llegó el token.
-           403 → entraste bien, pero tu cuenta no está autorizada. */
-      if (r.status === 401 || r.status === 403) {
-        var esPermiso = r.status === 403;
-        return r.json().catch(function () { return {}; }).then(function (b) {
-          return {
-            ok: false,
-            motivo: esPermiso ? 'SIN_PERMISO' : 'SIN_SESION',
-            http: r.status,
-            detalle: (b && b.motivo) || ''
-          };
-        });
-      }
-      return r.json().catch(function () {
-        return {ok: false, motivo: 'ERROR_SHALOM'};
-      });
-    }).catch(function () {
-      return {ok: false, motivo: 'SIN_RED'};
-    });
-  }
+  function _off() { return Promise.resolve(OFF); }
 
   var Shalom = {
-    // Interruptor maestro. La consulta ya va contra la API oficial; el ticket,
-    // las agencias y el registro llegan en las fases siguientes.
-    DISPONIBLE: true,
 
-    consultarGuia: function (guia, codigo) {
-      if (!guia || !codigo) return Promise.resolve({ok: false, motivo: 'SIN_DATO'});
-      return _llamar('track', {orderNumber: String(guia), orderCode: String(codigo)});
-    },
+    /* Interruptor maestro. Lo miran el auto-check y el extractor de agencias
+       para no intentar siquiera. Se pone en true cuando los métodos de abajo
+       vuelvan a hablar con alguien. */
+    DISPONIBLE: false,
 
-    // Comprueba la clave y devuelve el consumo del mes. Útil para diagnosticar
-    // sin tocar ningún pedido.
-    validar: function () {
-      return _llamar('validate', {});
-    },
+    /* ── Los métodos, en el orden en que se van a reconstruir ────────────
+       Cada uno vuelve cuando su endpoint esté medido y probado. Ver el plan
+       en docs/SHALOM.md, que conserva las formas REALES ya medidas de
+       /track y /instances/status — eso no se vuelve a medir. */
 
-    /* ¿Sigue viva la sesión de Shalom Pro? Se llama ANTES de registrar un
-       envío: si la sesión se cayó, es mejor un aviso claro que 10 registros
-       fallidos en fila sin saber por qué.
-
-       OJO: "instancia encendida" ≠ "sesión viva". La pantalla de Instancias
-       puede decir Conectado (el robot corre) mientras la cuenta está
-       deslogueada y el robot quedó parado en /login. Lo que decide si un
-       registro va a funcionar es la sesión, y es lo que mira esto.
-
-       → { ok:true,
-           data:   {…}  respuesta cruda de Shalom, para diagnosticar
-           sesion: { conocido:true, conectada:true|false, usuario, url }
-                   { conocido:false }  si Shalom cambió la forma }
-       Con conocido:false el panel muestra la respuesta cruda en vez de
-       afirmar un estado que nadie midió. */
-    estadoInstancia: function () {
-      return _llamar('instanceStatus', {});
-    },
-
-    /* Diagnóstico: devuelve la FORMA de la respuesta de Shalom (nombres de
-       campos y tipos, nunca valores) más cómo la interpreta hoy el traductor.
-       Existe porque la documentación de la API describe qué enviar pero no qué
-       devuelve; en vez de suponer la forma, se mide. No escribe en ningún
-       pedido y no expone datos de personas.
-
-       Shalom.esquema('93802318','9NK9')  → forma de /track
-       Shalom.esquema(null, null, 'agencies') → forma de /agencies          */
-    esquema: function (guia, codigo, de) {
-      return _llamar('esquema', {
-        de: de || 'track',
-        orderNumber: guia ? String(guia) : '',
-        orderCode: codigo ? String(codigo) : ''
-      });
-    },
-
-    ticket: function () {
-      return Promise.resolve(OFF);
-    },
-
-    /* Catálogo completo de agencias. Lo usa el extractor del panel para
-       generar el JSON que después lee el formulario del cliente.
-       Devuelve la respuesta cruda de Shalom: quien llama la traduce. */
-    agencias: function () {
-      return _llamar('agencias', {});
-    },
-
-    registrar: function () {
-      return Promise.resolve(OFF);
-    },
+    consultarGuia: _off,     // 1 · POST /track
+    ticket: _off,            // 2 · el PNG del ticket
+    agencias: _off,          // 3 · GET /agencies
+    validar: _off,           // 4 · GET /validate  (clave y consumo del mes)
+    estadoInstancia: _off,   // 5 · POST /instances/status
+    registrar: _off,         // 6 · alta de envío
+    esquema: _off,           // diagnóstico: la FORMA de una respuesta, sin valores
 
     /* Catálogo de cajas de Shalom (medidas oficiales de su app, ver
        docs/SHALOM.md). No son rangos: son cajas fijas, así que la regla

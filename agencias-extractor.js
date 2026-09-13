@@ -170,10 +170,20 @@
     {
       key: 'shalom', label: 'Shalom',
       traer: function () {
+        // Pasa por la puerta única, que hoy responde DESCONECTADO mientras la
+        // integración se rehace. El catálogo que ya está en data/ sigue
+        // sirviendo al formulario: extraer solo hace falta para actualizarlo.
         if (!global.Shalom || typeof global.Shalom.agencias !== 'function') {
           return Promise.resolve({error: true, motivo: 'La puerta de Shalom no está cargada'});
         }
-        return global.Shalom.agencias();
+        return global.Shalom.agencias().then(function (r) {
+          if (r && r.ok === false && r.motivo === 'DESCONECTADO') {
+            return {error: true, motivo:
+              'Extraer agencias de Shalom está en reconstrucción. ' +
+              'El catálogo que ya tienes sigue funcionando en el formulario.'};
+          }
+          return r;
+        });
       },
       outFile: 'agencias-shalom.json',
       jsonActual: './data/agencias-shalom.json', // para comparar antes de reemplazar
