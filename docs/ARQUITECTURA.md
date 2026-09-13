@@ -79,7 +79,50 @@ Consecuencias que hay que tener presentes al tocar cualquier cosa:
 | `respaldo.js` | 259 | Respaldo y restauración |
 | `ticket.js` | 223 | Ticket de Shalom en PNG |
 | `seleccion.js` | 159 | Qué pedidos están marcados, **solo en este dispositivo** |
+| `errores.js` | 152 | Registro de fallos: qué se rompió y en qué equipo |
 | `firebase-config.js` | 7 | Claves del proyecto |
+
+### Nota · Dónde viven los datos (`RAIZ`)
+
+**Todas** las rutas de Firestore salen de una constante, `RAIZ`, en la cabecera
+de `index.html`. Ninguna se escribe suelta en medio del código.
+
+No es manía de orden: es la puerta por la que este panel podrá servir a más de
+un negocio. El día que haya un segundo, `RAIZ` pasa a valer `negocios/<id>` y no
+hay que cazar rutas por cuatro archivos — que es la parte que, **con datos vivos
+dentro**, duele de verdad.
+
+**Hoy no se migra nada.** `RAIZ` vale `panel`, y los ~1042 pedidos se quedan
+donde están. Mover mil documentos para ganar cero hoy es un riesgo que no se
+paga solo.
+
+⚠️ Hay **cuatro** sitios que apuntan a lo mismo y no se enteran entre ellos:
+
+| | |
+|---|---|
+| `index.html` | `RAIZ` — el panel |
+| `functions/index.js` | `CFG_DOC`, `SHIP_COL`, `TOK_COL`, `FORMCFG_COL` |
+| `firestore.rules` | `match /panel/{document=**}` |
+| `storage.rules` | las rutas de documentos |
+
+Los cuatro cambian juntos, o no cambia ninguno.
+
+### Nota · Registro de errores (`errores.js`)
+
+Varios vendedores usan el panel desde equipos distintos. Sin esto, un fallo en
+el teléfono de uno muere en su pantalla y nadie más se entera — que es lo que
+convierte cualquier problema intermitente en una cacería a ciegas.
+
+Escribe en `<RAIZ>/errores/items`. **No guarda nada de clientes**: ni nombres,
+ni teléfonos, ni direcciones, ni DNI. Un registro de errores es el sitio más
+fácil para filtrar datos de personas sin darse cuenta, porque nadie lo revisa.
+Por eso `extra` solo admite valores simples: un objeto anidado podría arrastrar
+un pedido entero con el cliente dentro.
+
+Tres frenos, porque un bucle de errores cuesta dinero: tope de 20 por sesión,
+el mismo error no se repite antes de un minuto, y **nunca lanza** — si falla al
+guardar, se calla. Reintentar justo cuando algo va mal es la forma más rápida
+de convertir un fallo en una tormenta de escrituras.
 
 ### Nota · Las flechas `‹ ›` de la fila de etiquetas
 

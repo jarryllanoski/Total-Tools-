@@ -5,6 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
 <title>Mi Panel de Envíos</title>
 <script src="firebase-config.js?v=3"></script>
+<!-- errores.js va PRONTO: engancha window.onerror, así que cuanto antes
+     cargue, más fallos atrapa. No depende de nada. -->
+<script src="errores.js?v=1"></script>
 <script src="appcheck.js?v=1"></script>
 <!-- FIREBASE via REST API — sin SDK, funciona en Brave/Chrome/Firefox/Safari -->
 <script>
@@ -13,12 +16,33 @@
   const PRJ = window.FBConfig.PRJ;
   const BASE = `https://firestore.googleapis.com/v1/projects/${PRJ}/databases/(default)/documents`;
 
-  // Fixed paths — no team code needed
-  const cfgPath  = () => `panel/config`;
-  const shipPath = (id) => `panel/shipments/items/${id}`;
-  const shipCol  = () => `panel/shipments/items`;
-  const suppPath = (id) => `panel/suppliers/items/${id}`;
-  const suppCol  = () => `panel/suppliers/items`;
+  /* ── DÓNDE VIVEN LOS DATOS ───────────────────────────────────────────
+     TODAS las rutas de Firestore salen de aquí. Ninguna se escribe suelta
+     en medio del código.
+
+     No es manía de orden: es la puerta por la que este panel podrá servir a
+     más de un negocio. El día que haya un segundo, `RAIZ` pasa a valer
+     `negocios/<id>` y no hay que ir a cazar rutas por cuatro archivos —
+     que es la parte que, con datos vivos dentro, duele de verdad.
+
+     HOY NO SE MIGRA NADA. `RAIZ` vale `panel`, exactamente como estaba, y
+     los ~1042 pedidos se quedan donde están. Mover mil documentos para
+     ganar cero hoy sería el tipo de riesgo que no se paga solo.
+
+     ⚠️ Si cambias RAIZ, hay tres sitios más que apuntan a lo mismo y NO se
+     enteran: firestore.rules, functions/index.js (CFG_DOC, SHIP_COL,
+     TOK_COL, FORMCFG_COL) y storage.rules. Los cuatro cambian juntos o no
+     cambia ninguno. */
+  const RAIZ = 'panel';
+
+  const cfgPath   = () => `${RAIZ}/config`;
+  const shipPath  = (id) => `${RAIZ}/shipments/items/${id}`;
+  const shipCol   = () => `${RAIZ}/shipments/items`;
+  const suppPath  = (id) => `${RAIZ}/suppliers/items/${id}`;
+  const suppCol   = () => `${RAIZ}/suppliers/items`;
+  const trashPath = (id) => `${RAIZ}/trash/items/${id}`;
+  const formCfgPath = (id) => `${RAIZ}/forms/configs/${id}`;
+  const erroresPath = (id) => `${RAIZ}/errores/items/${id}`;
 
   // ── Firestore value converters ────────────────────────────────────────
   function toFs(v){
@@ -289,20 +313,29 @@
 
   // ── TRASH SUBCOLLECTION ────────────────────────────────────────────
   window._fbWriteTrashItem = async (id, item) => {
-    await fsPatch('panel/trash/items/' + id, item);
+    await fsPatch(trashPath(id), item);
   };
   window._fbDeleteTrashItem = async (id) => {
-    await fsDel('panel/trash/items/' + id);
+    await fsDel(trashPath(id));
   };
 
   // ── FORM CONFIG SNAPSHOTS ──────────────────────────────────────────
   window._fbSaveFormConfig = async (id, snap) => {
-    await fsPatch('panel/forms/configs/' + id, snap);
+    await fsPatch(formCfgPath(id), snap);
+  };
+
+  /* Anotar un fallo. Deliberadamente distinto de todo lo demás: NO reintenta,
+     NO marca nada como sucio y NO avisa si falla. Si el registro de errores
+     tropieza, se calla — reintentarlo justo cuando algo va mal es la forma
+     más rápida de convertir un fallo en una tormenta de escrituras. La
+     política (topes, deduplicación, qué se guarda) vive en errores.js. */
+  window._fbEscribirError = (id, doc) => {
+    fsPatch(erroresPath(id), doc).catch(() => {});
   };
 
   // ── TOKENS ────────────────────────────────────────────────────────
-  const tokPath = (id) => `panel/tokens/items/${id}`;
-  const tokCol  = () => `panel/tokens/items`;
+  const tokPath = (id) => `${RAIZ}/tokens/items/${id}`;
+  const tokCol  = () => `${RAIZ}/tokens/items`;
 
   window._fbSaveTok = async (tok) => {
     await fsPatch(tokPath(tok.id), tok);
