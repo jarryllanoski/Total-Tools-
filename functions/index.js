@@ -2,6 +2,7 @@
 
 const {setGlobalOptions} = require("firebase-functions");
 const {onRequest} = require("firebase-functions/https");
+const {defineSecret} = require("firebase-functions/params");
 const {initializeApp} = require("firebase-admin/app");
 const {getFirestore} = require("firebase-admin/firestore");
 const {getAuth} = require("firebase-admin/auth");
@@ -11,6 +12,8 @@ const comprobante = require("./comprobante");
 // Seleccion de datos del cliente recurrente (logica pura, testeable aparte).
 const clienteLookup = require("./clienteLookup");
 const {normalizarOlva} = require("./olvaNormalizar");
+// Puerta unica a la API de Shalom (lista blanca + traduccion).
+const shalomPuerta = require("./shalomPuerta");
 
 setGlobalOptions({maxInstances: 10});
 initializeApp();
@@ -21,6 +24,18 @@ const CFG_DOC = "panel/config";
 const SHIP_COL = "panel/shipments/items";
 const TOK_COL = "panel/tokens/items";
 const FORMCFG_COL = "panel/forms/configs";
+
+// La clave de Shalom vive en Secret Manager. Nunca en el codigo ni en el
+// navegador. Se pone con: firebase functions:secrets:set SHALOM_API_KEY
+const SHALOM_API_KEY = defineSecret("SHALOM_API_KEY");
+
+// ⚠️ ESTA LISTA DEBE COINCIDIR CON firestore.rules (funcion esAdmin).
+// Son dos archivos distintos que expresan la misma regla: si se cambian por
+// separado, alguien puede escribir en Firestore pero no hablar con Shalom, o
+// al reves. Al tocar una, tocar la otra.
+const ADMINS = [
+  "admin@totaltools.com",
+];
 
 // ── CORS ───────────────────────────────────────────────────────────────────
 const ALLOWED_ORIGINS = [
@@ -659,3 +674,75 @@ exports.extraerComprobante = onRequest(
 //   · La etiqueta del pedido (`status`) no se toca nunca: informar si, decidir
 //     por el operador no.
 //   · Un envio no desanda el camino (ver docs/INVARIANTES.md, 2 bis).
+
+// ── shalomPuerta ───────────────────────────────────────────────────────────
+// POST {op}  →  la unica via del panel hacia Shalom.
+//
+// CUATRO BARRERAS, en este orden y todas obligatorias:
+//   1. POST con token de Firebase Auth valido        → si no: SIN_SESION
+//   2. Correo en ADMINS (la misma lista que las reglas) → si no: SIN_PERMISO
+//   3. La operacion esta en la lista blanca          → si no: NO_PERMITIDO
+//   4. Recien entonces se usa la clave, del lado servidor
+//
+// Los codigos HTTP son de las BARRERAS (401/403/405). Lo que pase con Shalom
+// viaja siempre en 200 con {ok:false, motivo}: para el panel, "Shalom dijo que
+// no" no es un error de transporte, y mezclarlos fue lo que hizo que un fallo
+// de sesion se leyera como "tu plan vencio".
+//
+// Operaciones de hoy:
+//   {op:"validate"}            → {ok, valida, limite, usado, restante}
+//   {op:"esquema", de:"validate"} → la FORMA de la respuesta, sin valores
+exports.shalomPuerta = onRequest(
+    {region: "us-central1", secrets: [SHALOM_API_KEY], timeoutSeconds: 60},
+    async (req, res) => {
+      setCORS(req, res);
+      if (req.method === "OPTIONS") {
+        res.status(204).send("");
+        return;
+      }
+
+      // Las cuatro barreras viven en shalomPuerta.js para poder probarlas.
+      const paso = await shalomPuerta.barreras({
+        metodo: req.method,
+        authorization: req.get("Authorization"),
+        cuerpo: req.body,
+      }, {
+        verificar: (t) => getAuth().verifyIdToken(t),
+        admins: ADMINS,
+      });
+      if (paso.corte) {
+        res.status(paso.corte.http)
+            .json({ok: false, motivo: paso.corte.motivo});
+        return;
+      }
+      const destino = paso.destino;
+      const diagnostico = paso.diagnostico;
+
+      // 4 · recien aqui aparece la clave
+      try {
+        const r = await shalomPuerta.llamar(
+            destino, SHALOM_API_KEY.value(), paso.datos);
+        if (!r.ok) {
+          res.status(200).json({
+            ok: false, motivo: r.motivo, detalle: r.detalle, http: r.http,
+          });
+          return;
+        }
+        if (diagnostico) {
+          // Solo tipos, ni un valor: asi se escribe el contrato contra lo que
+          // la API devuelve de verdad sin que salga un dato de nadie.
+          res.status(200).json({ok: true, de: destino,
+            forma: shalomPuerta.forma(r.json)});
+          return;
+        }
+        res.status(200).json(shalomPuerta.traducirValidate(r.json));
+      } catch (e) {
+        console.error("shalomPuerta error:", e);
+        res.status(200).json({
+          ok: false,
+          motivo: "ERROR_SHALOM",
+          detalle: shalomPuerta.sanear(e && e.message),
+        });
+      }
+    },
+);

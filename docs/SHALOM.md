@@ -187,7 +187,93 @@ de Shalom:
 <script src="https://www.google.com/recaptcha/api.js?render=6LeGp5Et..."></script>
 ```
 
-## Estado: desconectada, se reconstruye endpoint por endpoint (13 sep 2026)
+## Estado: `/validate` conectado, el resto dormido (13 sep 2026)
+
+| Endpoint | Estado | Dónde |
+|---|---|---|
+| `GET /validate` | ✅ **conectado** | `functions/shalomPuerta.js` · `Shalom.validar()` |
+| `POST /track` | dormido | forma ya medida, arriba |
+| `POST /track/batch` | dormido | — |
+| `GET /agencies` | dormido | — |
+| `POST /instances/status` | dormido | forma ya medida, arriba |
+| alta de envío | dormido | — |
+
+`Shalom.DISPONIBLE` **sigue en false**. Lo miran el auto-check y el extractor
+de agencias, y lo que ellos necesitan es `consultarGuia` y `agencias`.
+Encenderlo ahora haría que el auto-check intentara consultar y fallara en cada
+tarjeta.
+
+### El camino, y por qué no hay otro
+
+```
+navegador → Cloud Function shalomPuerta → api.shalom-api.lat
+```
+
+El navegador **nunca** habla con Shalom. Hay una prueba que falla si alguna
+vez aparece una URL de Shalom en el código del panel.
+
+**Cuatro barreras, en este orden**, en `shalomPuerta.barreras()`:
+
+| # | Barrera | Si no |
+|---|---|---|
+| 1 | POST con token de Firebase Auth válido | `401 SIN_SESION` |
+| 2 | Correo en `ADMINS` (misma lista que `firestore.rules`) | `403 SIN_PERMISO` |
+| 3 | La operación está en `PERMITIDAS` | `NO_PERMITIDO` |
+| 4 | Recién entonces se usa la clave | — |
+
+> ⚠️ **El orden entre la 2 y la 3 no es cosmético.** Si la lista blanca se
+> mirara primero, a un desconocido se le respondería `NO_PERMITIDO` — y eso le
+> confirma qué operaciones existen. Un no-admin siempre se topa con
+> `SIN_PERMISO`, pida lo que pida. Hay una prueba dedicada; al reordenar las
+> barreras, falla.
+
+Las barreras viven en el módulo y no en `index.js` **para poder probarlas**.
+Un límite de seguridad sin pruebas es una intención.
+
+### Los códigos HTTP son de las barreras, no de Shalom
+
+Lo que pase con Shalom viaja siempre en **200** con `{ok:false, motivo}`.
+Mezclarlos fue lo que hizo que un fallo de sesión se leyera como *"tu plan
+venció"* y se fueran días revisando la cuenta equivocada.
+
+### El contrato de `GET /validate`
+
+```
+Shalom.validar() → {ok:true, valida:true, limite, usado, restante, ilimitado}
+                 → {ok:false, motivo:'BLOQUEADO'|'LIMITE'|'ERROR_SHALOM'|…}
+```
+
+> ⚠️ **`limite: null` con `ilimitado: true` es PLAN ILIMITADO, no "sin cuota".**
+> La documentación muestra `limit: 1000`; con plan ilimitado Shalom manda
+> `null` (contradicción 5 de `SHALOM-API.md`). Traducirlo a `0` diría lo
+> contrario de lo que pasa.
+
+Una clave rechazada (`valid:false`) se traduce a `BLOQUEADO`, no a un éxito con
+`valida:false`: para quien llama es lo mismo que estar bloqueado, y así hay una
+sola forma que manejar.
+
+### Cómo se mide el siguiente endpoint
+
+Desde el entorno donde se desarrolla **no se puede llamar a `shalom-api.lat`**
+(salida a internet restringida). Así que **mide la función desplegada**:
+
+```js
+await Shalom.esquema('validate')   // en la consola del panel
+```
+
+Devuelve la **forma** de la respuesta —qué campos vienen y de qué tipo— y **ni
+un solo valor**. Con eso se escribe el contrato contra lo que la API devuelve
+de verdad, sin que ningún dato de un cliente salga del servidor. La
+documentación y la realidad ya se contradijeron **seis veces**; esta es la
+herramienta para no volver a creerle a la documentación.
+
+Para añadir un endpoint: entra en `PERMITIDAS`, se mide con `esquema`, se
+escribe su `traducir…()` con pruebas, y recién entonces se enchufa el método
+en `shalom.js`.
+
+---
+
+## Antecedente: por qué se desconectó todo (13 sep 2026)
 
 Se retiró **toda** la lógica de API: el cliente (`functions/shalomApi.js`), los
 dos endpoints del backend (`shalomApi`, `shalomWebhook`) y la llamada directa

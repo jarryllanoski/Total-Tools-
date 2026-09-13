@@ -59,16 +59,68 @@
 (function (global) {
   'use strict';
 
-  /* Mientras la integración se rehace, TODA llamada responde lo mismo. No es
+  /* Los métodos que todavía no se han reconstruido responden lo mismo. No es
      un fallo: es el estado honesto del sistema, y la interfaz lo sabe leer. */
   var OFF = {ok: false, motivo: 'DESCONECTADO'};
   function _off() { return Promise.resolve(OFF); }
 
+  /* ── La única dirección hacia Shalom ────────────────────────────────────
+     El navegador NUNCA habla con api.shalom-api.lat. Habla con esta función,
+     que guarda la clave del lado servidor, exige que seas administrador y
+     solo acepta operaciones de una lista blanca. */
+  var FUNCION = 'https://us-central1-total-tools-24ce8.cloudfunctions.net/' +
+                'shalomPuerta';
+
+  /* El token de sesión, refrescado si está por vencer. Sin token no se
+     intenta siquiera: SIN_SESION es del panel, no de Shalom, y confundirlos
+     manda a revisar la cuenta de Shalom cuando lo que venció es tu sesión. */
+  function _token() {
+    try {
+      if (typeof global._authEnsureToken === 'function') {
+        return global._authEnsureToken().then(function (vale) {
+          return vale ? (localStorage.getItem('tt_id_token') || '') : '';
+        }).catch(function () { return ''; });
+      }
+      return Promise.resolve(localStorage.getItem('tt_id_token') || '');
+    } catch (e) {
+      return Promise.resolve('');
+    }
+  }
+
+  /* Una petición a la puerta. Nunca lanza: siempre resuelve con el contrato.
+     Los códigos HTTP son de las barreras; lo que diga Shalom llega en 200
+     dentro del cuerpo. */
+  function _pedir(cuerpo) {
+    return _token().then(function (tok) {
+      if (!tok) return {ok: false, motivo: 'SIN_SESION'};
+      return fetch(FUNCION, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + tok
+        },
+        body: JSON.stringify(cuerpo)
+      }).then(function (r) {
+        if (r.status === 401) return {ok: false, motivo: 'SIN_SESION'};
+        if (r.status === 403) return {ok: false, motivo: 'SIN_PERMISO'};
+        if (r.status === 405) return {ok: false, motivo: 'NO_PERMITIDO'};
+        return r.json().catch(function () {
+          return {ok: false, motivo: 'FORMATO_DESCONOCIDO'};
+        });
+      }).catch(function () {
+        return {ok: false, motivo: 'SIN_RED'};
+      });
+    });
+  }
+
   var Shalom = {
 
     /* Interruptor maestro. Lo miran el auto-check y el extractor de agencias
-       para no intentar siquiera. Se pone en true cuando los métodos de abajo
-       vuelvan a hablar con alguien. */
+       para no intentar siquiera.
+       SIGUE EN FALSE a propósito aunque `validar` ya funcione: lo que esos
+       dos necesitan es `consultarGuia` y `agencias`, y esos siguen apagados.
+       Se enciende cuando el seguimiento vuelva, no antes — encenderlo ahora
+       haría que el auto-check intentara consultar y fallara en cada tarjeta. */
     DISPONIBLE: false,
 
     /* ── Los métodos, en el orden en que se van a reconstruir ────────────
@@ -79,10 +131,23 @@
     consultarGuia: _off,     // 1 · POST /track
     ticket: _off,            // 2 · el PNG del ticket
     agencias: _off,          // 3 · GET /agencies
-    validar: _off,           // 4 · GET /validate  (clave y consumo del mes)
     estadoInstancia: _off,   // 5 · POST /instances/status
     registrar: _off,         // 6 · alta de envío
-    esquema: _off,           // diagnóstico: la FORMA de una respuesta, sin valores
+
+    /* ✅ CONECTADO · GET /validate — 2026-09-13
+       Dice si la clave sirve y cuánto se ha consumido. Es el primero a
+       propósito: no toca ni un envío, así que si algo está mal en la
+       autenticación se ve aquí y no a mitad de una consulta masiva.
+       → {ok:true, valida:true, limite, usado, restante, ilimitado}
+       ⚠️ `limite: null` con `ilimitado: true` es PLAN ILIMITADO, no "sin
+       cuota". La documentación muestra 1000; con plan ilimitado llega null. */
+    validar: function () { return _pedir({op: 'validate'}); },
+
+    /* Diagnóstico: la FORMA de la respuesta de un endpoint, sin un solo
+       valor dentro. Es la herramienta con la que se escribe cada contrato
+       contra lo que la API devuelve de verdad — la documentación y la
+       realidad ya se contradijeron seis veces. */
+    esquema: function (de) { return _pedir({op: 'esquema', de: de || 'validate'}); },
 
     /* Catálogo de cajas de Shalom (medidas oficiales de su app, ver
        docs/SHALOM.md). No son rangos: son cajas fijas, así que la regla

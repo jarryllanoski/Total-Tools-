@@ -1,10 +1,11 @@
 /**
  * La puerta única de Shalom.
  *
- * La integración está desconectada mientras se rehace endpoint por endpoint.
- * Estas pruebas cuidan lo que hace que desconectarla no rompa nada: que la
- * puerta responda siempre lo mismo, que ninguna pantalla se quede muda, y que
- * no vuelva a colarse una llamada directa a la API saltándose la puerta.
+ * La integración se rehace endpoint por endpoint: hoy `validate` está
+ * conectado y los otros cinco métodos siguen dormidos. Estas pruebas cuidan
+ * las dos mitades — que lo dormido siga respondiendo igual y no deje ninguna
+ * pantalla muda, y que lo conectado hable SOLO con la Cloud Function, nunca
+ * directo con la API (la clave es del servidor y ahí se queda).
  *
  * Ver docs/SHALOM.md.
  */
@@ -18,24 +19,105 @@ module.exports = async (t) => {
   E.cargar('shalom.js', win);
   const S = win.Shalom;
 
-  bloque('Mientras está desconectada, responde igual a todo');
+  bloque('Lo que aún no se ha reconstruido responde igual a todo');
   {
-    ok(S.DISPONIBLE === false, 'DISPONIBLE en false — lo miran el auto-check y el extractor');
-    const metodos = ['consultarGuia', 'ticket', 'agencias', 'validar',
-      'estadoInstancia', 'registrar', 'esquema'];
-    ok(metodos.every((m) => typeof S[m] === 'function'),
-        'los 7 métodos existen: nadie explota al llamarlos');
+    ok(S.DISPONIBLE === false,
+        'DISPONIBLE sigue en false aunque validar ya funcione: lo que miran ' +
+        'el auto-check y el extractor es consultarGuia y agencias');
+    const dormidos = ['consultarGuia', 'ticket', 'agencias',
+      'estadoInstancia', 'registrar'];
+    ok(dormidos.every((m) => typeof S[m] === 'function'),
+        'los 5 que faltan existen: nadie explota al llamarlos');
     // Se llaman DE VERDAD y se espera su respuesta. Comprobar solo que la
     // función existe dejaría pasar una que devuelve undefined.
-    const respuestas = await Promise.all(metodos.map((m) => S[m]()));
-    const malas = metodos.filter((m, i) => {
+    const respuestas = await Promise.all(dormidos.map((m) => S[m]()));
+    const malas = dormidos.filter((m, i) => {
       const r = respuestas[i];
       return !(r && r.ok === false && r.motivo === 'DESCONECTADO');
     });
     ok(malas.length === 0,
-        'los 7 devuelven {ok:false, motivo:"DESCONECTADO"}' +
+        'los 5 devuelven {ok:false, motivo:"DESCONECTADO"}' +
         (malas.length ? ' — fallan: ' + malas.join(', ') : ''));
     ok(respuestas.every((r) => !r.ok), 'ninguno devuelve ok:true sin dato real');
+  }
+
+  bloque('validate ya está conectado — y no habla directo con Shalom');
+  {
+    // Un panel completo de mentira: sesión, almacenamiento y red.
+    const montar = (op) => {
+      op = op || {};
+      const red = {llamadas: 0, url: null, cuerpo: null, cabeceras: null};
+      const win = {
+        _authEnsureToken: async () => op.sesion !== false
+      };
+      const extra = {
+        localStorage: {getItem: () => (op.sesion === false ? '' : 'TOKEN123')},
+        fetch: async (url, o) => {
+          red.llamadas++; red.url = url;
+          red.cabeceras = o.headers;
+          red.cuerpo = JSON.parse(o.body);
+          if (op.revienta) throw new Error('sin red');
+          return {
+            status: op.status || 200,
+            json: async () => {
+              if (op.noEsJson) throw new Error('no es json');
+              return op.json || {ok: true, valida: true};
+            }
+          };
+        }
+      };
+      E.cargar('shalom.js', win, extra);
+      return {S: win.Shalom, red};
+    };
+
+    {
+      const m = montar({});
+      const r = await m.S.validar();
+      ok(m.red.llamadas === 1, 'validar() llama a la puerta');
+      ok(String(m.red.url).indexOf('/shalomPuerta') > 0,
+          'a la Cloud Function, NUNCA a api.shalom-api.lat: la clave es del servidor');
+      ok(String(m.red.url).indexOf('shalom-api.lat') < 0,
+          'y no hay ni rastro del dominio de Shalom en el navegador');
+      ok(m.red.cuerpo.op === 'validate', 'pidiendo la operación por nombre');
+      ok(m.red.cabeceras.Authorization === 'Bearer TOKEN123',
+          'con el token de sesión: la función no atiende a desconocidos');
+      ok(r.ok === true, 'y devuelve lo que respondió la puerta');
+    }
+
+    {
+      const m = montar({sesion: false});
+      const r = await m.S.validar();
+      ok(r.ok === false && r.motivo === 'SIN_SESION', 'sin sesión: SIN_SESION');
+      ok(m.red.llamadas === 0,
+          'y ni se intenta — SIN_SESION es del panel, no de Shalom');
+    }
+
+    {
+      const m = montar({status: 401});
+      ok((await m.S.validar()).motivo === 'SIN_SESION', 'un 401 es tu sesión');
+    }
+    {
+      const m = montar({status: 403});
+      ok((await m.S.validar()).motivo === 'SIN_PERMISO',
+          'un 403 es tu cuenta, no la clave de Shalom: son cosas distintas');
+    }
+    {
+      const m = montar({revienta: true});
+      ok((await m.S.validar()).motivo === 'SIN_RED', 'si no hay red, se dice');
+    }
+    {
+      const m = montar({noEsJson: true});
+      ok((await m.S.validar()).motivo === 'FORMATO_DESCONOCIDO',
+          'una respuesta que no se puede leer no es un éxito');
+    }
+    {
+      const m = montar({});
+      await m.S.esquema();
+      ok(m.red.cuerpo.op === 'esquema' && m.red.cuerpo.de === 'validate',
+          'el diagnóstico pide la forma de validate por defecto');
+      await m.S.esquema('track');
+      ok(m.red.cuerpo.de === 'track', 'o la del endpoint que se le pida');
+    }
   }
 
   bloque('Lo local sigue vivo sin conexión');
