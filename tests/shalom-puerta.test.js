@@ -244,6 +244,25 @@ module.exports = async ({bloque, ok}) => {
     ok(r.usado === 137, 'y el consumo se conserva igual');
   }
 
+  {
+    // LA FORMA REAL, medida contra la API el 13 sep 2026. Son SEIS campos, no
+    // los cuatro de la documentación: userId y message no aparecen en ella.
+    const real = {valid: true, userId: 'u_123', limit: null,
+      currentUsage: 0, remaining: null, message: 'API key válida'};
+    const r = tv(real);
+    ok(r.ok === true, 'la respuesta REAL de la API se traduce');
+    ok(r.mensaje === 'API key válida',
+       'se devuelve lo que Shalom dice de la clave: sus palabras antes que las mías');
+    ok(!('userId' in r),
+       'userId NO viaja al navegador: ninguna pantalla lo necesita');
+    ok(r.usado === 0 && r.ilimitado === true, 'y el resto sale bien');
+  }
+  ok(tv({valid: true, campoNuevo: 1, limit: 5, currentUsage: 1,
+    remaining: 4}).ok === true,
+     'un campo que Shalom añada mañana no rompe nada: lo desconocido se ignora');
+  ok(tv({valid: true, limit: 5, currentUsage: 1, remaining: 4}).mensaje === null,
+     'y si no manda message, se dice null en vez de inventar un texto');
+
   bloque('El esquema describe la forma, sin un solo valor');
 
   {

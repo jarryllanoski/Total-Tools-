@@ -236,7 +236,33 @@ Lo que pase con Shalom viaja siempre en **200** con `{ok:false, motivo}`.
 Mezclarlos fue lo que hizo que un fallo de sesión se leyera como *"tu plan
 venció"* y se fueran días revisando la cuenta equivocada.
 
-### El contrato de `GET /validate`
+### El contrato de `GET /validate` — medido, no supuesto
+
+**Lo que devuelve de verdad** (medido contra la API el 13 sep 2026 con
+`Shalom.esquema('validate')`):
+
+| Campo | Tipo real | ¿En la documentación? |
+|---|---|---|
+| `valid` | `boolean` | sí |
+| `userId` | `string` | **no** |
+| `limit` | `null` | sí, pero como número (`1000`) |
+| `currentUsage` | `number` | sí |
+| `remaining` | `null` | sí, pero como número |
+| `message` | `string` | **no** |
+
+Seis campos, no los cuatro documentados. `userId` y `message` no aparecen en
+ninguna parte de `SHALOM-API.md`.
+
+**Qué se hace con cada uno:**
+
+- `message` **se devuelve**: es lo que Shalom dice de tu clave, y mostrar sus
+  palabras es mejor que inventar las mías.
+- `userId` **no**: es un identificador de la cuenta que ninguna pantalla
+  necesita, y lo que no hace falta no viaja al navegador.
+- Lo desconocido **se ignora**: si Shalom añade un campo mañana, esto sigue
+  funcionando en vez de romperse.
+
+### La forma que ve el panel
 
 ```
 Shalom.validar() → {ok:true, valida:true, limite, usado, restante, ilimitado}

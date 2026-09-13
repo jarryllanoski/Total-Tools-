@@ -94,8 +94,20 @@ function forma(v, prof) {
  *
  * ⚠️ `limite` en null significa PLAN ILIMITADO, no "sin cuota". La
  * documentación muestra `limit: 1000`, pero con plan ilimitado Shalom manda
- * `null` (contradicción 5 de docs/SHALOM-API.md). Convertirlo a 0 diría lo
- * contrario de lo que pasa.
+ * `null` — y `remaining` también (contradicción 5 de SHALOM-API.md, medida el
+ * 13 sep 2026 contra la API real). Convertirlo a 0 diría lo contrario.
+ *
+ * FORMA REAL MEDIDA — seis campos, no los cuatro documentados:
+ *   valid:boolean · userId:string · limit:null · currentUsage:number
+ *   · remaining:null · message:string
+ *
+ * `userId` y `message` NO están en la documentación. `message` se devuelve
+ * (es lo que Shalom dice de tu clave, y mostrar sus palabras es mejor que
+ * inventar las mías). `userId` NO: es un identificador de la cuenta que
+ * ninguna pantalla necesita, y lo que no hace falta no viaja al navegador.
+ *
+ * Los campos que no se reconocen se ignoran a propósito: si Shalom añade uno
+ * mañana, esto sigue funcionando en vez de romperse.
  * @param {*} j cuerpo JSON de Shalom
  * @return {Object} respuesta del contrato
  */
@@ -117,6 +129,7 @@ function traducirValidate(j) {
     usado: num(j.currentUsage),
     restante: num(j.remaining),
     ilimitado: j.limit === null,
+    mensaje: typeof j.message === "string" ? j.message : null,
   };
 }
 
