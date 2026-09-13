@@ -25,6 +25,11 @@
 
 const BASE = "https://api.shalom-api.lat";
 const TIEMPO_MAX_MS = 20000;
+// Hasta dónde baja el diagnóstico. Con 4 se cortaba justo donde hacía falta:
+// `statuses.data.entregado.cliente` salía como "objeto" a secas, y ahí es
+// donde vive quién recibió el paquete. Describir tipos no pesa nada; quedarse
+// corto obliga a otra ronda de despliegue y medición.
+const PROF_MAX = 8;
 
 /**
  * Lo único que se puede pedir. Añadir una entrada aquí es una decisión
@@ -76,13 +81,13 @@ function forma(v, prof) {
   prof = prof || 0;
   if (v === null) return "null";
   if (Array.isArray(v)) {
-    if (prof >= 4) return "array";
+    if (prof >= PROF_MAX) return "array";
     return "array[" + v.length + "] de " +
       (v.length ? JSON.stringify(forma(v[0], prof + 1)) : "?");
   }
   const t = typeof v;
   if (t !== "object") return t;
-  if (prof >= 4) return "objeto";
+  if (prof >= PROF_MAX) return "objeto";
   const o = {};
   Object.keys(v).slice(0, 40).forEach((k) => {
     o[k] = forma(v[k], prof + 1);

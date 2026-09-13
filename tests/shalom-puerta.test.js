@@ -306,6 +306,17 @@ module.exports = async ({bloque, ok}) => {
        'sí los tipos');
     ok(String(f.lista).indexOf('array[1]') === 0, 'y cuántos elementos hay');
   }
-  ok(JSON.stringify(P.forma({a: {b: {c: {d: {e: 1}}}}})).length < 200,
-     'no se hunde en objetos muy anidados');
+  {
+    // Baja lo suficiente: con el corte anterior (4), la rama
+    // `statuses.data.entregado.cliente` de /track salía como "objeto" a secas
+    // — y ahí es donde vive quién recibió el paquete.
+    const hondo = {statuses: {data: {entregado: {cliente: {nombre: 'x',
+      documento: '123'}}}}};
+    const f = JSON.stringify(P.forma(hondo));
+    ok(f.indexOf('nombre') > 0 && f.indexOf('documento') > 0,
+       'llega hasta statuses.data.entregado.cliente, que es donde hacía falta');
+    ok(f.indexOf('123') < 0 && f.indexOf('"x"') < 0, 'y sigue sin traer valores');
+  }
+  ok(JSON.stringify(P.forma({a: {b: {c: {d: {e: {f: {g: {h: {i: 1}}}}}}}}}))
+      .indexOf('objeto') > 0, 'pero tiene fondo: no se hunde para siempre');
 };
