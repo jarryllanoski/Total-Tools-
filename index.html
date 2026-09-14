@@ -112,11 +112,22 @@
     const h=await _authHeaders();
     const r=await fetch(`${BASE}/${path}?key=${KEY}`,{headers:h});
     if(r.status===404) return null;
-    if(!r.ok) throw new Error(await r.text());
+    if(!r.ok) throw _errorFs(r, await r.text());
     const doc=await r.json();
     if(!doc.fields) return null;
     const o={};Object.keys(doc.fields).forEach(k=>{o[k]=fromFs(doc.fields[k])});
     return o;
+  }
+
+  /* Un error de Firestore que SÍ dice qué pasó.
+     Sin el código HTTP, un 403 —esta sesión ya no tiene permiso— se veía igual
+     que un corte de red, y el panel decía "sin conexión" cuando lo que había
+     vencido era la sesión. Mandar a revisar el internet por un problema de
+     permisos es el mismo error de mezclar dos lados que costó días en Shalom. */
+  function _errorFs(r, texto){
+    const e = new Error('Firestore ' + r.status + ' ' + String(texto).slice(0, 200));
+    e.http = r.status;
+    return e;
   }
 
   async function fsPatch(path,obj){
@@ -141,7 +152,7 @@
       headers:h,
       body:JSON.stringify({fields})
     });
-    if(!r.ok) throw new Error(await r.text());
+    if(!r.ok) throw _errorFs(r, await r.text());
   }
   /* ── ESCRITURA POR TANDAS ────────────────────────────────────────────
      Antes, guardar todo era `Promise.all` de un fsPatch por documento: con
@@ -293,7 +304,7 @@
     const h=await _authHeaders();
     const r=await fetch(`${BASE}/${path}?key=${KEY}`,{method:'DELETE',headers:h});
     // 404 = el documento ya no existe → tratar como borrado exitoso
-    if(!r.ok && r.status!==404) throw new Error('fsDel HTTP '+r.status); // ★ Mejora 1: ahora el reintento sí funciona
+    if(!r.ok && r.status!==404) throw _errorFs(r, 'fsDel'); // ★ Mejora 1: ahora el reintento sí funciona
   }
   async function fsList(col){
     const h=await _authHeaders();
@@ -304,7 +315,7 @@
     do{
       const url=`${BASE}/${col}?key=${KEY}&pageSize=300${pageToken?'&pageToken='+encodeURIComponent(pageToken):''}`;
       const r=await fetch(url,{headers:h});
-      if(!r.ok) throw new Error('fsList HTTP '+r.status);
+      if(!r.ok) throw _errorFs(r, 'fsList');
       const data=await r.json();
       (data.documents||[]).forEach(doc=>{
         const o={};
@@ -1443,7 +1454,7 @@
 
 <div class="toast" id="toastEl"></div>
 
-<script src="auth.js?v=5"></script>
+<script src="auth.js?v=6"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
 <script>
@@ -1668,6 +1679,17 @@ async function _fbSaveWithRetry(data, attempt){
     // había pintado 'ok' ANTES de que esta línea limpiara la bandera.
     window._fbStatus && window._fbStatus('ok');
   } catch(e) {
+    // Un 403 al guardar es la misma sesión vencida: se marca pendiente (lo que
+    // no subió sobrevive) y se pide entrar de nuevo, en vez de gastar cuatro
+    // intentos que van a fallar igual.
+    if(e && e.http === 403){
+      lsSet('dpanel_pending', '1');
+      window._fbStatus && window._fbStatus('err');
+      if(window._authExpulsar){
+        window._authExpulsar('Tu sesión venció. Ingresa de nuevo — tus cambios están guardados aquí y se subirán al entrar.');
+      }
+      return;
+    }
     if(attempt < 3){
       const delay = [3000, 8000, 20000][attempt];
       setTimeout(() => _fbSaveWithRetry(data, attempt+1), delay);
@@ -1835,6 +1857,20 @@ const _initFirebase = async (intento) => {
   } catch(e) {
     // ★ La carga FALLÓ (no es "vacío"). NO tocar la nube: jamás subir local aquí.
     console.warn('Firebase init error (intento '+intento+'):', e);
+    /* ★ 403 = PERMISSION_DENIED. No es la red: es que esta sesión ya no tiene
+       permiso, casi siempre porque venció (auth.js corta a las 12 h). El
+       control de vencimiento solo corría AL CARGAR la página, así que si la
+       sesión moría con el panel abierto nadie se enteraba: salía "Sin conexión
+       a Firebase" y a revisar el internet.
+       Reintentar un 403 cuatro veces no lo arregla — solo llena la consola. */
+    if(e && e.http === 403){
+      if(window._authExpulsar){
+        window._authExpulsar('Tu sesión venció. Ingresa de nuevo.');
+      } else {
+        toast('⚠️ Tu sesión venció. Ingresa de nuevo.');
+      }
+      return;
+    }
     if(intento < 4){
       // Reintentar la carga; no nos quedamos con local viejo en pantalla sin avisar
       const delay = [2000, 5000, 10000, 20000][intento];

@@ -237,17 +237,47 @@
      cuando de verdad hace falta; al cerrarla no queda rastro. */
   var CLAVES_DATOS = ['dpanel', 'dpanel_pending', 'dpanel_last_sync', 'dpanel_dirty'];
 
-  function _clearSession(){
+  /* ¿Quedó algo sin subir a la nube? Se mira el registro que deja save():
+     si hay ids ahí, son cambios que viven SOLO en este navegador.
+     Devuelve -1 cuando el registro dice "subir todo" y no se puede contar. */
+  function _pendientes(){
+    try {
+      var raw = localStorage.getItem('dpanel_dirty');
+      if(!raw) return 0;
+      var o = JSON.parse(raw);
+      if(o && o.all) return -1;
+      return ((o && o.s) || []).length + ((o && o.p) || []).length;
+    } catch(e){ return 0; }
+  }
+
+  function _clearSession(conservarDatos){
     localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem(EXPIRY_KEY);
     localStorage.removeItem(EMAIL_KEY);
     localStorage.removeItem(INICIO_KEY);   // sin esto, el próximo ingreso
     localStorage.removeItem('tt_id_token'); // heredaría la hora vieja y
                                             // vencería al instante: bucle.
+    if(conservarDatos) return;   // ver _expulsar()
     CLAVES_DATOS.forEach(function(k){
       try { localStorage.removeItem(k); } catch(e){}
     });
   }
+
+  /* SESIÓN VENCIDA A MITAD DE TRABAJO — no es lo mismo que cerrar sesión.
+     Cerrar sesión es una decisión: se borra todo, incluidos los datos de
+     clientes cacheados. Vencer es un accidente, y la misma persona va a
+     volver a entrar en diez segundos. Si aquí se borrara el respaldo, un
+     cambio que no alcanzó a subir desaparecería sin que nadie lo decidiera.
+
+     Por eso los datos se conservan SOLO si hay algo pendiente. Si no hay
+     nada pendiente son una copia sin valor y se borran, que es lo que
+     protege la privacidad cuando alguien se sienta en la PC. */
+  function _expulsar(msg){
+    _clearSession(_pendientes() !== 0);
+    _showLogin();
+    _showErr(msg || 'Tu sesión venció. Ingresa de nuevo.');
+  }
+  window._authExpulsar = _expulsar;
 
   function _isValidSession(){
     var token  = localStorage.getItem(TOKEN_KEY);
@@ -296,10 +326,12 @@
       // podría iniciar sesión (el login necesita internet) y encima perdería
       // los datos locales justo durante el corte. Sin red se deja seguir y se
       // vuelve a evaluar cuando la conexión regrese.
+      // ★ Por _expulsar(), no por _clearSession() a secas: si quedó algo sin
+      //   subir, el respaldo se conserva. Vencer la sesión con el panel
+      //   cerrado y perder por eso un cambio que nunca llegó a la nube sería
+      //   una pérdida que nadie decidió.
       if(_sesionVencida() && navigator.onLine !== false){
-        _clearSession();
-        _showLogin();
-        _showErr('Tu sesión venció. Ingresa de nuevo.');
+        _expulsar('Tu sesión venció. Ingresa de nuevo.');
         return;
       }
       // Si ya tiene sesión válida, mostrar app directamente
@@ -317,7 +349,10 @@
       // deben quedar datos del negocio en el navegador. Si en cambio fue falta
       // de red ('sin_red'), NO se borra nada: puede ser una sesión sana sin
       // internet, y ese es justo el caso en que el modo sin conexión sirve.
-      if(res === 'rechazado') _clearSession();
+      // Misma regla que en _expulsar(): si hay algo sin subir, el respaldo se
+      // conserva. Un token rechazado mata la sesión, no el trabajo de quien la
+      // tenía — y esa persona va a volver a entrar.
+      if(res === 'rechazado') _clearSession(_pendientes() !== 0);
       _showLogin();
     },
 
@@ -372,6 +407,20 @@
     },
 
     logout(){
+      /* Cerrar sesión BORRA el respaldo local, y con él lo que no alcanzó a
+         subir. Antes se hacía en silencio: un cambio hecho sin conexión se
+         perdía por cerrar sesión, sin aviso y sin forma de recuperarlo. */
+      var n = _pendientes();
+      if(n !== 0){
+        var cuantos = n < 0 ? 'Hay cambios' :
+          ('Hay ' + n + ' cambio' + (n !== 1 ? 's' : ''));
+        var seguir = window.confirm(
+            cuantos + ' sin sincronizar con la nube.\n\n' +
+            'Cerrar sesión borra el respaldo local y esos cambios SE PIERDEN.\n' +
+            'Si esperas a que el punto de Firebase se ponga verde, se guardan.\n\n' +
+            '¿Cerrar sesión igual?');
+        if(!seguir) return;
+      }
       _clearSession();
       location.reload();
     }
@@ -409,12 +458,17 @@
 
   /* ── INIT AUTOMÁTICO ─────────────────────────────────────────────── */
   // Esperar a que el DOM esté listo
+  /* `window.AuthModule.init()` y no `AuthModule.init()`. En el navegador las
+     dos funcionan —una propiedad de window es un nombre global—, pero apoyarse
+     en eso ya salió caro dos veces en este proyecto: `save` declarado con
+     const que no llegaba a window, y `Seleccion` usado sin prefijo desde el
+     repintado. Escribirlo explícito cuesta siete letras. */
   if(document.readyState === 'loading'){
     document.addEventListener('DOMContentLoaded', function(){
-      AuthModule.init();
+      window.AuthModule.init();
     });
   } else {
-    AuthModule.init();
+    window.AuthModule.init();
   }
 
 })();

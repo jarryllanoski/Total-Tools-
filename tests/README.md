@@ -27,6 +27,7 @@ rompió de verdad** y no queremos que vuelva:
 | `guardado.test.js` | Guardar disparaba 971 peticiones a la vez: Firestore devolvía 429, el reintento las repetía enteras y la conexión se caía. Y un cambio que no lograba subir se perdía al cerrar la pestaña. Incluye que el endpoint sea `:commit` y nunca `:batchWrite`, que da 403 desde el navegador |
 | `shalom-puerta.test.js` | La puerta del servidor: que la clave no salga ni dentro de un mensaje de error, que solo se pueda pedir lo de la lista blanca, y que a un desconocido no se le confirme qué operaciones existen |
 | `guias.test.js` | Una guía con un dígito de más lleva semanas sin rastrearse y nadie se entera: un número mal escrito no da error, da silencio. Y la misma guía en dos pedidos, que unas veces es a propósito y otras un tipeo |
+| `sesion.test.js` | La sesión venció a las 12 h con el panel abierto y el panel dijo "sin conexión": a revisar el internet por un problema de permisos. Y cerrar sesión borraba en silencio los cambios que no habían subido |
 
 ## Que la prueba pueda fallar no se supone: se comprueba
 

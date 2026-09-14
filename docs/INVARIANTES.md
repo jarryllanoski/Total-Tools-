@@ -428,6 +428,44 @@ habría abierto exactamente el hueco que tapaba.
 > Los otros cuatro usos de `_fbSaveShipmentNow` (seguimiento y reparto) **se
 > quedan**: ahí no hay un `save()` detrás, así que no duplican nada.
 
+### Vencer la sesión no es cerrar sesión
+
+Son dos cosas distintas y hasta ahora hacían lo mismo: borrarlo todo.
+
+| | Qué es | Qué pasa con el respaldo local |
+|---|---|---|
+| **Cerrar sesión** | una decisión | se borra siempre — **pero avisa antes si hay algo sin subir** |
+| **Vencer** (12 h, o token rechazado) | un accidente | se conserva **solo si hay algo pendiente** |
+
+La regla del medio es la que importa: quien vence va a volver a entrar en diez
+segundos. Si al vencer se borrara el respaldo, **un cambio que nunca llegó a la
+nube desaparecería sin que nadie lo decidiera**. Y si no hay nada pendiente, el
+respaldo es una copia sin valor y se borra — que es lo que protege los nombres
+y DNI de los clientes cuando alguien se sienta en la PC.
+
+Todo pasa por `_expulsar()` en `auth.js`. Los tres caminos que vencían una
+sesión llamaban a `_clearSession()` a secas: al arrancar, al rechazarse el
+token y (nuevo) ante un 403.
+
+### Un 403 de Firestore es tu sesión, no la red
+
+`PERMISSION_DENIED` significa que **esta sesión ya no tiene permiso**, casi
+siempre porque venció. El control de las 12 h solo corría **al cargar la
+página**: si la sesión moría con el panel abierto, Firestore empezaba a
+responder 403 y el panel decía *"Sin conexión a Firebase"* — a revisar el
+internet por un problema de permisos.
+
+Ahora los errores de Firestore llevan su código HTTP (`e.http`), y ante un 403:
+
+- se dice **"Tu sesión venció"** y se muestra el login;
+- **no se reintenta** — cuatro intentos no arreglan un permiso;
+- al guardar, se marca `dpanel_pending` primero, y el aviso dice que los
+  cambios están a salvo. Quien lee "sesión vencida" sin eso cree que perdió su
+  trabajo.
+
+> Es el mismo error que costó días en Shalom —mezclar el lado del panel con el
+> del proveedor— aquí en Firebase. Un 5xx **sí** se reintenta: ese sí es la red.
+
 ### `dpanel_pending` tiene que ponerse en `'1'`
 
 Esta bandera se **leía** en dos sitios y **nadie la escribía nunca** en `'1'`.

@@ -131,8 +131,9 @@ function montarPersistencia(op) {
 function montarReintento(op) {
   const almacen = op.almacen || {};
   const pendientes = [];
-  const win = { _estados: [] };
+  const win = { _estados: [], _expulsado: null };
   win._fbStatus = function (s) { win._estados.push(s); };
+  win._authExpulsar = function (m) { win._expulsado = m || 'sí'; };
   win._fbSave = op.guardar;
   const ctx = {
     window: win,
@@ -184,7 +185,19 @@ function montarInit(op) {
   const almacen = op.almacen || {};
   const subidas = [];
   const S = { shipments: op.locales || [], suppliers: [], config: { name: op.nombre || 'Mi Negocio' } };
-  const win = { _fbLoad: async () => op.remoto, _mergeRemote: () => {}, _fbListen: () => {} };
+  const reintentos = [];
+  const win = {
+    _fbLoad: async () => {
+      if (op.cargaFalla) {
+        const e = new Error('Firestore ' + op.cargaFalla);
+        e.http = op.cargaFalla;
+        throw e;
+      }
+      return op.remoto;
+    },
+    _mergeRemote: () => {}, _fbListen: () => {}, _expulsado: null
+  };
+  win._authExpulsar = function (m) { win._expulsado = m || 'sí'; };
   const ctx = {
     window: win, S,
     document: { getElementById: () => null },
@@ -194,14 +207,14 @@ function montarInit(op) {
     _huboSuciosGuardados: !!op.recuperoSucios,
     console: { warn: () => {} },
     toast: () => {},
-    setTimeout: () => {},
+    setTimeout: (fn, ms) => { reintentos.push(ms); },
     salida: {}
   };
   const codigo = INIT + '\nsalida.init = _initFirebase;' +
                  '\nsalida.dirtyAll = function(){ return _dirtyAll; };';
   const n = Object.keys(ctx);
   new Function(...n, codigo)(...n.map((k) => ctx[k]));
-  return { api: ctx.salida, subidas };
+  return { api: ctx.salida, subidas, win, reintentos };
 }
 
 /* ═══════════════════════════════════════════════════════════════════════ */
@@ -367,6 +380,43 @@ module.exports = async function ({ bloque, ok }) {
   const i5 = montarInit({ remoto: null, locales: [] });
   await i5.api.init();
   ok(i5.subidas.length === 0, 'nube vacía y nada local: no se sube nada');
+
+  bloque('Un 403 es tu sesión, no la red');
+
+  {
+    /* auth.js corta la sesión a las 12 h, y ese control solo corría AL CARGAR
+       la página. Si la sesión moría con el panel abierto, Firestore empezaba a
+       responder 403 y el panel decía "Sin conexión a Firebase" — a revisar el
+       internet por un problema de permisos. Pasó de verdad. */
+    const i = montarInit({cargaFalla: 403});
+    await i.api.init();
+    ok(i.win._expulsado, 'un 403 al cargar dice que la sesión venció');
+    ok(String(i.win._expulsado).toLowerCase().indexOf('sesión') >= 0,
+       'y lo dice con esas palabras, no con "sin conexión"');
+    ok(i.reintentos.length === 0,
+       'y no se reintenta: cuatro intentos no arreglan un problema de permisos');
+    ok(i.subidas.length === 0, 'ni se sube nada a una nube que nos rechaza');
+  }
+  {
+    const i = montarInit({cargaFalla: 503});
+    await i.api.init();
+    ok(!i.win._expulsado, 'un 503 NO es tu sesión: no se expulsa a nadie');
+    ok(i.reintentos.length === 1, 'ese sí se reintenta');
+  }
+  {
+    let intentos = 0;
+    const r = montarReintento({guardar: async () => {
+      intentos++;
+      const e = new Error('denegado'); e.http = 403; throw e;
+    }});
+    await r.api.reintentar({}, 0); await r.drenar();
+    ok(intentos === 1, 'guardando, un 403 tampoco se reintenta cuatro veces');
+    ok(r.almacen.dpanel_pending === '1',
+       'pero queda marcado pendiente: lo que no subió no se pierde');
+    ok(r.win._expulsado, 'y se pide entrar de nuevo');
+    ok(String(r.win._expulsado).indexOf('se subirán') > 0,
+       'diciendo que los cambios están a salvo — si no, uno cree que los perdió');
+  }
 
   bloque('Lo que no subió sobrevive al cierre de la pestaña');
 
