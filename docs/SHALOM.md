@@ -338,6 +338,37 @@ automático sí la mira, y no se enciende hasta que la calibración esté hecha:
 encenderlo antes es soltar 484 consultas confiando en un traductor sin
 comprobar.
 
+### Calibración del 14 sep 2026 — 15 guías vivas reales
+
+No se dio por bueno el traductor hasta contrastarlo contra guías de verdad:
+
+| Resultado | |
+|---|---|
+| Traducidas correctamente | **14 de 15** |
+| `94578959` (retorno a origen) | `NO_ENCONTRADO` — correcto: Shalom no tiene seguimiento de esa guía |
+| Guías con `demora` | **7**, y **ninguna** apareció retrocedida |
+| Formato de fecha | `YYYY-MM-DD HH:MM:SS`, confirmado |
+
+La fila de `92760569` es la que cierra el caso: llegó con **demora Y entregado
+a la vez**. Es exactamente la combinación que antes se mostraba como *"Demora
+de envíos"* encima de un Entregado. Ahora dice Entregado.
+
+Tres pedidos quedaron detectados como desactualizados en el panel
+(`92760569` y `94391161` → Entregado; `95045598` → En destino).
+
+### Por qué el barrido del navegador NO se enciende
+
+`autoTrackingCheck()` (en `tracking.js`) tiene dos trancas: `AUTO_CHECK_ACTIVO`
+y `Shalom.DISPONIBLE`. **Las dos siguen en false, y es definitivo, no
+provisional.**
+
+Ese barrido consulta **al abrir el panel**: con ~70 guías vivas son ~70
+consultas en cada apertura, y el doble si se abre en la PC y en el celular.
+Peor: no corre si nadie abre el panel, que es justo cuando hace falta.
+
+La Fase 3 lo reemplaza por un barrido **en el servidor**, con horario
+configurable, que corre solo. Cuando esté, este ciclo se borra.
+
 ### Cómo se mide el siguiente endpoint
 
 Desde el entorno donde se desarrolla **no se puede llamar a `shalom-api.lat`**
