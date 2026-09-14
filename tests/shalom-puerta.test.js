@@ -369,7 +369,30 @@ module.exports = async ({bloque, ok}) => {
      'SIN_DATO', 'una fecha en blanco tampoco cuenta como paso');
   ok(tt({statuses: {success: false, message: 'no existe'}}).motivo ===
      'NO_ENCONTRADO', 'success:false es una guía que no existe');
-  ok(tt({}).motivo === 'FORMATO_DESCONOCIDO', 'sin statuses no sabemos qué nos dijeron');
+  {
+    /* LA FORMA REAL de una guía sin seguimiento, medida con 94578959 (un
+       retorno a origen): statuses viene null y search solo trae message y
+       success, sin data. */
+    const r = tt({search: {message: 'No se encontró información', success: false},
+      statuses: null});
+    ok(r.motivo === 'NO_ENCONTRADO',
+       'statuses:null es "no tengo seguimiento de esa guía", no una respuesta rara');
+    ok(r.motivo !== 'FORMATO_DESCONOCIDO',
+       'y la diferencia importa: uno manda a revisar la guía, el otro la integración');
+    ok(r.detalle === 'No se encontró información',
+       'con lo que dijo Shalom, que es lo que le explicas al cliente');
+    ok(r.ok === false, 'y sin estado: nada que escribir encima de lo que ya había');
+  }
+  ok(tt({search: {message: 'x', success: false}}).motivo === 'NO_ENCONTRADO',
+     'igual si statuses ni siquiera viene');
+  ok(tt({statuses: {success: true, data: null, message: 'sin datos'}}).motivo ===
+     'NO_ENCONTRADO', 'y si falta el árbol un nivel más abajo');
+  ok(tt({statuses: 'raro'}).motivo === 'FORMATO_DESCONOCIDO',
+     'pero un statuses que es TEXTO sí es no entender la respuesta');
+  ok(tt({statuses: {success: true, data: 'raro'}}).motivo === 'FORMATO_DESCONOCIDO',
+     'y un árbol que es texto también');
+  ok(tt({}).motivo === 'FORMATO_DESCONOCIDO',
+     'un cuerpo vacío no dice "no encontrado": no dice nada, y afirmarlo sería inventar');
   ok(tt({statuses: [{}]}).motivo === 'FORMATO_DESCONOCIDO',
      'y si llegara como ARRAY —que es lo que dice la documentación— tampoco: ' +
      'lo medido es un objeto, y aceptar las dos formas es adivinar');

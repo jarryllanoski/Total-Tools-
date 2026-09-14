@@ -292,12 +292,33 @@ function traducirTrack(j) {
   const raro = {ok: false, motivo: "FORMATO_DESCONOCIDO"};
   if (!j || typeof j !== "object" || Array.isArray(j)) return raro;
   const st = j.statuses;
-  if (!st || typeof st !== "object" || Array.isArray(st)) return raro;
+
+  /* SIN SEGUIMIENTO NO ES LO MISMO QUE NO ENTENDER LA RESPUESTA.
+     Medido con la guía 94578959 (un retorno a origen): Shalom contesta 200 con
+     `statuses: null` y un `search` que solo trae {message, success}, sin
+     `data`. Es una respuesta clara — "de esta guía no sé nada" —, no una que
+     no sepamos leer.
+     La diferencia no es cosmética: FORMATO_DESCONOCIDO manda a revisar la
+     integración, y NO_ENCONTRADO manda a revisar el número de guía. Confundir
+     el lado del panel con el lado de Shalom ya costó días una vez. */
+  if (st === null || st === undefined) {
+    // Con `search` delante es la forma medida y la lectura es segura. Sin él
+    // no hay respuesta que reconocer: un cuerpo vacío no dice "no encontrado",
+    // no dice nada, y afirmar lo primero sería inventar.
+    const bus = j.search;
+    if (!bus || typeof bus !== "object" || Array.isArray(bus)) return raro;
+    return {ok: false, motivo: "NO_ENCONTRADO", detalle: sanear(bus.message)};
+  }
+  if (typeof st !== "object" || Array.isArray(st)) return raro;
   if (st.success === false) {
     return {ok: false, motivo: "NO_ENCONTRADO", detalle: sanear(st.message)};
   }
   const d = st.data;
-  if (!d || typeof d !== "object" || Array.isArray(d)) return raro;
+  // Mismo caso un nivel más abajo: el árbol ausente es "no hay seguimiento".
+  if (d === null || d === undefined) {
+    return {ok: false, motivo: "NO_ENCONTRADO", detalle: sanear(st.message)};
+  }
+  if (typeof d !== "object" || Array.isArray(d)) return raro;
 
   const arbol = {};
   let alcanzado = null;

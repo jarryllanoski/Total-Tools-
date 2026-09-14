@@ -313,6 +313,22 @@ Extras medidos: `transito` trae `carguero`, `completo` y `cargueros[]`;
 > explicárselo al cliente. Viaja aparte, como bandera. No es que el bug esté
 > arreglado — es que ya no se puede escribir.
 
+**Una guía sin seguimiento no es una respuesta rara.** Medido con `94578959`
+(un retorno a origen): Shalom contesta **200** con `statuses: null` y un
+`search` que solo trae `{message, success}`, sin `data`.
+
+> Eso se traduce a **`NO_ENCONTRADO`**, no a `FORMATO_DESCONOCIDO`. La
+> diferencia no es cosmética: uno te manda a revisar **el número de guía**, el
+> otro a revisar **la integración**. Confundir el lado del panel con el lado de
+> Shalom ya costó días una vez.
+>
+> Pero solo cuando `search` viene delante — esa es la forma medida. Un cuerpo
+> vacío no dice "no encontrado": no dice nada, y afirmarlo sería inventar.
+
+**Formato de fecha confirmado en la calibración:** `YYYY-MM-DD HH:MM:SS`
+(ej. `2026-09-08 15:48:50`), sin zona horaria. Ordena bien como texto, así que
+no hace falta parsearla.
+
 La **fecha se devuelve tal cual** la manda Shalom. No se parsea: su formato no
 está medido, y adivinarlo es como se ordenan mal los historiales.
 
