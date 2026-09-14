@@ -14,6 +14,8 @@ const clienteLookup = require("./clienteLookup");
 const {normalizarOlva} = require("./olvaNormalizar");
 // Puerta unica a la API de Shalom (lista blanca + traduccion).
 const shalomPuerta = require("./shalomPuerta");
+// El interruptor: cuando apagar la puerta y cuando reencenderla (logica pura).
+const interruptor = require("./interruptor");
 
 setGlobalOptions({maxInstances: 10});
 initializeApp();
@@ -36,6 +38,55 @@ const SHALOM_API_KEY = defineSecret("SHALOM_API_KEY");
 const ADMINS = [
   "admin@totaltools.com",
 ];
+
+/* ── EL INTERRUPTOR DE LA PUERTA ───────────────────────────────────────────
+   El estado vive en Firestore para que lo compartan todos los dispositivos y
+   sobreviva al reinicio de la funcion. Se cachea unos segundos en memoria
+   para que un barrido de 484 guias no cueste 484 lecturas — y se actualiza a
+   mano tras cada escritura, asi que dentro de un mismo barrido el conteo de
+   fallos es exacto. */
+const PUERTA_DOC = "panel/shalom";
+const PUERTA_FRESCA_MS = 15000;
+let _puerta = {estado: null, ts: 0};
+
+/**
+ * El estado de la puerta, de cache o de Firestore.
+ * @return {Promise<Object>} estado normalizado
+ */
+async function _leerPuerta() {
+  const ahora = Date.now();
+  if (_puerta.estado && (ahora - _puerta.ts) < PUERTA_FRESCA_MS) {
+    return _puerta.estado;
+  }
+  let doc = null;
+  try {
+    const snap = await db.doc(PUERTA_DOC).get();
+    doc = snap.exists ? snap.data() : null;
+  } catch (e) {
+    // Si no se pudo leer, NO se bloquea a nadie: normalizar(null) deja la
+    // puerta abierta. Una puerta que se cierra porque no pudo leerse a si
+    // misma es peor que no tener puerta.
+    console.warn("puerta: no se pudo leer el estado:", e && e.message);
+  }
+  _puerta = {estado: interruptor.normalizar(doc), ts: ahora};
+  return _puerta.estado;
+}
+
+/**
+ * Guarda los cambios del interruptor y refresca la cache.
+ * @param {Object} cambios campos a escribir
+ * @return {Promise<void>}
+ */
+async function _guardarPuerta(cambios) {
+  _puerta.estado = interruptor.normalizar(
+      Object.assign({}, _puerta.estado, cambios));
+  _puerta.ts = Date.now();
+  try {
+    await db.doc(PUERTA_DOC).set(cambios, {merge: true});
+  } catch (e) {
+    console.warn("puerta: no se pudo guardar el estado:", e && e.message);
+  }
+}
 
 // ── CORS ───────────────────────────────────────────────────────────────────
 const ALLOWED_ORIGINS = [
@@ -722,10 +773,26 @@ exports.shalomPuerta = onRequest(
       const destino = paso.destino;
       const diagnostico = paso.diagnostico;
 
-      // 4 · recien aqui aparece la clave
+      // 4 · el interruptor. Si la puerta esta cerrada se responde al instante,
+      //     sin llamar a Shalom: una caida suya deja de costar cientos de
+      //     consultas que van a fallar igual.
+      const estadoPuerta = await _leerPuerta();
+      const llave = interruptor.decidir(
+          estadoPuerta, Date.now(), destino === "validate");
+      if (!llave.pasa) {
+        res.status(200).json({
+          ok: false, motivo: llave.motivo, reabre: llave.reabre,
+        });
+        return;
+      }
+
+      // 5 · recien aqui aparece la clave
       try {
         const r = await shalomPuerta.llamar(
             destino, SHALOM_API_KEY.value(), paso.datos);
+        const cambios = interruptor.tras(
+            estadoPuerta, r, Date.now(), llave.probando);
+        if (cambios) await _guardarPuerta(cambios);
         if (!r.ok) {
           res.status(200).json({
             ok: false, motivo: r.motivo, detalle: r.detalle, http: r.http,

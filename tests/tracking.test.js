@@ -138,4 +138,27 @@ module.exports = (t) => {
     });
     ok(T._rangoDeTexto('EN TRANSITO') === 1, 'sin acentos y en mayúsculas, igual');
   }
+
+  bloque('Los motivos del interruptor se explican como lo que son');
+  {
+    /* Ninguno de los dos es un fallo: son el sistema protegiéndose. Y son
+       distintos entre sí —uno lo decidió el operador, el otro la puerta sola—,
+       así que decirlos igual mandaría a buscar el arreglo donde no está. */
+    const apagada = T._motivoTexto('APAGADA', null);
+    ok(apagada.indexOf('apagado') > 0, 'APAGADA dice que está apagado');
+    ok(apagada.indexOf('Configuración') > 0,
+        'y dónde se enciende: un aviso sin salida es una queja');
+
+    const pausa = T._motivoTexto('PUERTA_CERRADA', Date.now() + 7 * 60000);
+    ok(pausa.indexOf('pausó solo') > 0, 'PUERTA_CERRADA dice que se pausó sola');
+    ok(/reintenta en \d+ min/.test(pausa),
+        'y hasta cuándo: "se pausó solo" sin hora se lee como "se rompió"');
+    ok(pausa.indexOf('siguen funcionando') > 0,
+        'y que el resto del panel sigue vivo — que es justo lo que se teme');
+    ok(pausa !== apagada, 'y los dos no dicen lo mismo');
+    ok(T._motivoTexto('PUERTA_CERRADA', 0).indexOf('reintenta en') < 0,
+        'sin hora válida no se inventa una');
+    ok(T._motivoTexto('PUERTA_CERRADA', Date.now() - 60000)
+        .indexOf('reintenta en') < 0, 'ni con una hora ya pasada');
+  }
 };

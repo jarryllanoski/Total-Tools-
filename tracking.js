@@ -65,6 +65,15 @@ function _conDetalle(detalle){
   return ' (' + d + ')';
 }
 
+/* "Se pausó solo" sin decir hasta cuándo se lee como "se rompió". Con la hora
+   es una espera; sin ella, un problema. */
+function _reabreEn(reabre){
+  var t = Number(reabre);
+  if (!t || t <= Date.now()) return '';
+  var min = Math.max(1, Math.round((t - Date.now()) / 60000));
+  return ' (reintenta en ' + min + ' min)';
+}
+
 function _motivoTexto(motivo, detalle){
   switch (motivo) {
     case 'DESCONECTADO':  return '🔧 Rastreo Shalom en reconstrucción';
@@ -89,6 +98,15 @@ function _motivoTexto(motivo, detalle){
     case 'ERROR_SHALOM':  return '⚠️ Shalom tuvo un error' + _conDetalle(detalle) +
       ' — reintenta en un momento';
     case 'SIN_RED':       return '📡 Sin conexión — revisa tu internet y reintenta';
+    /* Los dos del INTERRUPTOR. No son fallos: son el sistema protegiéndose.
+       Y son distintos entre sí — uno lo decidió el operador y el otro lo
+       decidió la puerta sola—, así que decirlos igual haría buscar el arreglo
+       en el sitio equivocado. */
+    case 'APAGADA':
+      return '🔌 El rastreo de Shalom está apagado — enciéndelo en Configuración';
+    case 'PUERTA_CERRADA':
+      return '⏸️ Shalom falló varias veces seguidas; el rastreo se pausó solo' +
+        _reabreEn(detalle) + ' — tus pedidos y el panel siguen funcionando';
     // La respuesta llegó pero no se reconoció su forma. NO se inventa un
     // estado: se avisa para poder ajustar el traductor con el dato real.
     case 'FORMATO_DESCONOCIDO':
@@ -767,7 +785,11 @@ Tracking.consultarAhora = async function(shipId) {
     if (window.render) window.render();
     if (window.toast) window.toast(_avisoConsulta(ship, r));
   } else {
-    if (window.toast) window.toast(_motivoTexto(r.motivo, r.detalle));
+    if (window.toast) {
+      // PUERTA_CERRADA trae `reabre` (una hora) en vez de `detalle` (un texto).
+      var extra = (r.motivo === 'PUERTA_CERRADA') ? r.reabre : r.detalle;
+      window.toast(_motivoTexto(r.motivo, extra));
+    }
   }
   // Se restaura SIEMPRE, en los dos caminos. Antes solo se hacía en el de
   // error: el otro confiaba en que render() redibujara la tarjeta, y si el

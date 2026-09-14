@@ -369,6 +369,57 @@ Peor: no corre si nadie abre el panel, que es justo cuando hace falta.
 La Fase 3 lo reemplaza por un barrido **en el servidor**, con horario
 configurable, que corre solo. Cuando esté, este ciclo se borra.
 
+## El interruptor — la puerta se apaga sola y se reenciende
+
+`functions/interruptor.js`. Estado compartido en Firestore: **`panel/shalom`**.
+
+| Estado | Qué pasa |
+|---|---|
+| **ABIERTA** | pasa todo |
+| **CERRADA** | tras **5 fallos seguidos del servicio**. Se responde al instante, **sin llamar a Shalom**, durante **10 minutos** |
+| **A PRUEBA** | pasado el descanso pasa **UNA** consulta. Si entra, se abre; si falla, otro descanso |
+
+Reabrir de golpe mandaría las 484 guías contra un servicio que sigue caído. Y
+si la consulta de prueba falla, **se cierra sin volver a contar hasta cinco**:
+ya sabemos que sigue caído, gastar cuatro consultas más es regalarlas.
+
+### ⛔ Qué apaga la puerta y qué no
+
+Solo los fallos **del servicio**: `SIN_RED` · `ERROR_SHALOM` · `BLOQUEADO` ·
+`LIMITE`.
+
+> **Nunca los del dato.** Una guía que no existe es información *correcta*
+> sobre esa guía. Si `NO_ENCONTRADO` contara, cinco guías mal escritas seguidas
+> —y hay tres en la base— dejarían al negocio sin seguimiento durante diez
+> minutos. Es la misma lección que ya costó días dos veces: no confundir el
+> lado del dato con el lado del proveedor.
+
+`FORMATO_DESCONOCIDO` tampoco cuenta: es un problema de traducción, no de
+disponibilidad, y cerrar la puerta lo escondería en vez de mostrarlo.
+
+### Preguntar "¿ya volvió?" es lo que la reenciende
+
+`validate` **se salta el descanso** a propósito: es una consulta, no toca
+ningún envío, y es la única forma de preguntar si Shalom volvió sin esperar los
+diez minutos a ciegas. La documentación de Shalom recomienda exactamente eso
+ante un 429. Y como cualquier respuesta buena reabre la puerta, **preguntar es
+también lo que la reenciende**.
+
+El interruptor **manual** (`encendida`) manda sobre todo: ni el diagnóstico se
+lo salta. Apagada es apagada, o el interruptor mentiría.
+
+### Detalles que no son obvios
+
+- **Sin documento, la puerta está ABIERTA.** Un `panel/shalom` que no existe
+  todavía no puede dejar el seguimiento apagado sin que nadie lo decidiera.
+- **Si el estado no se puede leer, se deja pasar.** Una puerta que se cierra
+  porque no pudo leerse a sí misma es peor que no tener puerta.
+- **No se escribe en Firestore por gusto:** una consulta buena estando ya
+  abierta no escribe nada.
+- El estado se cachea **15 s** en memoria para que un barrido de 484 guías no
+  cueste 484 lecturas, y se actualiza a mano tras cada escritura — así, dentro
+  de un mismo barrido, el conteo de fallos es exacto.
+
 ### Cómo se mide el siguiente endpoint
 
 Desde el entorno donde se desarrolla **no se puede llamar a `shalom-api.lat`**
