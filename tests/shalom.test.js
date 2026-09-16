@@ -215,4 +215,48 @@ module.exports = async (t) => {
     const con00 = lista.filter((a) => String(a.lat) === '0' && String(a.lng) === '0');
     ok(con00.length === 0, 'ninguna con coordenadas 0,0 (eso mandaba al Golfo de Guinea)');
   }
+
+  bloque('El interruptor, visto desde el panel');
+  {
+    const T = 1700000000000;
+    const tp = (e, ahora) => S.textoPuerta(e, ahora === undefined ? T : ahora);
+
+    ok(tp({}).icono === '🟢', 'sin nada guardado, la puerta está abierta');
+    ok(tp(null).icono === '🟢',
+        'y un documento que no existe tampoco deja al negocio sin rastreo');
+    ok(tp({encendida: true, cerradaHasta: 0}).texto.indexOf('funciona') > 0,
+        'abierta se dice en positivo: "funciona", no "sin errores"');
+
+    const apagada = tp({encendida: false});
+    ok(apagada.icono === '🔌' && apagada.texto.indexOf('por ti') > 0,
+        'apagada dice que la apagaste TÚ');
+
+    const pausada = tp({encendida: true, cerradaHasta: T + 7 * 60000});
+    ok(pausada.icono === '⏸️', 'pausada sola tiene su propio icono');
+    ok(pausada.texto.indexOf('sola') > 0, 'y dice que la decidió la puerta');
+    ok(/Reintenta en \d+ min/.test(pausada.texto),
+        'con la hora: "se pausó" sin decir hasta cuándo se lee como "se rompió"');
+    ok(pausada.texto !== apagada.texto,
+        'y los dos NO dicen lo mismo — una la decidiste tú y la otra la máquina');
+
+    ok(tp({encendida: true, cerradaHasta: T - 1000}).icono === '🟢',
+        'un descanso ya cumplido no se muestra como pausa');
+    ok(tp({encendida: false, cerradaHasta: T + 60000}).icono === '🔌',
+        'apagada a mano manda sobre la pausa automática, igual que en el motor');
+  }
+
+  bloque('El panel no le pisa la mano al motor');
+  {
+    const html = E.leer('index.html');
+    ok(/_fbEncenderPuerta = \(on\) =>[\s\S]{0,160}encendida/.test(html),
+        'encender y apagar escribe `encendida`');
+    const escritura = html.slice(html.indexOf('_fbEncenderPuerta'),
+        html.indexOf('_fbEncenderPuerta') + 220);
+    ok(escritura.indexOf('fallos') < 0 && escritura.indexOf('cerradaHasta') < 0,
+        'y NO toca fallos ni cerradaHasta: eso es del servidor, y escribirlo ' +
+        'desde el navegador sería pisarle la mano');
+    ok(html.indexOf('id="tglShalomPuerta"') > 0, 'el interruptor está en Config');
+    ok(html.indexOf('id="shalomPuertaEstado"') > 0,
+        'y debajo el estado REAL, que no siempre coincide con el interruptor');
+  }
 };

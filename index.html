@@ -55,6 +55,9 @@
   const trashPath = (id) => `${RAIZ}/trash/items/${id}`;
   const formCfgPath = (id) => `${RAIZ}/forms/configs/${id}`;
   const erroresPath = (id) => `${RAIZ}/errores/items/${id}`;
+  // El interruptor de la puerta a Shalom. Lo escribe sobre todo el servidor
+  // (functions/interruptor.js); el panel solo lee el estado y enciende/apaga.
+  const shalomPath  = () => `${RAIZ}/shalom`;
 
   // ── Firestore value converters ────────────────────────────────────────
   function toFs(v){
@@ -531,6 +534,16 @@
      tropieza, se calla — reintentarlo justo cuando algo va mal es la forma
      más rápida de convertir un fallo en una tormenta de escrituras. La
      política (topes, deduplicación, qué se guarda) vive en errores.js. */
+  /* El estado de la puerta a Shalom. Devuelve null si el documento no existe
+     todavía — y eso significa ABIERTA, no apagada: un archivo que nadie creó
+     no puede dejar el negocio sin rastreo. */
+  window._fbLeerPuerta = () => fsGet(shalomPath()).catch(() => null);
+
+  /* Encender o apagar a mano. NO toca la cuenta de fallos ni el descanso: eso
+     es del motor, y escribirlo desde acá sería pisarle la mano al servidor. */
+  window._fbEncenderPuerta = (on) =>
+    fsPatch(shalomPath(), {encendida: !!on, ultimoCambio: Date.now()});
+
   window._fbEscribirError = (id, doc) => {
     fsPatch(erroresPath(id), doc).catch(() => {});
   };
@@ -860,6 +873,18 @@
        Se conserva lo único que sigue siendo una decisión tuya: qué ve el cliente. -->
   <div class="cfg-sec">
     <div class="cfg-ttl">🚚 Configuración Shalom <span onclick="if(window.Ayuda)Ayuda.abrir('shalomConfig')" style="font-size:11px;color:#8b949e;cursor:pointer;font-weight:400;margin-left:8px" title="Ayuda">📖 Ayuda</span></div>
+    <!-- EL INTERRUPTOR MAESTRO. Va primero porque manda sobre todo lo demás:
+         apagado, ni el botón ⟳ consulta. Debajo del nombre va el ESTADO REAL,
+         que no siempre coincide con el interruptor: la puerta puede estar
+         pausada sola tras varios fallos de Shalom aunque tú la tengas
+         encendida. Decir solo "encendido/apagado" escondería justo eso. -->
+    <div class="tgl-row">
+      <div style="max-width:74%">
+        <div class="tgl-n">🚪 Puerta a Shalom</div>
+        <div class="tgl-s" id="shalomPuertaEstado">Consultando…</div>
+      </div>
+      <div class="tgl" id="tglShalomPuerta" onclick="toggleShalomPuerta()"></div>
+    </div>
     <div class="tgl-row" style="border:none">
       <div style="max-width:74%"><div class="tgl-n">📱 Mostrar en el link del cliente</div><div class="tgl-s">El cliente ve el estado de Shalom en su link de seguimiento. Apagado = solo tú lo ves en el panel.</div></div>
       <div class="tgl" id="tglTrackingWebCliente" onclick="toggleTrackingWebCliente()"></div>
@@ -2517,6 +2542,36 @@ function buscarDebounce(){
 /* DOC TOGGLE */
 function togDoc(id,slot){const s=S.shipments.find(x=>x.id===id);if(!s)return;if(slot==='guia')s.chkGuia=!s.chkGuia;else if(slot==='embalado')s.chkEmbalado=!s.chkEmbalado;else s.chkTicket=!s.chkTicket;save(id);render()}
 
+/* SHALOM: el interruptor maestro de la puerta (Config) */
+async function _pintarPuertaShalom(){
+  const fila = $('shalomPuertaEstado'), tgl = $('tglShalomPuerta');
+  if(!fila || !tgl) return;
+  const estado = (window._fbLeerPuerta ? await window._fbLeerPuerta() : null) || {};
+  // Sin documento, encendida: un archivo que nadie creó no puede dejar el
+  // negocio sin rastreo.
+  tgl.classList.toggle('on', estado.encendida !== false);
+  const v = (window.Shalom && Shalom.textoPuerta) ?
+    Shalom.textoPuerta(estado, Date.now()) :
+    {icono:'', color:'#8b949e', texto:''};
+  fila.textContent = v.icono + ' ' + v.texto;
+  fila.style.color = v.color;
+}
+async function toggleShalomPuerta(){
+  const tgl = $('tglShalomPuerta'); if(!tgl) return;
+  const on = !tgl.classList.contains('on');
+  tgl.classList.toggle('on', on);   // respuesta inmediata; se confirma abajo
+  try{
+    await window._fbEncenderPuerta(on);
+    toast(on ? '🚪 Puerta a Shalom encendida' :
+               '🔌 Puerta a Shalom apagada — el panel sigue funcionando igual');
+  }catch(e){
+    // No se pudo guardar: se deshace el toggle en vez de mentir sobre el estado.
+    tgl.classList.toggle('on', !on);
+    toast('⚠️ No se pudo cambiar el interruptor — reintenta');
+  }
+  _pintarPuertaShalom();
+}
+
 /* SHALOM: toggle auto-tracking (Config) */
 function toggleShalomAuto(){
   const el=document.getElementById('tglShalomAuto'); if(!el) return;
@@ -3822,10 +3877,10 @@ render();
      lo usa. config.js, print.js y voz.js preguntan por los pedidos marcados,
      así que siguen yendo detrás. El orden de carga es un contrato
      (ver docs/ARQUITECTURA.md). -->
-<script src="config.js?v=21"></script>
+<script src="config.js?v=22"></script>
 <script src="print.js?v=16"></script>
 <script src="notify.js?v=4"></script>
-<script src="shalom.js?v=14"></script>
+<script src="shalom.js?v=15"></script>
 <script src="tracking.js?v=18"></script>
 <script src="floatpanel.js?v=4"></script>
 <script src="delivery.js?v=8"></script>

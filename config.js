@@ -1338,7 +1338,9 @@ function changePIN(){
 function loadCfgUI(){
   $('cfgName').value=S.config.name||'';$('cfgPhone').value=S.config.phone||'';$('cfgCity').value=S.config.city||'';
   // Toggle auto-tracking Shalom (por defecto encendido)
-  { const t=$('tglShalomAuto'); if(t) t.classList.toggle('on', S.config.shalomAutoTrack!==false); }
+  // El estado de la puerta a Shalom se lee de Firestore, así que se pinta
+  // aparte y sin bloquear: la pantalla de Config no espera por la red.
+  if(typeof _pintarPuertaShalom==='function') _pintarPuertaShalom();
   // Configuración Shalom: solo queda "Mostrar en el link del cliente". El motor
   // de rastreo, el modo de etiquetas y los intervalos se retiraron con el
   // rastreo viejo. Los campos que quedan en S.config (trackingMotor,

@@ -420,6 +420,29 @@ lo salta. Apagada es apagada, o el interruptor mentiría.
   cueste 484 lecturas, y se actualiza a mano tras cada escritura — así, dentro
   de un mismo barrido, el conteo de fallos es exacto.
 
+### El interruptor en Config
+
+Un solo interruptor, **🚪 Puerta a Shalom**, en la sección Shalom. Es el
+maestro: apagado, ni el botón ⟳ consulta.
+
+Debajo del nombre va **el estado REAL**, que no siempre coincide con el
+interruptor:
+
+| | |
+|---|---|
+| 🟢 | Abierta — el rastreo de Shalom funciona |
+| ⏸️ | Pausada sola: Shalom falló varias veces. Reintenta en N min |
+| 🔌 | Apagada **por ti** — no se consulta nada |
+
+> Decir solo "encendido/apagado" escondería el caso del medio: la puerta puede
+> estar **pausada sola** aunque tú la tengas encendida. Y los tres textos dicen
+> cosas distintas a propósito — una la decidiste tú, la otra la máquina, y
+> confundirlas hace buscar el arreglo donde no está.
+
+**El panel no le pisa la mano al motor.** `_fbEncenderPuerta()` escribe
+**solo** `encendida`. La cuenta de fallos y el descanso son del servidor; hay
+una prueba que falla si el navegador intenta tocarlos.
+
 ### Cómo se mide el siguiente endpoint
 
 Desde el entorno donde se desarrolla **no se puede llamar a `shalom-api.lat`**

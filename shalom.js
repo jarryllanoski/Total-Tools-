@@ -166,6 +166,32 @@
       return _pedir({op: 'esquema', de: de || 'validate', datos: datos});
     },
 
+    /* ── El interruptor, visto desde el panel ────────────────────────
+       El estado real lo lleva el servidor (functions/interruptor.js) y vive
+       en Firestore. Acá solo se lee para mostrarlo y se enciende o apaga a
+       mano. La cuenta de fallos NO se toca desde el navegador: es del motor. */
+
+    /* El texto del estado. Los tres casos dicen cosas distintas a propósito:
+       apagada la decidió el operador, pausada la decidió la puerta sola, y
+       confundirlos haría buscar el arreglo donde no está. */
+    textoPuerta: function (estado, ahora) {
+      var e = estado || {};
+      var t = Number(ahora) || Date.now();
+      if (e.encendida === false) {
+        return {icono: '🔌', color: '#8b949e',
+          texto: 'Apagada por ti — no se consulta nada a Shalom'};
+      }
+      var hasta = Number(e.cerradaHasta) || 0;
+      if (hasta > t) {
+        var min = Math.max(1, Math.round((hasta - t) / 60000));
+        return {icono: '⏸️', color: '#d29922',
+          texto: 'Pausada sola: Shalom falló varias veces seguidas. ' +
+                 'Reintenta en ' + min + ' min.'};
+      }
+      return {icono: '🟢', color: '#2ea043',
+        texto: 'Abierta — el rastreo de Shalom funciona'};
+    },
+
     /* Catálogo de cajas de Shalom (medidas oficiales de su app, ver
        docs/SHALOM.md). No son rangos: son cajas fijas, así que la regla
        correcta es "la más chica en la que el paquete entra" — nunca "el rango
