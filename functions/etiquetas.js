@@ -129,11 +129,20 @@
       res.pasos : rangoDeTexto(res.estado);
     if (rango === null || rango === undefined) return null;
 
-    const nueva = etiquetaDeRango(rango, p);
+    let nueva = etiquetaDeRango(rango, p);
     if (!nueva) return null;
 
-    /* EN MODO SEMI, FINALIZADO LO CIERRAS TÚ. */
-    if (m === MODOS.SEMI && nueva === "FINALIZADO") return null;
+    /* EN MODO SEMI, FINALIZADO LO CIERRAS TÚ — pero el pedido igual avanza
+       hasta donde puede sin cerrarse.
+
+       Antes esto devolvía null y el pedido se quedaba QUIETO. Lo vio el
+       simulacro: tres pedidos que Shalom daba por entregados seguían en
+       ENVIADO. Y no era solo feo — en cuanto se guarda `trackingStatus:
+       "Entregado"`, el barrido deja de consultarlos (ya no pueden traer nada
+       nuevo), así que se habrían quedado en ENVIADO para siempre.
+
+       Si está entregado, como mínimo llegó a destino. Eso se puede afirmar. */
+    if (m === MODOS.SEMI && nueva === "FINALIZADO") nueva = "LLEGÓ A DESTINO";
 
     const actual = String(p.status || "").trim().toUpperCase();
     if (nueva === actual) return null; // ya está ahí

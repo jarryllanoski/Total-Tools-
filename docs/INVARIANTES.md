@@ -77,7 +77,16 @@ NUEVO PEDIDO → EN PROCESO → POR ALISTAR → ALISTADO → ENVIADO
 ### Los tres modos
 
 `S.config.barrido.modo`: `apagado` (solo registra) · `semi` (todo menos
-FINALIZADO, que cierras tú) · `auto` (todo). **De fábrica, `semi`** — es donde
+FINALIZADO, que cierras tú) · `auto` (todo).
+
+> ⚠️ **"Semi" no es "si toca FINALIZADO, no muevas nada".** Es *"muévelo hasta
+> donde pueda llegar sin cerrarlo"*: un Entregado avanza a `LLEGÓ A DESTINO`
+> (o a `PENDIENTE DE PAGO` si hay saldo).
+>
+> Con la lectura mala, el primer simulacro dejó **tres pedidos entregados
+> parados en ENVIADO**. Y no era cosmético: en cuanto se guarda
+> `trackingStatus: "Entregado"`, el barrido deja de consultarlos — habrían
+> quedado en ENVIADO **para siempre**. **De fábrica, `semi`** — es donde
 el error más caro, cerrar un pedido antes de tiempo, no puede ocurrir.
 
 > "Apagado" es sobre las **etiquetas**. El seguimiento se sigue registrando

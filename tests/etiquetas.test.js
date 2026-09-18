@@ -118,6 +118,25 @@ module.exports = async ({bloque, ok}) => {
      'ni siquiera un entregado');
   ok(nueva({status: 'LLEGÓ A DESTINO'}, shalom(3), 'semi') === null,
      'semiautomática: FINALIZADO lo cierras tú');
+  {
+    /* LO ENCONTRÓ EL SIMULACRO, y por eso existe el simulacro.
+       "Semiautomática" no es "si toca FINALIZADO, no muevas nada": es
+       "muévelo hasta donde pueda llegar sin cerrarlo". Con la lectura mala,
+       tres pedidos que Shalom daba por entregados se quedaban en ENVIADO. Y no
+       era solo feo: en cuanto se guarda trackingStatus "Entregado" el barrido
+       deja de consultarlos, así que habrían quedado en ENVIADO para siempre. */
+    ok(nueva({status: 'ENVIADO'}, shalom(3, 'Entregado'), 'semi') ===
+       'LLEGÓ A DESTINO',
+       'un entregado avanza al menos a LLEGÓ A DESTINO: si se entregó, llegó');
+    ok(nueva({status: 'ALISTADO'}, shalom(3, 'Entregado'), 'semi') ===
+       'LLEGÓ A DESTINO', 'venga de donde venga');
+    ok(nueva({status: 'ENVIADO', cost: '249'}, shalom(3), 'semi') ===
+       'PENDIENTE DE PAGO', 'y con saldo, a pendiente de pago');
+    ok(nueva({status: 'PENDIENTE DE PAGO'}, shalom(3), 'semi') === null,
+       'pero nunca hacia atrás: quien ya está en pendiente de pago se queda');
+    ok(nueva({status: 'LLEGÓ A DESTINO'}, shalom(3), 'auto') === 'FINALIZADO',
+       'y en automática sigue cerrando, que para eso está');
+  }
   ok(nueva({status: 'ENVIADO'}, shalom(2), 'semi') === 'LLEGÓ A DESTINO',
      'pero el resto sí se mueve');
   ok(nueva({status: 'ENVIADO', cost: '50'}, shalom(3), 'semi') ===
