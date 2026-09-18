@@ -770,15 +770,13 @@ const PAUSA_MS = 300; // entre consulta y consulta
 const TOPE_MS = 450000; // margen bajo el timeout de 540 s
 const TOPE_DETALLE = 60; // cuantas lineas guarda el informe
 
-exports.barridoShalom = onSchedule({
-  schedule: "*/30 * * * *",
-  timeZone: barrido.ZONA,
-  region: "us-central1",
-  secrets: [SHALOM_API_KEY],
-  timeoutSeconds: 540,
-  memory: "512MiB",
-  retryCount: 0, // un barrido perdido se recupera en la siguiente hora; uno
-}, async () => { // repetido consultaria todo dos veces.
+/**
+ * El barrido, en una funcion: lo llaman el horario y el boton "Correr ahora".
+ * Dos copias de esto acabarian barriendo distinto segun quien lo dispare.
+ * @param {boolean} [forzado] true = saltarse el reloj (boton manual)
+ * @return {Promise<?Object>} el informe, o null si no le tocaba
+ */
+async function _correrBarrido(forzado) {
   const arranque = Date.now();
 
   // 1 · ¿toca ahora?
@@ -788,13 +786,15 @@ exports.barridoShalom = onSchedule({
     cfg = (snap.exists && snap.data()) || {};
   } catch (e) {
     console.error("barrido: no se pudo leer la configuracion:", e);
-    return;
+    return null;
   }
   const b = (cfg.config && cfg.config.barrido) || {};
-  if (b.activo === false) return;
+  // El boton manual se salta el horario, pero NO el interruptor: si el
+  // seguimiento automatico esta apagado, apagado esta.
+  if (b.activo === false) return null;
   const horas = barrido.parseHoras(b.horas);
   const ahoraLocal = barrido.horaLocal(new Date());
-  if (!barrido.tocaAhora(horas, ahoraLocal)) return;
+  if (!forzado && !barrido.tocaAhora(horas, ahoraLocal)) return null;
 
   const modo = String(b.modo || etiquetas.MODOS.SEMI);
   const simulacro = b.simulacro !== false; // de fabrica, simulacro
@@ -806,7 +806,7 @@ exports.barridoShalom = onSchedule({
     snap.forEach((d) => docs.push(Object.assign({id: d.id}, d.data())));
   } catch (e) {
     console.error("barrido: no se pudieron leer los pedidos:", e);
-    return;
+    return null;
   }
   const porId = {};
   docs.forEach((d) => {
@@ -878,7 +878,8 @@ exports.barridoShalom = onSchedule({
   // 5 · el informe. Es lo unico que se ve desde Config, asi que dice TODO:
   //     a cuantos no se les pregunto y por que, no solo lo que cambio.
   const informe = {
-    ts: Date.now(), hora: ahoraLocal, modo: modo, simulacro: simulacro,
+    ts: Date.now(), hora: ahoraLocal, forzado: !!forzado,
+    modo: modo, simulacro: simulacro,
     candidatos: sel.consultar.length, consultadas: consultadas,
     fallidas: fallidas, conCambio: escrituras.length, escritas: escritas,
     movidas: escrituras.filter((w) => w.campos.status).length,
@@ -893,9 +894,77 @@ exports.barridoShalom = onSchedule({
   }
   console.log("barrido", JSON.stringify({
     hora: ahoraLocal, consultadas, conCambio: escrituras.length,
-    escritas, simulacro, cortado,
+    escritas, simulacro, cortado, forzado: !!forzado,
   }));
+  return informe;
+}
+
+// El horario. Cada 30 min pregunta; _correrBarrido decide si le toca.
+exports.barridoShalom = onSchedule({
+  schedule: "*/30 * * * *",
+  timeZone: barrido.ZONA,
+  region: "us-central1",
+  secrets: [SHALOM_API_KEY],
+  timeoutSeconds: 540,
+  memory: "512MiB",
+  // Un barrido perdido se recupera en el horario siguiente; uno repetido
+  // consultaria todo dos veces.
+  retryCount: 0,
+}, async () => {
+  await _correrBarrido(false);
 });
+
+// ── barridoAhora ──────────────────────────────────────────────────────────
+// El mismo barrido, a peticion. Sirve para ver el informe sin esperar a las
+// 19:00, y despues para forzar una actualizacion cuando hace falta.
+// Mismas barreras que la puerta: POST, token valido y correo de administrador.
+exports.barridoAhora = onRequest({
+  region: "us-central1",
+  secrets: [SHALOM_API_KEY],
+  timeoutSeconds: 540,
+  memory: "512MiB",
+}, async (req, res) => {
+  setCORS(req, res);
+  if (req.method === "OPTIONS") {
+    res.status(204).send("");
+    return;
+  }
+  if (req.method !== "POST") {
+    res.status(405).json({ok: false, motivo: "NO_PERMITIDO"});
+    return;
+  }
+  const authz = req.get("Authorization") || "";
+  const bearer = authz.match(/^Bearer\s+(.+)$/i);
+  if (!bearer) {
+    res.status(401).json({ok: false, motivo: "SIN_SESION"});
+    return;
+  }
+  let tok;
+  try {
+    tok = await getAuth().verifyIdToken(bearer[1]);
+  } catch (e) {
+    res.status(401).json({ok: false, motivo: "SIN_SESION"});
+    return;
+  }
+  const correo = String((tok && tok.email) || "").toLowerCase();
+  if (!correo || ADMINS.indexOf(correo) < 0) {
+    res.status(403).json({ok: false, motivo: "SIN_PERMISO"});
+    return;
+  }
+  try {
+    const informe = await _correrBarrido(true);
+    if (!informe) {
+      res.status(200).json({ok: false, motivo: "BARRIDO_APAGADO"});
+      return;
+    }
+    res.status(200).json({ok: true, informe: informe});
+  } catch (e) {
+    console.error("barridoAhora error:", e);
+    res.status(200).json({ok: false, motivo: "ERROR_SHALOM",
+      detalle: shalomPuerta.sanear(e && e.message)});
+  }
+});
+
 
 // ── shalomPuerta ───────────────────────────────────────────────────────────
 // POST {op}  →  la unica via del panel hacia Shalom.

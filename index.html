@@ -925,6 +925,7 @@
       <div class="tgl" id="tglBarridoSimulacro" onclick="toggleBarrido('simulacro')"></div>
     </div>
     <div class="tgl-s" id="barridoUltima" style="padding:6px 0 2px;line-height:1.5">Última corrida: —</div>
+    <button id="btnBarridoAhora" onclick="correrBarridoAhora()" class="btn-sec" style="width:100%;margin-top:8px">▶️ Correr ahora</button>
     <div class="tgl-row" style="border:none">
       <div style="max-width:74%"><div class="tgl-n">📱 Mostrar en el link del cliente</div><div class="tgl-s">El cliente ve el estado de Shalom en su link de seguimiento. Apagado = solo tú lo ves en el panel.</div></div>
       <div class="tgl" id="tglTrackingWebCliente" onclick="toggleTrackingWebCliente()"></div>
@@ -2637,6 +2638,42 @@ async function _pintarUltimoBarrido(){
     (u.cortado ? '<br><b style="color:#d29922">Se cortó: ' + u.cortado + '</b>' : '');
 }
 
+/* Correr el barrido a pedido: el MISMO barrido, sin esperar al horario.
+   Sirve para ver el informe ahora y, después, para forzar una actualización
+   cuando haga falta. Se salta el reloj pero NO el interruptor. */
+async function correrBarridoAhora(){
+  const btn = $('btnBarridoAhora'); if(!btn) return;
+  const antes = btn.textContent;
+  btn.disabled = true; btn.textContent = '⏳ Consultando… (puede tardar un minuto)';
+  try{
+    const tok = localStorage.getItem('tt_id_token') || '';
+    if(!tok){ toast('🔒 Tu sesión venció — ingresa de nuevo'); return; }
+    const r = await fetch('https://us-central1-total-tools-24ce8.cloudfunctions.net/barridoAhora',
+      {method:'POST', headers:{'Content-Type':'application/json','Authorization':'Bearer '+tok}});
+    if(r.status === 401){ toast('🔒 Tu sesión venció — ingresa de nuevo'); return; }
+    if(r.status === 403){ toast('🚫 Tu cuenta no está autorizada'); return; }
+    const j = await r.json().catch(()=>({ok:false}));
+    if(!j.ok){
+      toast(j.motivo === 'BARRIDO_APAGADO'
+        ? '⏸️ El seguimiento automático está apagado — enciéndelo arriba'
+        : '⚠️ No se pudo correr el barrido');
+      return;
+    }
+    const i = j.informe || {};
+    toast((i.simulacro ? '🧪 Simulacro: ' : '✅ ') + 'consultó ' + (i.consultadas||0) +
+          ' · ' + (i.movidas||0) + ' etiqueta(s) ' + (i.simulacro ? 'se moverían' : 'movidas'));
+    // Los pedidos cambiaron en la nube: que el panel los traiga.
+    if(!i.simulacro && window._fbLoad && window._mergeRemote){
+      try{ const remoto = await window._fbLoad(); if(remoto) window._mergeRemote(remoto); }catch(e){}
+    }
+  }catch(e){
+    toast('📡 No se pudo conectar — revisa tu internet');
+  }finally{
+    btn.disabled = false; btn.textContent = antes;
+    _pintarUltimoBarrido();
+  }
+}
+
 /* SHALOM: el interruptor maestro de la puerta (Config) */
 async function _pintarPuertaShalom(){
   const fila = $('shalomPuertaEstado'), tgl = $('tglShalomPuerta');
@@ -3972,7 +4009,7 @@ render();
      lo usa. config.js, print.js y voz.js preguntan por los pedidos marcados,
      así que siguen yendo detrás. El orden de carga es un contrato
      (ver docs/ARQUITECTURA.md). -->
-<script src="config.js?v=23"></script>
+<script src="config.js?v=24"></script>
 <script src="print.js?v=16"></script>
 <script src="notify.js?v=4"></script>
 <script src="shalom.js?v=15"></script>

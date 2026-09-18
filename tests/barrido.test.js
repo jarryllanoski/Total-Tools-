@@ -215,4 +215,26 @@ module.exports = async ({bloque, ok}) => {
     ok(c.campos.status === undefined,
        'pero la etiqueta no se toca ni en automático: es una decisión tuya');
   }
+
+  bloque('El horario y el botón "Correr ahora" son el MISMO barrido');
+  {
+    /* Dos copias del barrido acabarían barriendo distinto según quién lo
+       dispare, y el informe que se mira antes de encenderlo dejaría de
+       describir lo que hace el que corre solo. */
+    const idx = require('fs').readFileSync(
+        require('path').join(__dirname, '..', 'functions', 'index.js'), 'utf8');
+    const llamadas = (idx.match(/_correrBarrido\(/g) || []).length;
+    ok(llamadas >= 3,
+       'se define una vez y la llaman los dos: el horario y el botón');
+    ok(/await _correrBarrido\(false\)/.test(idx), 'el horario mira el reloj');
+    ok(/await _correrBarrido\(true\)/.test(idx), 'y el botón se lo salta');
+    ok(/if \(b\.activo === false\) return null;/.test(idx),
+       'pero ninguno se salta el interruptor: apagado es apagado');
+    const manual = idx.slice(idx.indexOf('exports.barridoAhora'),
+        idx.indexOf('exports.barridoAhora') + 1800);
+    ok(/verifyIdToken/.test(manual) && /ADMINS.indexOf/.test(manual),
+       'el botón exige sesión válida y correo de administrador');
+    ok(/req.method !== "POST"/.test(manual),
+       'y solo por POST: un barrido no se dispara abriendo una URL');
+  }
 };

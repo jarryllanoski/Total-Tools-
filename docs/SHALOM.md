@@ -488,6 +488,17 @@ que llega a Entregado sale de la lista para siempre.
   una guía falla. Con plan ilimitado, la eficiencia no aprieta lo suficiente
   como para arriesgar escribir el estado de un pedido en otro.
 
+### El botón "Correr ahora"
+
+`exports.barridoAhora` (POST, token + admin). Es **el mismo barrido**:
+`_correrBarrido(true)`. Dos copias acabarían barriendo distinto según quién lo
+dispare, y el informe que se mira antes de encenderlo dejaría de describir lo
+que hace el que corre solo.
+
+Se salta **el reloj**, no el interruptor: si el seguimiento automático está
+apagado, responde `BARRIDO_APAGADO`. Y solo por POST — un barrido no se
+dispara abriendo una URL.
+
 ### Cómo se mide el siguiente endpoint
 
 Desde el entorno donde se desarrolla **no se puede llamar a `shalom-api.lat`**
