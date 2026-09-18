@@ -1341,6 +1341,16 @@ function loadCfgUI(){
   // El estado de la puerta a Shalom se lee de Firestore, así que se pinta
   // aparte y sin bloquear: la pantalla de Config no espera por la red.
   if(typeof _pintarPuertaShalom==='function') _pintarPuertaShalom();
+  // El barrido programado: sus ajustes viven en S.config, su informe en el
+  // servidor. Lo segundo se pinta aparte y sin bloquear la pantalla.
+  if(typeof _cfgBarrido==='function'){
+    const b=_cfgBarrido();
+    if($('cfgBarridoHoras')) $('cfgBarridoHoras').value=b.horas||'';
+    if($('cfgBarridoModo'))  $('cfgBarridoModo').value=b.modo||'semi';
+    const ta=$('tglBarridoActivo');    if(ta) ta.classList.toggle('on', b.activo!==false);
+    const ts=$('tglBarridoSimulacro'); if(ts) ts.classList.toggle('on', b.simulacro!==false);
+  }
+  if(typeof _pintarUltimoBarrido==='function') _pintarUltimoBarrido();
   // Configuración Shalom: solo queda "Mostrar en el link del cliente". El motor
   // de rastreo, el modo de etiquetas y los intervalos se retiraron con el
   // rastreo viejo. Los campos que quedan en S.config (trackingMotor,

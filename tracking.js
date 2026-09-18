@@ -202,12 +202,20 @@ function _aplicarEstadoShalom(ship, resp, origen){
     escribio = true;
   }
 
-  // 2) La etiqueta NO se mueve. Se retiró el movimiento automático (y con él el
-  //    modo off/semi/auto): `ship.status` ahora lo cambias solo tú.
-  //    Lo que SÍ se conserva es *interpretar* lo que dice Shalom y devolverlo en
-  //    `resultado`, porque de ahí salen los avisos: el toast que te dice "llegó a
-  //    destino — avisar al cliente" y la alerta 🎉 del panel. Registrar e
-  //    informar sí; decidir por ti, no.
+  /* 2) LA ETIQUETA. Vuelve a moverse (18 sep 2026, decisión del negocio: es la
+        fórmula del manual del panel), y lo hace por el MISMO archivo que usa el
+        barrido del servidor: functions/etiquetas.js. Ahí viven los tres modos,
+        el no-retroceso, la regla de que un pedido con saldo no se cierra, y la
+        de que una etiqueta tuya —RECLAMOS, AVISAR CUANDO LLEGUE— no se toca.
+        Acá no se decide nada: se pregunta y se aplica. */
+  var movio = null;
+  if (window.Etiquetas && window.Etiquetas.decidirEtiqueta) {
+    var _cfg = (window.S && window.S.config) || {};
+    var _modo = (_cfg.barrido && _cfg.barrido.modo) || 'semi';
+    var _d = window.Etiquetas.decidirEtiqueta(ship, resp, _modo);
+    if (_d) { ship.status = _d.nueva; movio = _d.nueva; }
+  }
+
   var resultado = 'ok';
   if (/retorno a origen/i.test(estadoTexto))   resultado = 'RETORNO';
   else if (autoEstado === 'FINALIZADO')        resultado = 'FINALIZADO';
@@ -222,7 +230,7 @@ function _aplicarEstadoShalom(ship, resp, origen){
   //              justo el que se nos escapó con la guía 95046118 — se
   //              anunciaba como "sin cambios".
   return {cambio: true, escribio: escribio, avanzo: avanzo,
-    resultado: resultado, estado: estadoTexto};
+    resultado: resultado, estado: estadoTexto, movio: movio};
 }
 
 /* Lee un texto de estado y dice en qué punto del recorrido cae:
@@ -236,16 +244,14 @@ function _aplicarEstadoShalom(ship, resp, origen){
    decisión: si se escribe otra copia, las dos tienen que cambiar juntas — y la
    prueba que las compara vuelve con ella. */
 function _rangoDeTexto(t){
-  var u = String(t || '').toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
-  if (!u.trim()) return null;
-  if (u.indexOf('DEMORA') >= 0 || u.indexOf('RETRAS') >= 0) return null;
-  if (u.indexOf('ENTREGAD') >= 0) return 3;
-  if (u.indexOf('REPART') >= 0) return 2;
-  if (u.indexOf('DESTINO') >= 0 || u.indexOf('AGENCIA') >= 0 ||
-      u.indexOf('RECOJO') >= 0 || u.indexOf('RECOGER') >= 0) return 2;
-  if (u.indexOf('TRANSITO') >= 0 || u.indexOf('CAMINO') >= 0 ||
-      u.indexOf('RUTA') >= 0) return 1;
-  if (u.indexOf('ORIGEN') >= 0 || u.indexOf('REGISTRAD') >= 0) return 0;
+  /* La regla vive en functions/etiquetas.js porque el barrido del servidor
+     necesita EXACTAMENTE la misma respuesta. Dos copias divergen, y divergir
+     aquí significa que el barrido mueva de madrugada una etiqueta que el panel
+     habría rechazado. Si el archivo no cargó, se devuelve null: no clasificar
+     nunca bloquea ni mueve nada, así que lo peor es no hacer nada. */
+  if (window.Etiquetas && window.Etiquetas.rangoDeTexto) {
+    return window.Etiquetas.rangoDeTexto(t);
+  }
   return null;
 }
 
@@ -486,13 +492,13 @@ function _injectOverlays() {
     'Edita el pedido y coloca número de orden y código.',
     'Guarda tracking → el pedido <b>conserva su etiqueta actual</b>. La primera consulta (manual o automática) lo pasa a <b>ENVIADO</b>.',
     'Presiona <b>⟳ Consultar</b> en cualquier momento para actualizar al instante.',
-    'El sistema consulta Shalom automáticamente cada <b>12 horas</b> en tránsito y <b>24 horas</b> en destino, o <b>lo que configures</b> en ⚙️ Configuración → Shalom. Al entregarse deja de consultar.',
+    'El sistema consulta Shalom solo, <b>en los horarios que pongas</b> en ⚙️ Configuración → Shalom (de fábrica: 8:00, 11:30, 16:30 y 19:00). Corre en el servidor, así que funciona aunque no tengas el panel abierto. <b>Al entregarse deja de consultar</b>: ya no puede traer nada nuevo.',
     'Shalom dice "En tránsito" → etiqueta <b>ENVIADO</b> + el cliente ve el estado en su link.',
-    'Shalom dice "Demora de envíos" → etiqueta <b>ENVIADO</b> + el cliente ve el aviso de demora en su link.',
+    'Shalom dice "Demora de envíos" → el cliente ve el aviso de demora en su link, y <b>la etiqueta no se mueve</b>: un paquete demorado que ya está en destino sigue en destino. (Antes esta línea lo mandaba de vuelta a ENVIADO.)',
     'Shalom dice "En destino" → cambia automáticamente a <b>LLEGÓ A DESTINO</b>.',
     'Si el pedido tiene saldo pendiente → cambia a <b>PENDIENTE DE PAGO</b>.',
-    'Shalom dice "Entregado" → cambia automáticamente a <b>FINALIZADO</b>.',
-    'Los pasos 7 al 11 dependen de <b>Cambiar etiquetas</b> (⚙️ Configuración): <b>Apagado</b> = solo registra, no mueve nada · <b>Semiautomática</b> = mueve todo menos <b>FINALIZADO</b>, que cierras tú · <b>Automática</b> = mueve todo.',
+    'Shalom dice "Entregado" → cambia automáticamente a <b>FINALIZADO</b>. <b>Salvo que quede saldo por cobrar</b>: entonces se queda en PENDIENTE DE PAGO esperándote, ni siquiera en modo Automática.',
+    'Los pasos 7 al 11 dependen de <b>Mover etiquetas</b> (⚙️ Configuración → Shalom): <b>Apagado</b> = solo registra, no mueve nada · <b>Semiautomática</b> = mueve todo menos <b>FINALIZADO</b>, que cierras tú · <b>Automática</b> = mueve todo. Y en cualquier modo: <b>una etiqueta nunca retrocede</b>, y las tuyas (RECLAMOS, AVISAR CUANDO LLEGUE…) no se tocan jamás.',
   ];
   ov2.innerHTML = '<div id="trkManualSheet">'+
     '<div style="font-family:Syne,sans-serif;font-weight:800;font-size:17px;margin-bottom:14px">📖 Manual Shalom</div>'+

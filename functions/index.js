@@ -2,6 +2,7 @@
 
 const {setGlobalOptions} = require("firebase-functions");
 const {onRequest} = require("firebase-functions/https");
+const {onSchedule} = require("firebase-functions/scheduler");
 const {defineSecret} = require("firebase-functions/params");
 const {initializeApp} = require("firebase-admin/app");
 const {getFirestore} = require("firebase-admin/firestore");
@@ -16,6 +17,11 @@ const {normalizarOlva} = require("./olvaNormalizar");
 const shalomPuerta = require("./shalomPuerta");
 // El interruptor: cuando apagar la puerta y cuando reencenderla (logica pura).
 const interruptor = require("./interruptor");
+// A quien consulta el barrido y cuando (logica pura).
+const barrido = require("./barrido");
+// Que etiqueta le toca a un pedido. LO COMPARTE CON EL PANEL: ver la
+// cabecera de etiquetas.js — dos copias de esta regla divergirian.
+const etiquetas = require("./etiquetas");
 
 setGlobalOptions({maxInstances: 10});
 initializeApp();
@@ -38,6 +44,31 @@ const SHALOM_API_KEY = defineSecret("SHALOM_API_KEY");
 const ADMINS = [
   "admin@totaltools.com",
 ];
+
+/**
+ * EL ÚNICO CAMINO HACIA SHALOM: interruptor → llamada → interruptor.
+ *
+ * Lo usan el panel (a traves de shalomPuerta) y el barrido programado. Si el
+ * barrido tuviera su propia llamada, seria un segundo camino que se salta el
+ * interruptor — y entonces una caida de Shalom volveria a costar cientos de
+ * consultas, justo de madrugada y sin nadie mirando.
+ * @param {string} destino operacion de la lista blanca
+ * @param {Object} datos cuerpo para las operaciones POST
+ * @param {boolean} [diagnostico] true para `esquema` y `validate`
+ * @return {Promise<Object>} {ok:true, json} o {ok:false, motivo, …}
+ */
+async function _porLaPuerta(destino, datos, diagnostico) {
+  const estado = await _leerPuerta();
+  const esSondeo = diagnostico || destino === "validate";
+  const llave = interruptor.decidir(estado, Date.now(), esSondeo);
+  if (!llave.pasa) {
+    return {ok: false, motivo: llave.motivo, reabre: llave.reabre};
+  }
+  const r = await shalomPuerta.llamar(destino, SHALOM_API_KEY.value(), datos);
+  const cambios = interruptor.tras(estado, r, Date.now(), llave.probando);
+  if (cambios) await _guardarPuerta(cambios);
+  return r;
+}
 
 /* ── EL INTERRUPTOR DE LA PUERTA ───────────────────────────────────────────
    El estado vive en Firestore para que lo compartan todos los dispositivos y
@@ -726,6 +757,146 @@ exports.extraerComprobante = onRequest(
 //     por el operador no.
 //   · Un envio no desanda el camino (ver docs/INVARIANTES.md, 2 bis).
 
+// ── barridoShalom ─────────────────────────────────────────────────────────
+// El seguimiento automatico. Cloud Scheduler dispara CADA 30 MINUTOS y la
+// funcion decide si le toca: asi los horarios viven en Config y se cambian sin
+// volver a desplegar. Los disparos que no tocan no consultan nada a Shalom.
+//
+// ⚠️ ARRANCA EN SIMULACRO. Decide todo igual y NO ESCRIBE: deja el informe de
+// que habria cambiado. Mover 71 etiquetas a ciegas y corregirlas a mano
+// despues no es una opcion. Se apaga desde Config cuando el informe cuadre.
+const BARRIDO_DOC = "panel/barrido";
+const PAUSA_MS = 300; // entre consulta y consulta
+const TOPE_MS = 450000; // margen bajo el timeout de 540 s
+const TOPE_DETALLE = 60; // cuantas lineas guarda el informe
+
+exports.barridoShalom = onSchedule({
+  schedule: "*/30 * * * *",
+  timeZone: barrido.ZONA,
+  region: "us-central1",
+  secrets: [SHALOM_API_KEY],
+  timeoutSeconds: 540,
+  memory: "512MiB",
+  retryCount: 0, // un barrido perdido se recupera en la siguiente hora; uno
+}, async () => { // repetido consultaria todo dos veces.
+  const arranque = Date.now();
+
+  // 1 · ¿toca ahora?
+  let cfg = {};
+  try {
+    const snap = await db.doc(CFG_DOC).get();
+    cfg = (snap.exists && snap.data()) || {};
+  } catch (e) {
+    console.error("barrido: no se pudo leer la configuracion:", e);
+    return;
+  }
+  const b = (cfg.config && cfg.config.barrido) || {};
+  if (b.activo === false) return;
+  const horas = barrido.parseHoras(b.horas);
+  const ahoraLocal = barrido.horaLocal(new Date());
+  if (!barrido.tocaAhora(horas, ahoraLocal)) return;
+
+  const modo = String(b.modo || etiquetas.MODOS.SEMI);
+  const simulacro = b.simulacro !== false; // de fabrica, simulacro
+
+  // 2 · a quien se consulta
+  const docs = [];
+  try {
+    const snap = await db.collection(SHIP_COL).get();
+    snap.forEach((d) => docs.push(Object.assign({id: d.id}, d.data())));
+  } catch (e) {
+    console.error("barrido: no se pudieron leer los pedidos:", e);
+    return;
+  }
+  const porId = {};
+  docs.forEach((d) => {
+    porId[d.id] = d;
+  });
+  const sel = barrido.aConsultar(docs, arranque);
+
+  // 3 · consultar, decidir
+  const escrituras = [];
+  const detalle = [];
+  let consultadas = 0; let fallidas = 0; let cortado = "";
+  for (const item of sel.consultar) {
+    if (Date.now() - arranque > TOPE_MS) {
+      cortado = "se acabo el tiempo";
+      break;
+    }
+    const r = await _porLaPuerta("track",
+        {orderNumber: item.guia, orderCode: item.codigo});
+    consultadas++;
+    if (!r.ok) {
+      fallidas++;
+      // La puerta se cerro: seguir seria pedirle a un servicio caido 60 veces
+      // mas que nos diga que sigue caido.
+      if (r.motivo === "PUERTA_CERRADA" || r.motivo === "APAGADA") {
+        cortado = r.motivo;
+        break;
+      }
+      await new Promise((res) => setTimeout(res, PAUSA_MS));
+      continue;
+    }
+    const traducido = shalomPuerta.traducir("track", r.json);
+    const cambios = barrido.cambiosDe(porId[item.id], traducido, modo);
+    if (cambios) {
+      escrituras.push({id: item.id, campos: cambios.campos});
+      if (detalle.length < TOPE_DETALLE) {
+        detalle.push({
+          nombre: item.nombre, guia: item.guia,
+          de: porId[item.id].status || "",
+          a: cambios.etiqueta || porId[item.id].status || "",
+          shalom: traducido.estado,
+          movio: !!cambios.etiqueta,
+        });
+      }
+    }
+    await new Promise((res) => setTimeout(res, PAUSA_MS));
+  }
+
+  // 4 · escribir (o no, si es simulacro)
+  let escritas = 0;
+  if (!simulacro && escrituras.length) {
+    for (let i = 0; i < escrituras.length; i += 400) {
+      const lote = db.batch();
+      escrituras.slice(i, i + 400).forEach((w) => {
+        lote.set(db.doc(SHIP_COL + "/" + w.id), w.campos, {merge: true});
+      });
+      try {
+        await lote.commit();
+        escritas += Math.min(400, escrituras.length - i);
+      } catch (e) {
+        console.error("barrido: fallo una tanda de escritura:", e);
+      }
+    }
+    // Que el panel se entere de que hay datos nuevos sin releerlo todo.
+    try {
+      await db.doc(CFG_DOC).set({ts: Date.now()}, {merge: true});
+    } catch (e) {/* el latido se encargara */}
+  }
+
+  // 5 · el informe. Es lo unico que se ve desde Config, asi que dice TODO:
+  //     a cuantos no se les pregunto y por que, no solo lo que cambio.
+  const informe = {
+    ts: Date.now(), hora: ahoraLocal, modo: modo, simulacro: simulacro,
+    candidatos: sel.consultar.length, consultadas: consultadas,
+    fallidas: fallidas, conCambio: escrituras.length, escritas: escritas,
+    movidas: escrituras.filter((w) => w.campos.status).length,
+    saltados: sel.saltados, guiasMalas: sel.guiasMalas.slice(0, 20),
+    cortado: cortado, duracionMs: Date.now() - arranque,
+    detalle: detalle,
+  };
+  try {
+    await db.doc(BARRIDO_DOC).set({ultima: informe}, {merge: true});
+  } catch (e) {
+    console.error("barrido: no se pudo guardar el informe:", e);
+  }
+  console.log("barrido", JSON.stringify({
+    hora: ahoraLocal, consultadas, conCambio: escrituras.length,
+    escritas, simulacro, cortado,
+  }));
+});
+
 // ── shalomPuerta ───────────────────────────────────────────────────────────
 // POST {op}  →  la unica via del panel hacia Shalom.
 //
@@ -773,29 +944,13 @@ exports.shalomPuerta = onRequest(
       const destino = paso.destino;
       const diagnostico = paso.diagnostico;
 
-      // 4 · el interruptor. Si la puerta esta cerrada se responde al instante,
-      //     sin llamar a Shalom: una caida suya deja de costar cientos de
-      //     consultas que van a fallar igual.
-      const estadoPuerta = await _leerPuerta();
-      const llave = interruptor.decidir(
-          estadoPuerta, Date.now(), destino === "validate");
-      if (!llave.pasa) {
-        res.status(200).json({
-          ok: false, motivo: llave.motivo, reabre: llave.reabre,
-        });
-        return;
-      }
-
-      // 5 · recien aqui aparece la clave
+      // 4 · el interruptor y la llamada, por el camino unico.
       try {
-        const r = await shalomPuerta.llamar(
-            destino, SHALOM_API_KEY.value(), paso.datos);
-        const cambios = interruptor.tras(
-            estadoPuerta, r, Date.now(), llave.probando);
-        if (cambios) await _guardarPuerta(cambios);
+        const r = await _porLaPuerta(destino, paso.datos, diagnostico);
         if (!r.ok) {
           res.status(200).json({
-            ok: false, motivo: r.motivo, detalle: r.detalle, http: r.http,
+            ok: false, motivo: r.motivo, detalle: r.detalle,
+            http: r.http, reabre: r.reabre,
           });
           return;
         }

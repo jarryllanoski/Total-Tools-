@@ -20,6 +20,13 @@
      depende de nada al cargar. Lo usan config.js (formulario) y tracking.js
      (modal de seguimiento). -->
 <script src="guias.js?v=1"></script>
+<!-- ⚠️ SÍ, ESTE ARCHIVO ESTÁ EN functions/ Y NO ES UN ERROR.
+     Es la fórmula de qué etiqueta le toca a un pedido, y la usan LOS DOS: este
+     panel y el barrido programado del servidor. Una copia en cada lado
+     divergiría, y divergir ahí significa que el barrido mueva de madrugada una
+     etiqueta que el panel habría rechazado. Un archivo raro de ver en el árbol
+     es mejor que dos reglas que deciden si tus pedidos retroceden. -->
+<script src="functions/etiquetas.js?v=1"></script>
 <script src="appcheck.js?v=1"></script>
 <!-- FIREBASE via REST API — sin SDK, funciona en Brave/Chrome/Firefox/Safari -->
 <script>
@@ -541,6 +548,9 @@
 
   /* Encender o apagar a mano. NO toca la cuenta de fallos ni el descanso: eso
      es del motor, y escribirlo desde acá sería pisarle la mano al servidor. */
+  // El informe del último barrido. Solo se lee: lo escribe el servidor.
+  window._fbLeerBarrido = () => fsGet(`${RAIZ}/barrido`).catch(() => null);
+
   window._fbEncenderPuerta = (on) =>
     fsPatch(shalomPath(), {encendida: !!on, ultimoCambio: Date.now()});
 
@@ -885,6 +895,36 @@
       </div>
       <div class="tgl" id="tglShalomPuerta" onclick="toggleShalomPuerta()"></div>
     </div>
+
+    <!-- EL BARRIDO PROGRAMADO. Corre en el servidor, así que funciona con el
+         panel cerrado — que es justo cuando hace falta. -->
+    <div class="tgl-row">
+      <div style="max-width:74%">
+        <div class="tgl-n">🕐 Seguimiento automático</div>
+        <div class="tgl-s">Consulta tus guías vivas en los horarios de abajo, desde el servidor. Funciona aunque no tengas el panel abierto.</div>
+      </div>
+      <div class="tgl" id="tglBarridoActivo" onclick="toggleBarrido('activo')"></div>
+    </div>
+    <div class="frow">
+      <div class="fg"><label class="fl">Horarios (en punto o y media)</label><input class="fi" id="cfgBarridoHoras" placeholder="08:00, 11:30, 16:30, 19:00" onchange="guardarBarrido()"></div>
+      <div class="fg"><label class="fl">Mover etiquetas</label>
+        <select class="fs" id="cfgBarridoModo" onchange="guardarBarrido()">
+          <option value="apagado">Apagado — solo registra</option>
+          <option value="semi">Semiautomática — todo menos FINALIZADO</option>
+          <option value="auto">Automática — mueve todo</option>
+        </select>
+      </div>
+    </div>
+    <!-- EL SIMULACRO. Encendido de fábrica: mover decenas de etiquetas a
+         ciegas y corregirlas a mano después no es una opción. -->
+    <div class="tgl-row">
+      <div style="max-width:74%">
+        <div class="tgl-n">🧪 Modo simulacro</div>
+        <div class="tgl-s">Decide todo igual pero <b>no escribe nada</b>: deja el informe de qué habría cambiado. Apágalo cuando el informe cuadre.</div>
+      </div>
+      <div class="tgl" id="tglBarridoSimulacro" onclick="toggleBarrido('simulacro')"></div>
+    </div>
+    <div class="tgl-s" id="barridoUltima" style="padding:6px 0 2px;line-height:1.5">Última corrida: —</div>
     <div class="tgl-row" style="border:none">
       <div style="max-width:74%"><div class="tgl-n">📱 Mostrar en el link del cliente</div><div class="tgl-s">El cliente ve el estado de Shalom en su link de seguimiento. Apagado = solo tú lo ves en el panel.</div></div>
       <div class="tgl" id="tglTrackingWebCliente" onclick="toggleTrackingWebCliente()"></div>
@@ -2542,6 +2582,61 @@ function buscarDebounce(){
 /* DOC TOGGLE */
 function togDoc(id,slot){const s=S.shipments.find(x=>x.id===id);if(!s)return;if(slot==='guia')s.chkGuia=!s.chkGuia;else if(slot==='embalado')s.chkEmbalado=!s.chkEmbalado;else s.chkTicket=!s.chkTicket;save(id);render()}
 
+/* SHALOM: el barrido programado (Config) */
+function _cfgBarrido(){
+  S.config = S.config || {};
+  // Valores de fábrica: encendido, en simulacro y en semiautomática. Es la
+  // única combinación que no puede hacer daño el día que se despliega.
+  S.config.barrido = Object.assign(
+    {activo:true, simulacro:true, modo:'semi', horas:'08:00, 11:30, 16:30, 19:00'},
+    S.config.barrido || {});
+  return S.config.barrido;
+}
+function guardarBarrido(){
+  const b = _cfgBarrido();
+  const h = $('cfgBarridoHoras'), m = $('cfgBarridoModo');
+  if(h) b.horas = h.value.trim();
+  if(m) b.modo  = m.value;
+  save('config');
+}
+function toggleBarrido(cual){
+  const b = _cfgBarrido();
+  const el = $(cual === 'activo' ? 'tglBarridoActivo' : 'tglBarridoSimulacro');
+  if(!el) return;
+  el.classList.toggle('on');
+  b[cual] = el.classList.contains('on');
+  save('config');
+  if(cual === 'simulacro'){
+    toast(b.simulacro ? '🧪 Simulacro encendido — no va a escribir nada'
+                      : '✅ Simulacro apagado — el barrido ya escribe de verdad');
+  } else {
+    toast(b.activo ? '🕐 Seguimiento automático encendido'
+                   : '⏸️ Seguimiento automático apagado');
+  }
+}
+/* El informe de la última corrida. Dice también a cuántos NO se les preguntó:
+   sin eso, "consultó 12" parece poco cuando en realidad es todo lo que había. */
+async function _pintarUltimoBarrido(){
+  const el = $('barridoUltima'); if(!el) return;
+  const doc = (window._fbLeerBarrido ? await window._fbLeerBarrido() : null);
+  const u = doc && doc.ultima;
+  if(!u){ el.textContent = 'Última corrida: todavía ninguna.'; return; }
+  const cuando = new Date(u.ts).toLocaleString('es-PE',
+    {day:'numeric',month:'numeric',hour:'2-digit',minute:'2-digit'});
+  const s2 = u.saltados || {};
+  const ahorro = (s2.yaEntregados||0) + (s2.finalizados||0);
+  el.innerHTML =
+    '<b>Última corrida:</b> ' + cuando + ' (' + (u.hora||'') + ')' +
+    (u.simulacro ? ' · <b style="color:#d29922">SIMULACRO, no escribió</b>' : '') +
+    '<br>Consultó ' + (u.consultadas||0) + ' · cambió ' + (u.conCambio||0) +
+    ' · movió ' + (u.movidas||0) + ' etiqueta' + (u.movidas===1?'':'s') +
+    (u.fallidas ? ' · ' + u.fallidas + ' fallaron' : '') +
+    '<br>No preguntó a ' + ahorro + ' (ya entregados o finalizados)' +
+    ((u.guiasMalas||[]).length ? ' · ' + u.guiasMalas.length +
+      ' guía(s) mal escrita(s): ' + u.guiasMalas.map(g=>g.guia).join(', ') : '') +
+    (u.cortado ? '<br><b style="color:#d29922">Se cortó: ' + u.cortado + '</b>' : '');
+}
+
 /* SHALOM: el interruptor maestro de la puerta (Config) */
 async function _pintarPuertaShalom(){
   const fila = $('shalomPuertaEstado'), tgl = $('tglShalomPuerta');
@@ -3877,11 +3972,11 @@ render();
      lo usa. config.js, print.js y voz.js preguntan por los pedidos marcados,
      así que siguen yendo detrás. El orden de carga es un contrato
      (ver docs/ARQUITECTURA.md). -->
-<script src="config.js?v=22"></script>
+<script src="config.js?v=23"></script>
 <script src="print.js?v=16"></script>
 <script src="notify.js?v=4"></script>
 <script src="shalom.js?v=15"></script>
-<script src="tracking.js?v=18"></script>
+<script src="tracking.js?v=19"></script>
 <script src="floatpanel.js?v=4"></script>
 <script src="delivery.js?v=8"></script>
 <script src="qrtracking.js?v=3"></script>

@@ -36,12 +36,57 @@ NUEVO PEDIDO → EN PROCESO → POR ALISTAR → ALISTADO → ENVIADO
 
 ---
 
-## 2. Nadie mueve una etiqueta sola
+## 2. La etiqueta se mueve sola, pero por UNA sola puerta
 
-**Invariante actual (30 ago 2026): `ship.status` solo cambia cuando el operador
-lo cambia.** No hay ninguna ruta automática.
+> ### ⚠️ ESTE INVARIANTE SE REVIRTIÓ EL 18 SEP 2026
+>
+> Del 30 ago al 18 sep, `ship.status` **solo lo cambiaba el operador**. Ya no:
+> el dueño del negocio pidió recuperar la fórmula de su manual, y es su
+> decisión. Queda escrito con fecha y motivo para que dentro de tres meses
+> nadie lea el código, vea que mueve etiquetas, y crea que es un bug.
+>
+> **La limpieza de agosto puso una condición y se cumplió**: *"si la
+> automatización vuelve, tiene que volver por un solo sitio, no por cuatro"*.
+> Volvió por **`functions/etiquetas.js`** — un archivo, compartido por el panel
+> y por el barrido del servidor. Las otras tres rutas siguen retiradas.
 
-Se retiraron las cuatro que existían:
+**Invariante actual: `ship.status` cambia solo desde
+`Etiquetas.decidirEtiqueta()`, y desde ningún otro lugar.**
+
+| | |
+|---|---|
+| Quién lo llama | el panel (`_aplicarEstadoShalom`) y el barrido (`barrido.cambiosDe`) |
+| Dónde vive la regla | `functions/etiquetas.js` — **un archivo, no dos copias** |
+| Por qué en `functions/` | es el único sitio que ven los dos: el servidor lo requiere, el panel lo carga como `functions/etiquetas.js` |
+
+### Las cuatro reglas que no se pueden saltar
+
+1. **Un envío no desanda el camino.** El orden es el de los chips, y solo se
+   avanza.
+2. **Una etiqueta que no está en la escalera NO SE TOCA.** `RECLAMOS,
+   DEVOLUCIONES, GARANTÍA`, `AVISAR CUANDO LLEGUE`, `RETORNO A ORIGEN` son
+   decisiones del operador sobre algo que el recorrido de Shalom no sabe. Si no
+   se puede ubicar, no se sabe si moverla sería avanzar o retroceder.
+3. **Con saldo pendiente no se cierra un pedido, ni en modo Automática.**
+   Shalom entregó el paquete; a ti no te pagaron. Se queda en
+   `PENDIENTE DE PAGO`.
+4. **La demora NO es un peldaño.** El manual decía *"Demora de envíos →
+   ENVIADO"*: esa línea mandaba hacia atrás a un pedido ya en destino. La
+   demora avisa al cliente y no mueve nada.
+
+### Los tres modos
+
+`S.config.barrido.modo`: `apagado` (solo registra) · `semi` (todo menos
+FINALIZADO, que cierras tú) · `auto` (todo). **De fábrica, `semi`** — es donde
+el error más caro, cerrar un pedido antes de tiempo, no puede ocurrir.
+
+> "Apagado" es sobre las **etiquetas**. El seguimiento se sigue registrando
+> siempre: saber dónde está el paquete nunca sobra.
+
+### Lo de antes, que sigue en pie
+
+
+Las otras tres rutas automáticas **siguen retiradas** y no vuelven:
 
 | Origen retirado | Dónde estaba | Qué hacía |
 |---|---|---|

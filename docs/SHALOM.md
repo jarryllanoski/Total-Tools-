@@ -443,6 +443,51 @@ interruptor:
 **solo** `encendida`. La cuenta de fallos y el descanso son del servidor; hay
 una prueba que falla si el navegador intenta tocarlos.
 
+## El barrido programado
+
+`functions/barrido.js` + `exports.barridoShalom`. Cloud Scheduler dispara
+**cada 30 minutos** y la función decide si le toca.
+
+> **Por qué cada 30 min y no cuatro crones fijos.** Los disparos que no tocan
+> **no consultan nada a Shalom** — cuestan 48 invocaciones y 48 lecturas al
+> día, contra límites gratuitos de 66.000 y 50.000. A cambio, los horarios son
+> **un texto en Config** que se cambia sin volver a desplegar. Cuatro entradas
+> de cron atarían cada cambio de horario a un despliegue.
+
+Zona fija `America/Lima`: "8am" es 8am aquí, sin cuentas con UTC. Perú no
+cambia la hora, así que tampoco se corre medio año.
+
+### A quién NO se consulta, y cuánto ahorra
+
+| Razón | Por qué |
+|---|---|
+| Shalom ya dijo **Entregado** | es la última rama del árbol: no hay nada después |
+| etiqueta **FINALIZADO** | el pedido está cerrado |
+| **guía mal escrita** | se sabe de antemano que va a fallar; se lista para corregirla |
+| consultado hace < 50 min | defensa contra un disparo repetido |
+
+De 484 guías entran ~71 → **284 consultas al día**, y baja solo: cada pedido
+que llega a Entregado sale de la lista para siempre.
+
+### Detalles que no son obvios
+
+- **Arranca en SIMULACRO.** Decide todo igual y no escribe: deja el informe de
+  qué habría cambiado. Mover 71 etiquetas a ciegas y corregirlas a mano después
+  no es una opción.
+- **Si nada cambió, no se escribe nada** — ni la hora de la consulta. Estampar
+  "te miré y no había novedad" 284 veces al día es pagar por no-noticias.
+- **Si la puerta se cierra a mitad del barrido, se corta.** Seguir sería
+  pedirle 60 veces más a un servicio caído que nos diga que sigue caído.
+- **`retryCount: 0`.** Un barrido perdido se recupera en el horario siguiente;
+  uno repetido consultaría todo dos veces.
+- El historial se escribe con **el mismo formato que el panel**
+  (`{date, status, message, source}`): un tercer formato haría ilegible la
+  mitad de las entradas.
+- `/track/batch` bajaría las 284 consultas a 8, y **no se usa todavía**: la
+  documentación avisa que empareja por posición y no está medido qué pasa si
+  una guía falla. Con plan ilimitado, la eficiencia no aprieta lo suficiente
+  como para arriesgar escribir el estado de un pedido en otro.
+
 ### Cómo se mide el siguiente endpoint
 
 Desde el entorno donde se desarrolla **no se puede llamar a `shalom-api.lat`**

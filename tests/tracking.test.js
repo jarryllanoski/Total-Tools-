@@ -26,6 +26,11 @@ module.exports = (t) => {
 
   const dom = E.domFalso({});
   const win = {};
+  /* tracking.js delega la clasificación del recorrido y la fórmula de las
+     etiquetas en functions/etiquetas.js — el MISMO archivo que usa el barrido
+     del servidor. En el navegador lo carga un <script> antes; acá se trae por
+     require, que es el mismo archivo por la otra puerta del módulo. */
+  win.Etiquetas = require('../functions/etiquetas.js');
   // eslint-disable-next-line no-new-func
   new Function('window', 'document', 'localStorage', 'setTimeout', 'clearTimeout', 'console',
       puente)(win, dom.doc, {getItem: () => null, setItem() {}}, setTimeout, clearTimeout, console);
@@ -160,5 +165,94 @@ module.exports = (t) => {
         'sin hora válida no se inventa una');
     ok(T._motivoTexto('PUERTA_CERRADA', Date.now() - 60000)
         .indexOf('reintenta en') < 0, 'ni con una hora ya pasada');
+  }
+
+  bloque('El panel mueve la etiqueta con la MISMA fórmula que el servidor');
+  {
+    /* 18 sep 2026: el movimiento automático vuelve por decisión del negocio —
+       es la fórmula del manual del panel. Lo que se cuida aquí es que el panel
+       no tenga su propia versión: si decidiera distinto que el barrido, un
+       pedido tendría una etiqueta según quién lo consultó. */
+    const conModo = (modo) => { win.S = {config: {barrido: {modo}}}; };
+    const shalom = (pasos, estado) => ({ok: true, pasos, estado,
+      fecha: '2026-09-18 10:00'});
+
+    conModo('semi');
+    {
+      const s = {id: '1', status: 'ENVIADO', trackingStatus: 'En tránsito'};
+      const r = T._aplicarEstadoShalom(s, shalom(2, 'En destino'), 'shalom');
+      ok(s.status === 'LLEGÓ A DESTINO', 'en destino mueve la etiqueta');
+      ok(r.movio === 'LLEGÓ A DESTINO', 'y lo informa a quien llamó');
+    }
+    {
+      const s = {id: '2', status: 'LLEGÓ A DESTINO', trackingStatus: 'En destino'};
+      T._aplicarEstadoShalom(s, shalom(3, 'Entregado'), 'shalom');
+      ok(s.status === 'LLEGÓ A DESTINO',
+          'en semiautomática, FINALIZADO lo cierras tú');
+    }
+    conModo('auto');
+    {
+      const s = {id: '3', status: 'LLEGÓ A DESTINO', trackingStatus: 'En destino'};
+      T._aplicarEstadoShalom(s, shalom(3, 'Entregado'), 'shalom');
+      ok(s.status === 'FINALIZADO', 'en automática, cierra');
+    }
+    {
+      const s = {id: '4', status: 'LLEGÓ A DESTINO', cost: '249',
+        trackingStatus: 'En destino'};
+      T._aplicarEstadoShalom(s, shalom(3, 'Entregado'), 'shalom');
+      ok(s.status === 'PENDIENTE DE PAGO',
+          'pero con saldo pendiente no cierra ni en automática');
+    }
+    {
+      const s = {id: '5', status: 'RECLAMOS, DEVOLUCIONES, GARANT',
+        trackingStatus: ''};
+      T._aplicarEstadoShalom(s, shalom(3, 'Entregado'), 'shalom');
+      ok(s.status === 'RECLAMOS, DEVOLUCIONES, GARANT',
+          'y una etiqueta tuya no se toca ni en automática');
+    }
+    conModo('apagado');
+    {
+      const s = {id: '6', status: 'ENVIADO', trackingStatus: 'En tránsito'};
+      const r = T._aplicarEstadoShalom(s, shalom(2, 'En destino'), 'shalom');
+      ok(s.status === 'ENVIADO', 'apagado: la etiqueta no se mueve');
+      ok(s.trackingStatus === 'En destino',
+          'pero el seguimiento SÍ se registra — "apagado" es sobre etiquetas');
+      ok(r.movio === null, 'y el aviso lo sabe');
+    }
+    win.S = undefined;
+  }
+
+  bloque('La fórmula es un solo archivo, y el panel lo carga');
+  {
+    const html = E.leer('index.html');
+    ok(html.indexOf('functions/etiquetas.js') > 0,
+        'index.html carga functions/etiquetas.js — el mismo del servidor');
+    const trk = E.leer('tracking.js');
+    ok(/window\.Etiquetas\.rangoDeTexto/.test(trk),
+        'y tracking.js delega en él en vez de tener su copia');
+    ok(/window\.Etiquetas\.decidirEtiqueta/.test(trk),
+        'también para decidir la etiqueta');
+    const idx = E.leer('functions/index.js');
+    ok(/require\("\.\/etiquetas"\)/.test(idx),
+        'y el servidor requiere EL MISMO archivo, no una copia suya');
+  }
+
+  bloque('El manual del panel dice lo que el panel hace');
+  {
+    /* Un manual que describe algo que el sistema ya no hace es peor que no
+       tenerlo: se confía en él. Estas pruebas atan el texto al comportamiento
+       que sí está probado más arriba. */
+    const src = E.leer('tracking.js');
+    const manual = src.slice(src.indexOf('var pasos = ['),
+        src.indexOf('var pasos = [') + 3000);
+    ok(manual.indexOf('12 horas') < 0 && manual.indexOf('24 horas') < 0,
+        'ya no promete "cada 12 y 24 horas": ahora son horarios fijos');
+    ok(/horarios que pongas/.test(manual), 'y dice que los pones tú');
+    ok(/la etiqueta no se mueve/.test(manual),
+        'la demora avisa sin mover — la línea vieja mandaba a un pedido en ' +
+        'destino de vuelta a ENVIADO');
+    ok(/saldo por cobrar/.test(manual),
+        'y avisa que con saldo pendiente no se cierra');
+    ok(/nunca retrocede/.test(manual), 'y que una etiqueta no retrocede');
   }
 };
