@@ -1531,8 +1531,9 @@ function saveConfig(){
   // Save dispatch
   S.dispatch.cutHour=$('dispatchCutHour').value;
   S.dispatch.anticipation=parseInt($('dispatchAnticip').value)||0;
-  $('hdrName').textContent=S.config.name;
-  $('hdrPhone').textContent=S.config.phone;
+  // Una sola puerta para pintar el encabezado: tres copias del mismo par de
+  // líneas es como una se queda vieja sin que nadie lo note.
+  if(typeof pintarEncabezado==='function') pintarEncabezado();
   save('config'); renderChips(); toast('✅ Configuración guardada'); // ★ solo config
 }
 let _dragIdx=null;

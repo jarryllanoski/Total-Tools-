@@ -138,4 +138,25 @@ module.exports = (t) => {
     ok(/if\(window\.Seleccion\)\s*Seleccion\._pintarBoton\(\)/.test(html),
         'y aun así la llamada va con guarda: pintar un botón no puede tumbar el render');
   }
+
+  bloque('El encabezado se entera de que llegaron los datos');
+  {
+    /* Se pintaba UNA vez al arrancar. En un navegador sin respaldo local
+       —una PC nueva, una ventana privada— se quedaba en "Mi Negocio /
+       999000000" aunque el nombre de verdad llegara de la nube un segundo
+       después. Parecía que la configuración se había borrado, y no. */
+    const html = E.leer('index.html');
+    ok(/function pintarEncabezado\(\)/.test(html),
+        'pintar el encabezado es una función, no dos líneas sueltas');
+    const desde = html.indexOf('window._mergeRemote');
+    const merge = html.slice(desde,
+        html.indexOf("toast('☁️ Datos sincronizados')", desde));
+    ok(/pintarEncabezado\(\)/.test(merge),
+        'y el latido la llama: los datos de la nube también son el nombre');
+    ok(!/\$\('hdrName'\)\.textContent\s*=/.test(E.leer('config.js')),
+        'config.js ya no tiene su propia copia — tres copias del mismo par de ' +
+        'líneas es como una se queda vieja sin que nadie lo note');
+    ok(/pintarEncabezado/.test(E.leer('config.js')),
+        'usa la misma puerta que el resto');
+  }
 };
