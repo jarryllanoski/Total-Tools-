@@ -1520,7 +1520,7 @@
 
 <div class="toast" id="toastEl"></div>
 
-<script src="auth.js?v=6"></script>
+<script src="auth.js?v=7"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
 <script>
@@ -1751,7 +1751,9 @@ async function _fbSaveWithRetry(data, attempt){
     if(e && e.http === 403){
       lsSet('dpanel_pending', '1');
       window._fbStatus && window._fbStatus('err');
-      if(window._authExpulsar){
+      // Misma regla que arriba: sin sesión previa no hay a quién expulsar.
+      const habiaSesion = !!(window._authHaySesion && window._authHaySesion());
+      if(habiaSesion && window._authExpulsar){
         window._authExpulsar('Tu sesión venció. Ingresa de nuevo — tus cambios están guardados aquí y se subirán al entrar.');
       }
       return;
@@ -1930,12 +1932,17 @@ const _initFirebase = async (intento) => {
        a Firebase" y a revisar el internet.
        Reintentar un 403 cuatro veces no lo arregla — solo llena la consola. */
     if(e && e.http === 403){
-      if(window._authExpulsar){
+      /* ⚠️ Un 403 significa "tu sesión venció" SOLO SI HABÍA UNA SESIÓN.
+         Sin token guardado, el 403 es el estado NORMAL de quien todavía no ha
+         entrado — esta carga corre en paralelo con la pantalla de login.
+         Tratarlo como expulsión borraba la sesión y dibujaba una SEGUNDA
+         pantalla de login encima; al entrar se quitaba una y el usuario
+         seguía mirando la otra, tecleando su contraseña sin entender nada. */
+      const habiaSesion = !!(window._authHaySesion && window._authHaySesion());
+      if(habiaSesion && window._authExpulsar){
         window._authExpulsar('Tu sesión venció. Ingresa de nuevo.');
-      } else {
-        toast('⚠️ Tu sesión venció. Ingresa de nuevo.');
       }
-      return;
+      return; // en los dos casos: reintentar un 403 no lo arregla
     }
     if(intento < 4){
       // Reintentar la carga; no nos quedamos con local viejo en pantalla sin avisar

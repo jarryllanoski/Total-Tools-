@@ -501,6 +501,28 @@ Todo pasa por `_expulsar()` en `auth.js`. Los tres caminos que vencían una
 sesión llamaban a `_clearSession()` a secas: al arrancar, al rechazarse el
 token y (nuevo) ante un 403.
 
+### Un 403 es "venció tu sesión" SOLO si había una sesión
+
+> ⚠️ **Esto bloqueó el panel durante dos días.** Se corrigió el 20 sep 2026.
+
+`_initFirebase()` pide datos **al cargar la página, en paralelo con la pantalla
+de login**. Sin haber entrado todavía, Firestore responde `403` — y eso es lo
+**normal**, no una sesión vencida.
+
+Al tratarlo como expulsión, `_expulsar()` llamaba a `_showLogin()` y **dibujaba
+una segunda pantalla de login encima**. Al entrar, `_hideOverlay()` quitaba
+solo la primera (`getElementById` devuelve una) y el usuario seguía mirando la
+otra, tecleando su contraseña una y otra vez sin entender nada.
+
+Dos defensas, porque son dos fallos distintos:
+
+| | |
+|---|---|
+| **Se comprueba `_authHaySesion()`** antes de expulsar | sin token guardado no hay nadie a quien expulsar |
+| **`_showLogin()` es idempotente** — borra la anterior antes de poner la suya | que no existan dos no puede depender de que nadie la llame dos veces |
+
+Y `_hideOverlay()` quita **todas**, no la primera.
+
 ### Un 403 de Firestore es tu sesión, no la red
 
 `PERMISSION_DENIED` significa que **esta sesión ya no tiene permiso**, casi

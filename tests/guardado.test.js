@@ -134,6 +134,7 @@ function montarReintento(op) {
   const win = { _estados: [], _expulsado: null };
   win._fbStatus = function (s) { win._estados.push(s); };
   win._authExpulsar = function (m) { win._expulsado = m || 'sí'; };
+  win._authHaySesion = function () { return !!op.haySesion; };
   win._fbSave = op.guardar;
   const ctx = {
     window: win,
@@ -198,6 +199,7 @@ function montarInit(op) {
     _mergeRemote: () => {}, _fbListen: () => {}, _expulsado: null
   };
   win._authExpulsar = function (m) { win._expulsado = m || 'sí'; };
+  win._authHaySesion = function () { return !!op.haySesion; };
   const ctx = {
     window: win, S,
     document: { getElementById: () => null },
@@ -388,7 +390,7 @@ module.exports = async function ({ bloque, ok }) {
        la página. Si la sesión moría con el panel abierto, Firestore empezaba a
        responder 403 y el panel decía "Sin conexión a Firebase" — a revisar el
        internet por un problema de permisos. Pasó de verdad. */
-    const i = montarInit({cargaFalla: 403});
+    const i = montarInit({cargaFalla: 403, haySesion: true});
     await i.api.init();
     ok(i.win._expulsado, 'un 403 al cargar dice que la sesión venció');
     ok(String(i.win._expulsado).toLowerCase().indexOf('sesión') >= 0,
@@ -396,6 +398,19 @@ module.exports = async function ({ bloque, ok }) {
     ok(i.reintentos.length === 0,
        'y no se reintenta: cuatro intentos no arreglan un problema de permisos');
     ok(i.subidas.length === 0, 'ni se sube nada a una nube que nos rechaza');
+  }
+  {
+    /* ⚠️ EL CASO QUE LO ROMPIÓ TODO. Esta carga corre EN PARALELO con la
+       pantalla de login: sin haber entrado todavía, el 403 es lo NORMAL, no
+       una sesión vencida. Tratarlo como expulsión borraba la sesión y dibujaba
+       una segunda pantalla de login encima — y al entrar se quitaba una sola.
+       El usuario tecleaba su contraseña una y otra vez sin entender nada. */
+    const i = montarInit({cargaFalla: 403, haySesion: false});
+    await i.api.init();
+    ok(!i.win._expulsado,
+       'sin sesión previa, un 403 no expulsa a nadie: todavía no había entrado');
+    ok(i.reintentos.length === 0, 'y tampoco se reintenta, que no lo arregla');
+    ok(i.subidas.length === 0, 'ni se sube nada');
   }
   {
     const i = montarInit({cargaFalla: 503});
@@ -408,7 +423,7 @@ module.exports = async function ({ bloque, ok }) {
     const r = montarReintento({guardar: async () => {
       intentos++;
       const e = new Error('denegado'); e.http = 403; throw e;
-    }});
+    }, haySesion: true});
     await r.api.reintentar({}, 0); await r.drenar();
     ok(intentos === 1, 'guardando, un 403 tampoco se reintenta cuatro veces');
     ok(r.almacen.dpanel_pending === '1',

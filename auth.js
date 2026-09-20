@@ -92,6 +92,11 @@
 
   /* ── HTML ────────────────────────────────────────────────────────── */
   function _showLogin(){
+    /* IDEMPOTENTE A LA FUERZA. Dos pantallas de login con el mismo id es lo
+       que dejó a alguien tecleando su contraseña una y otra vez: entraba bien,
+       se quitaba una, y seguía mirando la otra. Que no puedan existir dos no
+       depende de que nadie llame dos veces — depende de aquí. */
+    _hideOverlay();
     var ov = document.createElement('div');
     ov.id = 'authOverlay';
     ov.innerHTML = `
@@ -279,6 +284,13 @@
   }
   window._authExpulsar = _expulsar;
 
+  /* ¿HABÍA una sesión? Es la pregunta que convierte un 403 en un diagnóstico.
+     Un 403 de Firestore significa "tu sesión venció" solo si existía una. Sin
+     token guardado es el estado normal de quien todavía no ha entrado. */
+  window._authHaySesion = function(){
+    try { return !!localStorage.getItem('tt_id_token'); } catch(e){ return false; }
+  };
+
   function _isValidSession(){
     var token  = localStorage.getItem(TOKEN_KEY);
     var expiry = parseInt(localStorage.getItem(EXPIRY_KEY)||'0');
@@ -432,8 +444,12 @@
   }
 
   function _hideOverlay(){
-    var ov = document.getElementById('authOverlay');
-    if(ov) ov.remove();
+    // querySelectorAll y no getElementById: éste devuelve SOLO la primera, y
+    // dejar una segunda escondida detrás es exactamente el bug que hubo.
+    var ovs = document.querySelectorAll('#authOverlay');
+    for(var i = 0; i < ovs.length; i++){
+      try { ovs[i].remove(); } catch(e){}
+    }
   }
 
   /* ── TOKEN VÁLIDO PARA REQUESTS ─────────────────────────────────── */
