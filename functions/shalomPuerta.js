@@ -366,18 +366,17 @@ function traducirTrack(j) {
  * sepa uno de estos correos se registra con el, pone su contrasena, y habla
  * con la API de Shalom del negocio.
  *
- * `legado` es la puerta vieja: una cuenta creada a mano desde la consola, sin
- * correo verificado. Se acepta a proposito y TEMPORALMENTE para no dejar al
- * dueno fuera; se retira en cuanto entre con su Gmail.
+ * No hay excepciones. Hubo una —una cuenta creada a mano, sin correo
+ * verificado— y se retiro el 20 sep 2026 junto con la cuenta: una contrasena
+ * de un buzon que no existe no se puede cambiar ni recuperar, asi que no era
+ * una llave de emergencia sino una llave perdida.
  * @param {Object} usuario token decodificado
  * @param {Array<string>} admins correos autorizados
- * @param {string} [legado] correo antiguo aceptado sin verificar
  * @return {boolean} true si puede
  */
-function esAdminDe(usuario, admins, legado) {
+function esAdminDe(usuario, admins) {
   const correo = String((usuario && usuario.email) || "").toLowerCase();
   if (!correo) return false;
-  if (legado && correo === String(legado).toLowerCase()) return true;
   if (usuario.email_verified !== true) return false;
   const lista = (admins || []).map((x) => String(x).toLowerCase());
   return lista.indexOf(correo) >= 0;

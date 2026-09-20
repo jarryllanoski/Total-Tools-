@@ -12,6 +12,7 @@
  */
 'use strict';
 const path = require('path');
+const E = require('./_entorno.js');
 const P = require(path.join(__dirname, '..', 'functions', 'shalomPuerta.js'));
 
 /* Un `fetch` de mentira. Guarda con qué se le llamó y responde a voluntad. */
@@ -217,18 +218,30 @@ module.exports = async ({bloque, ok}) => {
         ADMINS) === true, 'verificado y en la lista: pasa');
   }
   {
-    // La puerta vieja: una cuenta creada a mano, sin correo verificado. Se
-    // acepta A PROPÓSITO y temporalmente, para no dejar al dueño fuera.
+    /* NO HAY EXCEPCIONES, y esto se prueba a propósito.
+       Hubo una —admin@totaltools.com, creada a mano desde la consola, sin
+       correo verificado— y se retiró el 20 sep 2026 junto con la cuenta. Una
+       contraseña de un buzón que no existe no se puede cambiar ni recuperar:
+       no era una llave de emergencia, era una llave perdida esperando a que
+       alguien la encontrara. */
     ok(P.esAdminDe({email: 'admin@totaltools.com', email_verified: false},
-        ADMINS, 'admin@totaltools.com') === true,
-       'el correo de legado entra sin verificar, que para eso está');
-    ok(P.esAdminDe({email: 'admin@totaltools.com', email_verified: false},
-        ADMINS) === false,
-       'pero SOLO si se declara: el día que se retire, deja de entrar');
-    ok(P.esAdminDe({email: 'otro@gmail.com', email_verified: false},
-        ADMINS, 'admin@totaltools.com') === false,
-       'y no abre la puerta a cualquier otro sin verificar');
+        ADMINS) === false, 'la cuenta vieja ya no entra');
+    ok(P.esAdminDe({email: 'admin@totaltools.com', email_verified: true},
+        ADMINS) === false, 'ni aunque llegara verificada: no está en la lista');
+    ok(P.esAdminDe.length === 2,
+       'y la función ya no acepta un tercer parámetro de excepción: quitar la ' +
+       'puerta es quitarla, no dejarla desactivada esperando');
+    const idx = E.leer('functions/index.js');
+    ok(idx.indexOf('admin@totaltools.com') < 0,
+       'el correo viejo no aparece en ningún sitio del backend');
+    const reglas = E.leer('firestore.rules');
+    const activo = reglas.split('\n').filter((l) => l.indexOf('//') < 0).join('\n');
+    ok(activo.indexOf('admin@totaltools.com') < 0,
+       'ni en las reglas — solo en el comentario que explica por qué se fue');
+    ok(/email_verified == true/.test(activo),
+       'y las reglas siguen exigiendo el correo verificado');
   }
+
   ok(P.esAdminDe(null, ADMINS) === false && P.esAdminDe({}, ADMINS) === false,
      'sin usuario o sin correo, no');
 

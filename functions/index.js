@@ -41,16 +41,13 @@ const SHALOM_API_KEY = defineSecret("SHALOM_API_KEY");
 // Son dos archivos distintos que expresan la misma regla: si se cambian por
 // separado, alguien puede escribir en Firestore pero no hablar con Shalom, o
 // al reves. Al tocar una, tocar la otra.
+// ⚠️ Solo cuentas de Google: esAdminDe exige el correo VERIFICADO, y un
+// registro con contrasena nunca lo esta. Misma regla que firestore.rules.
 const ADMINS = [
   "jarryllanoski@gmail.com",
   "redbolima@gmail.com",
 ];
 
-/* Puerta vieja, TEMPORAL. La cuenta admin@totaltools.com se creo a mano desde
-   la consola y no tiene el correo verificado —ni existe ese buzon—, asi que no
-   pasaria el filtro. Se acepta para no dejar al dueno fuera mientras prueba
-   Google. SE RETIRA en cuanto confirme que entra con su Gmail. */
-const ADMIN_LEGADO = "admin@totaltools.com";
 
 /**
  * EL ÚNICO CAMINO HACIA SHALOM: interruptor → llamada → interruptor.
@@ -954,7 +951,7 @@ exports.barridoAhora = onRequest({
     return;
   }
   // Misma regla que la puerta: el correo solo vale si esta verificado.
-  if (!shalomPuerta.esAdminDe(tok, ADMINS, ADMIN_LEGADO)) {
+  if (!shalomPuerta.esAdminDe(tok, ADMINS)) {
     res.status(403).json({ok: false, motivo: "SIN_PERMISO"});
     return;
   }
@@ -1011,7 +1008,6 @@ exports.shalomPuerta = onRequest(
       }, {
         verificar: (t) => getAuth().verifyIdToken(t),
         admins: ADMINS,
-        legado: ADMIN_LEGADO,
       });
       if (paso.corte) {
         res.status(paso.corte.http)

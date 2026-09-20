@@ -35,25 +35,25 @@ service cloud.firestore {
     // seguiría en false salvo que el atacante pueda leer ese buzón — que es
     // justo lo que no puede.
     //
+    // ⚠️ SOLO ENTRAN CUENTAS DE GOOGLE. `email_verified` nunca es true en un
+    // registro con contraseña, así que esta lista no se puede reclamar
+    // registrándose con uno de estos correos.
+    //
+    // Se retiró admin@totaltools.com (20 sep 2026): era una cuenta creada a
+    // mano, con un buzón que no existe y por tanto sin recuperación posible.
+    // Una contraseña que no se puede cambiar ni recuperar no es una llave de
+    // emergencia: es una llave perdida esperando a que alguien la encuentre.
+    //
     // MANTENIMIENTO: agregar o quitar un administrador se hace aquí y con
     //   firebase deploy --only firestore:rules
     // (esto desaparece cuando pasemos a marcas en el usuario: ver docs).
     function esAdmin() {
-      return request.auth != null && (
-        (request.auth.token.email_verified == true
-          && request.auth.token.email in [
-            'jarryllanoski@gmail.com',
-            'redbolima@gmail.com'
-          ])
-        // ── PUERTA VIEJA, TEMPORAL ──────────────────────────────────────
-        // admin@totaltools.com se creó a mano desde la consola y NO tiene el
-        // correo verificado (ni existe ese buzón), así que no pasaría el
-        // filtro de arriba. Se deja abierta para no dejar al dueño fuera
-        // mientras prueba Google.
-        // ⚠️ SE RETIRA en cuanto confirme que entra con su Gmail. Mientras
-        // siga aquí, una contraseña adivinada abre el negocio entero.
-        || request.auth.token.email == 'admin@totaltools.com'
-      );
+      return request.auth != null
+        && request.auth.token.email_verified == true
+        && request.auth.token.email in [
+          'jarryllanoski@gmail.com',
+          'redbolima@gmail.com'
+        ];
     }
 
     // Solo administradores acceden a "panel/**" (todos tus pedidos, tokens, config)
