@@ -228,4 +228,18 @@ module.exports = async ({bloque, ok}) => {
        '…entrar las quita TODAS: ninguna se queda escondida detrás');
     ok(m.guardado.tt_id_token === 'ID', 'y la sesión queda guardada');
   }
+
+  bloque('El botón de Google está encendido');
+  {
+    const cfg = E.leer('firebase-config.js');
+    ok(/GOOGLE_CLIENT_ID:\s*'[^']*\.apps\.googleusercontent\.com'/.test(cfg),
+       'hay un ID de cliente configurado, así que el botón se muestra');
+    ok(!/CLIENT_SECRET|client_secret|Secreto de cliente/i.test(cfg),
+       'y el SECRETO no está en el repositorio: el ID es público, el secreto no');
+    const auth = E.leer('auth.js');
+    ok(/if\(!GOOGLE_CLIENT_ID\) return;/.test(auth),
+       'sin ID el botón no se dibuja — activarlo nunca puede dejar a nadie fuera');
+    ok(/accounts\.google\.com\/gsi\/client/.test(auth),
+       'y el botón lo dibuja Google, no nosotros: la contraseña nunca pasa por aquí');
+  }
 };
