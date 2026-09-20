@@ -284,6 +284,53 @@
   }
   window._authExpulsar = _expulsar;
 
+  /* ── ENTRÓ, PERO NO TIENE ACCESO ──────────────────────────────────────
+     Un 403 de Firestore puede significar dos cosas MUY distintas:
+       · tu sesión venció  → vuelve a entrar y listo;
+       · tu cuenta no está autorizada → volver a entrar no arregla nada.
+     Desde el 403 no se pueden distinguir. Y tratar la segunda como la primera
+     manda al usuario a un bucle: entra bien, se le dice "tu sesión venció",
+     vuelve a entrar, y otra vez. Sin entender nunca qué pasa.
+
+     Así que no se adivina: se dice lo que SÍ se sabe —con qué correo entró— y
+     se le dan las dos salidas. El correo es el dato que resuelve el problema:
+     casi siempre entró con la cuenta equivocada. */
+  function _sinAcceso(correo){
+    _hideOverlay();
+    var ov = document.createElement('div');
+    ov.id = 'authOverlay';
+    ov.innerHTML =
+      '<div id="authBox">' +
+        '<div id="authLogo">' +
+          '<div class="logo-icon">🔒</div>' +
+          '<div class="logo-name">SIN ACCESO</div>' +
+          '<div class="logo-sub">Tu cuenta entró, pero no está autorizada</div>' +
+        '</div>' +
+        '<div style="font-size:13px;color:#e6edf3;line-height:1.6;' +
+             'background:#161b22;border:1px solid #30363d;border-radius:10px;' +
+             'padding:12px;margin-bottom:14px">' +
+          'Entraste como<br><b style="color:#388bfd;word-break:break-all">' +
+          String(correo || 'una cuenta desconocida').replace(/</g, '&lt;') +
+          '</b>' +
+        '</div>' +
+        '<div style="font-size:12px;color:#8b949e;line-height:1.5;margin-bottom:16px">' +
+          'Si es la cuenta correcta, falta darle permiso. Si no lo es, sal y ' +
+          'entra con la otra.' +
+        '</div>' +
+        '<button id="authBtn" onclick="window.AuthModule.logout()">Salir y usar otra cuenta</button>' +
+        '<div id="authErr"></div>' +
+        '<div id="authLoading">Verificando...</div>' +
+      '</div>';
+    document.body.appendChild(ov);
+  }
+  window._authSinAcceso = _sinAcceso;
+
+  /* El correo con el que se entró. Es lo único accionable cuando algo falla
+     por permisos: casi siempre se entró con la cuenta equivocada. */
+  window._authCorreo = function(){
+    try { return localStorage.getItem(EMAIL_KEY) || ''; } catch(e){ return ''; }
+  };
+
   /* ¿HABÍA una sesión? Es la pregunta que convierte un 403 en un diagnóstico.
      Un 403 de Firestore significa "tu sesión venció" solo si existía una. Sin
      token guardado es el estado normal de quien todavía no ha entrado. */

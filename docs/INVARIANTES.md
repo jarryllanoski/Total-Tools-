@@ -610,6 +610,47 @@ de entrega y las firmas **no**.
 
 ---
 
+## 11 bis. Un correo solo vale si está verificado
+
+> ⚠️ **Sin esto, tu panel se abre registrándose.**
+
+Firebase, con correo/contraseña activado, deja que **cualquiera cree una cuenta
+con cualquier correo** — no comprueba que sea suyo. Y las reglas decían:
+
+```js
+request.auth.token.email in ['admin@totaltools.com']
+```
+
+Alguien que supiera un correo de esa lista podía registrarse con él, poner su
+propia contraseña, y entrar a los datos del negocio. **Sin hackear nada.**
+
+La defensa es una línea, en **los dos sitios** que deciden quién es
+administrador (`firestore.rules` y `shalomPuerta.esAdminDe`):
+
+```js
+request.auth.token.email_verified == true
+```
+
+`email_verified` solo llega en `true` cuando el proveedor confirmó la
+identidad. **Google siempre lo hace.** Un registro con contraseña llega en
+`false`, y seguiría en `false` salvo que el atacante pueda leer ese buzón — que
+es justo lo que no puede.
+
+> Un `"true"` de texto tampoco pasa: se compara contra el booleano.
+
+### La puerta vieja, y por qué se va
+
+`admin@totaltools.com` se creó a mano desde la consola: **no tiene el correo
+verificado, y ese buzón ni siquiera existe.** No pasaría el filtro, así que
+está aceptado aparte y **a propósito**, para no dejar al dueño fuera mientras
+prueba Google.
+
+**Se retira en cuanto confirme que entra con su Gmail.** Mientras siga ahí, una
+contraseña adivinada abre el negocio entero — y esa contraseña no se puede
+recuperar ni cambiar por correo, porque el buzón no existe.
+
+---
+
 ## 11. Seguridad
 
 - **Firestore solo acepta correos de la lista de administradores**

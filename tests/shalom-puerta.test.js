@@ -153,7 +153,7 @@ module.exports = async ({bloque, ok}) => {
 
   bloque('Las cuatro barreras, y en ese orden');
 
-  const ADMINS = ['admin@totaltools.com'];
+  const ADMINS = ['jarryllanoski@gmail.com', 'redbolima@gmail.com'];
   // Si el corte no llega, la prueba tiene que FALLAR diciéndolo, no reventar
   // y llevarse por delante las que vienen detrás.
   const motivo = (r) => (r && r.corte ? r.corte.motivo : 'NO CORTÓ');
@@ -168,10 +168,15 @@ module.exports = async ({bloque, ok}) => {
       cuerpo: op.cuerpo || {op: 'validate'}
     }, {
       admins: op.admins || ADMINS,
+      legado: op.legado,
       verificar: async (t) => {
         visto.verificaciones++;
         if (op.tokenMalo) throw new Error('invalido');
-        return {email: 'correo' in op ? op.correo : 'admin@totaltools.com'};
+        return {
+          email: 'correo' in op ? op.correo : 'jarryllanoski@gmail.com',
+          // Google siempre verifica. Un registro con contraseña, no.
+          email_verified: op.verificado === undefined ? true : op.verificado
+        };
       }
     }).then((r) => Object.assign(r, {visto: visto}));
   };
@@ -187,10 +192,45 @@ module.exports = async ({bloque, ok}) => {
      'con sesión pero fuera de la lista de admins: SIN_PERMISO');
   ok(motivo(await pasar({correo: ''})) === 'SIN_PERMISO',
      'un token sin correo tampoco pasa');
-  ok((await pasar({correo: 'ADMIN@TotalTools.com'})).ok === true,
+  ok((await pasar({correo: 'JARRYLlanoski@Gmail.com'})).ok === true,
      'el correo no distingue mayúsculas: nadie se bloquea a sí mismo por eso');
-  ok((await pasar({admins: ['ADMIN@TOTALTOOLS.COM']})).ok === true,
+  ok((await pasar({admins: ['JARRYLLANOSKI@GMAIL.COM']})).ok === true,
      'la lista tampoco');
+
+  {
+    /* ⚠️ LA PROPIEDAD MÁS IMPORTANTE DE TODO ESTE ARCHIVO.
+       Firebase deja que cualquiera cree una cuenta con CUALQUIER correo sin
+       comprobar que sea suyo. Si el correo valiera por sí solo, alguien que
+       sepa el del dueño se registra con él, pone su propia contraseña, y
+       entra. Sin hackear nada. `email_verified` solo llega en true cuando el
+       proveedor confirmó la identidad — Google siempre lo hace; un registro
+       con contraseña, nunca. */
+    const r = await pasar({correo: 'jarryllanoski@gmail.com', verificado: false});
+    ok(motivo(r) === 'SIN_PERMISO',
+       'un correo de la lista SIN VERIFICAR no entra: registrarse con el ' +
+       'correo de otro no puede ser una forma de entrar');
+    ok(P.esAdminDe({email: 'jarryllanoski@gmail.com'}, ADMINS) === false,
+       'ni cuando el token no trae el dato: ausente se trata como no verificado');
+    ok(P.esAdminDe({email: 'jarryllanoski@gmail.com', email_verified: 'true'},
+        ADMINS) === false, 'ni con un "true" de texto, que parece verdadero');
+    ok(P.esAdminDe({email: 'jarryllanoski@gmail.com', email_verified: true},
+        ADMINS) === true, 'verificado y en la lista: pasa');
+  }
+  {
+    // La puerta vieja: una cuenta creada a mano, sin correo verificado. Se
+    // acepta A PROPÓSITO y temporalmente, para no dejar al dueño fuera.
+    ok(P.esAdminDe({email: 'admin@totaltools.com', email_verified: false},
+        ADMINS, 'admin@totaltools.com') === true,
+       'el correo de legado entra sin verificar, que para eso está');
+    ok(P.esAdminDe({email: 'admin@totaltools.com', email_verified: false},
+        ADMINS) === false,
+       'pero SOLO si se declara: el día que se retire, deja de entrar');
+    ok(P.esAdminDe({email: 'otro@gmail.com', email_verified: false},
+        ADMINS, 'admin@totaltools.com') === false,
+       'y no abre la puerta a cualquier otro sin verificar');
+  }
+  ok(P.esAdminDe(null, ADMINS) === false && P.esAdminDe({}, ADMINS) === false,
+     'sin usuario o sin correo, no');
 
   {
     // EL ORDEN IMPORTA. Sin sesión, la respuesta es SIN_SESION — nunca

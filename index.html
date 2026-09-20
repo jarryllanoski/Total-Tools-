@@ -1520,7 +1520,7 @@
 
 <div class="toast" id="toastEl"></div>
 
-<script src="auth.js?v=7"></script>
+<script src="auth.js?v=8"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
 <script>
@@ -1939,8 +1939,16 @@ const _initFirebase = async (intento) => {
          pantalla de login encima; al entrar se quitaba una y el usuario
          seguía mirando la otra, tecleando su contraseña sin entender nada. */
       const habiaSesion = !!(window._authHaySesion && window._authHaySesion());
-      if(habiaSesion && window._authExpulsar){
-        window._authExpulsar('Tu sesión venció. Ingresa de nuevo.');
+      if(habiaSesion){
+        /* Había sesión y aun así Firestore dice que no. Son dos cosas
+           distintas —venció, o esta cuenta no está autorizada— y desde el 403
+           no se pueden separar. Antes se afirmaba "venció", y a quien entraba
+           con la cuenta equivocada lo mandaba a un bucle: entra, se le dice
+           que venció, vuelve a entrar, y otra vez.
+           Ahora se dice lo que SÍ se sabe: con qué correo entró. */
+        const correo = (window._authCorreo && window._authCorreo()) || '';
+        if(window._authSinAcceso) window._authSinAcceso(correo);
+        else if(window._authExpulsar) window._authExpulsar('Tu sesión venció. Ingresa de nuevo.');
       }
       return; // en los dos casos: reintentar un 403 no lo arregla
     }

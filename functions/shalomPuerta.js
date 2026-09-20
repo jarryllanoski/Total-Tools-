@@ -358,6 +358,32 @@ function traducirTrack(j) {
 }
 
 /**
+ * ¿Este usuario es administrador?
+ *
+ * ⚠️ EL CORREO SOLO VALE SI ESTA VERIFICADO — misma regla que firestore.rules,
+ * y por el mismo motivo: Firebase deja que cualquiera cree una cuenta con
+ * CUALQUIER correo sin comprobar que sea suyo. Sin esta linea, alguien que
+ * sepa uno de estos correos se registra con el, pone su contrasena, y habla
+ * con la API de Shalom del negocio.
+ *
+ * `legado` es la puerta vieja: una cuenta creada a mano desde la consola, sin
+ * correo verificado. Se acepta a proposito y TEMPORALMENTE para no dejar al
+ * dueno fuera; se retira en cuanto entre con su Gmail.
+ * @param {Object} usuario token decodificado
+ * @param {Array<string>} admins correos autorizados
+ * @param {string} [legado] correo antiguo aceptado sin verificar
+ * @return {boolean} true si puede
+ */
+function esAdminDe(usuario, admins, legado) {
+  const correo = String((usuario && usuario.email) || "").toLowerCase();
+  if (!correo) return false;
+  if (legado && correo === String(legado).toLowerCase()) return true;
+  if (usuario.email_verified !== true) return false;
+  const lista = (admins || []).map((x) => String(x).toLowerCase());
+  return lista.indexOf(correo) >= 0;
+}
+
+/**
  * Las cuatro barreras, en orden y como función pura.
  *
  * Vive aquí y no en index.js para que se pueda PROBAR. Es el límite de
@@ -387,9 +413,10 @@ async function barreras(entrada, deps) {
 
   // 2 · administrador. Va ANTES de mirar la operación: a un desconocido no se
   // le confirma ni qué operaciones existen.
+  if (!esAdminDe(usuario, deps.admins, deps.legado)) {
+    return cortar(403, "SIN_PERMISO");
+  }
   const correo = String((usuario && usuario.email) || "").toLowerCase();
-  const admins = (deps.admins || []).map((x) => String(x).toLowerCase());
-  if (!correo || admins.indexOf(correo) < 0) return cortar(403, "SIN_PERMISO");
 
   // 3 · lista blanca
   const cuerpo = (entrada.cuerpo && typeof entrada.cuerpo === "object") ?
@@ -434,6 +461,7 @@ module.exports = {
   traducirValidate,
   traducirTrack,
   PASOS,
+  esAdminDe,
   traducir,
   barreras,
   llamar,

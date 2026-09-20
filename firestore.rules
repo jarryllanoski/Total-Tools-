@@ -20,14 +20,40 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // ── Lista blanca de correos de administrador ──────────────────────────
-    // ⚠️ CONFIRMA que este es EXACTAMENTE el correo con el que entras al panel.
-    //    Si te equivocas, te bloquearías a ti mismo. Puedes poner varios.
+    // ── Quién es administrador ────────────────────────────────────────────
+    //
+    // ⚠️ EL CORREO SOLO VALE SI ESTÁ VERIFICADO, y esto no es un detalle.
+    //
+    // Firebase, con correo/contraseña activado, deja que CUALQUIERA cree una
+    // cuenta con CUALQUIER correo — no comprueba que sea suyo. Sin la
+    // comprobación de abajo, alguien que sepa uno de estos correos podía
+    // registrarse con él, poner su propia contraseña, y entrar a los datos del
+    // negocio. Sin hackear nada.
+    //
+    // `email_verified` solo es true cuando el proveedor confirmó la identidad:
+    // Google siempre lo hace. Un registro con contraseña llega en false y
+    // seguiría en false salvo que el atacante pueda leer ese buzón — que es
+    // justo lo que no puede.
+    //
+    // MANTENIMIENTO: agregar o quitar un administrador se hace aquí y con
+    //   firebase deploy --only firestore:rules
+    // (esto desaparece cuando pasemos a marcas en el usuario: ver docs).
     function esAdmin() {
-      return request.auth != null
-        && request.auth.token.email in [
-          'admin@totaltools.com'
-        ];
+      return request.auth != null && (
+        (request.auth.token.email_verified == true
+          && request.auth.token.email in [
+            'jarryllanoski@gmail.com',
+            'redbolima@gmail.com'
+          ])
+        // ── PUERTA VIEJA, TEMPORAL ──────────────────────────────────────
+        // admin@totaltools.com se creó a mano desde la consola y NO tiene el
+        // correo verificado (ni existe ese buzón), así que no pasaría el
+        // filtro de arriba. Se deja abierta para no dejar al dueño fuera
+        // mientras prueba Google.
+        // ⚠️ SE RETIRA en cuanto confirme que entra con su Gmail. Mientras
+        // siga aquí, una contraseña adivinada abre el negocio entero.
+        || request.auth.token.email == 'admin@totaltools.com'
+      );
     }
 
     // Solo administradores acceden a "panel/**" (todos tus pedidos, tokens, config)

@@ -232,8 +232,9 @@ module.exports = async ({bloque, ok}) => {
        'pero ninguno se salta el interruptor: apagado es apagado');
     const manual = idx.slice(idx.indexOf('exports.barridoAhora'),
         idx.indexOf('exports.barridoAhora') + 1800);
-    ok(/verifyIdToken/.test(manual) && /ADMINS.indexOf/.test(manual),
-       'el botón exige sesión válida y correo de administrador');
+    ok(/verifyIdToken/.test(manual) && /esAdminDe\(tok, ADMINS/.test(manual),
+       'el botón exige sesión válida y la MISMA comprobación de administrador ' +
+       'que la puerta — incluido que el correo esté verificado');
     ok(/req.method !== "POST"/.test(manual),
        'y solo por POST: un barrido no se dispara abriendo una URL');
   }

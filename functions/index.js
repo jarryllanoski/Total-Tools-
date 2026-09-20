@@ -42,8 +42,15 @@ const SHALOM_API_KEY = defineSecret("SHALOM_API_KEY");
 // separado, alguien puede escribir en Firestore pero no hablar con Shalom, o
 // al reves. Al tocar una, tocar la otra.
 const ADMINS = [
-  "admin@totaltools.com",
+  "jarryllanoski@gmail.com",
+  "redbolima@gmail.com",
 ];
+
+/* Puerta vieja, TEMPORAL. La cuenta admin@totaltools.com se creo a mano desde
+   la consola y no tiene el correo verificado —ni existe ese buzon—, asi que no
+   pasaria el filtro. Se acepta para no dejar al dueno fuera mientras prueba
+   Google. SE RETIRA en cuanto confirme que entra con su Gmail. */
+const ADMIN_LEGADO = "admin@totaltools.com";
 
 /**
  * EL ÚNICO CAMINO HACIA SHALOM: interruptor → llamada → interruptor.
@@ -946,8 +953,8 @@ exports.barridoAhora = onRequest({
     res.status(401).json({ok: false, motivo: "SIN_SESION"});
     return;
   }
-  const correo = String((tok && tok.email) || "").toLowerCase();
-  if (!correo || ADMINS.indexOf(correo) < 0) {
+  // Misma regla que la puerta: el correo solo vale si esta verificado.
+  if (!shalomPuerta.esAdminDe(tok, ADMINS, ADMIN_LEGADO)) {
     res.status(403).json({ok: false, motivo: "SIN_PERMISO"});
     return;
   }
@@ -1004,6 +1011,7 @@ exports.shalomPuerta = onRequest(
       }, {
         verificar: (t) => getAuth().verifyIdToken(t),
         admins: ADMINS,
+        legado: ADMIN_LEGADO,
       });
       if (paso.corte) {
         res.status(paso.corte.http)
