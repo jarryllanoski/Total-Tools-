@@ -2633,6 +2633,22 @@ function toggleBarrido(cual){
                    : '⏸️ Seguimiento automático apagado');
   }
 }
+/* Por qué fallaron, no solo cuántas. Un número suelto no se puede accionar:
+   "6 fallaron" no distingue un corte de red de una cuota agotada ni de una
+   clave rechazada, y cada una se arregla en un sitio distinto. */
+const _MOTIVO_HUMANO = {
+  SIN_RED: 'sin conexión', ERROR_SHALOM: 'error de Shalom',
+  LIMITE: 'cuota agotada', BLOQUEADO: 'clave rechazada',
+  NO_ENCONTRADO: 'guía no encontrada', SIN_DATO: 'sin estado',
+  FORMATO_DESCONOCIDO: 'respuesta no reconocida',
+  PUERTA_CERRADA: 'puerta cerrada', APAGADA: 'puerta apagada'
+};
+function _motivosBarrido(m){
+  const pares = Object.keys(m || {}).map(k =>
+    (m[k] + ' ' + (_MOTIVO_HUMANO[k] || k.toLowerCase().replace(/_/g,' '))));
+  return pares.length ? ' (' + pares.join(' · ') + ')' : '';
+}
+
 /* El informe de la última corrida. Dice también a cuántos NO se les preguntó:
    sin eso, "consultó 12" parece poco cuando en realidad es todo lo que había. */
 async function _pintarUltimoBarrido(){
@@ -2649,7 +2665,8 @@ async function _pintarUltimoBarrido(){
     (u.simulacro ? ' · <b style="color:#d29922">SIMULACRO, no escribió</b>' : '') +
     '<br>Consultó ' + (u.consultadas||0) + ' · cambió ' + (u.conCambio||0) +
     ' · movió ' + (u.movidas||0) + ' etiqueta' + (u.movidas===1?'':'s') +
-    (u.fallidas ? ' · ' + u.fallidas + ' fallaron' : '') +
+    (u.fallidas ? ' · <b style="color:#d29922">' + u.fallidas + ' fallaron</b>' +
+      _motivosBarrido(u.motivos) : '') +
     '<br>No preguntó a ' + ahorro + ' (ya entregados o finalizados)' +
     ((u.guiasMalas||[]).length ? ' · ' + u.guiasMalas.length +
       ' guía(s) mal escrita(s): ' + u.guiasMalas.map(g=>g.guia).join(', ') : '') +
@@ -4038,7 +4055,7 @@ render();
      lo usa. config.js, print.js y voz.js preguntan por los pedidos marcados,
      así que siguen yendo detrás. El orden de carga es un contrato
      (ver docs/ARQUITECTURA.md). -->
-<script src="config.js?v=25"></script>
+<script src="config.js?v=26"></script>
 <script src="print.js?v=16"></script>
 <script src="notify.js?v=4"></script>
 <script src="shalom.js?v=15"></script>

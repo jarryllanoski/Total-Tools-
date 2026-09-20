@@ -822,6 +822,10 @@ async function _correrBarrido(forzado) {
   const escrituras = [];
   const detalle = [];
   let consultadas = 0; let fallidas = 0; let cortado = "";
+  /* Por que fallaron, no solo cuantas. "6 fallaron" no se puede accionar:
+     no distingue un corte de red de una cuota agotada ni de una clave
+     rechazada, y cada una se arregla en un sitio distinto. */
+  const motivos = {};
   for (const item of sel.consultar) {
     if (Date.now() - arranque > TOPE_MS) {
       cortado = "se acabo el tiempo";
@@ -832,6 +836,8 @@ async function _correrBarrido(forzado) {
     consultadas++;
     if (!r.ok) {
       fallidas++;
+      const m = r.motivo || "DESCONOCIDO";
+      motivos[m] = (motivos[m] || 0) + 1;
       // La puerta se cerro: seguir seria pedirle a un servicio caido 60 veces
       // mas que nos diga que sigue caido.
       if (r.motivo === "PUERTA_CERRADA" || r.motivo === "APAGADA") {
@@ -885,7 +891,8 @@ async function _correrBarrido(forzado) {
     ts: Date.now(), hora: ahoraLocal, forzado: !!forzado,
     modo: modo, simulacro: simulacro,
     candidatos: sel.consultar.length, consultadas: consultadas,
-    fallidas: fallidas, conCambio: escrituras.length, escritas: escritas,
+    fallidas: fallidas, motivos: motivos,
+    conCambio: escrituras.length, escritas: escritas,
     movidas: escrituras.filter((w) => w.campos.status).length,
     saltados: sel.saltados, guiasMalas: sel.guiasMalas.slice(0, 20),
     cortado: cortado, duracionMs: Date.now() - arranque,

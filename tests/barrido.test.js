@@ -238,4 +238,22 @@ module.exports = async ({bloque, ok}) => {
     ok(/req.method !== "POST"/.test(manual),
        'y solo por POST: un barrido no se dispara abriendo una URL');
   }
+
+  bloque('Un fallo tiene que decir POR QUÉ, no solo cuántos');
+  {
+    /* La primera corrida real dijo "6 fallaron" y nada más. Con eso no se
+       puede hacer nada: un corte de red, una cuota agotada y una clave
+       rechazada se arreglan en tres sitios distintos. */
+    const idx = require('fs').readFileSync(
+        require('path').join(__dirname, '..', 'functions', 'index.js'), 'utf8');
+    ok(/motivos\[m\] = \(motivos\[m\] \|\| 0\) \+ 1;/.test(idx),
+       'el barrido cuenta los fallos POR MOTIVO');
+    ok(/motivos: motivos,/.test(idx), 'y los guarda en el informe');
+    const html = require('fs').readFileSync(
+        require('path').join(__dirname, '..', 'index.html'), 'utf8');
+    ok(/_MOTIVO_HUMANO/.test(html),
+       'y el panel los traduce: "LIMITE" no le dice nada a nadie');
+    ok(/SIN_RED: 'sin conexión'/.test(html) && /LIMITE: 'cuota agotada'/.test(html),
+       'con palabras que distinguen dónde está el problema');
+  }
 };
