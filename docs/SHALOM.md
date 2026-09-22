@@ -128,6 +128,32 @@ Forma real, medida con `Shalom.esquema('instances')` contra la API desplegada:
 ⚠️ **La documentación la pinta PLANA**; viene envuelta en `instances`. Es la
 séptima vez que la doc y la realidad no coinciden en esta API.
 
+### ⚠️ El ESTADO del panel de Shalom NO es la sesión — comprobado
+
+El 22/09/2026 el panel decía **⚠️ sesión caída** y `shalom-api.lat/dashboard/
+instances` mostraba **✅ Conectado** en verde. Se midió todo antes de tocar una
+línea:
+
+| Fuente | Decía |
+|---|---|
+| `GET /instances` → `isLoggedIn` | `false` |
+| `POST /instances/status` | `false`, `url: https://pro.shalom.pe/login` |
+| Su panel, **después de pulsar "Verificar"** | ✅ Conectado |
+
+Los dos endpoints coincidían, así que **no hay ninguno cacheado**: su columna
+ESTADO mide *"la instancia está encendida"* (el robot corriendo), no *"la cuenta
+tiene sesión"*. Su producto llama igual a dos cosas distintas.
+
+**Y se cerró en las dos direcciones**, que es lo que lo convierte en prueba y no
+en teoría: al cerrar sesión y volver a entrar desde su panel, el campo pasó a
+`true` y el botón del panel se puso verde. El campo funciona; lo que engaña es
+su pantalla.
+
+Moraleja para el registro de envíos: **la única fuente de verdad es
+`isLoggedIn`.** Si alguna vez el panel dice "caída" y el de ellos dice
+Conectado, el panel tiene razón — y registrar en ese estado falla sin decir por
+qué.
+
 ### Las tres respuestas que no son "la sesión está caída"
 
 | Caso | Motivo | Por qué va aparte |
