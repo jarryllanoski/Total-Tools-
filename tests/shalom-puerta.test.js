@@ -64,13 +64,34 @@ module.exports = async ({bloque, ok}) => {
     ok(r.ok === false && r.motivo === 'NO_PERMITIDO', 'lo que no está, no se pide');
     ok(f.llamadas === 0, 'y ni siquiera se llama a Shalom: no es un proxy ciego');
   }
-  ok(!P.PERMITIDAS['instances'] && !P.PERMITIDAS['webhooks'] &&
-     !P.PERMITIDAS['tracking/subscriptions'],
-     'ninguno de los endpoints destructivos está en la lista');
-  ok(Object.keys(P.PERMITIDAS).join(',') === 'validate,track',
-     'hoy hay dos, y en el orden en que se reconstruyen');
+  /* Lo que hay que vigilar NO es el nombre, es el MÉTODO. `GET /instances`
+     solo lista; `DELETE /instances` borra la instancia y mata el auto-login.
+     Son la misma palabra y cosas opuestas: una lista de nombres prohibidos
+     habría dejado pasar el peligroso o —como pasó— bloqueado el inofensivo. */
+  {
+    const claves = Object.keys(P.PERMITIDAS);
+    const metodos = claves.map((k) => P.PERMITIDAS[k].metodo);
+    const rutas = claves.map((k) => P.PERMITIDAS[k].ruta);
+    ok(metodos.every((m) => m === 'GET' || m === 'POST'),
+       'ni un DELETE ni un PUT en la lista: la puerta no puede borrar nada, ' +
+       'y eso no depende de acordarse de un nombre');
+    ok(rutas.every((r) => !/logout|login|subscriptions|webhooks/i.test(r)),
+       'ni cerrar sesión, ni entrar, ni tocar webhooks o suscripciones');
+    ok(!P.PERMITIDAS['instances/logout'] && !P.PERMITIDAS['webhooks'] &&
+       !P.PERMITIDAS['tracking/subscriptions'],
+       'y los destructivos siguen fuera por su nombre también');
+  }
+  ok(Object.keys(P.PERMITIDAS).join(',') === 'validate,track,instances',
+     'hoy hay tres, y en el orden en que se reconstruyen');
   ok(!P.PERMITIDAS.track.soloMedir,
      'track ya no es solo medible: su forma se midió y se tradujo');
+  ok(P.PERMITIDAS.instances.metodo === 'GET' &&
+     P.PERMITIDAS.instances.ruta === '/instances',
+     'instances entra SOLO como GET');
+  ok(P.PERMITIDAS.instances.soloMedir === true,
+     'y en `soloMedir`: se puede MIRAR su forma, no usarla. La documentación ' +
+     'de esta API y la realidad ya se contradijeron seis veces, así que se ' +
+     'mide antes de traducir');
 
   bloque('Cada endpoint por su traductor, nunca por el de otro');
 
@@ -296,9 +317,19 @@ module.exports = async ({bloque, ok}) => {
     ok(r.ok === true && r.destino === 'validate' && r.diagnostico === true,
        'el diagnóstico pasa por la misma lista blanca');
   }
-  ok(motivo(await pasar({cuerpo: {op: 'esquema', de: 'instances'}})) ===
+  ok(motivo(await pasar({cuerpo: {op: 'esquema', de: 'instances/logout'}})) ===
      'NO_PERMITIDO',
      'y no sirve para asomarse a un endpoint que no está permitido');
+  {
+    // Las dos caras de `soloMedir`, que es todo el punto de este estado.
+    const r = await pasar({cuerpo: {op: 'esquema', de: 'instances'}});
+    ok(r.ok === true && r.destino === 'instances' && r.diagnostico === true,
+       'a `instances` sí se le puede mirar la forma…');
+    ok(motivo(await pasar({cuerpo: {op: 'instances'}})) === 'SIN_TRADUCTOR',
+       '…pero USARLA todavía no: sin traductor devolvería su JSON crudo por ' +
+       'la puerta de otro, que es justo cómo una forma mal entendida llega a ' +
+       'la pantalla como si fuera un dato bueno');
+  }
 
   bloque('Traducir /validate — jamás ok:true sin dato real');
 

@@ -42,6 +42,16 @@ const PERMITIDAS = {
   // SIN_TRADUCTOR en vez de devolver algo a medio entender. Es el estado
   // intermedio de cada endpoint: medible antes que conectado.
   track: {metodo: "POST", ruta: "/track"},
+  /* La sesión de Shalom Pro. Se abre en `soloMedir` a propósito: la
+     documentación de esta API y la realidad ya se contradijeron seis veces
+     (ver docs/SHALOM-API.md), así que primero se mira la forma con `esquema`
+     y recién después se escribe el traductor.
+     Va el GET y no el `POST /instances/status` porque el POST exige un
+     `instanceId` que el panel no tiene guardado en ninguna parte, mientras
+     que el GET no pide nada Y DEVUELVE ESE ID — que es además la llave que
+     van a necesitar el ticket y el registro de envíos. No gasta cuota y no
+     puede crear ni borrar nada. */
+  instances: {metodo: "GET", ruta: "/instances", soloMedir: true},
 };
 
 /**
