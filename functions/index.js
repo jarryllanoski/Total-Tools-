@@ -5,7 +5,7 @@ const {onRequest} = require("firebase-functions/https");
 const {onSchedule} = require("firebase-functions/scheduler");
 const {defineSecret} = require("firebase-functions/params");
 const {initializeApp} = require("firebase-admin/app");
-const {getFirestore} = require("firebase-admin/firestore");
+const {getFirestore, FieldValue} = require("firebase-admin/firestore");
 const {getAuth} = require("firebase-admin/auth");
 
 // Modulo aislado de extraccion de comprobantes.
@@ -17,6 +17,8 @@ const {normalizarOlva} = require("./olvaNormalizar");
 const shalomPuerta = require("./shalomPuerta");
 // El interruptor: cuando apagar la puerta y cuando reencenderla (logica pura).
 const interruptor = require("./interruptor");
+// Verificar la firma de los avisos de Shalom (logica pura, sin red).
+const webhook = require("./webhook");
 // A quien consulta el barrido y cuando (logica pura).
 const barrido = require("./barrido");
 // Que etiqueta le toca a un pedido. LO COMPARTE CON EL PANEL: ver la
@@ -36,6 +38,11 @@ const FORMCFG_COL = "panel/forms/configs";
 // La clave de Shalom vive en Secret Manager. Nunca en el codigo ni en el
 // navegador. Se pone con: firebase functions:secrets:set SHALOM_API_KEY
 const SHALOM_API_KEY = defineSecret("SHALOM_API_KEY");
+
+// El secreto del webhook. `PUT /webhooks` lo devuelve COMPLETO una sola vez;
+// despues queda enmascarado. Se pone con:
+//   firebase functions:secrets:set SHALOM_WEBHOOK_SECRET
+const SHALOM_WEBHOOK_SECRET = defineSecret("SHALOM_WEBHOOK_SECRET");
 
 // ⚠️ ESTA LISTA DEBE COINCIDIR CON firestore.rules (funcion esAdmin).
 // Son dos archivos distintos que expresan la misma regla: si se cambian por
@@ -760,6 +767,99 @@ exports.extraerComprobante = onRequest(
 //   · La etiqueta del pedido (`status`) no se toca nunca: informar si, decidir
 //     por el operador no.
 //   · Un envio no desanda el camino (ver docs/INVARIANTES.md, 2 bis).
+
+// ── shalomWebhook ─────────────────────────────────────────────────────────
+// LA UNICA PUERTA PUBLICA SIN AUTENTICACION DEL SISTEMA. Cualquiera en
+// internet puede llamarla; lo unico que separa un aviso de Shalom de uno
+// inventado es la firma. Por eso aqui no hay atajos y no se escribe NADA
+// antes de verificarla.
+//
+// ⚠️ ETAPA 4a: MIDE, NO TRADUCE. El webhook habla otro idioma que /track
+// ("IN_TRANSIT" en vez de "En transito") y ese mapa no esta documentado en
+// ninguna parte. Adivinarlo seria repetir el fallo que costo dias, esta vez
+// escribiendo solo y de madrugada. Asi que por ahora: verifica, descarta
+// repetidos, y ANOTA la forma y los codigos. Ningun pedido se toca.
+const WEB_DOC = "panel/webhook";
+const WEB_COL = "panel/webhook/eventos";
+
+exports.shalomWebhook = onRequest({
+  region: "us-central1",
+  secrets: [SHALOM_WEBHOOK_SECRET],
+  timeoutSeconds: 30,
+  memory: "256MiB",
+}, async (req, res) => {
+  // No lo llama un navegador: no hay CORS que dar.
+  if (req.method !== "POST") {
+    res.status(405).send("no");
+    return;
+  }
+
+  const firma = req.get("X-Shalom-Signature") || "";
+  // req.rawBody son los bytes TAL COMO LLEGARON. Reparsear el JSON y volver a
+  // serializarlo cambia los bytes, y entonces la firma no cuadra nunca.
+  const crudo = req.rawBody;
+  const v = webhook.verificarFirma(
+      firma, crudo, SHALOM_WEBHOOK_SECRET.value(), Date.now());
+
+  if (!v.ok) {
+    console.warn("webhook rechazado:", v.motivo);
+    // Se anota para poder ver si alguien esta probando la puerta. El cuerpo NO
+    // se guarda: si no esta firmado, no hay razon para creer nada de lo que
+    // trae —ni para darle sitio en la base de datos—.
+    try {
+      await db.doc(WEB_DOC).set({
+        rechazados: FieldValue.increment(1),
+        ultimoRechazo: {ts: Date.now(), motivo: v.motivo},
+      }, {merge: true});
+    } catch (e) {
+      // No vale fallar por no poder anotar.
+    }
+    // Respuesta corta y sin detalle: decir QUE fallo ayuda a quien prueba.
+    res.status(401).send("no");
+    return;
+  }
+
+  /* Repetidos. Shalom reintenta si no respondemos rapido, y aplicar dos veces
+     el mismo aviso duplica historiales. `create()` falla si el documento ya
+     existe, asi que la comprobacion y la marca son UNA sola operacion: entre
+     mirar y escribir no cabe un segundo intento. */
+  const id = webhook.idDeEvento(firma);
+  try {
+    await db.doc(WEB_COL + "/" + id).create({recibido: Date.now()});
+  } catch (e) {
+    // Ya estaba: es un reintento. 200 para que deje de insistir, y nada mas.
+    res.status(200).send("ok");
+    return;
+  }
+
+  let cuerpo = null;
+  try {
+    cuerpo = JSON.parse(crudo.toString("utf8"));
+  } catch (e) {
+    cuerpo = null;
+  }
+  const codigos = webhook.codigos(cuerpo);
+  try {
+    await db.doc(WEB_COL + "/" + id).set({
+      // La FORMA (tipos, sin valores) y los CODIGOS (MAYUSCULAS, que nunca son
+      // un nombre ni una direccion). Con eso se mide el vocabulario sin
+      // guardar datos de nadie.
+      forma: shalomPuerta.forma(cuerpo),
+      codigos: codigos,
+      bytes: crudo ? crudo.length : 0,
+    }, {merge: true});
+    await db.doc(WEB_DOC).set({
+      recibidos: FieldValue.increment(1),
+      ultimo: {ts: Date.now(), codigos: codigos,
+        bytes: crudo ? crudo.length : 0},
+    }, {merge: true});
+  } catch (e) {
+    console.error("webhook: no se pudo anotar el evento:", e);
+  }
+
+  console.log("webhook ok", JSON.stringify({id: id, codigos: codigos}));
+  res.status(200).send("ok");
+});
 
 // ── barridoShalom ─────────────────────────────────────────────────────────
 // El seguimiento automatico. Cloud Scheduler dispara CADA 30 MINUTOS y la

@@ -176,8 +176,19 @@ module.exports = async (t) => {
         'ticket.js no manda una clave desde el navegador (hubo una rama que lo hacía)');
     ok(!E.existe('functions/shalomApi.js'), 'el cliente del backend sigue borrado');
     const fidx = E.leer('functions/index.js');
-    ok(!/exports\.shalomApi|exports\.shalomWebhook/.test(fidx),
-        'los dos endpoints del backend siguen fuera');
+    ok(!/exports\.shalomApi\b/.test(fidx),
+        'el proxy ciego `shalomApi` sigue fuera y no vuelve: lo reemplazó ' +
+        '`shalomPuerta`, con lista blanca y cuatro barreras');
+    /* `shalomWebhook` SÍ volvió (22 sep 2026), y por eso se comprueba en qué
+       se diferencia del que se retiró: el viejo era un endpoint público que
+       escribía; el nuevo no toca la base de datos hasta verificar la firma. */
+    ok(/exports\.shalomWebhook/.test(fidx), 'el webhook está de vuelta');
+    const wh = fidx.slice(fidx.indexOf('exports.shalomWebhook'),
+        fidx.indexOf('exports.barridoShalom'));
+    ok(/verificarFirma/.test(wh), 'y lo primero que hace es verificar la firma');
+    ok(wh.indexOf('req.rawBody') > 0,
+        'sobre el cuerpo CRUDO: reparsear el JSON cambia los bytes y la firma ' +
+        'deja de cuadrar');
   }
 
   bloque('Cada pantalla dice algo honesto');

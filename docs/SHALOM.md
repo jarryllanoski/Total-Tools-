@@ -499,6 +499,67 @@ Se salta **el reloj**, no el interruptor: si el seguimiento automático está
 apagado, responde `BARRIDO_APAGADO`. Y solo por POST — un barrido no se
 dispara abriendo una URL.
 
+## El webhook — etapa 4a: recibir y medir
+
+`functions/webhook.js` + `exports.shalomWebhook`.
+
+> ⚠️ **Es la única puerta pública sin autenticación del sistema.** Cualquiera
+> en internet puede llamarla. Lo único que separa un aviso de Shalom de uno
+> inventado es la firma.
+
+### La firma
+
+```
+X-Shalom-Signature: t=<unix>,v1=<hex>
+v1 = HMAC-SHA256("<t>.<cuerpo CRUDO>", whsec_…)
+```
+
+> **Firmamos solo el cuerpo durante días.** Es sobre `"<t>.<cuerpo>"`, y el
+> cuerpo **crudo** (`req.rawBody`): reparsear el JSON y volver a serializarlo
+> da los mismos datos y **otros bytes**, así que la firma no cuadra nunca — con
+> el mismo síntoma que una firma mal calculada, que es lo que hace perder días.
+
+| Defensa | Por qué |
+|---|---|
+| **Ventana de 5 min** sobre `t` | sin ella, quien grabe UNA llamada válida puede reenviarla para siempre |
+| **Comparación en tiempo constante** | `===` se rinde en el primer byte distinto; midiendo tiempos se reconstruye la firma |
+| **Tope de 64 KB** | un aviso de estado son cientos de bytes, no megas |
+| **Sin secreto, no pasa nada** | ni para probar |
+| **`create()` para descartar repetidos** | mirar y marcar en UNA operación: entre medio no cabe un segundo intento. Shalom reintenta, y aplicar dos veces duplica historiales |
+| **401 corto y sin detalle** | decir *qué* falló ayuda a quien está probando la puerta |
+
+Y **no se escribe en la base de datos antes de verificar**. De un aviso sin
+firma no se guarda ni el cuerpo: si no está firmado, no hay razón para creer
+nada de lo que trae.
+
+### ⛔ Por qué NO traduce todavía
+
+El webhook habla **otro idioma** que `/track`:
+
+```
+/track                    →  "En tránsito"   (español)
+/tracking/subscriptions   →  "IN_TRANSIT"    (inglés, código)
+```
+
+**El mapa completo de códigos no está documentado en ninguna parte.**
+Adivinarlo sería repetir el fallo que costó días — esta vez escribiendo solo y
+de madrugada.
+
+Así que la etapa 4a **mide**: anota la **forma** del evento (tipos, sin
+valores) y los **códigos** que trae. Un valor solo se guarda si es
+`MAYÚSCULAS_CON_GUION`, que nunca es un nombre ni una dirección. Con eso se
+levanta el vocabulario sin guardar un dato de nadie.
+
+### Lo que viene
+
+**4b** — traducir con el mapa medido, **por el mismo `functions/etiquetas.js`**
+que usa el barrido: un solo sitio decide la etiqueta, así que webhook y barrido
+no pueden decidir distinto.
+
+**4c** — suscribir las guías vivas, suscribir al crear un pedido, desuscribir
+al entregarse. Y el barrido baja de 4 corridas al día a 1 o 2: pasa de hacer el
+trabajo a **vigilar que el webhook no se haya caído en silencio**.
+
 ### Cómo se mide el siguiente endpoint
 
 Desde el entorno donde se desarrolla **no se puede llamar a `shalom-api.lat`**
