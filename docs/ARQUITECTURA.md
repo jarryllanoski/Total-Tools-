@@ -107,6 +107,40 @@ paga solo.
 
 Los cuatro cambian juntos, o no cambia ninguno.
 
+### Nota · El diálogo de confirmar (`confirmar()`)
+
+Hay **un solo** diálogo de "¿seguro?" en el panel, y **seis** pantallas lo
+usan: borrar pedido, borrar varios, borrar proveedor, vaciar papelera, borrar
+link y borrar etiqueta/courier.
+
+Antes, cada una escribía a mano sobre el mismo botón —texto, color, acción y
+`disabled`— y tenía que **acordarse de dejarlo limpio para las otras cinco**.
+Dos se olvidaron:
+
+| Pantalla | Qué olvidaba |
+|---|---|
+| Pedido → papelera | al terminar **bien** dejaba el botón en `"Moviendo…"` y **deshabilitado** (solo lo reponía si fallaba) |
+| Borrar link · borrar etiqueta | no reponían **ni el texto ni el `disabled`** al abrir |
+
+Resultado: borrabas un pedido y el siguiente borrado de link **nacía muerto**.
+Y no fallaba siempre — fallaba según lo que hubieras hecho antes, que es lo
+peor que puede hacer un fallo: parece que se arregla solo.
+
+**Ahora nadie toca el botón.** `confirmar({texto|html, textoSi, trabajando,
+siFalla, alConfirmar})` lo pone en su sitio al abrir y lo devuelve **siempre**
+al terminar, salga bien o mal.
+
+> ⚠️ **La regla, y lo que la sostiene:** `delYes` solo puede aparecer **dos
+> veces en todo el proyecto** — el botón en el HTML y la línea que lo toma
+> dentro de `confirmar()`. Hay una prueba que se pone roja si alguien le
+> escribe encima por su cuenta, y otra que comprueba que las seis pantallas
+> siguen pasando por la puerta. Eso es lo que impide que vuelva dentro de seis
+> meses.
+
+Y una decisión pequeña que se nota: **si la acción falla, el diálogo NO se
+cierra.** El aviso se lee con él delante y se puede reintentar sin volver a
+buscar el pedido.
+
 ### Nota · Avisos del número de guía (`guias.js`)
 
 Dos avisos, los dos salidos de mirar los 971 pedidos reales:

@@ -28,6 +28,7 @@ rompió de verdad** y no queremos que vuelva:
 | `shalom-puerta.test.js` | La puerta del servidor: que la clave no salga ni dentro de un mensaje de error, que solo se pueda pedir lo de la lista blanca, y que a un desconocido no se le confirme qué operaciones existen |
 | `guias.test.js` | Una guía con un dígito de más lleva semanas sin rastrearse y nadie se entera: un número mal escrito no da error, da silencio. Y la misma guía en dos pedidos, que unas veces es a propósito y otras un tipeo |
 | `sesion.test.js` | La sesión venció a las 12 h con el panel abierto y el panel dijo "sin conexión": a revisar el internet por un problema de permisos. Y cerrar sesión borraba en silencio los cambios que no habían subido |
+| `confirmar.test.js` | Borrabas un pedido y el siguiente borrado de link nacía muerto: el botón decía "Moviendo…" y no respondía. No fallaba siempre — fallaba según lo que hubieras hecho antes |
 | `interruptor.test.js` | Que una caída de Shalom no cueste 484 consultas que van a fallar igual — y sobre todo, que cinco guías mal escritas seguidas NO apaguen el seguimiento del negocio |
 | `etiquetas.test.js` | La fórmula que mueve etiquetas sola. Que un envío no desande el camino, que una etiqueta tuya (RECLAMOS…) no se toque jamás, y que un pedido con saldo no se cierre ni en modo automático |
 | `barrido.test.js` | Corre en el servidor cuatro veces al día sin nadie mirando: a quién NO consulta, que "8am" sea 8am en Perú, y que si nada cambió no escriba nada |

@@ -92,23 +92,20 @@ function restoreTrash(i){
 
 function emptyTrash(){
   if(!S.trash.length){toast('La papelera ya está vacía');return}
-  $('delMsg').textContent=`¿Eliminar definitivamente ${S.trash.length} envío(s)? Esto no se puede deshacer.`;
-  $('delYes').style.background='var(--red)';
-  $('delYes').textContent='Eliminar definitivamente';
-  $('delYes').onclick=async()=>{
-    $('delYes').disabled=true;
-    $('delYes').textContent='Eliminando...';
-    try{
-      if(window._fsList&&window._fbDeleteTrashItem){
-        const items=await window._fsList('panel/trash/items');
-        await Promise.all(items.map(x=>window._fbDeleteTrashItem(x._id)));
-      }
-    }catch(e){console.warn('emptyTrash subcol:',e.message);}
-    S.trash=[];save('config');closeOverlay('delOverlay');openTrash();toast('🗑️ Papelera vaciada'); // solo config (trash)
-    $('delYes').disabled=false;
-    $('delYes').textContent='Eliminar definitivamente';
-  };
-  openOverlay('delOverlay');
+  confirmar({
+    texto:`¿Eliminar definitivamente ${S.trash.length} envío(s)? Esto no se puede deshacer.`,
+    textoSi:'Eliminar definitivamente',
+    trabajando:'Eliminando...',
+    alConfirmar: async () => {
+      try{
+        if(window._fsList&&window._fbDeleteTrashItem){
+          const items=await window._fsList('panel/trash/items');
+          await Promise.all(items.map(x=>window._fbDeleteTrashItem(x._id)));
+        }
+      }catch(e){console.warn('emptyTrash subcol:',e.message);}
+      S.trash=[];save('config');openTrash();toast('🗑️ Papelera vaciada'); // solo config (trash)
+    }
+  });
 }
 
 /* WA SHEET */
@@ -1311,18 +1308,24 @@ function _tokAction(id, action){
 // Borrado con confirmación (modal). Solo elimina el TOKEN, nunca el pedido real.
 function _confirmDelToken(tok){
   var quien = String(tok.name||tok.phone||'este link').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-  if($('delMsg')) $('delMsg').innerHTML='¿Eliminar el link de <b>'+quien+'</b>?<br><span style="font-size:11px;color:var(--text2)">Solo se borra el link. El pedido registrado NO se toca.</span>';
-  if($('delYes')){
-    $('delYes').style.background='var(--red)';
-    $('delYes').onclick=function(){
-      closeOverlay('delOverlay');
-      if(!window._fbDelTok){ toast('⚠️ Error'); return; }
-      window._fbDelTok(tok.id||tok._id||'')
-        .then(function(){ delete _tokSel[tok.id||tok._id||'']; toast('🗑️ Link eliminado'); loadTokenList(true); })
-        .catch(function(){ toast('⚠️ Error al eliminar'); });
-    };
-  }
-  openOverlay('delOverlay');
+  /* Antes esta pantalla no reponía el texto ni el `disabled` del botón, así
+     que heredaba lo que hubiera dejado la anterior. Si venías de borrar un
+     pedido, salía diciendo "Moviendo…" y apagado: el link no se borraba y no
+     había forma de saber por qué. Ahora ni lo toca. */
+  confirmar({
+    html:'¿Eliminar el link de <b>'+quien+'</b>?<br><span style="font-size:11px;color:var(--text2)">Solo se borra el link. El pedido registrado NO se toca.</span>',
+    textoSi:'Sí, eliminar',
+    trabajando:'Eliminando...',
+    siFalla:'⚠️ Error al eliminar',
+    alConfirmar: async function(){
+      var id = tok.id||tok._id||'';
+      if(!window._fbDelTok) throw new Error('sin _fbDelTok');
+      await window._fbDelTok(id);
+      delete _tokSel[id];
+      toast('🗑️ Link eliminado');
+      loadTokenList(true);
+    }
+  });
 }
 
 function changePIN(){
@@ -1581,15 +1584,19 @@ function confirmDelItem(type,idx){
   else if(type==='courier') name=S.couriers[idx];
   else name=S.extraFields[idx];
   if(type==='courier'&&FIXED_COURIERS.includes(name)){toast('⚠️ Este courier es fijo y no se puede eliminar');return}
-  $('delMsg').textContent=`¿Eliminar "${name}"? Esto no se puede deshacer.`;
-  $('delYes').style.background='var(--red)';
-  $('delYes').onclick=()=>{
-    if(type==='label'){S.labels.splice(idx,1);renderChips()}
-    else if(type==='courier') S.couriers.splice(idx,1);
-    else S.extraFields.splice(idx,1);
-    save('config');loadCfgUI();closeOverlay('delOverlay');toast('🗑️ Eliminado'); // solo config
-  };
-  openOverlay('delOverlay');
+  /* Tenía el mismo fallo que el borrado de link: no reponía el texto ni el
+     `disabled`, así que borrar una etiqueta o un courier también quedaba
+     muerto si antes habías borrado un pedido. Eran dos pantallas, no una. */
+  confirmar({
+    texto:`¿Eliminar "${name}"? Esto no se puede deshacer.`,
+    textoSi:'Sí, eliminar',
+    alConfirmar: () => {
+      if(type==='label'){S.labels.splice(idx,1);renderChips()}
+      else if(type==='courier') S.couriers.splice(idx,1);
+      else S.extraFields.splice(idx,1);
+      save('config');loadCfgUI();toast('🗑️ Eliminado'); // solo config
+    }
+  });
 }
 function toggleDispatchDay(v){
   if(!S.dispatch.days) S.dispatch.days=[];

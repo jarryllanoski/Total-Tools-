@@ -3330,19 +3330,18 @@ function quitarAsignacion(pedidoId, codigo){
 function delSupplier(id){
   const sup=S.suppliers.find(x=>x.id===id); if(!sup) return;
   if(sup.tipo==='tienda'){ toast('🏬 La tienda no se puede eliminar'); return; }
-  $('delMsg').textContent=`¿Eliminar el proveedor "${sup.name}"? Se borra su Excel de stock. No se puede deshacer.`;
-  $('delYes').style.background='var(--red)';
-  $('delYes').textContent='Eliminar proveedor';
-  $('delYes').disabled=false;
-  $('delYes').onclick=()=>{
-    S.suppliers=S.suppliers.filter(x=>x.id!==id);
-    if(window.Cotizacion&&Cotizacion.stock) Cotizacion.stock.del(id);
-    if(window._fbDeleteSupplier) window._fbDeleteSupplier(id); // borra el doc en Firestore
-    save('config'); render(); closeOverlay('delOverlay'); closeOverlay('suppOverlay'); // bump ts para otros dispositivos
-    if($('suppManageOverlay').classList.contains('open')) renderSuppManage();
-    toast('🗑️ Proveedor eliminado');
-  };
-  openOverlay('delOverlay');
+  confirmar({
+    texto: `¿Eliminar el proveedor "${sup.name}"? Se borra su Excel de stock. No se puede deshacer.`,
+    textoSi: 'Eliminar proveedor',
+    alConfirmar: () => {
+      S.suppliers=S.suppliers.filter(x=>x.id!==id);
+      if(window.Cotizacion&&Cotizacion.stock) Cotizacion.stock.del(id);
+      if(window._fbDeleteSupplier) window._fbDeleteSupplier(id); // borra el doc en Firestore
+      save('config'); render(); closeOverlay('suppOverlay'); // bump ts para otros dispositivos
+      if($('suppManageOverlay').classList.contains('open')) renderSuppManage();
+      toast('🗑️ Proveedor eliminado');
+    }
+  });
 }
 function toggleAllSuppItems(){
   const sup=S.suppliers.find(x=>x.id===_suppId); if(!sup||!sup.items||!sup.items.length) return;
@@ -3715,30 +3714,73 @@ function applyStatus(st){
   }
 }
 
+/* ── LA ÚNICA PUERTA AL DIÁLOGO DE CONFIRMAR ─────────────────────────────
+   Cinco pantallas —borrar pedido, borrar varios, borrar proveedor, vaciar
+   papelera y borrar link— escribían A MANO sobre el mismo botón: su texto, su
+   color, su acción y si estaba apagado. Cada una tenía que acordarse de
+   dejarlo limpio para las otras cuatro.
+
+   Una se olvidó. `openDel` dejaba el botón en "Moviendo…" y DESHABILITADO al
+   terminar bien (solo lo reponía si fallaba), y el borrado de link no reponía
+   nada. Resultado: borrabas un pedido y el siguiente borrado de link nacía
+   muerto — el botón salía diciendo "Moviendo…" y no respondía. No fallaba
+   siempre: fallaba según lo que hubieras hecho antes, que es lo peor que
+   puede hacer un fallo.
+
+   Ahora nadie toca el botón. Esta función lo pone en su sitio al abrir y lo
+   devuelve SIEMPRE al terminar —salga bien o mal—, así que ya no hay nada de
+   qué acordarse. Hay una prueba que falla si alguien vuelve a escribirle
+   encima por su cuenta. */
+function confirmar(op){
+  const msg = $('delMsg'), si = $('delYes');
+  if(!msg || !si) return;
+  const textoSi = op.textoSi || 'Sí, eliminar';
+
+  if(op.html !== undefined) msg.innerHTML = op.html;
+  else msg.textContent = op.texto || '';
+  si.textContent = textoSi;
+  si.disabled = false;
+  si.style.background = op.colorSi || 'var(--red)';
+
+  si.onclick = async () => {
+    si.disabled = true;
+    if(op.trabajando) si.textContent = op.trabajando;
+    let bien = false;
+    try{
+      await op.alConfirmar();
+      bien = true;
+    }catch(e){
+      console.warn('confirmar:', e);
+      toast(op.siFalla || '⚠️ No se pudo completar la acción');
+    }finally{
+      si.disabled = false;
+      si.textContent = textoSi;
+    }
+    // Cerrar solo si salió bien: si falló, el aviso se lee con el diálogo
+    // delante y se puede reintentar sin volver a buscar el pedido.
+    if(bien) closeOverlay('delOverlay');
+  };
+  openOverlay('delOverlay');
+}
+window.confirmar = confirmar;
+
 /* DELETE → TRASH */
 function openDel(id){
   const s=S.shipments.find(x=>x.id===id);if(!s)return;
-  $('delMsg').textContent=`¿Mover "${s.name}" a la papelera?`;
-  $('delYes').style.background='var(--red)';
-  $('delYes').textContent='Mover a papelera';
-  $('delYes').disabled=false;   // botón siempre habilitado al abrir (evita que quede trabado)
-  $('delYes').onclick=async()=>{
-    $('delYes').disabled=true;
-    $('delYes').textContent='Moviendo...';
-    try{
+  confirmar({
+    texto: `¿Mover "${s.name}" a la papelera?`,
+    textoSi: 'Mover a papelera',
+    trabajando: 'Moviendo...',
+    siFalla: '❌ No se pudo mover a papelera. El pedido no fue borrado.',
+    alConfirmar: async () => {
       if(window._fbWriteTrashItem)
         await window._fbWriteTrashItem(id,{shipment:s,deletedAt:Date.now()});
       S.trash.push({shipment:s,deletedAt:Date.now()});
       S.shipments=S.shipments.filter(x=>x.id!==id);
       if(window._fbDeleteShipment) window._fbDeleteShipment(id);
-      save('config');render();closeOverlay('delOverlay');toast('🗑️ Movido a papelera'); // solo config (trash): el pedido ya se borró de Firestore
-    }catch(e){
-      $('delYes').disabled=false;
-      $('delYes').textContent='Mover a papelera';
-      toast('❌ No se pudo mover a papelera. El pedido no fue borrado.');
+      save('config');render();toast('🗑️ Movido a papelera'); // solo config (trash): el pedido ya se borró de Firestore
     }
-  };
-  openOverlay('delOverlay');
+  });
 }
 function delSelected(){
   const sel=Seleccion.marcados();if(!sel.length){toast('Selecciona envíos');return}
@@ -3751,11 +3793,11 @@ function delSelected(){
      estar borrado, y el aviso decía otro número. Una acción destructiva no
      puede preguntar dos veces y confiar en que le respondan igual. */
   const ids=new Set(sel.map(s=>String(s.id)));
-  $('delMsg').textContent=`¿Mover ${sel.length} envío(s) a la papelera?`;
-  $('delYes').style.background='var(--red)';
-  $('delYes').textContent='Mover a papelera';
-  $('delYes').disabled=false;   // botón siempre habilitado al abrir (evita que quede trabado)
-  $('delYes').onclick=()=>{
+  confirmar({
+    texto: `¿Mover ${sel.length} envío(s) a la papelera?`,
+    textoSi: 'Mover a papelera',
+    trabajando: 'Moviendo...',
+    alConfirmar: () => {
     // Se resuelven los objetos AHORA, contra la lista viva: si el latido los
     // reemplazó, la papelera tiene que guardar la versión buena, no la que se
     // capturó hace treinta segundos.
@@ -3767,9 +3809,9 @@ function delSelected(){
     });
     S.shipments=S.shipments.filter(x=>!ids.has(String(x.id)));
     Seleccion.quitar(Array.from(ids));
-    save('config');render();closeOverlay('delOverlay');toast(`🗑️ ${aBorrar.length} movidos a papelera`); // solo config (trash): los pedidos ya se borraron de Firestore
-  };
-  openOverlay('delOverlay');
+    save('config');render();toast(`🗑️ ${aBorrar.length} movidos a papelera`); // solo config (trash): los pedidos ya se borraron de Firestore
+    }
+  });
 }
 
 /* PIN */
@@ -4055,7 +4097,7 @@ render();
      lo usa. config.js, print.js y voz.js preguntan por los pedidos marcados,
      así que siguen yendo detrás. El orden de carga es un contrato
      (ver docs/ARQUITECTURA.md). -->
-<script src="config.js?v=26"></script>
+<script src="config.js?v=27"></script>
 <script src="print.js?v=16"></script>
 <script src="notify.js?v=4"></script>
 <script src="shalom.js?v=15"></script>
