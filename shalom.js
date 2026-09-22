@@ -146,8 +146,17 @@
 
     ticket: _off,            // 2 · el PNG del ticket
     agencias: _off,          // 3 · GET /agencies
-    estadoInstancia: _off,   // 5 · POST /instances/status
     registrar: _off,         // 6 · alta de envío
+
+    /* ✅ CONECTADO · GET /instances — 2026-09-22
+       Si la cuenta de Shalom Pro tiene sesión abierta. Va el GET y no el
+       `POST /instances/status` que decía el plan: el POST exige un
+       `instanceId` que el panel no tiene, y el GET no pide nada Y LO DEVUELVE.
+       → {ok:true, sesion:{conocido, conectada, usuario, nombre, id, url}}
+       ⚠️ "Instancia encendida" NO es "sesión viva": el robot puede estar
+       corriendo parado en la pantalla de login, y así los registros fallan
+       uno tras otro sin decir por qué. Esto contesta la pregunta correcta. */
+    estadoInstancia: function () { return _pedir({op: 'instances'}); },
 
     /* ✅ CONECTADO · GET /validate — 2026-09-13
        Dice si la clave sirve y cuánto se ha consumido. Es el primero a

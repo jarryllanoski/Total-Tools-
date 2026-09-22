@@ -51,7 +51,7 @@ const PERMITIDAS = {
      que el GET no pide nada Y DEVUELVE ESE ID — que es además la llave que
      van a necesitar el ticket y el registro de envíos. No gasta cuota y no
      puede crear ni borrar nada. */
-  instances: {metodo: "GET", ruta: "/instances", soloMedir: true},
+  instances: {metodo: "GET", ruta: "/instances"},
 };
 
 /**
@@ -448,6 +448,64 @@ async function barreras(entrada, deps) {
 }
 
 /**
+ * Traduce la respuesta de `GET /instances` al contrato del panel.
+ *
+ * FORMA REAL MEDIDA (22 sep 2026, contra la API desplegada):
+ *   {instances: [{id:string, name:string, username:string,
+ *                 createdAt:string(ISO con milisegundos), isLoggedIn:boolean}]}
+ *
+ * La documentación la pinta PLANA; viene envuelta en `instances`. Una vez más
+ * la doc y la realidad no coinciden — por eso se mide antes de traducir.
+ *
+ * REGLA DE ORO, la de este endpoint en particular: solo se afirma algo cuando
+ * `isLoggedIn` es un booleano de verdad. Si Shalom cambia la forma se devuelve
+ * FORMATO_DESCONOCIDO y el panel enseña la respuesta cruda, en vez de inventar
+ * un "conectado" que haría fallar un lote entero de registros sin decir por
+ * qué. Es exactamente lo que faltaba cuando el traductor de /track daba por
+ * bueno un formato que ya no existía.
+ *
+ * ⚠️ NINGUNA instancia y VARIAS instancias son cosas distintas, y ninguna de
+ * las dos es "la sesión está caída":
+ *   - 0 → no hay cuenta de Shalom Pro que consultar.
+ *   - >1 → no se puede saber CUÁL usa el panel, y elegir la primera sería
+ *     adivinar. Con dos instancias, una dentro y otra fuera, afirmar por la
+ *     primera es una mentira que se paga con un lote de registros fallidos.
+ *
+ * `url` (dónde quedó parado el robot) NO lo da este endpoint, solo el
+ * `POST /instances/status`. Va en null a propósito: el panel no pinta el
+ * enlace en vez de inventarse una dirección.
+ * @param {*} j cuerpo JSON de Shalom
+ * @return {Object} respuesta del contrato
+ */
+function traducirInstancias(j) {
+  const raro = {ok: false, motivo: "FORMATO_DESCONOCIDO"};
+  if (!j || typeof j !== "object" || Array.isArray(j)) return raro;
+  const lista = j.instances;
+  if (!Array.isArray(lista)) return raro;
+  if (!lista.length) return {ok: false, motivo: "SIN_INSTANCIA"};
+  if (lista.length > 1) return {ok: false, motivo: "VARIAS_INSTANCIAS"};
+  const it = lista[0];
+  if (!it || typeof it !== "object" || Array.isArray(it)) return raro;
+  if (typeof it.isLoggedIn !== "boolean") return raro;
+  const txt = (x) => (typeof x === "string" && x ? x : null);
+  return {
+    ok: true,
+    sesion: {
+      conocido: true,
+      conectada: it.isLoggedIn,
+      usuario: txt(it.username),
+      nombre: txt(it.name),
+      // La llave que van a necesitar el ticket y el registro de envíos. No se
+      // guarda en ninguna parte a propósito: pedirla es una consulta que no
+      // gasta cuota, y un id guardado puede quedar viejo si la instancia se
+      // rehace. Menos estado que mantener, y nunca desfasado.
+      id: txt(it.id),
+      url: null,
+    },
+  };
+}
+
+/**
  * Traduce la respuesta cruda del endpoint que sea. Un endpoint sin traductor
  * NO devuelve su JSON: eso es justo lo que hace que una forma mal entendida
  * llegue a la pantalla como si fuera un dato bueno.
@@ -458,6 +516,7 @@ async function barreras(entrada, deps) {
 function traducir(op, json) {
   if (op === "validate") return traducirValidate(json);
   if (op === "track") return traducirTrack(json);
+  if (op === "instances") return traducirInstancias(json);
   return {ok: false, motivo: "SIN_TRADUCTOR"};
 }
 
@@ -469,6 +528,7 @@ module.exports = {
   forma,
   traducirValidate,
   traducirTrack,
+  traducirInstancias,
   PASOS,
   esAdminDe,
   traducir,

@@ -88,10 +88,9 @@ module.exports = async ({bloque, ok}) => {
   ok(P.PERMITIDAS.instances.metodo === 'GET' &&
      P.PERMITIDAS.instances.ruta === '/instances',
      'instances entra SOLO como GET');
-  ok(P.PERMITIDAS.instances.soloMedir === true,
-     'y en `soloMedir`: se puede MIRAR su forma, no usarla. La documentación ' +
-     'de esta API y la realidad ya se contradijeron seis veces, así que se ' +
-     'mide antes de traducir');
+  ok(!P.PERMITIDAS.instances.soloMedir,
+     'y ya no es solo medible: su forma se midió contra la API real el ' +
+     '22/09/2026 y se tradujo');
 
   bloque('Cada endpoint por su traductor, nunca por el de otro');
 
@@ -321,14 +320,27 @@ module.exports = async ({bloque, ok}) => {
      'NO_PERMITIDO',
      'y no sirve para asomarse a un endpoint que no está permitido');
   {
-    // Las dos caras de `soloMedir`, que es todo el punto de este estado.
-    const r = await pasar({cuerpo: {op: 'esquema', de: 'instances'}});
-    ok(r.ok === true && r.destino === 'instances' && r.diagnostico === true,
-       'a `instances` sí se le puede mirar la forma…');
-    ok(motivo(await pasar({cuerpo: {op: 'instances'}})) === 'SIN_TRADUCTOR',
-       '…pero USARLA todavía no: sin traductor devolvería su JSON crudo por ' +
-       'la puerta de otro, que es justo cómo una forma mal entendida llega a ' +
-       'la pantalla como si fuera un dato bueno');
+    const r = await pasar({cuerpo: {op: 'instances'}});
+    ok(r.ok === true && r.destino === 'instances',
+       'instances ya pasa como operación normal');
+    const d = await pasar({cuerpo: {op: 'esquema', de: 'instances'}});
+    ok(d.ok === true && d.diagnostico === true,
+       'y se le puede seguir mirando la forma, por si Shalom la cambia');
+  }
+  {
+    /* La guarda de `soloMedir` no se prueba con un endpoint ya conectado: se
+       prueba con uno que lo esté de verdad, o deja de probarse el día que
+       todos se conecten. Se monta uno de mentira. */
+    const falso = {metodo: 'GET', ruta: '/nada', soloMedir: true};
+    P.PERMITIDAS.__prueba = falso;
+    ok(motivo(await pasar({cuerpo: {op: '__prueba'}})) === 'SIN_TRADUCTOR',
+       'un endpoint en `soloMedir` NO se puede usar: sin traductor devolvería ' +
+       'su JSON crudo por la puerta de otro, que es justo cómo una forma mal ' +
+       'entendida llega a la pantalla como si fuera un dato bueno');
+    const d = await pasar({cuerpo: {op: 'esquema', de: '__prueba'}});
+    ok(d.ok === true && d.diagnostico === true,
+       '…pero MIRARLE la forma sí: medir antes de traducir, siempre');
+    delete P.PERMITIDAS.__prueba;
   }
 
   bloque('Traducir /validate — jamás ok:true sin dato real');
@@ -534,4 +546,109 @@ module.exports = async ({bloque, ok}) => {
 
   ok(JSON.stringify(P.forma({a: {b: {c: {d: {e: {f: {g: {h: {i: 1}}}}}}}}}))
       .indexOf('objeto') > 0, 'pero tiene fondo: no se hunde para siempre');
+
+  bloque('Traducir GET /instances — "encendida" no es "con sesión"');
+
+  {
+    /* FORMA REAL, medida el 22/09/2026 contra la API desplegada. La
+       documentación la pinta PLANA; viene envuelta en `instances`. Una vez
+       más la doc y la realidad no coincidieron — la séptima. */
+    const real = {instances: [{
+      id: '3524c6ef-99ad-4988-b62d-8f85d000aaaa',
+      name: 'Jarlyn Total',
+      username: 'cuenta@ejemplo.com',
+      createdAt: '2026-08-30T14:02:11.000Z',
+      isLoggedIn: true
+    }]};
+    const ti = P.traducirInstancias;
+
+    {
+      const r = ti(real);
+      ok(r.ok === true && r.sesion.conocido === true,
+         'la forma medida se traduce');
+      ok(r.sesion.conectada === true, 'y dice que la sesión está viva');
+      ok(r.sesion.usuario === 'cuenta@ejemplo.com',
+         'con qué cuenta está dentro');
+      ok(r.sesion.id === '3524c6ef-99ad-4988-b62d-8f85d000aaaa',
+         'y el instanceId, que es la llave que van a necesitar el ticket y el ' +
+         'registro de envíos');
+      ok(r.sesion.url === null,
+         'la url va en null: este endpoint NO la da (solo el POST /status), y ' +
+         'el panel prefiere no pintar el enlace antes que inventarse una ' +
+         'dirección');
+    }
+
+    {
+      const fuera = JSON.parse(JSON.stringify(real));
+      fuera.instances[0].isLoggedIn = false;
+      fuera.instances[0].username = null;
+      const r = ti(fuera);
+      ok(r.ok === true && r.sesion.conectada === false,
+         'y cuando la cuenta se deslogueó, lo dice');
+      ok(r.sesion.usuario === null, 'sin inventar un nombre de cuenta');
+    }
+
+    /* EL ERROR CARO DE ESTE ENDPOINT. La pantalla de Instancias de Shalom
+       puede decir "Conectado" —el robot corre— mientras `isLoggedIn` es
+       false: corre, pero parado en el login. Registrar envíos así falla, y
+       falla sin decir por qué. */
+    {
+      const trampa = {instances: [{id: 'x', name: 'n', username: null,
+        createdAt: '2026-08-30T14:02:11.000Z', isLoggedIn: false,
+        status: 'CONNECTED', estado: 'Conectado'}]};
+      ok(ti(trampa).sesion.conectada === false,
+         'un "Conectado" en cualquier otro campo NO cuenta: lo único que ' +
+         'decide si un registro va a funcionar es isLoggedIn');
+    }
+
+    bloque('…y jamás afirma nada que no haya medido');
+
+    ok(ti(null).motivo === 'FORMATO_DESCONOCIDO', 'sin respuesta, no se afirma');
+    ok(ti('hola').motivo === 'FORMATO_DESCONOCIDO', 'un texto tampoco');
+    ok(ti([]).motivo === 'FORMATO_DESCONOCIDO',
+       'ni un array suelto: la forma medida es un objeto con `instances` dentro');
+    ok(ti({}).motivo === 'FORMATO_DESCONOCIDO', 'ni un objeto vacío');
+    ok(ti({instances: 'nada'}).motivo === 'FORMATO_DESCONOCIDO',
+       'si `instances` deja de ser una lista, no se entiende y se dice');
+    ok(ti({instances: [{id: 'x', isLoggedIn: 'true'}]}).motivo ===
+       'FORMATO_DESCONOCIDO',
+       'un "true" de TEXTO no es un booleano. Sin esta línea, el día que ' +
+       'Shalom mande la cadena "false" el panel diría "conectada" —porque un ' +
+       'texto no vacío es verdadero— y los registros fallarían en fila');
+    ok(ti({instances: [{id: 'x'}]}).motivo === 'FORMATO_DESCONOCIDO',
+       'si falta isLoggedIn, no hay nada que afirmar');
+    ok(ti({instances: [null]}).motivo === 'FORMATO_DESCONOCIDO',
+       'ni con un hueco en la lista');
+    ok(ti(real).ok === true && ti({instances: [Object.assign(
+        {campoNuevo: 1}, real.instances[0])]}).ok === true,
+       'y un campo nuevo que Shalom añada mañana no lo rompe: lo que no se ' +
+       'reconoce se ignora');
+
+    bloque('Cero instancias y varias no son "la sesión está caída"');
+
+    ok(ti({instances: []}).motivo === 'SIN_INSTANCIA',
+       'sin ninguna cuenta de Shalom Pro no hay sesión que consultar, y eso ' +
+       'NO es lo mismo que una sesión caída: se arregla creando la instancia');
+    ok(ti({instances: []}).ok === false, 'y no se afirma nada');
+    {
+      const dos = {instances: [real.instances[0],
+        Object.assign({}, real.instances[0], {id: 'y', isLoggedIn: false})]};
+      ok(ti(dos).motivo === 'VARIAS_INSTANCIAS',
+         'con dos instancias no se elige la primera: si una está dentro y la ' +
+         'otra fuera, afirmar por la primera es una mentira que se paga con ' +
+         'un lote entero de registros fallidos');
+      ok(ti(dos).ok === false, 'adivinar cuál usa el panel no es una opción');
+    }
+    ok(P.traducir('instances', real).sesion.conectada === true,
+       'y el despachador manda instances a SU traductor');
+  }
+
+  bloque('Los motivos nuevos tienen palabras en el panel');
+  {
+    /* Un motivo sin traducción sale como código en la pantalla, y
+       "VARIAS_INSTANCIAS" no le dice nada a nadie. */
+    const html = E.leer('index.html');
+    ok(/SIN_INSTANCIA:'[^']+'/.test(html), 'SIN_INSTANCIA se explica');
+    ok(/VARIAS_INSTANCIAS:'[^']+'/.test(html), 'VARIAS_INSTANCIAS también');
+  }
 };

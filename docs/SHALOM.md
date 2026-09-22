@@ -99,6 +99,54 @@ Este documento explica **por qué** el rastreo automático de Shalom se retiró,
 volver a tocar nada de Shalom: aquí está la razón para no repetir caminos que ya
 sabemos que no funcionan.
 
+## El contrato de `GET /instances` — medido, no supuesto (22 sep 2026) ✅
+
+**Es el que está conectado**, no el `POST /instances/status` de más abajo. Dos
+razones, y las dos se descubrieron al ir a conectarlo:
+
+1. El POST exige un `instanceId` que **el panel no tenía guardado en ninguna
+   parte**. El GET no pide nada… y lo devuelve.
+2. Ese `id` es además la llave que exige `/track/label` para el ticket
+   (contradicción 2 de `docs/SHALOM-API.md`) y el registro de envíos. Sacarlo
+   aquí desbloquea las tres cosas.
+
+Lo único que aporta el POST sobre el GET es la `url` —dónde quedó parado el
+robot—. Si algún día hace falta, se añade con su propia medición.
+
+Forma real, medida con `Shalom.esquema('instances')` contra la API desplegada:
+
+```json
+{ "instances": [ {
+    "id":        "string",
+    "name":      "string",
+    "username":  "string",
+    "createdAt": "string(####-##-##T##:##:##.###Z)",
+    "isLoggedIn": "boolean"
+} ] }
+```
+
+⚠️ **La documentación la pinta PLANA**; viene envuelta en `instances`. Es la
+séptima vez que la doc y la realidad no coinciden en esta API.
+
+### Las tres respuestas que no son "la sesión está caída"
+
+| Caso | Motivo | Por qué va aparte |
+|---|---|---|
+| `instances: []` | `SIN_INSTANCIA` | No hay cuenta que consultar. Se arregla creando la instancia, no entrando a Shalom |
+| más de una | `VARIAS_INSTANCIAS` | No se puede saber cuál usa el panel. Con una dentro y otra fuera, elegir la primera diría "todo bien" y los registros fallarían igual |
+| `isLoggedIn` no booleano | `FORMATO_DESCONOCIDO` | El día que llegue la **cadena** `"false"`, un texto no vacío es verdadero: diría "conectada" y fallaría en fila |
+
+`url` va en **null** a propósito: este endpoint no la da, y el panel prefiere
+no pintar el enlace antes que inventarse una dirección.
+
+**El `id` no se guarda en ninguna parte.** Pedirlo es una consulta que no gasta
+cuota, y un id guardado puede quedar viejo si la instancia se rehace. Menos
+estado, y nunca desfasado.
+
+`GET /instances` **sondea** igual que `validate`: puede pasar mientras la
+puerta descansa, y como cualquier respuesta buena la reabre, apretar *Verificar
+sesión* es también la forma de preguntar "¿ya volvió?".
+
 ## El contrato de `POST /instances/status` — medido, no supuesto
 
 Igual que con `/track`, la documentación dice **qué enviar** pero no **qué

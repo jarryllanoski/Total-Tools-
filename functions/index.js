@@ -70,7 +70,12 @@ const ADMINS = [
  */
 async function _porLaPuerta(destino, datos, diagnostico) {
   const estado = await _leerPuerta();
-  const esSondeo = diagnostico || destino === "validate";
+  /* `instances` sondea igual que `validate`: es UNA consulta, no toca
+     ningun envio y no gasta cuota, asi que puede pasar mientras la puerta
+     descansa. Y como cualquier respuesta buena la reabre, apretar
+     "Verificar sesion" es tambien la forma de preguntar "¿ya volvio?". */
+  const esSondeo = diagnostico || destino === "validate" ||
+      destino === "instances";
   const llave = interruptor.decidir(estado, Date.now(), esSondeo);
   if (!llave.pasa) {
     return {ok: false, motivo: llave.motivo, reabre: llave.reabre};
