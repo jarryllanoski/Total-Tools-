@@ -233,6 +233,10 @@ function _procesarDoc(file,slot){
       // Subir un documento ya NO mueve la etiqueta: el estado lo cambias tú.
     }).catch(function(e){
       console.warn('[Doc] Storage falló, usando base64:',e&&e.message);
+      // Si lo que falló fue la sesión, decirlo: el archivo quedó aquí, pero
+      // no está en la nube y eso se arregla volviendo a entrar, no esperando.
+      var t = window._authTextoMotivo && window._authTextoMotivo(e);
+      if(t) toast(t);
       _procesarDocBase64(file,slot);
     });
     return;

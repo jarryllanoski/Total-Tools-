@@ -47,7 +47,29 @@ function montar(op) {
   };
   win._fbStatus = function (s) { win._estados.push(s); };
   win._guardarSucios = function () { win._sucios++; };
-  win.Errores = { anotar: function (d) { win._anotados.push(d); } };
+  win.Errores = { anotar: function (d, e, x) { win._anotados.push(d); win._detalle = x; } };
+  /* Por defecto HAY sesión, que es el estado normal. `op.sesion` la rompe con
+     el motivo que se quiera ('rechazado', 'sin_red', 'vencida') para probar la
+     puerta: es la única forma de comprobar que el panel se NIEGA a escribir
+     sin identificarse en vez de salir como anónimo y comerse un 403. */
+  win._toasts = [];
+  win.toast = function (t) { win._toasts.push(t); };
+  win._authTextoMotivo = function (e) { return (e && e.auth) ? ('dice:' + e.auth) : ''; };
+  if (op.sinPuerta) {
+    /* El camino de respaldo: un `auth.js` viejo en caché, sin la puerta. Ahí
+       el panel NO puede degradar a anónimo —que es el agujero que se está
+       tapando— pero tampoco puede tumbarse entero por un archivo desfasado. */
+    win._authEnsureToken = async function () { return false; };
+  } else {
+    win._authToken = async function () {
+      if (op.sesion && op.sesion !== 'ok') {
+        const e = new Error('sesion:' + op.sesion);
+        e.auth = op.sesion;
+        throw e;
+      }
+      return 'idtoken-de-prueba';
+    };
+  }
 
   let nCommit = 0;
   const fetchFalso = async function (url, init) {
@@ -504,4 +526,111 @@ module.exports = async function ({ bloque, ok }) {
   const r3 = montarReintento({ guardar: async () => { veces++; if (veces < 3) throw new Error('no'); } });
   await r3.api.reintentar({}, 0); await r3.drenar();
   ok(r3.almacen.dpanel_pending === '0', 'si entra al tercer intento, no queda marcado pendiente');
+
+  bloque('Sin sesión no se escribe — y no se pierde nada');
+
+  {
+    /* Auditoría § 13, "el más grave". `_authHeaders` devolvía {} cuando no
+       había token y la petición salía SIN IDENTIFICAR: 403 a todo durante
+       una hora, con el punto rojo de siempre —el mismo que significa "mal
+       internet"— como único aviso. */
+    const m = montar({sesion: 'rechazado', ships: new Set(['p0', 'p1']), all: false});
+    let reventó = null;
+    try { await m.win._fbSave(datos(2)); } catch (e) { reventó = e; }
+
+    ok(m.red.urls.length === 0,
+       'no sale NI UNA petición a Firestore: negarse antes de salir es el ' +
+       'arreglo, mandarla y comerse el 403 era el bug');
+    ok(reventó, 'y el guardado falla de verdad, no dice que fue bien');
+    const est = m.estado();
+    ok(est.ships.has('p0') && est.ships.has('p1'),
+       'los dos pedidos quedan marcados como sucios: no entraron, pero tampoco ' +
+       'se perdieron — el próximo guardado los sube');
+    ok(m.win._sucios > 0,
+       'y el registro de sucios se graba, así que sobrevive a cerrar la pestaña');
+    ok(m.win._estados.indexOf('err') >= 0, 'el punto se pone rojo');
+  }
+
+  {
+    /* Un fallo de sesión no es un fallo de `:commit`. Si se rehiciera la
+       tanda uno por uno, fallarían TODOS por lo mismo, y la regla de "si
+       sueltos entraron todos, el endpoint está roto" al revés apagaría
+       `:commit` para el resto de la sesión por algo que no tiene que ver. */
+    const m = montar({sesion: 'rechazado', ships: new Set(['p0']), all: false});
+    try { await m.win._fbSave(datos(1)); } catch (e) { /* esperado */ }
+    ok(m.red.patch.length === 0,
+       'no se rehace uno por uno: darían el mismo error tantas veces como ' +
+       'documentos haya, sin una sola escritura de más');
+    ok(m.win._anotados.indexOf('fs.sesion') >= 0,
+       'y queda anotado como problema de SESIÓN, con su propio nombre');
+    ok(m.win._anotados.indexOf('fs.commit') < 0,
+       'no como un fallo de commit, que es lo que apagaría el camino rápido');
+  }
+
+  {
+    // 971 documentos que fallan no pueden producir 971 avisos.
+    const m = montar({sesion: 'rechazado', all: true});
+    try { await m.win._fbSave(datos(300)); } catch (e) { /* esperado */ }
+    ok(m.win._toasts.length === 1,
+       'un solo aviso aunque fallen cientos de documentos: el panel quedaría ' +
+       'inservible justo cuando hay que leerlo');
+    ok(m.win._toasts[0] === 'dice:rechazado',
+       'y el texto lo decide auth.js, no cada pantalla por su cuenta');
+  }
+
+  {
+    // Las dos causas se arreglan distinto, así que se dicen distinto.
+    const m = montar({sesion: 'sin_red', all: true});
+    try { await m.win._fbSave(datos(3)); } catch (e) { /* esperado */ }
+    ok(m.win._toasts[0] === 'dice:sin_red',
+       'un corte de red no dice "tu sesión venció": una se espera, la otra ' +
+       'se resuelve volviendo a entrar');
+  }
+
+  {
+    /* El camino de respaldo, que es el que se coló en la primera mutación:
+       con un `auth.js` viejo en caché no existe `_authToken`. Antes eso
+       llevaba derecho a mandar la petición sin identificar — el agujero
+       entero, por la puerta de atrás. */
+    const m = montar({sinPuerta: true, ships: new Set(['p0']), all: false});
+    let reventó = null;
+    try { await m.win._fbSave(datos(1)); } catch (e) { reventó = e; }
+    ok(m.red.urls.length === 0,
+       'sin la puerta y sin token tampoco sale la petición: el respaldo no ' +
+       'puede ser una rendija por donde vuelva el mismo agujero');
+    ok(reventó, 'y falla, no dice que guardó');
+    ok(m.estado().ships.has('p0'), 'el pedido queda sucio igual');
+  }
+
+  {
+    // Y con token guardado, el respaldo SÍ deja trabajar: un archivo viejo en
+    // caché no puede dejar a nadie fuera de su propio panel.
+    const m = montar({sinPuerta: true, almacen: {tt_id_token: 'ID-VIEJO'},
+      ships: new Set(['p0']), all: false});
+    await m.win._fbSave(datos(1));
+    ok(m.red.urls.length > 0, 'con token sí escribe, aunque auth.js esté viejo');
+    ok(m.red.commit.length === 1, 'y por el camino rápido, como siempre');
+  }
+
+  bloque('Guardar UN pedido que falla lo deja marcado, no olvidado');
+
+  {
+    /* Auditoría § 1. `_fbSaveShipment` solo pintaba el punto rojo y se
+       olvidaba: el cambio no estaba en la nube y tampoco quedaba marcado,
+       así que nadie lo reintentaba jamás. Es la explicación de "cambié la
+       etiqueta y se regresó sola". */
+    const m = montar({patchFalla: true, ships: new Set(), all: false});
+    await m.win._fbSaveShipment({id: 'p7', name: 'Ana', status: 'ENVIADO'});
+    ok(m.estado().ships.has('p7'),
+       'el pedido queda sucio: "falló" y "se perdió" no son lo mismo');
+    ok(m.win._sucios > 0, 'y grabado, para que sobreviva a cerrar la pestaña');
+    ok(m.win._estados.indexOf('err') >= 0, 'el punto sigue poniéndose rojo');
+  }
+
+  {
+    const m = montar({ships: new Set(), all: false});
+    await m.win._fbSaveShipment({id: 'p7', name: 'Ana', status: 'ENVIADO'});
+    ok(!m.estado().ships.has('p7'),
+       'y si entra bien NO queda sucio: marcar de más obliga a resubirlo entero');
+  }
 };

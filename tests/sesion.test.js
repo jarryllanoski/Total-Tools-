@@ -74,12 +74,12 @@ function montar(op) {
     document: d.doc,
     localStorage: ls,
     location: {reload: () => { visto.recargas++; }},
-    navigator: {onLine: true},
+    navigator: {onLine: op.onLine !== false},
     confirm: (m) => { visto.preguntas.push(m); return op.confirma !== false; },
-    fetch: async () => (op.loginOk ?
+    fetch: op.fetch || (async () => (op.loginOk ?
       {ok: true, status: 200, json: async () => ({
         idToken: 'ID', refreshToken: 'REF', expiresIn: '3600'})} :
-      {ok: false, status: 400, json: async () => ({})}),
+      {ok: false, status: 400, json: async () => ({})})),
     setTimeout: () => {},
     console: {warn() {}, log() {}, error() {}}
   };
@@ -241,5 +241,156 @@ module.exports = async ({bloque, ok}) => {
        'sin ID el botón no se dibuja — activarlo nunca puede dejar a nadie fuera');
     ok(/accounts\.google\.com\/gsi\/client/.test(auth),
        'y el botón lo dibuja Google, no nosotros: la contraseña nunca pasa por aquí');
+  }
+
+  bloque('La puerta del token: o da el token, o se niega — nunca "bueno, igual"');
+
+  {
+    /* El hallazgo 13 de la auditoría, el que estaba marcado como "el más
+       grave": cuando no había token, cada sitio mandaba la petición IGUAL,
+       sin identificarse. Las reglas exigen sesión, así que Firestore
+       respondía 403 a todo lo que escribieras durante esa hora — y el único
+       aviso era el mismo punto rojo que significa "mal internet". */
+    const ahora = Date.now();
+    const viva = () => ({
+      tt_auth_token: 'REF',
+      tt_auth_expiry: String(ahora + 60 * 60 * 1000),
+      tt_id_token: 'ID-BUENO'
+    });
+
+    {
+      const m = montar({almacen: viva()});
+      await asentar();
+      const tok = await m.win._authToken();
+      ok(tok === 'ID-BUENO', 'con sesión sana devuelve el token, sin ceremonia');
+      ok((await m.win._authEnsureToken()) === true,
+         'y el contrato booleano de antes sigue igual: tiene 5 consumidores');
+    }
+
+    {
+      /* El caso más sutil y el que nadie mira: la sesión dice estar viva
+         —fecha de vencimiento en el futuro— pero el idToken no está. Antes
+         eso salía como petición anónima igual que los demás. */
+      const a = viva();
+      delete a.tt_id_token;
+      const m = montar({almacen: a});
+      await asentar();
+      let lanzo = null;
+      try { await m.win._authToken(); } catch (e) { lanzo = e; }
+      ok(lanzo, 'sin idToken guardado se NIEGA, aunque la sesión parezca viva');
+      ok(lanzo && lanzo.auth === 'sin_token', 'y dice que el motivo es ese');
+    }
+
+    {
+      /* Las 12 h cumplidas: no se renueva más, y se dice por qué.
+         Sin red a propósito: con red, `init()` expulsa la sesión al arrancar
+         —que es lo correcto— y entonces lo que se estaría midiendo es la
+         expulsión, no la puerta. Sin red no expulsa (no podría volver a
+         entrar), y es justo el caso en que la puerta tiene que hablar. */
+      const a = viva();
+      a.tt_auth_inicio = String(ahora - 13 * 60 * 60 * 1000);
+      const m = montar({almacen: a, onLine: false});
+      await asentar();
+      let lanzo = null;
+      try { await m.win._authToken(); } catch (e) { lanzo = e; }
+      ok(lanzo && lanzo.auth === 'vencida', 'sesión de más de 12 h: "vencida"');
+    }
+
+    {
+      /* Sin red, con el token por vencer. Es el caso que NO debe confundirse
+         con el de abajo: acá se espera a que vuelva internet; abajo hay que
+         volver a entrar. */
+      const a = viva();
+      a.tt_auth_expiry = String(ahora + 1000); // dentro del margen de 5 min
+      const m = montar({almacen: a, fetch: async () => { throw new Error('red'); }});
+      await asentar();
+      let lanzo = null;
+      try { await m.win._authToken(); } catch (e) { lanzo = e; }
+      ok(lanzo && lanzo.auth === 'sin_red', 'un corte de red se llama "sin_red"');
+      ok((await m.win._authEnsureToken()) === false,
+         'y el booleano dice false: un texto no vacío habría pasado por "renovado"');
+    }
+
+    {
+      // El servidor rechaza el token: la sesión murió de verdad.
+      const a = viva();
+      a.tt_auth_expiry = String(ahora + 1000);
+      const m = montar({almacen: a,
+        fetch: async () => ({ok: false, status: 400, json: async () => ({})})});
+      await asentar();
+      let lanzo = null;
+      try { await m.win._authToken(); } catch (e) { lanzo = e; }
+      ok(lanzo && lanzo.auth === 'rechazado', 'un token rechazado se llama "rechazado"');
+    }
+
+    {
+      // Lo que jamás puede pasar, en una sola prueba.
+      const m = montar({almacen: {}});
+      await asentar();
+      let dio = 'NO LANZO';
+      try { dio = await m.win._authToken(); } catch (e) { dio = null; }
+      ok(dio === null,
+         'sin nada de sesión NO devuelve cadena vacía: lanza. Devolver "" era ' +
+         'exactamente lo que dejaba salir la petición sin identificar');
+    }
+  }
+
+  bloque('Las palabras del motivo las decide un solo sitio');
+
+  {
+    const m = montar({almacen: {}});
+    await asentar();
+    const t = m.win._authTextoMotivo;
+    ok(typeof t === 'function', 'auth.js traduce el motivo a palabras');
+    ok(t({auth: 'sin_red'}).indexOf('conexión') > 0,
+       'sin red habla de conexión');
+    ok(t({auth: 'rechazado'}).indexOf('sesión') > 0 &&
+       t({auth: 'rechazado'}).indexOf('conexión') < 0,
+       'y una sesión muerta NO habla de conexión: mandar a revisar el internet ' +
+       'por un problema de permisos es lo que hace perder una tarde');
+    ok(t({auth: 'vencida'}).indexOf('ingresa de nuevo') > 0,
+       'y dice qué hacer, no solo qué pasó');
+    ok(t(new Error('cualquier otra cosa')) === '' && t(null) === '',
+       'y si el error no es de sesión devuelve vacío, para que quien llama ' +
+       'use su propio mensaje sin tener que saber de motivos');
+  }
+
+  bloque('Nadie se fabrica la cabecera por su cuenta');
+
+  {
+    /* Había CUATRO sitios armando el `Authorization` a mano, cada uno con su
+       propia versión de "si hay token lo pongo, y si no, mando igual". Basta
+       con que uno degrade para tener el agujero entero. */
+
+    const idx = E.leer('index.html');
+    const puerta = idx.slice(idx.indexOf('async function _authHeaders('),
+        idx.indexOf('// ── REST helpers'));
+    ok(/headers\['Authorization'\] = 'Bearer ' \+ tok;/.test(puerta),
+       'la cabecera se pone SIEMPRE, no dentro de un "si hay token"');
+    ok(/throw/.test(puerta),
+       'y si no hay token se lanza: devolver {} era mandar la petición como anónimo');
+    ok(puerta.indexOf('if(ok){') < 0,
+       'ya no queda el "si salió bien pongo la cabecera, y si no, paciencia"');
+
+    const st = E.leer('storage.js');
+    ok((st.match(/await window\._authToken\(\)/g) || []).length === 2,
+       'storage.js pasa por la puerta al subir Y al borrar');
+    ok(!/if \(_idTok\) _uploadHdrs/.test(st),
+       'y ya no sube con la cabecera puesta solo "si había token": un 403 ahí ' +
+       'dejaba el pedido con la etiqueta movida, sin archivo y sin aviso');
+    ok(!/_idTok \? \{ 'Authorization'/.test(st),
+       'ni borra sin identificarse, que es un 403 silencioso: el archivo sigue ' +
+       'ahí y el panel cree que ya no está');
+
+    const cot = E.leer('cotizacion.js');
+    ok(/return window\._authToken\(\);/.test(cot),
+       'cotizacion.js también pasa por la puerta');
+    ok(cot.indexOf("localStorage.getItem('tt_id_token')") < 0,
+       'y ya no lee el token a mano para mandar la llamada con la cabecera vacía');
+
+    const sh = E.leer('shalom.js');
+    ok(/if \(!tok\) return \{ok: false, motivo: 'SIN_SESION'\};/.test(sh),
+       'shalom.js ya se negaba solo, y se queda como está: lo que funciona no ' +
+       'se toca para que se parezca al resto');
   }
 };

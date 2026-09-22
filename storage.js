@@ -79,11 +79,17 @@ async function uploadFile(file, shipId, slot) {
   var encoded = encodePath(path);
   var url     = STORAGE_BASE + '/' + encoded + '?uploadType=media&name=' + encoded + '&key=' + FB_KEY;
 
-  // Renovar idToken si está por vencer antes de subir
-  if (typeof window._authEnsureToken === 'function') await window._authEnsureToken();
-  var _idTok = localStorage.getItem('tt_id_token') || '';
-  var _uploadHdrs = { 'Content-Type': file.type };
-  if (_idTok) _uploadHdrs['Authorization'] = 'Bearer ' + _idTok;
+  /* ★ PUERTA. Antes se llamaba a `_authEnsureToken()` IGNORANDO su respuesta
+     y se subía con la cabecera puesta solo «si había token». Sin token la
+     subida salía anónima, Storage respondía 403 — y como subir un documento
+     ya cambia la etiqueta del pedido en memoria, quedabas con el pedido
+     movido, sin archivo y sin un solo aviso. Ahora, sin sesión no se sube:
+     se lanza con el motivo y quien llama decide qué decir. */
+  if (typeof window._authToken !== 'function') {
+    throw new Error('Storage: auth.js no está cargado — no se sube sin sesión');
+  }
+  var _idTok = await window._authToken(); // lanza con .auth si no hay sesión
+  var _uploadHdrs = { 'Content-Type': file.type, 'Authorization': 'Bearer ' + _idTok };
 
   var response = await fetch(url, {
     method:  'POST',
@@ -122,10 +128,15 @@ async function deleteFile(path) {
   var encoded = encodePath(path);
   var url = STORAGE_BASE + '/' + encoded + '?key=' + FB_KEY;
   try {
-    if (typeof window._authEnsureToken === 'function') await window._authEnsureToken();
-    var _idTok = localStorage.getItem('tt_id_token') || '';
-    var _delHdrs = _idTok ? { 'Authorization': 'Bearer ' + _idTok } : {};
-    await fetch(url, { method: 'DELETE', headers: _delHdrs });
+    /* Misma puerta que al subir. Un borrado anónimo es un 403 silencioso:
+       el archivo sigue ahí ocupando espacio y el panel cree que ya no está. */
+    if (typeof window._authToken !== 'function') {
+      throw new Error('Storage: auth.js no está cargado — no se borra sin sesión');
+    }
+    var _idTok = await window._authToken(); // lanza con .auth si no hay sesión
+    await fetch(url, {
+      method: 'DELETE', headers: { 'Authorization': 'Bearer ' + _idTok }
+    });
   } catch(e) {
     console.warn('[Storage] Error eliminando:', path, e.message);
   }
@@ -188,7 +199,8 @@ function patchLoadDoc() {
       })
       .catch(function(e) {
         console.warn('[Storage] Error subiendo, usando base64:', e.message);
-        global.toast('⚠️ Error Storage — guardando localmente');
+        var t = global._authTextoMotivo && global._authTextoMotivo(e);
+        global.toast(t || '⚠️ Error Storage — guardando localmente');
         // Fallback a base64
         _origLoadDoc(input, slot);
       });

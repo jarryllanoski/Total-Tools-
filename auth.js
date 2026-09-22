@@ -500,24 +500,69 @@
   }
 
   /* ── TOKEN VÁLIDO PARA REQUESTS ─────────────────────────────────── */
-  // Renovar token automáticamente si está por vencer (menos de 5 min)
-  async function _ensureValidToken(){
+  /* Devuelve el MOTIVO: 'ok' | 'vencida' | 'rechazado' | 'sin_red'.
+     Un booleano no alcanza. "No tengo token" tiene tres causas con tres
+     arreglos distintos —esperar a que vuelva internet, volver a entrar, o
+     nada porque pasaron las 12 h— y decirle a alguien "revisa tu conexión"
+     cuando lo que murió fue su sesión es lo que hace perder una tarde. */
+  async function _motivoToken(){
     // Si la sesión ya cumplió sus 12 h, no se renueva más. Sin esto, alguien
     // trabajando sin parar la extendería indefinidamente y el límite no
     // existiría en la práctica.
-    if(_sesionVencida()) return false;
+    if(_sesionVencida()) return 'vencida';
     var expiry = parseInt(localStorage.getItem(EXPIRY_KEY)||'0');
     var margin = 5 * 60 * 1000; // 5 minutos antes de vencer
-    if(Date.now() < expiry - margin) return true; // token válido
-    // _refreshToken pasó a devolver un motivo ('ok'|'rechazado'|'sin_red');
-    // acá el contrato es booleano, así que se traduce en vez de devolverlo
-    // crudo — un texto no vacío sería siempre verdadero y "sin red" pasaría
-    // por token renovado.
-    return (await _refreshToken()) === 'ok';
+    if(Date.now() < expiry - margin) return 'ok'; // token válido
+    return await _refreshToken(); // 'ok' | 'rechazado' | 'sin_red'
+  }
+
+  // Renovar token automáticamente si está por vencer (menos de 5 min)
+  async function _ensureValidToken(){
+    // El contrato de acá es booleano y tiene 5 consumidores, así que se
+    // traduce el motivo en vez de devolverlo crudo — un texto no vacío sería
+    // siempre verdadero y "sin red" pasaría por token renovado.
+    return (await _motivoToken()) === 'ok';
+  }
+
+  /* ★ LA PUERTA. Devuelve el idToken listo para usar, o LANZA.
+     Nunca devuelve vacío, y ese es todo el punto. Antes cada sitio que
+     necesitaba el token hacía su propia versión de «lo intento y si no sale,
+     mando la petición igual»: la petición salía SIN IDENTIFICAR, las reglas
+     la rechazaban con 403, y nada avisaba. Se podía trabajar una hora entera
+     sin que subiera nada, con el punto en verde.
+     El error lleva `.auth` con el motivo, para que quien lo atrape pueda
+     decir cuál de los tres problemas es en vez de "sin conexión" a todo. */
+  async function _tokenODetenerse(){
+    var motivo = await _motivoToken();
+    var tok = '';
+    try { tok = localStorage.getItem('tt_id_token') || ''; } catch(e){}
+    if(motivo === 'ok' && tok) return tok;
+    // Motivo 'ok' pero sin token guardado: la sesión dice estar viva y no hay
+    // con qué firmar. Es el mismo agujero, así que la misma negativa.
+    var causa = (motivo === 'ok') ? 'sin_token' : motivo;
+    var e = new Error('sesion:' + causa);
+    e.auth = causa;
+    throw e;
+  }
+
+  /* Las palabras las decide UN SOLO SITIO. Si cada pantalla escribe su
+     propia versión, tarde o temprano una dice "revisa tu conexión" ante una
+     sesión vencida y manda a buscar el problema donde no está.
+     Devuelve '' si el error no es de sesión, para que quien llama use su
+     propio mensaje sin tener que saber de motivos. */
+  function _textoMotivo(e){
+    var m = e && e.auth;
+    if(!m) return '';
+    return (m === 'sin_red')
+      ? '📴 Sin conexión — tus cambios quedan guardados aquí y suben al volver'
+      : '🔒 Tu sesión venció. Tus cambios están guardados aquí; ingresa de nuevo para subirlos';
   }
 
   // Exponer para que index.html la use antes de cada request
-  window._authEnsureToken = _ensureValidToken;
+  window._authEnsureToken  = _ensureValidToken;
+  window._authMotivoToken  = _motivoToken;
+  window._authToken        = _tokenODetenerse;
+  window._authTextoMotivo  = _textoMotivo;
 
   /* ── INIT AUTOMÁTICO ─────────────────────────────────────────────── */
   // Esperar a que el DOM esté listo

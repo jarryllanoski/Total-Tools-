@@ -97,17 +97,56 @@
   //     funciona, solo queda contada como "no verificada" en Firebase. El día
   //     que se active el bloqueo, ahí sí pasa a ser obligatoria — y para
   //     entonces ya se habrá confirmado que llega bien desde acá.
+
+  /* Un aviso de sesión, y UNO SOLO cada medio minuto.
+     Un guardado de 971 documentos que falla no puede producir 971 avisos: el
+     panel quedaría inservible justo en el momento en que hace falta leerlo.
+     Y el texto distingue las dos causas, porque se arreglan distinto: una se
+     espera, la otra se resuelve volviendo a entrar. */
+  let _avisoSesionTs = 0;
+  function _avisarSesion(motivo){
+    const ahora = Date.now();
+    if(ahora - _avisoSesionTs < 30000) return;
+    _avisoSesionTs = ahora;
+    // Las palabras viven en auth.js, que es quien conoce los motivos.
+    const txt = (window._authTextoMotivo && window._authTextoMotivo({auth: motivo}))
+      || '🔒 Tu sesión venció — ingresa de nuevo';
+    try{ window.toast && window.toast(txt); }catch(e){}
+  }
+
+  function _errorAuth(motivo){
+    const e = new Error('sesion:' + motivo);
+    e.auth = motivo;
+    return e;
+  }
+
+  /* ★ ESTO ES UNA PUERTA, NO UN INTENTO.
+     Antes, cuando no había token, devolvía `{}` y la petición salía SIN
+     IDENTIFICAR. Las reglas exigen sesión, así que Firestore respondía 403 a
+     todo lo que escribieras durante esa hora — y el único aviso era el mismo
+     punto rojo que significa "mal internet", con lo que seguías trabajando.
+     Ahora se niega antes de salir, y dice cuál de los dos problemas es. */
   async function _authHeaders(){
     const headers = {};
-    try{
-      if(typeof window._authEnsureToken === 'function'){
-        const ok = await window._authEnsureToken(); // refresca si está por vencer
-        if(ok){
-          const tok = localStorage.getItem('tt_id_token') || '';
-          if(tok) headers['Authorization'] = 'Bearer ' + tok;
-        }
+    let tok = '';
+    if(typeof window._authToken === 'function'){
+      try {
+        tok = await window._authToken(); // lanza con .auth si no hay sesión
+      } catch(e){
+        _avisarSesion(e && e.auth);
+        throw e;
       }
-    }catch(e){ /* sin token de sesión → seguir sin Authorization */ }
+    } else {
+      /* auth.js viejo en caché. No se degrada a anónimo —que es justo el
+         agujero que se está tapando— pero tampoco se tumba el panel entero
+         por un archivo desfasado: se exige el token por el camino de antes. */
+      try{
+        if(typeof window._authEnsureToken === 'function') await window._authEnsureToken();
+        tok = localStorage.getItem('tt_id_token') || '';
+      }catch(e){ tok = ''; }
+      if(!tok){ _avisarSesion('sin_token'); throw _errorAuth('sin_token'); }
+    }
+    headers['Authorization'] = 'Bearer ' + tok;
     try{
       if(typeof window._appCheckToken === 'function'){
         const ac = await window._appCheckToken();
@@ -287,6 +326,23 @@
         }
         tanda.forEach(x => ok.push(x.clave)); // commit es atómico: entró entera
       } catch(e){ fallo = e; }
+
+      /* Un fallo de SESIÓN no es un fallo de este documento ni de este
+         endpoint: hasta que vuelva a haber sesión no va a entrar ni una sola
+         escritura. Rehacer la tanda uno por uno daría el mismo error tantas
+         veces como documentos haya, y peor: si `_patchLimitado` los entrega
+         todos fallados, la regla de abajo apagaría `:commit` para el resto de
+         la sesión por algo que no tiene nada que ver con `:commit`.
+         Se marca como no guardado TODO lo que quede —que es lo que mantiene
+         el registro de sucios— y se corta. */
+      if(fallo && fallo.auth){
+        const decididos = new Set(ok.concat(fail));
+        conWrite.forEach(x => { if(!decididos.has(x.clave)) fail.push(x.clave); });
+        try{ window.Errores && window.Errores.anotar('fs.sesion', fallo, {
+          documentos: conWrite.length, motivo: fallo.auth
+        }); }catch(_){}
+        break;
+      }
 
       if(fallo){
         console.warn('commit falló, se rehace la tanda uno por uno:', fallo && fallo.message);
@@ -482,7 +538,20 @@
     try{
       await fsPatch(shipPath(s.id),slimShipment(s));
       window._fbStatus&&window._fbStatus('ok');
-    }catch(e){window._fbStatus&&window._fbStatus('err');}
+    }catch(e){
+      /* Antes esto solo pintaba el punto rojo y se olvidaba del pedido: el
+         cambio no estaba en la nube y tampoco quedaba marcado, así que nadie
+         lo reintentaba nunca. Ahora queda sucio —y el registro de sucios
+         sobrevive a cerrar la pestaña—, así que el siguiente guardado lo
+         sube. Es la diferencia entre "falló" y "se perdió". */
+      try{
+        if(s && s.id && typeof _dirtyShips !== 'undefined'){
+          _dirtyShips.add(s.id);
+          window._guardarSucios && window._guardarSucios();
+        }
+      }catch(_){}
+      window._fbStatus&&window._fbStatus('err');
+    }
   };
 
   // Guardar un shipment individual inmediatamente (sin debounce)
@@ -1520,7 +1589,7 @@
 
 <div class="toast" id="toastEl"></div>
 
-<script src="auth.js?v=8"></script>
+<script src="auth.js?v=9"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
 <script>
@@ -3581,6 +3650,8 @@ function loadCotiz(input){
       toast('✅ Cotización subida');
     }).catch(function(e){
       console.warn('[Cotiz] Storage falló, usando base64:',e&&e.message);
+      var t = window._authTextoMotivo && window._authTextoMotivo(e);
+      if(t) toast(t);
       _loadCotizBase64(file,sup);
     });
     return;
@@ -4092,12 +4163,12 @@ render();
 })();
 </script>
 <!-- ★ SHALOM tracking — cargado al final -->
-<script src="storage.js?v=3"></script>
+<script src="storage.js?v=4"></script>
 <!-- seleccion.js ya se cargó en la cabecera, ANTES del script en línea que
      lo usa. config.js, print.js y voz.js preguntan por los pedidos marcados,
      así que siguen yendo detrás. El orden de carga es un contrato
      (ver docs/ARQUITECTURA.md). -->
-<script src="config.js?v=27"></script>
+<script src="config.js?v=28"></script>
 <script src="print.js?v=16"></script>
 <script src="notify.js?v=4"></script>
 <script src="shalom.js?v=15"></script>
@@ -4111,7 +4182,7 @@ render();
 <script src="ayuda.js?v=4"></script>
 <script src="dashboard.js?v=2"></script>
 <script src="voz.js?v=3"></script>
-<script src="cotizacion.js?v=2"></script>
+<script src="cotizacion.js?v=3"></script>
 <script>
 updateShareLink();
 

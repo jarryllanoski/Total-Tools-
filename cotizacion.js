@@ -383,10 +383,15 @@
     for(var i=0;i<arr.length;i++){ var u=(arr[i]&&arr[i].u)||''; if(/apisale\.institucional\.pe/i.test(u)) return u; }
     return '';
   }
+  /* ★ PUERTA. Antes devolvía '' cuando no había sesión y la llamada salía sin
+     cabecera: la función respondía 401 y acá se veía «Error al leer el
+     comprobante — subí el PDF a mano», mandando a resolver a mano algo que se
+     arreglaba volviendo a entrar. Ahora rechaza con el motivo. */
   function _getToken(){
-    var p=Promise.resolve();
-    try{ if(typeof window._authEnsureToken==='function') p=Promise.resolve(window._authEnsureToken()); }catch(e){}
-    return p.then(function(){ try{ return localStorage.getItem('tt_id_token')||''; }catch(e){ return ''; } });
+    if(typeof window._authToken !== 'function'){
+      return Promise.reject(new Error('auth.js no está cargado'));
+    }
+    return window._authToken();
   }
   // Estados donde SÍ se jala automáticamente al abrir (fase de preparación).
   var _AUTO_STATES = ['NUEVO PEDIDO', 'EN PROCESO', 'POR ALISTAR'];
@@ -436,8 +441,17 @@
         _renderJalarBox(s);
         _setStatus('⚠️ '+((data&&data.motivo)||'No se pudo leer el comprobante')+' — podés subir el PDF a mano.','var(--red)');
       }
-    }).catch(function(){
-      if(_curId===s.id){ _renderJalarBox(s); _setStatus('⚠️ Error al leer el comprobante — subí el PDF a mano.','var(--red)'); }
+    }).catch(function(err){
+      if(_curId!==s.id) return;
+      _renderJalarBox(s);
+      // Que el aviso diga la causa: "subí el PDF a mano" es un mal consejo
+      // cuando lo único que pasa es que hay que volver a entrar.
+      var esSesion = err && err.auth;
+      _setStatus(esSesion
+        ? (err.auth === 'sin_red'
+            ? '📴 Sin conexión — intentá de nuevo cuando vuelva.'
+            : '🔒 Tu sesión venció — ingresá de nuevo y volvé a intentar.')
+        : '⚠️ Error al leer el comprobante — subí el PDF a mano.', 'var(--red)');
     });
   }
 

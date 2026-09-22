@@ -64,11 +64,10 @@ patrón de búsqueda, no del código.
 
 ## Pendientes — pérdida silenciosa de escrituras
 
-### ⬜ 13 · El token vence cada hora y las escrituras caen sin avisar
+### ✅ 13 · El token vence cada hora y las escrituras caen sin avisar
 
-**El más grave.** Si `_refreshToken()` falla (red mala en el momento de
-renovar), `_authHeaders()` **degrada a peticiones sin identificar** en vez de
-negarse:
+**Era el más grave.** Si `_refreshToken()` fallaba, `_authHeaders()` **degradaba
+a peticiones sin identificar** en vez de negarse:
 
 ```js
 const ok = await window._authEnsureToken();
@@ -76,13 +75,52 @@ if(ok){ ...devuelve Authorization: Bearer... }
 return {};     // ← sin cabecera
 ```
 
-Y las reglas exigen sesión → **403 a todo lo que escribas durante esa hora**. El
-punto sigue verde. Nada avisa.
+Las reglas exigen sesión → **403 a todo lo que escribieras durante esa hora**,
+con el mismo punto rojo que significa "mal internet" como único aviso.
 
-**Arreglo:** renovar antes de escribir y, si no se puede, **negarse a escribir y
-avisar**. Nunca degradar.
+Y no era un sitio: eran **cuatro**, cada uno con su propia versión de *"si hay
+token lo pongo, y si no, mando igual"*. Basta con que uno degrade para tener el
+agujero entero.
+
+| Sitio | Qué hacía |
+|---|---|
+| `index.html:_authHeaders` | `return {}` — las 6 llamadas a Firestore salían anónimas |
+| `storage.js` (subir) | llamaba a `_authEnsureToken()` **ignorando la respuesta** |
+| `storage.js` (borrar) | igual — un 403 silencioso: el archivo sigue ahí y el panel cree que no |
+| `cotizacion.js` | `tok ? {...} : {}` |
+
+(`shalom.js` ya se negaba solo con `SIN_SESION`. Se dejó como estaba.)
+
+**Arreglado.** `auth.js` expone ahora **una puerta**, `window._authToken()`, que
+devuelve el token **o lanza** — nunca cadena vacía, que era justo lo que dejaba
+salir la petición. El error lleva `.auth` con el motivo (`vencida`,
+`rechazado`, `sin_red`, `sin_token`) y las palabras las traduce
+`_authTextoMotivo()` en **un solo sitio**, para que ninguna pantalla mande a
+revisar el internet por una sesión muerta. Los cuatro sitios pasan por ahí.
+
+Además:
+
+- **Un fallo de sesión ya no reintenta la tanda uno por uno.** Daría el mismo
+  error tantas veces como documentos haya y, peor, la regla de "si sueltos
+  entraron todos, el endpoint está roto" habría apagado `:commit` para el resto
+  de la sesión por algo que no tiene que ver con `:commit`.
+- **Un solo aviso cada 30 s.** 971 documentos que fallan no pueden dar 971
+  avisos.
+- **Nada se pierde:** lo que no entró queda sucio, y el registro de sucios
+  sobrevive a cerrar la pestaña.
+- **El camino de respaldo** (un `auth.js` viejo en caché, sin la puerta) exige
+  el token igual, pero no tumba el panel: un archivo desfasado no puede dejar a
+  nadie fuera de su propio panel. Tiene su propia prueba — fue una mutación que
+  sobrevivió a la primera ronda.
 
 ### ⬜ 1 · `_fbSaveShipmentNow` falla en silencio absoluto
+
+> **Parcialmente arreglado.** `_fbSaveShipment` —el hermano sin reintentos—
+> ya no se olvida: al fallar marca el pedido como sucio y lo graba, así que el
+> siguiente guardado lo sube. Queda `_fbSaveShipmentNow`, que tras 3 intentos
+> sigue haciendo solo `console.warn`, y son sus 8 llamadas las que mueven
+> etiquetas.
+
 
 Tras 3 reintentos solo hace `console.warn`. No escribe en localStorage, no marca
 el pedido como sucio, no toca el punto de Firebase, no avisa.
