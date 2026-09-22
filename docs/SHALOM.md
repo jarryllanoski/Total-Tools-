@@ -535,6 +535,17 @@ dispara abriendo una URL.
 > 4. Suscribir cada guía con `POST /tracking/subscriptions`: **registrar la URL
 >    no basta**, sin suscripción no llega nada.
 >
+> **Verificado, no supuesto.** El 22/09/2026, con la función ya retirada, se
+> consultó `GET /webhooks` con la clave real:
+>
+> ```
+> HTTP/1.1 200 OK
+> {"success":true,"configured":false,"webhook":null}
+> ```
+>
+> No quedó nada registrado del lado de Shalom apuntando a una URL muerta. El
+> formulario de su panel nunca llegó a guardar nada.
+>
 > **Lo que también queda aparcado por dependencia:** la suscripción automática
 > de guías. Las suscripciones solo alimentan al webhook; sin él no sirven de
 > nada.
