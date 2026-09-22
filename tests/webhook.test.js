@@ -178,7 +178,7 @@ module.exports = async ({bloque, ok}) => {
 
   {
     const idx = E.leer('functions/index.js');
-    const fn = idx.slice(idx.indexOf('exports.shalomWebhook'),
+    const fn = idx.slice(idx.indexOf('const _shalomWebhook = onRequest'),
         idx.indexOf('exports.barridoShalom'));
     const antes = fn.slice(0, fn.indexOf('if (!v.ok)'));
     ok(antes.indexOf('db.doc') < 0 && antes.indexOf('.set(') < 0,
@@ -192,5 +192,37 @@ module.exports = async ({bloque, ok}) => {
        'hay razón para creer nada de lo que trae');
     ok(/res\.status\(401\)\.send\("no"\)/.test(rechazo),
        'se responde corto y sin detalle: decir QUÉ falló ayuda a quien prueba');
+  }
+
+  bloque('Aparcado de verdad: no basta con borrar el despliegue');
+
+  {
+    /* 22/09/2026. Se retiro el despliegue de `shalomWebhook` porque era una
+       puerta publica abierta que no recibia nada —Shalom nunca llego a
+       registrar la URL— y cada peticion rechazada costaba una escritura.
+       Pero borrar la funcion desplegada NO borra el `exports`: el siguiente
+       `firebase deploy --only functions` la habria vuelto a crear sola, y la
+       puerta reaparecia sin que nadie se enterara. De ahi el interruptor. */
+    const idx = E.leer('functions/index.js');
+    const m = /const WEBHOOK_ACTIVO = (true|false);/.exec(idx);
+    ok(m, 'el webhook tiene un interruptor explicito, no un despliegue ' +
+       'borrado a mano que nadie recuerda');
+    ok(/\n *if \(WEBHOOK_ACTIVO\) exports\.shalomWebhook = _shalomWebhook;/
+        .test(idx),
+       'y el export cuelga de el: con false, `firebase deploy` ni ve la funcion');
+    ok(!/^exports\.shalomWebhook/m.test(idx),
+       'no queda ningun export suelto que se despliegue por su cuenta');
+
+    if (m && m[1] === 'true') {
+      /* Si alguien vuelve a encenderlo, que no reviva tambien el agujero de
+         costo: un contador que escribe en CADA golpe convierte la puerta
+         publica en una factura. */
+      const fn = idx.slice(idx.indexOf('const _shalomWebhook = onRequest'),
+          idx.indexOf('exports.barridoShalom'));
+      const rechazo = fn.slice(fn.indexOf('if (!v.ok)'), fn.indexOf('const id ='));
+      ok(rechazo.indexOf('rechazados: FieldValue.increment(1)') < 0,
+         'y antes de encenderlo hay que arreglar el contador de rechazos: ' +
+         'una escritura por cada peticion invalida la paga el dueno');
+    }
   }
 };

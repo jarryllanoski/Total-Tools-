@@ -499,9 +499,45 @@ Se salta **el reloj**, no el interruptor: si el seguimiento automático está
 apagado, responde `BARRIDO_APAGADO`. Y solo por POST — un barrido no se
 dispara abriendo una URL.
 
-## El webhook — etapa 4a: recibir y medir
+## El webhook — etapa 4a: recibir y medir · ⏸ APARCADO
 
-`functions/webhook.js` + `exports.shalomWebhook`.
+`functions/webhook.js` + `_shalomWebhook`, detrás de `WEBHOOK_ACTIVO = false`.
+
+> ## ⏸ Aparcado el 22 de septiembre de 2026 — léelo antes de tocar nada
+>
+> **La función no está desplegada.** Se retiró a propósito.
+>
+> **Por qué.** Shalom nunca llegó a registrar la URL: su formulario del panel
+> (`shalom-api.lat/dashboard/webhooks`) devolvía *"URL requerida"* con el campo
+> lleno — un fallo suyo, no nuestro (su propia documentación dice que una URL
+> mal escrita da **400 "URL inválida"**, no ese mensaje). Sin URL registrada no
+> llegaba un solo aviso… pero la función seguía viva en internet, y **cada
+> petición rechazada costaba una escritura a Firestore** (ver `docs/DEUDA.md`
+> § 24). Cero beneficio, costo real y creciente si alguien daba con la URL.
+>
+> **Qué se conserva.** Todo: `functions/webhook.js`, el manejador completo en
+> `functions/index.js`, las pruebas de `tests/webhook.test.js` y el contrato
+> medido de más abajo. No se borró una línea.
+>
+> **Por qué un interruptor y no borrar el `exports`.** Retirar el despliegue a
+> mano no basta: el siguiente `firebase deploy --only functions` habría vuelto
+> a crear la función sola y la puerta pública reaparecía sin que nadie se
+> enterara. El `exports` cuelga ahora de `WEBHOOK_ACTIVO`, y hay una prueba que
+> comprueba que no queda ningún export suelto.
+>
+> **Para revivirlo, en este orden:**
+> 1. Arreglar el contador de rechazos (`docs/DEUDA.md` § 24). Hay una prueba
+>    que falla sola si se enciende sin arreglarlo.
+> 2. `WEBHOOK_ACTIVO = true` y `firebase deploy --only functions:shalomWebhook`.
+> 3. Registrar la URL con `PUT /webhooks` **desde la terminal, no desde su
+>    panel**, y guardar el `whsec_…` que devuelve —solo se muestra ahí— directo
+>    en Secret Manager.
+> 4. Suscribir cada guía con `POST /tracking/subscriptions`: **registrar la URL
+>    no basta**, sin suscripción no llega nada.
+>
+> **Lo que también queda aparcado por dependencia:** la suscripción automática
+> de guías. Las suscripciones solo alimentan al webhook; sin él no sirven de
+> nada.
 
 > ⚠️ **Es la única puerta pública sin autenticación del sistema.** Cualquiera
 > en internet puede llamarla. Lo único que separa un aviso de Shalom de uno

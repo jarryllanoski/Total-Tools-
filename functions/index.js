@@ -782,7 +782,22 @@ exports.extraerComprobante = onRequest(
 const WEB_DOC = "panel/webhook";
 const WEB_COL = "panel/webhook/eventos";
 
-exports.shalomWebhook = onRequest({
+// ⏸ APARCADO — 22 de septiembre de 2026.
+// La funcion NO se despliega: el despliegue se retiro a proposito porque
+// Shalom nunca llego a registrar la URL (su formulario devolvia "URL
+// requerida" con el campo lleno), asi que no recibia nada — pero seguia
+// siendo una puerta publica abierta en internet, y cada peticion rechazada
+// le costaba una escritura a Firestore. Cero beneficio, costo real.
+//
+// El codigo y sus pruebas se quedan intactos. Para revivirlo: poner esto en
+// true, ARREGLAR ANTES el contador de rechazos (ver docs/DEUDA.md § 24),
+// registrar la URL con `PUT /webhooks` y guardar el secreto que devuelve.
+//
+// Sin este interruptor, un `firebase deploy --only functions` volveria a
+// crear la funcion sola y la puerta reaparecia sin que nadie se enterara.
+const WEBHOOK_ACTIVO = false;
+
+const _shalomWebhook = onRequest({
   region: "us-central1",
   secrets: [SHALOM_WEBHOOK_SECRET],
   timeoutSeconds: 30,
@@ -860,6 +875,10 @@ exports.shalomWebhook = onRequest({
   console.log("webhook ok", JSON.stringify({id: id, codigos: codigos}));
   res.status(200).send("ok");
 });
+
+// Solo se exporta —y por tanto solo existe en internet— si el interruptor
+// esta en true. Con false, `firebase deploy` ni la ve.
+if (WEBHOOK_ACTIVO) exports.shalomWebhook = _shalomWebhook;
 
 // ── barridoShalom ─────────────────────────────────────────────────────────
 // El seguimiento automatico. Cloud Scheduler dispara CADA 30 MINUTOS y la

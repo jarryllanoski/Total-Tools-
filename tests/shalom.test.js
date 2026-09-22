@@ -183,7 +183,7 @@ module.exports = async (t) => {
        se diferencia del que se retiró: el viejo era un endpoint público que
        escribía; el nuevo no toca la base de datos hasta verificar la firma. */
     ok(/exports\.shalomWebhook/.test(fidx), 'el webhook está de vuelta');
-    const wh = fidx.slice(fidx.indexOf('exports.shalomWebhook'),
+    const wh = fidx.slice(fidx.indexOf('const _shalomWebhook = onRequest'),
         fidx.indexOf('exports.barridoShalom'));
     ok(/verificarFirma/.test(wh), 'y lo primero que hace es verificar la firma');
     ok(wh.indexOf('req.rawBody') > 0,

@@ -210,6 +210,34 @@ El centro de alertas cubre negocio (retrasados, sin guía, sin cerrar). **Ningun
 alerta observa si tus cambios llegan a Firestore.** La clase de fallo más cara
 es la única sin cobertura.
 
+### ⬜ 24 · El webhook cobraba por cada golpe en la puerta
+
+`shalomWebhook` era **la única puerta pública sin autenticación del sistema**.
+Cuando rechazaba una petición con firma inválida hacía esto:
+
+```js
+await db.doc(WEB_DOC).set({
+  rechazados: FieldValue.increment(1),
+  ultimoRechazo: {ts: Date.now(), motivo: v.motivo},
+}, {merge: true});
+```
+
+**Una escritura a Firestore por cada petición rechazada.** Quien encontrara la
+URL podía convertirla en una factura sin pasar ni una sola firma válida. La
+intención era buena —ver si alguien prueba la puerta— pero el costo lo paga el
+dueño, no quien golpea.
+
+**Estado: aparcado, no arreglado.** El 22/09/2026 se retiró el despliegue de la
+función y su `exports` quedó detrás de `WEBHOOK_ACTIVO = false`
+(`functions/index.js`), así que hoy la puerta no existe en internet. El código y
+sus pruebas siguen enteros.
+
+**Arreglo pendiente, obligatorio antes de volver a encenderlo:** que el contador
+no escriba en cada golpe — contar en memoria y volcar como mucho una vez por
+minuto, o dejarlo solo en `console.warn` y mirarlo en los registros. Hay una
+prueba en `tests/webhook.test.js` que **falla sola** si alguien pone
+`WEBHOOK_ACTIVO = true` sin haber tocado ese contador.
+
 ### ✅ 21 · El CI tenía una lista escrita a mano
 
 Se cambió por un comodín, que no se puede desfasar. Y se añadieron tres
