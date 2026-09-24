@@ -81,8 +81,9 @@ module.exports = async ({bloque, ok}) => {
        !P.PERMITIDAS['tracking/subscriptions'],
        'y los destructivos siguen fuera por su nombre también');
   }
-  ok(Object.keys(P.PERMITIDAS).join(',') === 'validate,track,instances',
-     'hoy hay tres, y en el orden en que se reconstruyen');
+  ok(Object.keys(P.PERMITIDAS).join(',') ===
+     'validate,track,instances,agencies',
+     'hoy hay cuatro, y en el orden en que se reconstruyen');
   ok(!P.PERMITIDAS.track.soloMedir,
      'track ya no es solo medible: su forma se midió y se tradujo');
   ok(P.PERMITIDAS.instances.metodo === 'GET' &&
@@ -91,6 +92,41 @@ module.exports = async ({bloque, ok}) => {
   ok(!P.PERMITIDAS.instances.soloMedir,
      'y ya no es solo medible: su forma se midió contra la API real el ' +
      '22/09/2026 y se tradujo');
+
+  {
+    /* El catálogo de agencias va por la variante PÚBLICA: misma estructura y
+       NO CONSUME CUOTA, así que refrescarlo sale gratis. Y a un endpoint
+       público no se le manda la clave — una credencial no viaja donde no
+       hace falta, ni siquiera a un sitio de confianza. */
+    const a = P.PERMITIDAS.agencies;
+    ok(a.ruta === '/public/agencies',
+       'agencias va por la ruta pública: no consume cuota');
+    ok(a.publico === true, 'y marcada como pública');
+    ok(a.soloMedir === true,
+       'en soloMedir hasta medir su forma: la doc de esta API ya se equivocó ' +
+       'siete veces');
+
+    const f = conFetch(resp(200, {data: []}));
+    await P.llamar('agencies', 'sk_la_clave_secreta');
+    const cab = (f.opciones && f.opciones.headers) || {};
+    f.restaurar();
+    ok(cab['x-api-key'] === undefined,
+       'y la clave NO viaja en la petición, aunque la puerta la tenga');
+
+    const f2 = conFetch(resp(200, {data: []}));
+    const r2 = await P.llamar('agencies', '');
+    f2.restaurar();
+    ok(r2.ok === true,
+       'y sin clave configurada igual se puede consultar: un endpoint público ' +
+       'no se bloquea por una credencial que no necesita');
+
+    const f3 = conFetch(resp(200, {valid: true}));
+    await P.llamar('validate', 'sk_la_clave_secreta');
+    const cab3 = (f3.opciones && f3.opciones.headers) || {};
+    f3.restaurar();
+    ok(cab3['x-api-key'] === 'sk_la_clave_secreta',
+       'pero a los que SÍ la necesitan se les sigue mandando');
+  }
 
   bloque('Cada endpoint por su traductor, nunca por el de otro');
 

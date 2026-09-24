@@ -52,6 +52,17 @@ const PERMITIDAS = {
      van a necesitar el ticket y el registro de envíos. No gasta cuota y no
      puede crear ni borrar nada. */
   instances: {metodo: "GET", ruta: "/instances"},
+  /* El catálogo de agencias. Va la variante PÚBLICA a propósito: devuelve la
+     misma estructura que `/agencies` y NO CONSUME CUOTA, así que refrescar el
+     catálogo sale gratis. `publico` hace que la puerta no mande la clave: una
+     credencial no viaja donde no hace falta.
+     Sigue pasando por aquí y no por el navegador porque su API responde
+     `access-control-allow-origin: https://shalom-api.lat` — medido el
+     22/09/2026 —, así que un fetch desde el panel lo bloquearía CORS.
+     En `soloMedir` hasta medir su forma: la doc dice 552 agencias con 48
+     campos, y la doc de esta API ya se equivocó siete veces. */
+  agencies: {metodo: "GET", ruta: "/public/agencies",
+    publico: true, soloMedir: true},
 };
 
 /**
@@ -198,13 +209,18 @@ function traducirValidate(j) {
 async function llamar(op, clave, cuerpo) {
   const def = PERMITIDAS[op];
   if (!def) return {ok: false, motivo: "NO_PERMITIDO"};
-  if (!clave) return {ok: false, motivo: "BLOQUEADO", detalle: "sin clave"};
+  // Un endpoint público no necesita clave, así que tampoco se le manda: una
+  // credencial no viaja donde no hace falta, ni siquiera a un sitio de
+  // confianza. Y si falta la clave, eso ya no puede bloquear su consulta.
+  if (!clave && !def.publico) {
+    return {ok: false, motivo: "BLOQUEADO", detalle: "sin clave"};
+  }
 
   let r;
   try {
     const opciones = {
       method: def.metodo,
-      headers: {"x-api-key": clave},
+      headers: def.publico ? {} : {"x-api-key": clave},
       signal: AbortSignal.timeout(TIEMPO_MAX_MS),
     };
     if (def.metodo === "POST") {
