@@ -61,8 +61,7 @@ const PERMITIDAS = {
      22/09/2026 —, así que un fetch desde el panel lo bloquearía CORS.
      En `soloMedir` hasta medir su forma: la doc dice 552 agencias con 48
      campos, y la doc de esta API ya se equivocó siete veces. */
-  agencies: {metodo: "GET", ruta: "/public/agencies",
-    publico: true, soloMedir: true},
+  agencies: {metodo: "GET", ruta: "/public/agencies", publico: true},
 };
 
 /**
@@ -522,6 +521,88 @@ function traducirInstancias(j) {
 }
 
 /**
+ * El texto de un valor, o "" si no hay. Un número se convierte a texto a
+ * propósito — ver `traducirAgencias`.
+ * @param {*} v valor
+ * @return {string} texto
+ */
+function _txt(v) {
+  if (v === null || v === undefined) return "";
+  if (typeof v === "number") return isFinite(v) ? String(v) : "";
+  if (typeof v === "string") return v.trim();
+  return "";
+}
+
+/**
+ * Traduce `GET /public/agencies` al esquema común del catálogo — el MISMO que
+ * ya usa el buscador del formulario, así no hay que tocarlo.
+ *
+ * FORMA REAL MEDIDA (24 sep 2026, contra la API desplegada): 34 campos por
+ * agencia, no los 48 que dice la documentación para `/agencies`. Faltan
+ * `hora_domingo` y `referencia`. Se comprobó que **no las usa nadie** (el
+ * formulario lee `ag.horario || ag.hora_atencion`, y `hora_atencion` sí
+ * viene), así que se quedan vacías en vez de mentir con un dato inventado.
+ * Es la contradicción nº 8 entre la documentación de esta API y la realidad.
+ *
+ * ⚠️ `ter_id` LLEGA COMO NÚMERO y en el catálogo guardado es TEXTO ("3").
+ * Se normaliza a texto aquí, en un solo sitio. Sin esto, el día que se
+ * verifique la agencia antes de registrar un envío, `3 !== "3"` fallaría en
+ * silencio — y un envío sin agencia verificada es un paquete pagado que puede
+ * salir a la ciudad equivocada.
+ *
+ * ⚠️ No hay campo `distrito`: la API manda `zona`. Es el mismo mapeo que hace
+ * `_mapShalom` en el navegador. Antes de reemplazar el catálogo, el extractor
+ * compara con el que ya está en uso, así que un cambio masivo de distritos se
+ * vería antes de aceptar nada.
+ *
+ * Una agencia sin id no entra: no sirve para registrar y ensucia el catálogo.
+ * Cuántas se descartaron se DICE, no se calla.
+ * @param {*} j cuerpo JSON de Shalom
+ * @return {Object} respuesta del contrato
+ */
+function traducirAgencias(j) {
+  const raro = {ok: false, motivo: "FORMATO_DESCONOCIDO"};
+  if (!j || typeof j !== "object" || Array.isArray(j)) return raro;
+  // Jamás ok:true sin dato real: si no dice que salió bien, no salió bien.
+  if (j.success !== true) return raro;
+  if (!Array.isArray(j.data)) return raro;
+
+  const agencias = [];
+  let sinId = 0;
+  j.data.forEach((a) => {
+    if (!a || typeof a !== "object" || Array.isArray(a)) {
+      sinId++;
+      return;
+    }
+    const id = _txt(a.ter_id);
+    if (!id) {
+      sinId++;
+      return;
+    }
+    agencias.push({
+      ter_id: id,
+      nombre: _txt(a.nombre) || _txt(a.lugar_over),
+      departamento: _txt(a.departamento),
+      provincia: _txt(a.provincia),
+      distrito: _txt(a.zona) || _txt(a.ter_zona),
+      direccion: _txt(a.direccion),
+      referencia: "", // no viene en la variante pública
+      telefono: _txt(a.telefono),
+      horario: _txt(a.hora_atencion),
+      horarioDom: "", // tampoco viene, y no lo usa nadie
+      latitud: _txt(a.latitud),
+      longitud: _txt(a.longitud),
+    });
+  });
+
+  // 554 agencias que se vuelven 0 no es un catálogo vacío: es que cambió la
+  // forma. Reemplazar el catálogo con eso lo dejaría inservible.
+  if (!agencias.length) return raro;
+
+  return {ok: true, agencias: agencias, total: agencias.length, sinId: sinId};
+}
+
+/**
  * Traduce la respuesta cruda del endpoint que sea. Un endpoint sin traductor
  * NO devuelve su JSON: eso es justo lo que hace que una forma mal entendida
  * llegue a la pantalla como si fuera un dato bueno.
@@ -533,6 +614,7 @@ function traducir(op, json) {
   if (op === "validate") return traducirValidate(json);
   if (op === "track") return traducirTrack(json);
   if (op === "instances") return traducirInstancias(json);
+  if (op === "agencies") return traducirAgencias(json);
   return {ok: false, motivo: "SIN_TRADUCTOR"};
 }
 
@@ -545,6 +627,7 @@ module.exports = {
   traducirValidate,
   traducirTrack,
   traducirInstancias,
+  traducirAgencias,
   PASOS,
   esAdminDe,
   traducir,

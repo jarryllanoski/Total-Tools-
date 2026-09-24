@@ -173,6 +173,86 @@ estado, y nunca desfasado.
 puerta descansa, y como cualquier respuesta buena la reabre, apretar *Verificar
 sesión* es también la forma de preguntar "¿ya volvió?".
 
+## El contrato de `GET /public/agencies` — medido, no supuesto (24 sep 2026) ✅
+
+El catálogo de agencias, que devuelve la vida al botón **Extraer agencias**.
+
+**Va la variante PÚBLICA**, y por dos razones medidas:
+
+1. **No consume cuota** (la doc lo dice, y es lo que hace viable refrescar el
+   catálogo a diario por nada).
+2. **No necesita clave, así que la puerta no se la manda.** Una credencial no
+   viaja donde no hace falta.
+
+Sigue pasando por la puerta y no por el navegador porque su API responde
+`access-control-allow-origin: https://shalom-api.lat` — medido en las
+cabeceras de una respuesta real —, así que un `fetch` desde el panel lo
+bloquearía CORS.
+
+### ⚠️ Contradicción nº 8: la pública NO trae "la misma estructura"
+
+La documentación dice que `/public/agencies` tiene *misma estructura* que
+`/agencies` (48 campos). Lo medido son **34**, y faltan **`hora_domingo`** y
+**`referencia`**.
+
+Se comprobó **antes** de aceptar la pérdida: el formulario lee
+`ag.horario || ag.hora_atencion` y `hora_atencion` sí viene; `horarioDom` y la
+`referencia` **de la agencia** no las usa nadie (`referencia` en el panel es la
+del pedido, otra cosa). Se devuelven vacías en vez de inventar un dato.
+
+### ⚠️ `ter_id` llega como NÚMERO
+
+En el catálogo guardado es **texto** (`"ter_id": "3"`). Se normaliza a texto en
+el traductor, en un solo sitio. Sin eso, el día que se verifique la agencia
+antes de registrar un envío, `3 !== "3"` **no da error: simplemente falla**, y
+un envío sin verificar es un paquete pagado que puede salir a otra ciudad.
+
+### ⚠️ No hay campo `distrito`
+
+La API manda **`zona`**. Es el mismo mapeo que hace `_mapShalom` en el
+navegador. Antes de reemplazar el catálogo, el extractor compara con el que ya
+está en uso, así que un cambio masivo de distritos se vería antes de aceptar
+nada.
+
+### Lo que el traductor se niega a hacer
+
+| Caso | Respuesta | Por qué |
+|---|---|---|
+| Sin `success: true` | `FORMATO_DESCONOCIDO` | Jamás ok:true sin dato real |
+| `data` no es una lista | `FORMATO_DESCONOCIDO` | |
+| **Todas se descartan → 0** | `FORMATO_DESCONOCIDO` | 554 que se vuelven 0 no es un catálogo vacío: es que cambió la forma. Reemplazarlo con eso lo deja inservible |
+| Una agencia sin `ter_id` | Se descarta, **y se cuenta** en `sinId` | No sirve para registrar. Descartar 4 de 5 en silencio sería un catálogo roto que parece bueno |
+
+Devuelve la lista bajo la clave **`agencias`** —no `lista`— porque es una de las
+que `agencias-extractor.js` sabe buscar, y la misma del archivo del catálogo.
+Hay una prueba que lo afirma contra el código del extractor, no de memoria.
+
+### La estabilidad de los `ter_id` — medida con dos catálogos reales
+
+Comparando la extracción del **19 jul 2026** con la del **5 sep 2026** (48 días):
+
+| | |
+|---|---|
+| 546 → 550 agencias · 6 se fueron, 10 llegaron | |
+| Mismo departamento/provincia/distrito | **539** (98,7 %) |
+| **Se mudaron de ubicación** | **1** |
+| Mismo sitio, nombre retocado | 13 |
+| Mismo sitio, dirección de calle distinta | 17 |
+
+```
+id 671   jul: CALLAO   / CALLAO   / VENTANILLA / POR DEFINIR
+         sep: AREQUIPA / AREQUIPA / SACHACA    / VARIANTE UCHUMAYO CO
+```
+
+**Shalom recicla los ids de los huecos "POR DEFINIR".** Así que un `ter_id`
+guardado hace semanas **no es una promesa**: antes de registrar un envío hay
+que comprobar que sigue apuntando donde creemos.
+
+Y la comprobación correcta es por **departamento/provincia/distrito**, no por
+nombre: medido contra esos dos catálogos, el distrito da **1 aviso verdadero y
+0 falsas alarmas**; el nombre daría **13 falsas alarmas** ("HUARAZ" → "HUARAZ
+CO") y el aviso dejaría de leerse.
+
 ## El contrato de `POST /instances/status` — medido, no supuesto
 
 Igual que con `/track`, la documentación dice **qué enviar** pero no **qué

@@ -102,9 +102,8 @@ module.exports = async ({bloque, ok}) => {
     ok(a.ruta === '/public/agencies',
        'agencias va por la ruta pública: no consume cuota');
     ok(a.publico === true, 'y marcada como pública');
-    ok(a.soloMedir === true,
-       'en soloMedir hasta medir su forma: la doc de esta API ya se equivocó ' +
-       'siete veces');
+    ok(!a.soloMedir,
+       'y ya no es solo medible: su forma se midió el 24/09/2026 y se tradujo');
 
     const f = conFetch(resp(200, {data: []}));
     await P.llamar('agencies', 'sk_la_clave_secreta');
@@ -686,5 +685,116 @@ module.exports = async ({bloque, ok}) => {
     const html = E.leer('index.html');
     ok(/SIN_INSTANCIA:'[^']+'/.test(html), 'SIN_INSTANCIA se explica');
     ok(/VARIAS_INSTANCIAS:'[^']+'/.test(html), 'VARIAS_INSTANCIAS también');
+  }
+
+  bloque('Traducir GET /public/agencies — el catálogo, sin sorpresas');
+
+  {
+    /* FORMA REAL, medida el 24/09/2026 contra la API desplegada: 34 campos
+       por agencia, NO los 48 que la documentación promete para `/agencies`.
+       Faltan `hora_domingo` y `referencia` — contradicción nº 8. Se comprobó
+       que no las usa nadie antes de aceptar la pérdida. */
+    const cruda = {
+      success: true, message: 'ok', total: 2, query: null,
+      data: [
+        {ter_id: 3, ter_abrebiatura: 'CHA', zona: 'CHACHAPOYAS',
+          ter_zona: 'CHACHAPOYAS', provincia: 'CHACHAPOYAS',
+          departamento: 'AMAZONAS', lugar: null,
+          latitud: '-6.238673', longitud: '-77.868008', sp: '1',
+          direccion: 'JR. DOS DE MAYO CDRA. 15 S/N',
+          telefono: '(01) 500 7878',
+          hora_atencion: 'LUNES A VIERNES - 8AM A 8PM',
+          nombre: 'AMAZONAS / CHACHAPOYAS / CHACHAPOYAS / CO DOS DE MAYO',
+          lugar_over: 'CHACHAPOYAS', estadoAgencia: 'ACTIVO', ter_aereo: 0},
+        {ter_id: 671, zona: 'VENTANILLA', provincia: 'CALLAO',
+          departamento: 'CALLAO', nombre: 'CALLAO / CALLAO / VENTANILLA',
+          direccion: 'AV. X 100', telefono: '', hora_atencion: '',
+          latitud: '', longitud: ''}
+      ]
+    };
+    const ta = P.traducirAgencias;
+
+    {
+      const r = ta(cruda);
+      ok(r.ok === true && r.total === 2, 'la forma medida se traduce');
+
+      /* EL DETALLE QUE FALLARÍA EN SILENCIO. La API manda `ter_id` como
+         NÚMERO; el catálogo guardado lo tiene como TEXTO ("3"). El día que se
+         verifique la agencia antes de registrar, `3 !== "3"` dejaría pasar un
+         envío sin verificar — pagado, y quizá a otra ciudad. */
+      ok(r.agencias[0].ter_id === '3',
+         'el ter_id se normaliza a TEXTO: llega como número y el catálogo lo ' +
+         'guarda como texto, y 3 !== "3" no avisa, simplemente falla');
+      ok(typeof r.agencias[1].ter_id === 'string', 'todos, no solo el primero');
+
+      // La API no manda `distrito`: manda `zona`. Mismo mapeo que el navegador.
+      ok(r.agencias[0].distrito === 'CHACHAPOYAS',
+         'el distrito sale de `zona`, que es como lo manda esta API');
+      ok(r.agencias[0].horario === 'LUNES A VIERNES - 8AM A 8PM',
+         'y el horario de `hora_atencion`, que es el que el formulario ya lee');
+      ok(r.agencias[0].referencia === '' && r.agencias[0].horarioDom === '',
+         'lo que la variante pública NO manda queda vacío, no inventado');
+      ok(r.agencias[0].nombre.indexOf('CO DOS DE MAYO') > 0,
+         'el nombre completo, que es el que guarda el catálogo');
+    }
+
+    {
+      /* Que la traducción NO rompa el buscador: el esquema tiene que ser
+         exactamente el del catálogo que el formulario ya lee. Se compara
+         contra el archivo REAL del repositorio, no contra una lista escrita
+         a mano que se desfasaría. */
+      const real = JSON.parse(E.leer('data/agencias-shalom.json'));
+      const esperados = Object.keys(real.agencias[0]).sort().join(',');
+      const salen = Object.keys(ta(cruda).agencias[0]).sort().join(',');
+      ok(salen === esperados,
+         'el esquema traducido es IDÉNTICO al del catálogo en uso — si no, el ' +
+         'buscador del formulario dejaría de encontrar campos' +
+         (salen === esperados ? '' : ('\n      espera: ' + esperados +
+           '\n      sale  : ' + salen)));
+    }
+
+    {
+      // El extractor busca la lista por unos nombres concretos; `lista` no
+      // está entre ellos y `agencias` sí. Se afirma el nombre, no se confía.
+      const ext = E.leer('agencias-extractor.js');
+      const claves = /var claves = \[([^\]]+)\]/.exec(ext);
+      ok(claves && claves[1].indexOf("'agencias'") >= 0,
+         'la clave `agencias` es de las que el extractor sabe buscar');
+      ok(ta(cruda).agencias !== undefined,
+         'y el traductor la devuelve con ese nombre, no con otro');
+    }
+
+    bloque('…y el catálogo no se reemplaza con basura');
+
+    ok(ta(null).motivo === 'FORMATO_DESCONOCIDO', 'sin respuesta, nada');
+    ok(ta([]).motivo === 'FORMATO_DESCONOCIDO', 'un array suelto tampoco');
+    ok(ta({data: [{ter_id: 1, nombre: 'X'}]}).motivo === 'FORMATO_DESCONOCIDO',
+       'sin `success: true` no se afirma nada, aunque vengan agencias');
+    ok(ta({success: true, data: 'nada'}).motivo === 'FORMATO_DESCONOCIDO',
+       'si `data` deja de ser una lista, se dice');
+    ok(ta({success: true, data: []}).motivo === 'FORMATO_DESCONOCIDO',
+       '554 agencias que se vuelven 0 NO es un catálogo vacío: es que cambió ' +
+       'la forma. Reemplazar el catálogo con eso lo dejaría inservible');
+
+    {
+      const cojo = {success: true, data: [
+        {ter_id: 3, nombre: 'BUENA', zona: 'Z'},
+        {nombre: 'SIN ID'}, {ter_id: null, nombre: 'NULA'}, null, 'texto'
+      ]};
+      const r = ta(cojo);
+      ok(r.ok === true && r.total === 1,
+         'una agencia sin id no entra: no sirve para registrar y ensucia el ' +
+         'catálogo');
+      ok(r.sinId === 4,
+         'y cuántas se descartaron se DICE, no se calla — 4 de 5 en silencio ' +
+         'sería un catálogo roto que parece bueno');
+    }
+
+    ok(ta({success: true, data: [Object.assign({campoNuevo: 1},
+        cruda.data[0])]}).ok === true,
+       'un campo que Shalom añada mañana no rompe nada: lo que no se reconoce ' +
+       'se ignora');
+    ok(P.traducir('agencies', cruda).total === 2,
+       'y el despachador manda agencies a SU traductor');
   }
 };

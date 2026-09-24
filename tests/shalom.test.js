@@ -25,9 +25,9 @@ module.exports = async (t) => {
         'DISPONIBLE sigue en false aunque consultarGuia ya funcione: el botón ' +
         '⟳ no la mira y el barrido automático sí — a mano se calibra, en masa ' +
         'se confía en un traductor sin comprobar');
-    const dormidos = ['ticket', 'agencias', 'registrar'];
+    const dormidos = ['ticket', 'registrar'];
     ok(dormidos.every((m) => typeof S[m] === 'function'),
-        'los 3 que faltan existen: nadie explota al llamarlos');
+        'los 2 que faltan existen: nadie explota al llamarlos');
     // Se llaman DE VERDAD y se espera su respuesta. Comprobar solo que la
     // función existe dejaría pasar una que devuelve undefined.
     const respuestas = await Promise.all(dormidos.map((m) => S[m]()));
@@ -36,7 +36,7 @@ module.exports = async (t) => {
       return !(r && r.ok === false && r.motivo === 'DESCONECTADO');
     });
     ok(malas.length === 0,
-        'los 3 devuelven {ok:false, motivo:"DESCONECTADO"}' +
+        'los 2 devuelven {ok:false, motivo:"DESCONECTADO"}' +
         (malas.length ? ' — fallan: ' + malas.join(', ') : ''));
     ok(respuestas.every((r) => !r.ok), 'ninguno devuelve ok:true sin dato real');
   }

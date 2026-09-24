@@ -145,8 +145,16 @@
     },
 
     ticket: _off,            // 2 · el PNG del ticket
-    agencias: _off,          // 3 · GET /agencies
     registrar: _off,         // 6 · alta de envío
+
+    /* ✅ CONECTADO · GET /public/agencies — 2026-09-24
+       El catálogo completo, ya mapeado al esquema que usa el buscador.
+       → {ok:true, agencias:[…12 campos…], total, sinId}
+       Va la variante PÚBLICA: misma utilidad y NO CONSUME CUOTA, así que
+       refrescar el catálogo sale gratis. La puerta no le manda la clave.
+       ⚠️ Devuelve `agencias`, no `lista`: es la clave que busca
+       `agencias-extractor.js` y la misma del archivo del catálogo. */
+    agencias: function () { return _pedir({op: 'agencies'}); },
 
     /* ✅ CONECTADO · GET /instances — 2026-09-22
        Si la cuenta de Shalom Pro tiene sesión abierta. Va el GET y no el
