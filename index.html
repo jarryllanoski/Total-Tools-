@@ -475,6 +475,12 @@
         dispatch:data.dispatch||{},
         config:data.config||{},
         trash:data.trash||[],
+        /* ★ HERMANA de `config`, jamás dentro. `handleConfig` devuelve el
+           objeto `config` ENTERO al formulario público, así que meter aquí
+           los recursos publicaría los precios mayoristas y los comunicados
+           internos a quien pidiera esa URL. Misma razón por la que
+           `msgTemplates` y `labels` están fuera. */
+        recursos:data.recursos||[],
         ts:saveTs // usar saveTs fijo para que _S_TS y config.ts coincidan tras la escritura
       }}];
       for(const s of(data.shipments||[])){
@@ -751,6 +757,10 @@
     </div>
     <div style="display:flex;align-items:center;gap:8px">
       <div class="hdr-phone" id="hdrPhone">999000000</div>
+      <button type="button" onclick="abrirRecursos()" title="Centro de recursos"
+        style="background:rgba(163,113,247,.15);border:1px solid rgba(163,113,247,.35);
+        border-radius:20px;padding:2px 9px;font-size:11px;font-weight:700;color:#a78bfa;
+        cursor:pointer;font-family:inherit;line-height:1.6;flex-shrink:0">📚 Recursos</button>
       <div id="alertasSlot" style="display:flex;align-items:center"></div>
     </div>
   </div>
@@ -933,6 +943,23 @@
     </div>
   </div>
 
+  <!-- CENTRO DE RECURSOS -->
+  <div class="cfg-sec">
+    <div class="cfg-ttl">📚 Centro de recursos</div>
+    <div style="font-size:11px;color:#8b949e;line-height:1.5;margin-bottom:10px">
+      Los enlaces que aparecen en el botón 📚 de arriba: manuales, videos, procesos,
+      catálogos y garantía. Solo <b>https://</b>, y el icono se deduce del enlace.</div>
+    <div id="recCfgLista"></div>
+    <div class="cfl-add-row" style="flex-wrap:wrap;gap:6px">
+      <input class="fi" id="recNuevoTit" placeholder="Título (ej: Manual del taladro)" maxlength="80" style="flex:1;min-width:140px">
+      <select class="fi" id="recNuevaCat" style="flex:0 0 auto;width:110px"></select>
+      <input class="fi" id="recNuevaUrl" placeholder="https://drive.google.com/…" maxlength="2000" style="flex:1;min-width:180px"
+        onkeydown="if(event.key==='Enter')recAgregar()">
+      <button class="cfl-plus" onclick="recAgregar()">＋</button>
+    </div>
+    <div id="recCfgAviso" style="display:none;font-size:11px;line-height:1.5;margin-top:8px"></div>
+  </div>
+
   <!-- NOTIFICACIONES -->
   <div class="cfg-sec">
     <div class="cfg-ttl">🔔 Notificaciones</div>
@@ -1016,6 +1043,18 @@
         border:1px solid rgba(56,139,253,.35);color:#388bfd">&#128268; Verificar sesión de Shalom Pro</button>
       <div id="shalomInstEstado" style="display:none;margin-top:10px;font-size:12px;line-height:1.5"></div>
     </div>
+  </div>
+</div>
+
+<!-- CENTRO DE RECURSOS -->
+<div class="overlay" id="recursosOverlay" onclick="closeOverlay('recursosOverlay')">
+  <div class="sheet" onclick="event.stopPropagation()" style="max-height:88vh;display:flex;flex-direction:column">
+    <div class="sheet-handle"></div>
+    <div class="sheet-title">📚 Centro de recursos</div>
+    <input class="fi" id="recBuscar" placeholder="🔍 Buscar…" oninput="_recBuscar(this.value)"
+      style="display:none;margin-bottom:9px">
+    <div class="chips-wrap" id="recChips"></div>
+    <div id="recLista" style="overflow-y:auto;flex:1;min-height:60px"></div>
   </div>
 </div>
 
@@ -2779,6 +2818,183 @@ async function correrBarridoAhora(){
 }
 
 /* SHALOM: el interruptor maestro de la puerta (Config) */
+/* ══ CENTRO DE RECURSOS ══════════════════════════════════════════════════
+   La lógica (qué es cada enlace, qué se descarta, cómo se filtra) vive en
+   `recursos.js` y se prueba sin navegador. Aquí solo está la pantalla.
+
+   NO CUESTA NI UNA LECTURA NI UNA ESCRITURA NUEVAS: `S.recursos` viaja en el
+   documento de configuración que el panel ya lee al arrancar, y se guarda con
+   `save('config')`, que sube ESE documento y no los 1165 pedidos. */
+let _recCat = 'Todos';
+let _recQ   = '';
+
+function _recLista(){
+  return (window.Recursos ? Recursos.normalizar(S.recursos) : []);
+}
+
+function abrirRecursos(){
+  _recCat = 'Todos'; _recQ = '';
+  const b = $('recBuscar'); if(b) b.value = '';
+  _recPintar();
+  openOverlay('recursosOverlay');
+}
+function _recFiltrar(c){ _recCat = c; _recPintar(); }
+function _recBuscar(v){ _recQ = v || ''; _recPintar(); }
+
+function _recPintar(){
+  const cont = $('recLista'); if(!cont) return;
+  // Si `recursos.js` no cargó (archivo viejo en caché, o fallo de red), esto
+  // se calla en vez de tumbar la pantalla: es un módulo accesorio, no el
+  // panel. Lo mismo en el editor.
+  if(!window.Recursos){
+    cont.innerHTML = '<div style="text-align:center;padding:22px;color:var(--text2);font-size:12.5px">No se pudo cargar el centro de recursos. Recarga la página.</div>';
+    return;
+  }
+  const todos = _recLista();
+
+  // El buscador se dibuja solo si hay suficientes. Sobre cinco elementos es
+  // decoración que ocupa sitio en la pantalla de un teléfono.
+  const bus = $('recBuscar');
+  if(bus) bus.style.display = todos.length >= Recursos.UMBRAL_BUSCADOR ? '' : 'none';
+
+  const chips = $('recChips');
+  if(chips){
+    const cats = Recursos.categoriasConAlgo(todos);
+    // Con una sola categoría el filtro no filtra nada: se esconde entero.
+    chips.style.display = cats.length > 1 ? '' : 'none';
+    chips.innerHTML = ['Todos'].concat(cats).map(c =>
+      '<div class="chip'+(_recCat===c?' active':'')+'" onclick="_recFiltrar(\''+escJs(c)+'\')">'+escH(c)+'</div>'
+    ).join('');
+  }
+
+  if(!todos.length){
+    cont.innerHTML = '<div style="text-align:center;padding:26px 10px;color:var(--text2);font-size:12.5px;line-height:1.6">'+
+      'Todavía no hay recursos.<br>Agrégalos en <b>Config → 📚 Centro de recursos</b>.'+
+      '<div style="margin-top:12px"><button type="button" onclick="closeOverlay(\'recursosOverlay\');goPage(\'configurar\')" '+
+      'style="padding:9px 16px;border-radius:9px;cursor:pointer;font-family:inherit;font-size:12px;font-weight:700;'+
+      'background:rgba(163,113,247,.15);border:1px solid rgba(163,113,247,.35);color:#a78bfa">Ir a Config</button></div></div>';
+    return;
+  }
+
+  const vis = Recursos.filtrar(todos, _recCat, _recQ);
+  if(!vis.length){
+    cont.innerHTML = '<div style="text-align:center;padding:22px 10px;color:var(--text2);font-size:12.5px">'+
+      'Nada con «'+escH(_recQ)+'».</div>';
+    return;
+  }
+
+  // `escU` no vale aquí: acepta http:. Estos enlaces ya pasaron por
+  // `urlValida` (solo https) en `normalizar`, y aun así se escapan para el
+  // atributo. rel="noopener" evita que la pestaña abierta toque a esta.
+  cont.innerHTML = vis.map(r => {
+    const t = Recursos.tipoDe(r.u);
+    return '<a href="'+escH(r.u)+'" target="_blank" rel="noopener noreferrer" '+
+      'style="display:flex;align-items:center;gap:11px;padding:11px 12px;margin-bottom:7px;'+
+      'border-radius:11px;background:var(--bg3);border:1px solid var(--bd);text-decoration:none">'+
+      '<div style="font-size:20px;flex-shrink:0">'+t.icono+'</div>'+
+      '<div style="flex:1;min-width:0">'+
+        '<div style="font-size:13px;font-weight:700;color:var(--text);overflow:hidden;'+
+        'text-overflow:ellipsis;white-space:nowrap">'+escH(r.t)+'</div>'+
+        '<div style="font-size:10.5px;color:var(--text2);margin-top:2px;overflow:hidden;'+
+        'text-overflow:ellipsis;white-space:nowrap">'+escH(r.n || t.etiqueta)+' · '+escH(r.c)+'</div>'+
+      '</div>'+
+      '<div style="color:var(--text2);font-size:13px;flex-shrink:0">↗</div></a>';
+  }).join('');
+}
+
+/* ── El editor, en Config ───────────────────────────────────────────── */
+function _recAviso(txt, color){
+  const e = $('recCfgAviso'); if(!e) return;
+  if(!txt){ e.style.display='none'; return; }
+  e.style.display='block'; e.style.color = color || '#f59e0b'; e.textContent = txt;
+}
+
+function _recCfgPintar(){
+  const cont = $('recCfgLista'); if(!cont || !window.Recursos) return;
+  const sel = $('recNuevaCat');
+  if(sel && !sel.options.length){
+    sel.innerHTML = Recursos.CATEGORIAS.map(c=>'<option>'+escH(c)+'</option>').join('');
+  }
+  const l = _recLista();
+  if(!l.length){
+    cont.innerHTML = '<div style="font-size:11.5px;color:var(--text2);padding:4px 0 8px">Sin recursos todavía.</div>';
+    return;
+  }
+  cont.innerHTML = l.map((r,i) => {
+    const t = Recursos.tipoDe(r.u);
+    return '<div style="display:flex;align-items:center;gap:7px;padding:8px 9px;margin-bottom:6px;'+
+      'border-radius:9px;background:var(--bg3);border:1px solid var(--bd)">'+
+      '<div style="font-size:16px;flex-shrink:0">'+t.icono+'</div>'+
+      '<div style="flex:1;min-width:0">'+
+        '<div style="font-size:12px;font-weight:700;color:var(--text);overflow:hidden;'+
+        'text-overflow:ellipsis;white-space:nowrap">'+escH(r.t)+'</div>'+
+        '<div style="font-size:10px;color:var(--text2);overflow:hidden;text-overflow:ellipsis;'+
+        'white-space:nowrap">'+escH(r.c)+' · '+escH(r.u)+'</div>'+
+      '</div>'+
+      '<button type="button" onclick="recMover(\''+escJs(r.id)+'\',-1)" '+(i===0?'disabled ':'')+
+        'style="background:none;border:none;color:var(--text2);cursor:pointer;font-size:13px;padding:2px 4px">▲</button>'+
+      '<button type="button" onclick="recMover(\''+escJs(r.id)+'\',1)" '+(i===l.length-1?'disabled ':'')+
+        'style="background:none;border:none;color:var(--text2);cursor:pointer;font-size:13px;padding:2px 4px">▼</button>'+
+      '<button type="button" onclick="recBorrar(\''+escJs(r.id)+'\')" '+
+        'style="background:none;border:none;color:#f87171;cursor:pointer;font-size:13px;padding:2px 4px">✕</button>'+
+      '</div>';
+  }).join('');
+}
+
+function recAgregar(){
+  if(!window.Recursos){ _recAviso('Recarga la página e intenta de nuevo.'); return; }
+  const tit = ($('recNuevoTit')||{value:''}).value.trim();
+  const url = ($('recNuevaUrl')||{value:''}).value.trim();
+  const cat = ($('recNuevaCat')||{value:''}).value;
+  if(!url){ _recAviso('Pega el enlace primero.'); return; }
+  if(!Recursos.urlValida(url)){
+    _recAviso('Ese enlace no sirve. Tiene que empezar por https:// y ser una dirección completa.');
+    return;
+  }
+  S.recursos = Array.isArray(S.recursos) ? S.recursos : [];
+  S.recursos.push({id:'r_'+Date.now()+'_'+Math.random().toString(36).slice(2,7),
+    t:tit, u:url, c:cat, n:'', publico:false});
+  save('config');            // ★ sube SOLO el documento de config
+  $('recNuevoTit').value=''; $('recNuevaUrl').value='';
+  _recCfgPintar();
+  // El fallo más probable de todo esto no es el código: es una carpeta de
+  // Drive sin compartir. Quien la abra vería "solicitar acceso" y pensaría
+  // que el panel está roto.
+  if(/drive\.google\.com|docs\.google\.com/.test(url)){
+    _recAviso('✅ Agregado. Comprueba que en Drive esté compartido como «Cualquier persona con el enlace», o quien lo abra verá «solicitar acceso».', '#8b949e');
+  } else {
+    _recAviso('✅ Agregado.', 'var(--green,#2ea043)');
+  }
+}
+
+function recBorrar(id){
+  const r = _recLista().find(x=>x.id===id); if(!r) return;
+  confirmar({
+    texto: 'Quitar «'+r.t+'» del centro de recursos. El archivo en Drive no se toca.',
+    textoSi: 'Quitar',
+    alConfirmar: function(){
+      S.recursos = (Array.isArray(S.recursos)?S.recursos:[]).filter(x=>{
+        const l = Recursos.normalizar([x])[0];
+        return !l || l.id !== id;
+      });
+      save('config'); _recCfgPintar(); _recAviso('');
+    }
+  });
+}
+
+function recMover(id, dir){
+  const bruto = Array.isArray(S.recursos) ? S.recursos : [];
+  // Se mueve sobre la lista CRUDA, no sobre la normalizada: si una fila
+  // inválida está escondida entre dos válidas, mover por el índice de la
+  // lista visible saltaría por encima de ella y el orden guardado no
+  // coincidiría con el que ves.
+  const i = bruto.findIndex(x=>{ const l = Recursos.normalizar([x])[0]; return l && l.id===id; });
+  const j = i + dir;
+  if(i < 0 || j < 0 || j >= bruto.length) return;
+  const tmp = bruto[i]; bruto[i] = bruto[j]; bruto[j] = tmp;
+  S.recursos = bruto; save('config'); _recCfgPintar();
+}
+
 async function _pintarPuertaShalom(){
   const fila = $('shalomPuertaEstado'), tgl = $('tglShalomPuerta');
   if(!fila || !tgl) return;
@@ -4170,7 +4386,7 @@ render();
      lo usa. config.js, print.js y voz.js preguntan por los pedidos marcados,
      así que siguen yendo detrás. El orden de carga es un contrato
      (ver docs/ARQUITECTURA.md). -->
-<script src="config.js?v=28"></script>
+<script src="config.js?v=29"></script>
 <script src="print.js?v=16"></script>
 <script src="notify.js?v=4"></script>
 <script src="shalom.js?v=17"></script>
@@ -4182,6 +4398,7 @@ render();
 <script src="agencias-extractor.js?v=11"></script>
 <script src="respaldo.js?v=1"></script>
 <script src="ayuda.js?v=4"></script>
+<script src="recursos.js?v=1"></script>
 <script src="dashboard.js?v=2"></script>
 <script src="voz.js?v=3"></script>
 <script src="cotizacion.js?v=3"></script>

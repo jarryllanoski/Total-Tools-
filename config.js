@@ -1358,6 +1358,9 @@ function loadCfgUI(){
     const ts=$('tglBarridoSimulacro'); if(ts) ts.classList.toggle('on', b.simulacro!==false);
   }
   if(typeof _pintarUltimoBarrido==='function') _pintarUltimoBarrido();
+  // El centro de recursos: sus enlaces viven en S.recursos, que ya llegó con
+  // la configuración. No pide nada a la red.
+  if(typeof _recCfgPintar==='function') _recCfgPintar();
   // Configuración Shalom: solo queda "Mostrar en el link del cliente". El motor
   // de rastreo, el modo de etiquetas y los intervalos se retiraron con el
   // rastreo viejo. Los campos que quedan en S.config (trackingMotor,

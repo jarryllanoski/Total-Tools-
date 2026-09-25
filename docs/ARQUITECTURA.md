@@ -67,6 +67,7 @@ Consecuencias que hay que tener presentes al tocar cualquier cosa:
 | `floatpanel.js` | 570 | Mini paneles flotantes (solo PC) |
 | `voz.js` | 496 | Asistente de voz |
 | `ayuda.js` | 468 | Ayuda dentro del panel |
+| `recursos.js` | 185 | Centro de recursos: enlaces a Drive, videos y catálogos |
 | `delivery.js` | 417 | Rutas de motorizado |
 | `alertas.js` | 376 | Centro de alertas |
 | `loading-screen.js` | 361 | Pantalla de carga del seguimiento del cliente |
@@ -140,6 +141,41 @@ al terminar, salga bien o mal.
 Y una decisión pequeña que se nota: **si la acción falla, el diálogo NO se
 cierra.** El aviso se lee con él delante y se puede reintentar sin volver a
 buscar el pedido.
+
+### Nota · Centro de recursos (`recursos.js`)
+
+El botón 📚 de la cabecera. Enlaces a Drive, videos, procesos, catálogos y
+garantía, en cinco categorías fijas.
+
+**Dónde viven los datos, y por qué importa.** En `S.recursos`, clave **hermana**
+de `config` dentro del mismo documento — **nunca dentro de `config`**.
+`handleConfig` (`functions/index.js`) devuelve el objeto `config` **entero** al
+formulario público, así que meterlos ahí publicaría los precios mayoristas y
+los comunicados internos a quien pidiera esa URL. Es la misma razón por la que
+`msgTemplates` y `labels` están fuera. Hay una prueba que lo vigila.
+
+**Lo que cuesta: nada.** `S.recursos` viaja en el documento de configuración que
+el panel ya lee al arrancar, y se guarda con `save('config')`, que sube **ese
+documento** y no los 1165 pedidos. Cero lecturas nuevas, cero escrituras
+nuevas.
+
+**Solo `https://`.** `urlValida()` rechaza `javascript:`, `data:` y hasta
+`http://`. No es quisquillosería: un `javascript:` dentro de un `href` ejecuta
+código con los permisos del panel. Y al pintar se escapa igual, con
+`rel="noopener noreferrer"` — validar y luego inyectar en crudo sería no haber
+validado. **No se usa `escU`**, que acepta `http://`.
+
+**El icono se deduce del enlace** (carpeta de Drive, hoja de cálculo, YouTube,
+PDF…): así dar de alta un recurso es pegar una dirección, y no acaba todo en
+🔗 iguales porque nadie elige iconos.
+
+**El buscador aparece a partir de 8 recursos**, y los chips solo si hay más de
+una categoría con algo dentro. Un filtro que siempre sale vacío enseña a no
+usar los filtros.
+
+**`publico: false` existe desde el día uno** aunque hoy no se use. Cuando el
+cliente deba ver avisos y promociones en su link de seguimiento, será añadir el
+interruptor y un endpoint que devuelva **solo** los marcados — sin migrar nada.
 
 ### Nota · Avisos del número de guía (`guias.js`)
 

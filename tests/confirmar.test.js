@@ -146,10 +146,15 @@ module.exports = async ({bloque, ok}) => {
        'la puerta está expuesta para que config.js la use');
   }
   {
-    // Las seis pantallas migradas.
+    /* Toda pantalla que borra algo pasa por la MISMA puerta. El número sube
+       cuando se añade una —hoy son 7, con el centro de recursos—, y tiene que
+       subir a mano: si alguien monta su propio diálogo de borrado con su
+       propio botón, esta cuenta no se mueve pero la de `delYes` de arriba sí,
+       y salta. Las dos juntas son la reja. */
     const todo = E.leer('index.html') + E.leer('config.js');
     const usos = (todo.match(/confirmar\(\{/g) || []).length;
-    ok(usos === 6,
-       'las seis pantallas que borran algo pasan por la misma puerta');
+    ok(usos === 7,
+       'las siete pantallas que borran algo pasan por la misma puerta ' +
+       '(vistas: ' + usos + ')');
   }
 };
