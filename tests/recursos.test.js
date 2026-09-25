@@ -196,45 +196,208 @@ module.exports = async ({bloque, ok}) => {
        'y nunca metidos dentro de `config`');
   }
 
+  bloque('La portada se deduce del enlace: en la mayoría no subes nada');
+
+  {
+    const p = (u, img) => R.portadaDe(R.normalizar([{t:'x', u:u, img:img}])[0]);
+
+    ok(p('https://youtu.be/dQw4w9WgXcQ') === 'https://img.youtube.com/vi/dQw4w9WgXcQ/hqdefault.jpg',
+       'un video de YouTube trae su miniatura solo');
+    ['https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+      'https://youtube.com/watch?list=PL1&v=dQw4w9WgXcQ',
+      'https://www.youtube.com/shorts/dQw4w9WgXcQ',
+      'https://www.youtube.com/embed/dQw4w9WgXcQ'].forEach((u) => {
+      ok(p(u).indexOf('dQw4w9WgXcQ') > 0, 'y en sus otras formas: ' + u.slice(8, 40));
+    });
+    ok(p('https://drive.google.com/file/d/1AbC_defGHIj/view').indexOf('thumbnail?id=1AbC_defGHIj') > 0,
+       'un ARCHIVO de Drive también');
+    ok(p('https://drive.google.com/drive/folders/1AbC_defGHIj') === null,
+       'una CARPETA de Drive no: no existe miniatura de carpeta, y pedirla ' +
+       'devolvería una imagen rota');
+    ok(p('https://cualquier.pe/x') === null, 'y de lo demás, ninguna');
+
+    ok(p('https://youtu.be/dQw4w9WgXcQ', 'https://mi.pe/portada.jpg') === 'https://mi.pe/portada.jpg',
+       'la que TÚ pones gana siempre: es una decisión tuya, no una deducción');
+    ok(p('https://youtu.be/dQw4w9WgXcQ', 'javascript:alert(1)').indexOf('img.youtube') > 0,
+       'pero una portada con `javascript:` se descarta en `normalizar` y se ' +
+       'cae a la deducida — una portada es otra dirección de la que el ' +
+       'navegador va a cargar algo');
+    ok(R.portadaDe(null) === null, 'y sin recurso no revienta');
+
+    ok(R.idYoutube('https://noesyoutube.com.pe/watch?v=abc123') === '',
+       'un dominio que solo CONTIENE youtube.com no cuenta');
+    ok(R.idDrive('https://drive.google.com/drive/folders/1AbC_defGHIj') === '',
+       'y una carpeta no da id de archivo');
+    /* La forma ANTIGUA de una carpeta trae un `id=`, así que sin la guarda
+       caería en el patrón genérico y devolvería el id de la CARPETA como si
+       fuera de un archivo — miniatura rota. Lo descubrió una mutación que
+       sobrevivió: la guarda anterior miraba solo `/folders/`. */
+    ok(R.idDrive('https://drive.google.com/folderview?id=1AbC_defGHIj') === '',
+       'ni en su forma antigua `folderview?id=`, que SÍ trae un id y se ' +
+       'colaría por el patrón genérico');
+    ok(R.idDrive('https://drive.google.com/drive/u/1/folders/1AbC_defGHIj') === '',
+       'ni con el número de cuenta en medio');
+    ok(R.idDrive('https://drive.google.com/open?id=1AbC_defGHIj') === '1AbC_defGHIj',
+       'pero `open?id=` de un ARCHIVO sí: esa es la forma vieja de un archivo');
+  }
+
+  bloque('Ordenar no puede cambiar lo que está guardado');
+
+  {
+    const l = R.normalizar([
+      {t: 'Zeta', u: 'https://x.pe/1', c: 'Videos'},
+      {t: 'Álvaro', u: 'https://x.pe/2', c: 'Garantía'},
+      {t: 'Manual', u: 'https://x.pe/3', c: 'Manuales'}
+    ]);
+    const antes = l.map(r => r.t).join(',');
+    const az = R.ordenar(l, 'az');
+    ok(l.map(r => r.t).join(',') === antes,
+       'ordenar devuelve una COPIA: la lista guardada no se toca, así que ' +
+       'mirar de otra forma no reescribe tu configuración');
+    ok(az[0].t === 'Álvaro',
+       'A–Z ordena sin que la tilde mande a la Á al final');
+    ok(R.ordenar(l, 'categoria')[0].c === 'Manuales',
+       'por categoría sigue el orden declarado, no el alfabético: el sitio de ' +
+       'cada grupo no puede cambiar al renombrar una categoría');
+    ok(R.ordenar(l, 'nuevos')[0].t === 'Manual', 'y "más nuevos" invierte');
+    ok(R.ordenar(null, 'az').length === 0, 'sin lista no revienta');
+  }
+
+  bloque('Los grupos y las cuentas de arriba');
+
+  {
+    const l = R.normalizar([
+      {t: 'a', u: 'https://drive.google.com/drive/folders/1AbC_defGHIj', c: 'Manuales'},
+      {t: 'b', u: 'https://youtu.be/dQw4w9WgXcQ', c: 'Videos'},
+      {t: 'c', u: 'https://x.pe/c.pdf', c: 'Catálogos'},
+      {t: 'd', u: 'https://x.pe/d.pdf', c: 'Catálogos'}
+    ]);
+    const g = R.agrupar(l);
+    ok(g.length === 3, 'un grupo por categoría con algo dentro, ni uno vacío');
+    ok(g[0].cat === 'Manuales' && g[2].cat === 'Catálogos',
+       'y en el orden declarado');
+    ok(g[2].items.length === 2, 'con sus elementos');
+
+    const c = R.cuentas(l);
+    ok(c.total === 4 && c.carpetas === 1 && c.videos === 1 && c.archivos === 2,
+       'las cuatro tarjetas de arriba cuentan por TIPO — otro eje que los ' +
+       'chips, que cuentan por categoría');
+    ok(c.carpetas + c.videos + c.archivos === c.total,
+       'y los tres suman el total: ningún recurso se queda sin contar');
+  }
+
+  bloque('Lo que se manda por WhatsApp');
+
+  {
+    const l = R.normalizar([
+      {t: 'Catálogo 2026', u: 'https://x.pe/1'},
+      {t: '', u: 'https://x.pe/2'}
+    ]);
+    const txt = R.textoCompartir(l);
+    ok(txt.indexOf('Catálogo 2026') === 0 && txt.indexOf('https://x.pe/1') > 0,
+       'cada enlace va con su título: seis URLs sueltas no le dicen nada a ' +
+       'quien las recibe');
+    ok(txt.indexOf('https://x.pe/1') >= 0 && txt.indexOf('https://x.pe/2') >= 0,
+       'y van los dos marcados, no solo el primero');
+    ok(txt.indexOf('\n\n') > 0,
+       'separados por una línea en blanco: pegados serían un muro ilegible en ' +
+       'el chat');
+    ok(R.textoCompartir([]) === '' && R.textoCompartir(null) === '',
+       'sin nada marcado, texto vacío — el botón ya avisa antes de llegar aquí');
+  }
+
   bloque('La pantalla no deshace lo que la lógica protege');
 
   {
-    /* De nada sirve validar el enlace si después se pinta sin escapar. Estas
-       dos líneas son las que convierten la validación en seguridad real. */
+    /* De nada sirve validar el enlace si después se pinta sin escapar. Y son
+       DOS sitios: la fila y la tarjeta del mosaico. Si uno se escapa y el
+       otro no, el agujero está igual de abierto. */
     const html = E.leer('index.html');
-    const pinta = html.slice(html.indexOf('cont.innerHTML = vis.map'),
-        html.indexOf('/* ── El editor, en Config'));
-    ok(/href="'\+escH\(r\.u\)\+'"/.test(pinta),
-       'el enlace se escapa al pintarlo: validar y luego inyectar en crudo ' +
-       'sería no haber validado');
-    ok(/rel="noopener noreferrer"/.test(pinta),
-       'y se abre con rel="noopener": sin eso, la pestaña que se abre puede ' +
-       'cambiar la dirección de la tuya');
-    ok(pinta.indexOf('escU(') < 0,
-       'y NO se usa `escU`, que acepta http:// — aquí solo vale https');
+    const fila = html.slice(html.indexOf('function _recFila(r){'),
+        html.indexOf('function _recMosaicoCard(r){'));
+    const mosaico = html.slice(html.indexOf('function _recMosaicoCard(r){'),
+        html.indexOf('/* ── Marcar ──'));
 
-    const ed = html.slice(html.indexOf('function _recCfgPintar'),
-        html.indexOf('function recAgregar'));
-    ok(ed.indexOf('href=') < 0,
-       'el editor no pinta enlaces clicables: una fila con un enlace a medio ' +
-       'escribir no tiene por qué poder abrirse');
+    [['la fila', fila], ['la tarjeta del mosaico', mosaico]].forEach(([nombre, t]) => {
+      ok(/href="'\+escH\(r\.u\)\+'"/.test(t),
+         'en ' + nombre + ' el enlace se escapa: validar y luego inyectar en ' +
+         'crudo sería no haber validado');
+      ok(/rel="noopener noreferrer"/.test(t),
+         'y se abre con rel="noopener": sin eso la pestaña nueva puede cambiar ' +
+         'la dirección de la tuya');
+      ok(t.indexOf('escU(') < 0, 'y sin `escU`, que acepta http://');
+    });
 
-    ok(/if\(!Recursos\.urlValida\(url\)\)/.test(html),
-       'y al agregar se valida ANTES de guardar, no al pintar: un enlace malo ' +
-       'no llega ni a la nube');
+    ok(/<img src="'\+escH\(p\)\+'"/.test(mosaico),
+       'la portada también se escapa: es otra dirección que viene de fuera');
+    ok(/onerror="'\+_REC_ONERR\+'"/.test(mosaico),
+       'y lleva `onerror`: la miniatura de Drive NO está garantizada, así que ' +
+       'lo que impide ver una imagen rota no es la URL, es esta caída al icono');
+    ok(/loading="lazy"/.test(mosaico),
+       'y `loading="lazy"`: en el mosaico, 40 portadas en datos móviles se ' +
+       'bajan solo cuando se ven');
+
+    const prev = html.slice(html.indexOf('function recPrevia()'),
+        html.indexOf('async function recSubirPortada'));
+    ok(/onerror="'\+_REC_ONERR\+'"/.test(prev),
+       'la vista previa del editor cae igual: ahí es donde descubres que esa ' +
+       'portada no va a cargar, antes de guardarla');
+
+    ok(/if\(!Recursos\.urlValida\(url\)\)/.test(html) &&
+       /if\(img && !Recursos\.urlValida\(img\)\)/.test(html),
+       'el enlace Y la portada se validan al GUARDAR, no al pintar: nada malo ' +
+       'llega a la nube');
   }
 
   {
-    // Guardar los recursos NO puede costar lo que cuesta guardar los pedidos.
+    // Guardar recursos NO puede costar lo que cuesta guardar los pedidos.
     const html = E.leer('index.html');
-    const bloqueRec = html.slice(html.indexOf('function recAgregar'),
+    const conComentarios = html.slice(html.indexOf('/* ══ CENTRO DE RECURSOS'),
         html.indexOf('async function _pintarPuertaShalom'));
-    const guardados = (bloqueRec.match(/save\('config'\)/g) || []).length;
-    ok(guardados === 3,
-       'agregar, borrar y mover usan `save(\'config\')`: sube UN documento, ' +
-       'no los 1165 pedidos');
+    /* Sin comentarios: se cuentan LLAMADAS, no prosa. Una explicación que
+       menciona `save('config')` no es un guardado, y contarla haría que la
+       prueba pasara o fallara según cómo esté redactado un comentario. */
+    const bloqueRec = conComentarios
+        .replace(/\/\*[\s\S]*?\*\//g, '')
+        .replace(/^\s*\/\/.*$/gm, '');
+    ok((bloqueRec.match(/save\('config'\)/g) || []).length === 2,
+       'guardar y quitar usan `save(\'config\')`: sube UN documento, no los ' +
+       '1169 pedidos');
     ok(!/save\(\)/.test(bloqueRec),
        'y ninguno llama a `save()` sin argumento, que enciende _dirtyAll y ' +
-       'sube la base entera por cambiar el orden de un enlace');
+       'sube la base entera por editar una nota');
+
+    /* La selección de recursos NO puede ser la de pedidos: compartirla haría
+       que marcar un catálogo marcara un envío, y que el 🗑️ de Envíos borrara
+       lo que marcaste aquí. */
+    ok(bloqueRec.indexOf('Seleccion') < 0,
+       'el centro de recursos no toca `seleccion.js` ni de lejos: esa es la ' +
+       'selección de PEDIDOS');
+    ok(/let _recSel = new Set\(\)/.test(bloqueRec),
+       'tiene la suya, en memoria, que se olvida al recargar');
+
+    // La subida reusa lo que ya existe y funciona, en su propia carpeta.
+    ok(/StorageModule\.uploadFile\(f, 'portadas', id, 'recursos'\)/.test(bloqueRec),
+       'la portada se sube con el `storage.js` de siempre, pero a la carpeta ' +
+       '`recursos/` — no mezclada con los documentos de los envíos');
+    const reglas = E.leer('storage.rules');
+    ok(/match \/recursos\/\{grupo\}\/\{fileName\}/.test(reglas),
+       'y esa carpeta tiene su regla: lo que no está declarado se deniega, y ' +
+       'la subida fallaría con un 403 que parece un problema de sesión');
+  }
+
+  {
+    // El editor sale de Config: ya no se administra desde ahí.
+    const html = E.leer('index.html');
+    ok(html.indexOf('recCfgLista') < 0 && html.indexOf('recNuevaUrl') < 0,
+       'no queda nada del editor viejo en Config');
+    ok(E.leer('config.js').indexOf('_recCfgPintar') < 0,
+       'ni la llamada que lo pintaba');
+    ok(/id="page-recursos"/.test(html), 'es una página propia');
+    ok(/if\(id==='recursos'\) recRender\(\);/.test(html),
+       'y `goPage` la pinta al entrar');
+    ok(!/\['envios','compartir','configurar','recursos'\]/.test(html),
+       'sin cuarta pestaña: cuatro no entran en un teléfono de 360 px sin ' +
+       'dejar "Config" en "Confi…"');
   }
 };

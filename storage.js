@@ -65,8 +65,14 @@ function getDisplayUrl(doc) {
  * @param {string} slot - 'guia' | 'embalado' | 'ticket'
  * @returns {Promise<{d: string, n: string, t: string, storage: true}>}
  */
-async function uploadFile(file, shipId, slot) {
+async function uploadFile(file, shipId, slot, carpeta) {
   if (!file || !shipId || !slot) throw new Error('Parámetros incompletos');
+  /* `carpeta` por defecto 'shipments' para no cambiarle nada a los ocho
+     sitios que ya llamaban aquí. El centro de recursos pasa 'recursos'.
+     ⚠️ Cada carpeta necesita su regla en `storage.rules`: lo que no esté
+     declarado allí se deniega, y la subida fallaría con un 403 que parece
+     un problema de sesión. */
+  var raiz = (carpeta === 'recursos') ? 'recursos' : 'shipments';
 
   // Determinar extensión
   var ext = 'jpg';
@@ -75,7 +81,7 @@ async function uploadFile(file, shipId, slot) {
   else if (file.type.includes('jpeg') || file.type.includes('jpg')) ext = 'jpg';
   else if (file.type.includes('webp')) ext = 'webp';
 
-  var path    = 'shipments/' + shipId + '/' + slot + '.' + ext;
+  var path    = raiz + '/' + shipId + '/' + slot + '.' + ext;
   var encoded = encodePath(path);
   var url     = STORAGE_BASE + '/' + encoded + '?uploadType=media&name=' + encoded + '&key=' + FB_KEY;
 

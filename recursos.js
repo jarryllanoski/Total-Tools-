@@ -126,6 +126,10 @@
         u: u,
         c: c,
         n: String(r.n == null ? '' : r.n).trim().slice(0, MAX_NOTA),
+        // La portada que TÚ pusiste —subida o pegada—. Pasa por la misma
+        // criba que el enlace: una portada es otro sitio del que el navegador
+        // va a cargar algo.
+        img: urlValida(r.img) ? String(r.img).trim() : '',
         publico: r.publico === true
       });
     }
@@ -172,6 +176,140 @@
       return (lista || []).some(function (r) { return r.c === c; });
     });
   }
+
+  /* ── PORTADAS ──────────────────────────────────────────────────────────
+     La portada NO se guarda cuando se puede deducir del enlace. Si Google
+     cambia mañana su dirección de miniaturas, se toca UNA función; si
+     estuviera guardada, habría que arreglar cuarenta registros con una URL
+     muerta cada uno. */
+
+  /**
+   * El id de un video de YouTube, en cualquiera de sus cuatro formas.
+   * @param {string} url dirección
+   * @return {string} id, o '' si no es de YouTube
+   */
+  function idYoutube(url) {
+    var u = String(url == null ? '' : url);
+    var m = u.match(/(?:youtube\.com\/(?:watch\?(?:.*&)?v=|shorts\/|embed\/|live\/)|youtu\.be\/)([A-Za-z0-9_-]{6,20})/i);
+    return m ? m[1] : '';
+  }
+
+  /**
+   * El id de un ARCHIVO de Drive. Una carpeta no cuenta: no tiene miniatura,
+   * y pedirla devolvería una imagen rota.
+   * @param {string} url dirección
+   * @return {string} id, o '' si no es un archivo de Drive
+   */
+  function idDrive(url) {
+    var u = String(url == null ? '' : url);
+    /* Una carpeta se descarta ANTES de buscar el id, y en sus DOS formas:
+       la actual `/drive/folders/1of…` y la antigua `folderview?id=1of…`.
+       La antigua es la que importa: trae un `id=`, así que sin esta línea
+       caería en el patrón genérico de abajo y devolvería el id de la carpeta
+       como si fuera de un archivo — miniatura rota en la tarjeta. */
+    if (/\/folders\//i.test(u) || /folderview/i.test(u)) return '';
+    var m = u.match(/\/(?:file|document|spreadsheets|presentation)\/d\/([A-Za-z0-9_-]{10,})/i) ||
+            u.match(/[?&]id=([A-Za-z0-9_-]{10,})/);
+    return m ? m[1] : '';
+  }
+
+  /**
+   * La portada de un recurso, o null si no hay ninguna.
+   *
+   * Orden: la que subiste o pegaste gana siempre —es una decisión tuya—, y
+   * solo si no hay se deduce del enlace.
+   *
+   * ⚠️ La de YouTube es de fiar: lleva quince años igual y no pide permisos.
+   * La de Drive NO está garantizada —exige que el archivo esté compartido, y
+   * Google ha movido ese endpoint más de una vez—. Por eso lo que hace que
+   * esto sea seguro no es la dirección, es el `onerror` de la pantalla: si no
+   * carga, se ve el icono. Nunca una imagen rota.
+   * @param {Object} r recurso ya normalizado
+   * @return {?string} dirección de la portada
+   */
+  function portadaDe(r) {
+    if (!r) return null;
+    if (r.img) return r.img;
+    var y = idYoutube(r.u);
+    if (y) return 'https://img.youtube.com/vi/' + y + '/hqdefault.jpg';
+    var d = idDrive(r.u);
+    if (d) return 'https://drive.google.com/thumbnail?id=' + d + '&sz=w400';
+    return null;
+  }
+
+  var ORDENES = ['categoria', 'az', 'nuevos'];
+
+  /**
+   * Ordena una copia, nunca la lista original: ordenar en la pantalla no
+   * puede cambiar el orden que se guarda.
+   * @param {Array<Object>} lista recursos ya normalizados
+   * @param {string} modo 'categoria' | 'az' | 'nuevos'
+   * @return {Array<Object>} copia ordenada
+   */
+  function ordenar(lista, modo) {
+    var l = (lista || []).slice();
+    if (modo === 'az') {
+      return l.sort(function (a, b) {
+        return _plano(a.t).localeCompare(_plano(b.t));
+      });
+    }
+    if (modo === 'nuevos') return l.reverse();
+    // Por categoría, en el orden declarado de CATEGORIAS — no alfabético:
+    // el sitio de cada grupo no puede cambiar al renombrar una categoría.
+    return l.sort(function (a, b) {
+      return CATEGORIAS.indexOf(a.c) - CATEGORIAS.indexOf(b.c);
+    });
+  }
+
+  /**
+   * Agrupa por categoría, en el orden declarado y sin grupos vacíos.
+   * @param {Array<Object>} lista recursos ya normalizados
+   * @return {Array<{cat:string, items:Array<Object>}>} grupos con contenido
+   */
+  function agrupar(lista) {
+    return CATEGORIAS.map(function (c) {
+      return {cat: c, items: (lista || []).filter(function (r) { return r.c === c; })};
+    }).filter(function (g) { return g.items.length > 0; });
+  }
+
+  /**
+   * Cuántos hay de cada tipo, para las tarjetas de arriba.
+   * @param {Array<Object>} lista recursos ya normalizados
+   * @return {{total:number, carpetas:number, videos:number, archivos:number}} cuentas
+   */
+  function cuentas(lista) {
+    var l = lista || [];
+    var carpetas = 0;
+    var videos = 0;
+    l.forEach(function (r) {
+      var e = tipoDe(r.u).etiqueta;
+      if (e === 'Carpeta de Drive') carpetas++;
+      else if (e === 'Video') videos++;
+    });
+    return {total: l.length, carpetas: carpetas, videos: videos,
+      archivos: l.length - carpetas - videos};
+  }
+
+  /**
+   * Lo que se manda por WhatsApp con los marcados. Un enlace por línea con su
+   * título: pegar seis URLs sueltas no le dice nada a quien las recibe.
+   * @param {Array<Object>} sel recursos marcados
+   * @return {string} texto listo para enviar
+   */
+  function textoCompartir(sel) {
+    return (sel || []).map(function (r) {
+      return (r.t ? r.t + '\n' : '') + r.u;
+    }).join('\n\n');
+  }
+
+  Recursos.idYoutube = idYoutube;
+  Recursos.idDrive = idDrive;
+  Recursos.portadaDe = portadaDe;
+  Recursos.ordenar = ordenar;
+  Recursos.ORDENES = ORDENES;
+  Recursos.agrupar = agrupar;
+  Recursos.cuentas = cuentas;
+  Recursos.textoCompartir = textoCompartir;
 
   Recursos.CATEGORIAS = CATEGORIAS;
   Recursos.UMBRAL_BUSCADOR = UMBRAL_BUSCADOR;

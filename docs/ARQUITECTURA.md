@@ -144,38 +144,55 @@ buscar el pedido.
 
 ### Nota · Centro de recursos (`recursos.js`)
 
-El botón 📚 de la cabecera. Enlaces a Drive, videos, procesos, catálogos y
-garantía, en cinco categorías fijas.
+El botón 📚 de la cabecera abre **`page-recursos`**: una página con la misma
+cara que Envíos —las clases de `panel.css` no dicen "envío" en ningún nombre,
+así que se reutilizan tal cual y **no hay CSS nuevo** salvo la rejilla del
+mosaico, en línea—. No tiene pestaña a propósito: cuatro no entran en un
+teléfono de 360 px sin dejar "Config" en "Confi…".
 
-**Dónde viven los datos, y por qué importa.** En `S.recursos`, clave **hermana**
-de `config` dentro del mismo documento — **nunca dentro de `config`**.
-`handleConfig` (`functions/index.js`) devuelve el objeto `config` **entero** al
-formulario público, así que meterlos ahí publicaría los precios mayoristas y
-los comunicados internos a quien pidiera esa URL. Es la misma razón por la que
-`msgTemplates` y `labels` están fuera. Hay una prueba que lo vigila.
+**Dónde viven los datos.** En `S.recursos`, clave **hermana** de `config`
+dentro del mismo documento — **nunca dentro de `config`**. `handleConfig`
+(`functions/index.js`) devuelve el objeto `config` **entero** al formulario
+público, así que meterlos ahí publicaría los precios mayoristas y los
+comunicados internos. Misma razón que `msgTemplates` y `labels`.
 
-**Lo que cuesta: nada.** `S.recursos` viaja en el documento de configuración que
-el panel ya lee al arrancar, y se guarda con `save('config')`, que sube **ese
-documento** y no los 1165 pedidos. Cero lecturas nuevas, cero escrituras
-nuevas.
+**Lo que cuesta: nada.** Viaja en el documento de configuración que el panel ya
+lee al arrancar, y se guarda con `save('config')` — ese documento, no los 1169
+pedidos.
 
-**Solo `https://`.** `urlValida()` rechaza `javascript:`, `data:` y hasta
-`http://`. No es quisquillosería: un `javascript:` dentro de un `href` ejecuta
-código con los permisos del panel. Y al pintar se escapa igual, con
-`rel="noopener noreferrer"` — validar y luego inyectar en crudo sería no haber
-validado. **No se usa `escU`**, que acepta `http://`.
+**Dos ejes de filtro, no uno repetido.** Los chips filtran por **categoría**
+(Manuales, Videos, Procesos, Catálogos, Garantía); las cuatro tarjetas de
+arriba, por **tipo de archivo** (carpetas, videos, archivos). Son dos preguntas
+distintas y las dos se hacen.
 
-**El icono se deduce del enlace** (carpeta de Drive, hoja de cálculo, YouTube,
-PDF…): así dar de alta un recurso es pegar una dirección, y no acaba todo en
-🔗 iguales porque nadie elige iconos.
+**Las portadas no se guardan cuando se pueden deducir.** YouTube da su
+miniatura (fiable, sin permisos) y un archivo de Drive también (**no
+garantizada**: exige compartir, y Google ha movido ese endpoint). Si Google lo
+cambia, se toca **una función**; guardadas, habría que arreglar cuarenta
+registros con una URL muerta. Lo que hace que una fuente poco fiable sea segura
+no es la URL: es el **`onerror`** que cae al icono. Nunca una imagen rota.
 
-**El buscador aparece a partir de 8 recursos**, y los chips solo si hay más de
-una categoría con algo dentro. Un filtro que siempre sale vacío enseña a no
-usar los filtros.
+⚠️ Una **carpeta** de Drive no tiene miniatura, y se descarta en sus **dos**
+formas: `/folders/` y la antigua **`folderview?id=`** — esta última trae un
+`id=` y se colaba por el patrón genérico devolviendo el id de la carpeta como
+si fuera de un archivo. Lo destapó una mutación que sobrevivió.
 
-**`publico: false` existe desde el día uno** aunque hoy no se use. Cuando el
-cliente deba ver avisos y promociones en su link de seguimiento, será añadir el
-interruptor y un endpoint que devuelva **solo** los marcados — sin migrar nada.
+**Solo `https://`**, para el enlace **y para la portada**: una portada es otra
+dirección de la que el navegador va a cargar algo. Se valida al guardar y se
+escapa al pintar, en la fila **y** en la tarjeta del mosaico.
+
+**La selección vive en memoria y NUNCA en `seleccion.js`**, que es el marcado de
+*pedidos*: compartirlo haría que marcar un catálogo marcara un envío, y que el
+🗑️ de Envíos borrara lo que marcaste aquí.
+
+**Las portadas subidas** van a `recursos/` en Storage (regla propia en
+`storage.rules`; sin ella la subida daría un 403 que parece un problema de
+sesión), con el `uploadFile` de siempre, que ahora acepta carpeta destino.
+
+⚠️ **Deuda anotada:** `storage.rules` permite escribir con
+`request.auth != null` — *cualquiera* con una cuenta de Google, no solo los
+administradores. Firestore sí exige la lista. Es anterior a esto y se arregla
+aparte.
 
 ### Nota · Avisos del número de guía (`guias.js`)
 

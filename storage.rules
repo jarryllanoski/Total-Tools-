@@ -9,6 +9,18 @@ service firebase.storage {
       allow write: if request.auth != null;
     }
 
+    // Portadas del centro de recursos
+    // Lectura pública: igual que los documentos de envíos, y el día que el
+    // cliente vea avisos en su link las va a necesitar.
+    // ⚠️ La escritura es `request.auth != null`, el MISMO nivel que arriba —
+    // y ese nivel es más flojo que el de Firestore, que sí exige estar en la
+    // lista de administradores. Se deja igual a propósito para no cambiar dos
+    // cosas a la vez; está anotado como deuda aparte.
+    match /recursos/{grupo}/{fileName} {
+      allow read:  if true;
+      allow write: if request.auth != null;
+    }
+
     // Cualquier otro path: denegado por defecto
     match /{allPaths=**} {
       allow read, write: if false;

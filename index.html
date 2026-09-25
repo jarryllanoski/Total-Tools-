@@ -757,7 +757,7 @@
     </div>
     <div style="display:flex;align-items:center;gap:8px">
       <div class="hdr-phone" id="hdrPhone">999000000</div>
-      <button type="button" onclick="abrirRecursos()" title="Centro de recursos"
+      <button type="button" onclick="goPage('recursos')" title="Centro de recursos"
         style="background:rgba(163,113,247,.15);border:1px solid rgba(163,113,247,.35);
         border-radius:20px;padding:2px 9px;font-size:11px;font-weight:700;color:#a78bfa;
         cursor:pointer;font-family:inherit;line-height:1.6;flex-shrink:0">📚 Recursos</button>
@@ -810,6 +810,73 @@
   </div>
   <div id="cardsArea"></div>
   <div class="powered">POWERED BY MI PANEL LOCAL</div>
+</div>
+
+<!-- RECURSOS — misma cara que Envíos, con las MISMAS clases de panel.css.
+     Ninguna de ellas dice "envío" en su nombre, así que no hay CSS nuevo
+     salvo la rejilla del mosaico, que se inyecta abajo. -->
+<div class="page" id="page-recursos">
+  <div class="stats" id="recStats">
+    <div class="stat" onclick="recTipo('')"><div class="stat-n c-green" id="recNTotal">0</div><div class="stat-l">Total recursos</div></div>
+    <div class="stat" onclick="recTipo('Carpeta de Drive')"><div class="stat-n c-blue" id="recNCarp">0</div><div class="stat-l">📁 Carpetas</div></div>
+    <div class="stat" onclick="recTipo('Video')"><div class="stat-n c-red" id="recNVid">0</div><div class="stat-l">🎬 Videos</div></div>
+    <div class="stat" onclick="recTipo('archivos')"><div class="stat-n c-purple" id="recNArch">0</div><div class="stat-l">📄 Archivos</div></div>
+  </div>
+  <div class="toolbar">
+    <div class="tb-top">
+      <div class="tb-search" style="flex:1">
+        <span style="cursor:pointer" onclick="recLimpiarBusca()">🔍</span>
+        <input id="recSearch" placeholder="Buscar manual, video, catálogo..." oninput="recBuscar(this.value)">
+        <button onclick="recOrdenSig()" id="recOrdenBtn" style="background:none;border:none;cursor:pointer;font-size:15px;padding:0 2px;color:var(--text2)" title="Ordenar">⚙️</button>
+      </div>
+    </div>
+    <div id="recFiltroBar" style="display:none;margin-bottom:6px"></div>
+    <div style="display:flex;align-items:center;gap:7px;margin-bottom:8px">
+      <div id="recChipTodos" class="chip active" onclick="recFiltrar('')" style="flex-shrink:0">TODOS</div>
+      <div class="chips-wrap" id="recChips" style="flex:1;margin:0"></div>
+    </div>
+    <div class="tb-btns">
+      <button class="tb-btn" onclick="recSelTodo()" title="Marcar / desmarcar todo">☑️</button>
+      <button class="tb-btn" onclick="recWhatsApp()" title="Enviar los marcados por WhatsApp">📤</button>
+      <button class="tb-btn" onclick="recCopiar()" title="Copiar los enlaces marcados">🔗</button>
+      <button class="tb-btn" onclick="recVista()" id="recVistaBtn" title="Lista / Mosaico">▦</button>
+      <button class="tb-btn pri" onclick="recEditar(null)" title="Nuevo recurso">➕</button>
+      <button class="tb-btn danger" onclick="recQuitar()" title="Quitar los marcados">🗑️</button>
+    </div>
+  </div>
+  <div id="recCards"></div>
+  <div class="powered">POWERED BY MI PANEL LOCAL</div>
+</div>
+
+<!-- HOJA: NUEVO / EDITAR RECURSO -->
+<div class="overlay" id="recEditOverlay">
+  <div class="sheet" onclick="event.stopPropagation()">
+    <div class="sheet-handle"></div>
+    <div class="sheet-title" id="recEditTtl">📚 Nuevo recurso</div>
+    <div class="fg"><label class="fl">Título</label>
+      <input class="fi" id="recFTit" maxlength="80" placeholder="Manual del taladro"></div>
+    <div class="fg"><label class="fl">Categoría</label>
+      <select class="fi" id="recFCat"></select></div>
+    <div class="fg"><label class="fl">Enlace *</label>
+      <input class="fi" id="recFUrl" maxlength="2000" placeholder="https://drive.google.com/…" oninput="recPrevia()"></div>
+    <div class="fg"><label class="fl">Nota</label>
+      <input class="fi" id="recFNota" maxlength="120" placeholder="23 archivos · edición 2026"></div>
+    <div class="fg"><label class="fl">Portada <span style="font-weight:400;color:var(--text2)">(opcional)</span></label>
+      <div style="display:flex;gap:7px;align-items:center;margin-bottom:7px">
+        <input class="fi" id="recFImg" maxlength="2000" placeholder="Pega la URL de una imagen…" oninput="recPrevia()" style="flex:1">
+        <button type="button" onclick="document.getElementById('recFArchivo').click()" title="Subir una imagen"
+          style="flex-shrink:0;padding:9px 12px;border-radius:9px;cursor:pointer;font-family:inherit;font-size:13px;
+          background:rgba(163,113,247,.15);border:1px solid rgba(163,113,247,.35);color:#a78bfa">📁</button>
+        <input type="file" id="recFArchivo" accept="image/*" style="display:none" onchange="recSubirPortada(this)">
+      </div>
+      <div id="recPreviaBox" style="display:none"></div>
+      <div id="recEditAviso" style="display:none;font-size:11px;line-height:1.5;margin-top:6px"></div>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:6px">
+      <button class="btn-sec" style="flex:1" onclick="closeOverlay('recEditOverlay')">Cancelar</button>
+      <button class="btn-pri" style="flex:1" id="recFGuardar" onclick="recGuardar()">Guardar</button>
+    </div>
+  </div>
 </div>
 
 <!-- COMPARTIR -->
@@ -943,23 +1010,6 @@
     </div>
   </div>
 
-  <!-- CENTRO DE RECURSOS -->
-  <div class="cfg-sec">
-    <div class="cfg-ttl">📚 Centro de recursos</div>
-    <div style="font-size:11px;color:#8b949e;line-height:1.5;margin-bottom:10px">
-      Los enlaces que aparecen en el botón 📚 de arriba: manuales, videos, procesos,
-      catálogos y garantía. Solo <b>https://</b>, y el icono se deduce del enlace.</div>
-    <div id="recCfgLista"></div>
-    <div class="cfl-add-row" style="flex-wrap:wrap;gap:6px">
-      <input class="fi" id="recNuevoTit" placeholder="Título (ej: Manual del taladro)" maxlength="80" style="flex:1;min-width:140px">
-      <select class="fi" id="recNuevaCat" style="flex:0 0 auto;width:110px"></select>
-      <input class="fi" id="recNuevaUrl" placeholder="https://drive.google.com/…" maxlength="2000" style="flex:1;min-width:180px"
-        onkeydown="if(event.key==='Enter')recAgregar()">
-      <button class="cfl-plus" onclick="recAgregar()">＋</button>
-    </div>
-    <div id="recCfgAviso" style="display:none;font-size:11px;line-height:1.5;margin-top:8px"></div>
-  </div>
-
   <!-- NOTIFICACIONES -->
   <div class="cfg-sec">
     <div class="cfg-ttl">🔔 Notificaciones</div>
@@ -1043,18 +1093,6 @@
         border:1px solid rgba(56,139,253,.35);color:#388bfd">&#128268; Verificar sesión de Shalom Pro</button>
       <div id="shalomInstEstado" style="display:none;margin-top:10px;font-size:12px;line-height:1.5"></div>
     </div>
-  </div>
-</div>
-
-<!-- CENTRO DE RECURSOS -->
-<div class="overlay" id="recursosOverlay" onclick="closeOverlay('recursosOverlay')">
-  <div class="sheet" onclick="event.stopPropagation()" style="max-height:88vh;display:flex;flex-direction:column">
-    <div class="sheet-handle"></div>
-    <div class="sheet-title">📚 Centro de recursos</div>
-    <input class="fi" id="recBuscar" placeholder="🔍 Buscar…" oninput="_recBuscar(this.value)"
-      style="display:none;margin-bottom:9px">
-    <div class="chips-wrap" id="recChips"></div>
-    <div id="recLista" style="overflow-y:auto;flex:1;min-height:60px"></div>
   </div>
 </div>
 
@@ -2093,6 +2131,11 @@ function goPage(id){
   ['envios','compartir','configurar'].forEach((n,i)=>{if(n===id)document.querySelectorAll('.tab')[i].classList.add('active')});
   if(id==='configurar') loadCfgUI();
   if(id==='compartir') { updateShareLink(); loadTokenList(); }
+  /* Recursos no tiene pestaña a propósito: cuatro no entran en un teléfono
+     de 360 px sin que "Config" quede en "Confi…". Se entra por el 📚 de la
+     cabecera y se sale tocando cualquier pestaña — el bucle de arriba no
+     enciende ninguna, que es lo correcto: no estás en ninguna de las tres. */
+  if(id==='recursos') recRender();
 }
 
 /* OVERLAYS */
@@ -2819,180 +2862,305 @@ async function correrBarridoAhora(){
 
 /* SHALOM: el interruptor maestro de la puerta (Config) */
 /* ══ CENTRO DE RECURSOS ══════════════════════════════════════════════════
-   La lógica (qué es cada enlace, qué se descarta, cómo se filtra) vive en
-   `recursos.js` y se prueba sin navegador. Aquí solo está la pantalla.
+   Página propia con la MISMA cara que Envíos: sus clases de panel.css no
+   dicen "envío" en ningún nombre, así que se reutilizan tal cual.
 
    NO CUESTA NI UNA LECTURA NI UNA ESCRITURA NUEVAS: `S.recursos` viaja en el
    documento de configuración que el panel ya lee al arrancar, y se guarda con
-   `save('config')`, que sube ESE documento y no los 1165 pedidos. */
-let _recCat = 'Todos';
-let _recQ   = '';
+   `save('config')` — ESE documento, no los 1169 pedidos.
 
-function _recLista(){
-  return (window.Recursos ? Recursos.normalizar(S.recursos) : []);
+   ⚠️ La selección vive AQUÍ, en memoria, y NUNCA en `seleccion.js`: ese es el
+   marcado de pedidos, y compartirlo haría que marcar un catálogo marcara un
+   envío —y que el 🗑️ de Envíos borrara lo que marcaste aquí—. */
+let _recCat = '';      // categoría (chips)
+let _recTipo = '';     // tipo de archivo (tarjetas de arriba)
+let _recQ = '';        // búsqueda
+let _recOrden = 'categoria';
+let _recMosaico = false;
+let _recSel = new Set();
+let _recEditId = null;
+
+const _REC_ORDEN_TXT = {categoria: 'Por categoría', az: 'A – Z', nuevos: 'Más nuevos'};
+
+function recLista(){ return window.Recursos ? Recursos.normalizar(S.recursos) : []; }
+
+function recLimpiarBusca(){ const e=$('recSearch'); if(e) e.value=''; _recQ=''; recRender(); }
+function recBuscar(v){ _recQ = v||''; recRender(); }
+function recFiltrar(c){ _recCat = c||''; recRender(); }
+function recTipo(t){ _recTipo = (_recTipo===t) ? '' : (t||''); recRender(); }
+function recVista(){ _recMosaico = !_recMosaico; recRender(); }
+function recOrdenSig(){
+  const i = Recursos.ORDENES.indexOf(_recOrden);
+  _recOrden = Recursos.ORDENES[(i+1) % Recursos.ORDENES.length];
+  toast('↕️ ' + _REC_ORDEN_TXT[_recOrden]);
+  recRender();
 }
 
-function abrirRecursos(){
-  _recCat = 'Todos'; _recQ = '';
-  const b = $('recBuscar'); if(b) b.value = '';
-  _recPintar();
-  openOverlay('recursosOverlay');
+/* El tipo de archivo, para las tarjetas de arriba. Es un eje DISTINTO al de
+   los chips (categoría): "enséñame los videos" y "enséñame los manuales" son
+   dos preguntas, y las dos se hacen. */
+function _recEsTipo(r, t){
+  if(!t) return true;
+  const e = Recursos.tipoDe(r.u).etiqueta;
+  if(t === 'archivos') return e !== 'Carpeta de Drive' && e !== 'Video';
+  return e === t;
 }
-function _recFiltrar(c){ _recCat = c; _recPintar(); }
-function _recBuscar(v){ _recQ = v || ''; _recPintar(); }
 
-function _recPintar(){
-  const cont = $('recLista'); if(!cont) return;
-  // Si `recursos.js` no cargó (archivo viejo en caché, o fallo de red), esto
-  // se calla en vez de tumbar la pantalla: es un módulo accesorio, no el
-  // panel. Lo mismo en el editor.
+function recRender(){
+  const cont = $('recCards'); if(!cont) return;
   if(!window.Recursos){
-    cont.innerHTML = '<div style="text-align:center;padding:22px;color:var(--text2);font-size:12.5px">No se pudo cargar el centro de recursos. Recarga la página.</div>';
+    cont.innerHTML = '<div class="cgroup" style="padding:22px;text-align:center;color:var(--text2);font-size:12.5px">No se pudo cargar el centro de recursos. Recarga la página.</div>';
     return;
   }
-  const todos = _recLista();
+  const todos = recLista();
 
-  // El buscador se dibuja solo si hay suficientes. Sobre cinco elementos es
-  // decoración que ocupa sitio en la pantalla de un teléfono.
-  const bus = $('recBuscar');
-  if(bus) bus.style.display = todos.length >= Recursos.UMBRAL_BUSCADOR ? '' : 'none';
+  const c = Recursos.cuentas(todos);
+  if($('recNTotal')) $('recNTotal').textContent = c.total;
+  if($('recNCarp'))  $('recNCarp').textContent  = c.carpetas;
+  if($('recNVid'))   $('recNVid').textContent   = c.videos;
+  if($('recNArch'))  $('recNArch').textContent  = c.archivos;
 
+  const cats = Recursos.categoriasConAlgo(todos);
   const chips = $('recChips');
   if(chips){
-    const cats = Recursos.categoriasConAlgo(todos);
-    // Con una sola categoría el filtro no filtra nada: se esconde entero.
-    chips.style.display = cats.length > 1 ? '' : 'none';
-    chips.innerHTML = ['Todos'].concat(cats).map(c =>
-      '<div class="chip'+(_recCat===c?' active':'')+'" onclick="_recFiltrar(\''+escJs(c)+'\')">'+escH(c)+'</div>'
+    chips.innerHTML = cats.map(x =>
+      '<div class="chip'+(_recCat===x?' active':'')+'" onclick="recFiltrar(\''+escJs(x)+'\')">'+escH(x)+'</div>'
+    ).join('');
+  }
+  const td = $('recChipTodos'); if(td) td.classList.toggle('active', !_recCat);
+  const vb = $('recVistaBtn'); if(vb) vb.textContent = _recMosaico ? '☰' : '▦';
+
+  // Los filtros activos se VEN y se quitan de un toque. Un filtro puesto que
+  // no se ve es la causa número uno de "me desaparecieron las cosas".
+  const bar = $('recFiltroBar');
+  if(bar){
+    const act = [];
+    if(_recTipo) act.push(['tipo', _recTipo==='archivos'?'📄 Archivos':_recTipo]);
+    if(_recOrden!=='categoria') act.push(['orden', _REC_ORDEN_TXT[_recOrden]]);
+    bar.style.display = act.length ? '' : 'none';
+    bar.innerHTML = act.map(a =>
+      '<span class="chip active" style="margin-right:5px" onclick="'+
+      (a[0]==='tipo' ? 'recTipo(\'\')' : 'recOrden0()')+'">'+escH(a[1])+' ✕</span>'
     ).join('');
   }
 
   if(!todos.length){
-    cont.innerHTML = '<div style="text-align:center;padding:26px 10px;color:var(--text2);font-size:12.5px;line-height:1.6">'+
-      'Todavía no hay recursos.<br>Agrégalos en <b>Config → 📚 Centro de recursos</b>.'+
-      '<div style="margin-top:12px"><button type="button" onclick="closeOverlay(\'recursosOverlay\');goPage(\'configurar\')" '+
-      'style="padding:9px 16px;border-radius:9px;cursor:pointer;font-family:inherit;font-size:12px;font-weight:700;'+
-      'background:rgba(163,113,247,.15);border:1px solid rgba(163,113,247,.35);color:#a78bfa">Ir a Config</button></div></div>';
+    cont.innerHTML = '<div class="cgroup" style="padding:30px 18px;text-align:center">'+
+      '<div style="font-size:34px;margin-bottom:8px">📚</div>'+
+      '<div style="font-size:13px;color:var(--text2);line-height:1.6">Todavía no hay recursos.<br>'+
+      'Toca <b style="color:var(--blue)">➕</b> para agregar el primero: un manual, un video, un catálogo.</div></div>';
     return;
   }
 
-  const vis = Recursos.filtrar(todos, _recCat, _recQ);
+  let vis = Recursos.filtrar(todos, _recCat || 'Todos', _recQ).filter(r => _recEsTipo(r, _recTipo));
   if(!vis.length){
-    cont.innerHTML = '<div style="text-align:center;padding:22px 10px;color:var(--text2);font-size:12.5px">'+
-      'Nada con «'+escH(_recQ)+'».</div>';
+    cont.innerHTML = '<div class="cgroup" style="padding:26px;text-align:center;color:var(--text2);font-size:12.5px">Nada con esos filtros.</div>';
     return;
   }
+  vis = Recursos.ordenar(vis, _recOrden);
 
-  // `escU` no vale aquí: acepta http:. Estos enlaces ya pasaron por
-  // `urlValida` (solo https) en `normalizar`, y aun así se escapan para el
-  // atributo. rel="noopener" evita que la pestaña abierta toque a esta.
-  cont.innerHTML = vis.map(r => {
-    const t = Recursos.tipoDe(r.u);
-    return '<a href="'+escH(r.u)+'" target="_blank" rel="noopener noreferrer" '+
-      'style="display:flex;align-items:center;gap:11px;padding:11px 12px;margin-bottom:7px;'+
-      'border-radius:11px;background:var(--bg3);border:1px solid var(--bd);text-decoration:none">'+
-      '<div style="font-size:20px;flex-shrink:0">'+t.icono+'</div>'+
+  // Agrupado por categoría solo cuando ese es el orden: con "A–Z" o "más
+  // nuevos" los grupos romperían justo el orden que pediste.
+  const grupos = (_recOrden === 'categoria')
+    ? Recursos.agrupar(vis)
+    : [{cat: _REC_ORDEN_TXT[_recOrden], items: vis}];
+
+  cont.innerHTML = grupos.map(g =>
+    '<div class="cgroup">'+
+      '<div class="cgroup-hdr"><div class="cgroup-bar"></div>'+
+      '<div class="cgroup-name">'+escH(g.cat)+'</div><div class="cgroup-spacer"></div>'+
+      '<div class="cgroup-cnt">'+g.items.length+'</div></div>'+
+      (_recMosaico
+        ? '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:9px;padding:11px">'+
+          g.items.map(_recMosaicoCard).join('')+'</div>'
+        : g.items.map(_recFila).join(''))+
+    '</div>'
+  ).join('');
+}
+function recOrden0(){ _recOrden='categoria'; recRender(); }
+
+/* Una imagen que no carga cae al icono y la tarjeta queda entera. Es lo que
+   permite usar la miniatura de Drive, que NO está garantizada, sin riesgo de
+   que se vea una foto rota. */
+const _REC_ONERR = "this.style.display='none';this.nextElementSibling.style.display='flex'";
+
+function _recFila(r){
+  const t = Recursos.tipoDe(r.u);
+  const m = _recSel.has(r.id);
+  return '<div class="card" style="display:flex;align-items:center;gap:10px">'+
+    '<input type="checkbox" '+(m?'checked ':'')+'onclick="event.stopPropagation();recMarcar(\''+escJs(r.id)+'\')" style="flex-shrink:0;width:17px;height:17px">'+
+    '<a href="'+escH(r.u)+'" target="_blank" rel="noopener noreferrer" style="flex:1;min-width:0;display:flex;align-items:center;gap:10px;text-decoration:none">'+
+      '<div style="font-size:19px;flex-shrink:0">'+t.icono+'</div>'+
       '<div style="flex:1;min-width:0">'+
-        '<div style="font-size:13px;font-weight:700;color:var(--text);overflow:hidden;'+
-        'text-overflow:ellipsis;white-space:nowrap">'+escH(r.t)+'</div>'+
-        '<div style="font-size:10.5px;color:var(--text2);margin-top:2px;overflow:hidden;'+
-        'text-overflow:ellipsis;white-space:nowrap">'+escH(r.n || t.etiqueta)+' · '+escH(r.c)+'</div>'+
+        '<div style="font-size:13px;font-weight:700;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escH(r.t)+'</div>'+
+        '<div style="font-size:10.5px;color:var(--text2);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+
+          escH(t.etiqueta)+(r.n?' · '+escH(r.n):'')+'</div>'+
+      '</div></a>'+
+    '<button onclick="recEditar(\''+escJs(r.id)+'\')" title="Editar" style="background:none;border:none;color:var(--text2);cursor:pointer;font-size:14px;padding:4px 6px;flex-shrink:0">✏️</button>'+
+    '</div>';
+}
+
+function _recMosaicoCard(r){
+  const t = Recursos.tipoDe(r.u);
+  const p = Recursos.portadaDe(r);
+  const m = _recSel.has(r.id);
+  return '<div style="border:1.5px solid '+(m?'var(--blue)':'var(--bd)')+';border-radius:10px;overflow:hidden;background:var(--bg2)">'+
+    '<a href="'+escH(r.u)+'" target="_blank" rel="noopener noreferrer" style="display:block;text-decoration:none">'+
+      '<div style="position:relative;height:88px;background:var(--bg3)">'+
+        (p ? '<img src="'+escH(p)+'" loading="lazy" onerror="'+_REC_ONERR+'" style="width:100%;height:100%;object-fit:cover;display:block">' : '')+
+        '<div style="'+(p?'display:none;':'display:flex;')+'width:100%;height:100%;align-items:center;justify-content:center;font-size:30px">'+t.icono+'</div>'+
       '</div>'+
-      '<div style="color:var(--text2);font-size:13px;flex-shrink:0">↗</div></a>';
-  }).join('');
+      '<div style="padding:7px 8px">'+
+        '<div style="font-size:11.5px;font-weight:700;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escH(r.t)+'</div>'+
+        '<div style="font-size:9.5px;color:var(--text2);margin-top:1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escH(r.n||t.etiqueta)+'</div>'+
+      '</div></a>'+
+    '<div style="display:flex;border-top:1px solid var(--bd)">'+
+      '<button onclick="recMarcar(\''+escJs(r.id)+'\')" style="flex:1;background:none;border:none;color:'+(m?'var(--blue)':'var(--text2)')+';cursor:pointer;font-size:12px;padding:5px">'+(m?'☑️':'☐')+'</button>'+
+      '<button onclick="recEditar(\''+escJs(r.id)+'\')" style="flex:1;background:none;border:none;color:var(--text2);cursor:pointer;font-size:12px;padding:5px;border-left:1px solid var(--bd)">✏️</button>'+
+    '</div></div>';
 }
 
-/* ── El editor, en Config ───────────────────────────────────────────── */
-function _recAviso(txt, color){
-  const e = $('recCfgAviso'); if(!e) return;
-  if(!txt){ e.style.display='none'; return; }
-  e.style.display='block'; e.style.color = color || '#f59e0b'; e.textContent = txt;
+/* ── Marcar ──────────────────────────────────────────────────────────── */
+function recMarcar(id){ if(_recSel.has(id)) _recSel.delete(id); else _recSel.add(id); recRender(); }
+function recSelTodo(){
+  const vis = Recursos.filtrar(recLista(), _recCat||'Todos', _recQ).filter(r=>_recEsTipo(r,_recTipo));
+  // Marca lo VISIBLE, no la lista entera: marcar cosas que no ves y borrarlas
+  // después es exactamente cómo se pierde algo sin enterarse.
+  if(vis.every(r=>_recSel.has(r.id))) vis.forEach(r=>_recSel.delete(r.id));
+  else vis.forEach(r=>_recSel.add(r.id));
+  recRender();
+}
+function _recMarcados(){ return recLista().filter(r=>_recSel.has(r.id)); }
+
+/* ── Compartir ───────────────────────────────────────────────────────── */
+function recWhatsApp(){
+  const sel = _recMarcados();
+  if(!sel.length){ toast('☑️ Marca al menos un recurso'); return; }
+  window.open('https://wa.me/?text='+encodeURIComponent(Recursos.textoCompartir(sel)), '_blank', 'noopener');
+}
+function recCopiar(){
+  const sel = _recMarcados();
+  if(!sel.length){ toast('☑️ Marca al menos un recurso'); return; }
+  const txt = Recursos.textoCompartir(sel);
+  const listo = () => toast('🔗 '+sel.length+' enlace(s) copiado(s)');
+  try{
+    if(navigator.clipboard && navigator.clipboard.writeText)
+      navigator.clipboard.writeText(txt).then(listo).catch(()=>_copiarFallback(txt,listo));
+    else _copiarFallback(txt, listo);
+  }catch(e){ _copiarFallback(txt, listo); }
 }
 
-function _recCfgPintar(){
-  const cont = $('recCfgLista'); if(!cont || !window.Recursos) return;
-  const sel = $('recNuevaCat');
-  if(sel && !sel.options.length){
-    sel.innerHTML = Recursos.CATEGORIAS.map(c=>'<option>'+escH(c)+'</option>').join('');
-  }
-  const l = _recLista();
-  if(!l.length){
-    cont.innerHTML = '<div style="font-size:11.5px;color:var(--text2);padding:4px 0 8px">Sin recursos todavía.</div>';
-    return;
-  }
-  cont.innerHTML = l.map((r,i) => {
-    const t = Recursos.tipoDe(r.u);
-    return '<div style="display:flex;align-items:center;gap:7px;padding:8px 9px;margin-bottom:6px;'+
-      'border-radius:9px;background:var(--bg3);border:1px solid var(--bd)">'+
-      '<div style="font-size:16px;flex-shrink:0">'+t.icono+'</div>'+
-      '<div style="flex:1;min-width:0">'+
-        '<div style="font-size:12px;font-weight:700;color:var(--text);overflow:hidden;'+
-        'text-overflow:ellipsis;white-space:nowrap">'+escH(r.t)+'</div>'+
-        '<div style="font-size:10px;color:var(--text2);overflow:hidden;text-overflow:ellipsis;'+
-        'white-space:nowrap">'+escH(r.c)+' · '+escH(r.u)+'</div>'+
-      '</div>'+
-      '<button type="button" onclick="recMover(\''+escJs(r.id)+'\',-1)" '+(i===0?'disabled ':'')+
-        'style="background:none;border:none;color:var(--text2);cursor:pointer;font-size:13px;padding:2px 4px">▲</button>'+
-      '<button type="button" onclick="recMover(\''+escJs(r.id)+'\',1)" '+(i===l.length-1?'disabled ':'')+
-        'style="background:none;border:none;color:var(--text2);cursor:pointer;font-size:13px;padding:2px 4px">▼</button>'+
-      '<button type="button" onclick="recBorrar(\''+escJs(r.id)+'\')" '+
-        'style="background:none;border:none;color:#f87171;cursor:pointer;font-size:13px;padding:2px 4px">✕</button>'+
-      '</div>';
-  }).join('');
-}
-
-function recAgregar(){
-  if(!window.Recursos){ _recAviso('Recarga la página e intenta de nuevo.'); return; }
-  const tit = ($('recNuevoTit')||{value:''}).value.trim();
-  const url = ($('recNuevaUrl')||{value:''}).value.trim();
-  const cat = ($('recNuevaCat')||{value:''}).value;
-  if(!url){ _recAviso('Pega el enlace primero.'); return; }
-  if(!Recursos.urlValida(url)){
-    _recAviso('Ese enlace no sirve. Tiene que empezar por https:// y ser una dirección completa.');
-    return;
-  }
-  S.recursos = Array.isArray(S.recursos) ? S.recursos : [];
-  S.recursos.push({id:'r_'+Date.now()+'_'+Math.random().toString(36).slice(2,7),
-    t:tit, u:url, c:cat, n:'', publico:false});
-  save('config');            // ★ sube SOLO el documento de config
-  $('recNuevoTit').value=''; $('recNuevaUrl').value='';
-  _recCfgPintar();
-  // El fallo más probable de todo esto no es el código: es una carpeta de
-  // Drive sin compartir. Quien la abra vería "solicitar acceso" y pensaría
-  // que el panel está roto.
-  if(/drive\.google\.com|docs\.google\.com/.test(url)){
-    _recAviso('✅ Agregado. Comprueba que en Drive esté compartido como «Cualquier persona con el enlace», o quien lo abra verá «solicitar acceso».', '#8b949e');
-  } else {
-    _recAviso('✅ Agregado.', 'var(--green,#2ea043)');
-  }
-}
-
-function recBorrar(id){
-  const r = _recLista().find(x=>x.id===id); if(!r) return;
+/* ── Quitar ──────────────────────────────────────────────────────────── */
+function recQuitar(){
+  const sel = _recMarcados();
+  if(!sel.length){ toast('☑️ Marca lo que quieras quitar'); return; }
   confirmar({
-    texto: 'Quitar «'+r.t+'» del centro de recursos. El archivo en Drive no se toca.',
+    texto: 'Quitar '+sel.length+' recurso(s) del centro. Los archivos en Drive NO se tocan.',
     textoSi: 'Quitar',
     alConfirmar: function(){
+      const fuera = new Set(sel.map(r=>r.id));
       S.recursos = (Array.isArray(S.recursos)?S.recursos:[]).filter(x=>{
         const l = Recursos.normalizar([x])[0];
-        return !l || l.id !== id;
+        return !l || !fuera.has(l.id);
       });
-      save('config'); _recCfgPintar(); _recAviso('');
+      _recSel.clear(); save('config'); recRender();
+      toast('🗑️ '+sel.length+' quitado(s)');
     }
   });
 }
 
-function recMover(id, dir){
-  const bruto = Array.isArray(S.recursos) ? S.recursos : [];
-  // Se mueve sobre la lista CRUDA, no sobre la normalizada: si una fila
-  // inválida está escondida entre dos válidas, mover por el índice de la
-  // lista visible saltaría por encima de ella y el orden guardado no
-  // coincidiría con el que ves.
-  const i = bruto.findIndex(x=>{ const l = Recursos.normalizar([x])[0]; return l && l.id===id; });
-  const j = i + dir;
-  if(i < 0 || j < 0 || j >= bruto.length) return;
-  const tmp = bruto[i]; bruto[i] = bruto[j]; bruto[j] = tmp;
-  S.recursos = bruto; save('config'); _recCfgPintar();
+/* ── Editar / crear ──────────────────────────────────────────────────── */
+function recEditar(id){
+  if(!window.Recursos) return;
+  _recEditId = id || null;
+  const r = id ? recLista().find(x=>x.id===id) : null;
+  const sel = $('recFCat');
+  if(sel) sel.innerHTML = Recursos.CATEGORIAS.map(c=>'<option>'+escH(c)+'</option>').join('');
+  $('recEditTtl').textContent = r ? '✏️ Editar recurso' : '📚 Nuevo recurso';
+  $('recFTit').value = r ? r.t : '';
+  $('recFUrl').value = r ? r.u : '';
+  $('recFNota').value = r ? r.n : '';
+  $('recFImg').value = r ? r.img : '';
+  if(sel) sel.value = r ? r.c : Recursos.CATEGORIAS[0];
+  $('recEditAviso').style.display='none';
+  recPrevia();
+  openOverlay('recEditOverlay');
+}
+
+function _recAviso(txt, color){
+  const e = $('recEditAviso'); if(!e) return;
+  if(!txt){ e.style.display='none'; return; }
+  e.style.display='block'; e.style.color = color||'#f59e0b'; e.textContent = txt;
+}
+
+function recPrevia(){
+  const box = $('recPreviaBox'); if(!box) return;
+  const u = ($('recFUrl')||{value:''}).value.trim();
+  const img = ($('recFImg')||{value:''}).value.trim();
+  const p = Recursos.portadaDe({u:u, img: Recursos.urlValida(img) ? img : ''});
+  if(!p){ box.style.display='none'; box.innerHTML=''; return; }
+  box.style.display='block';
+  box.innerHTML = '<img src="'+escH(p)+'" onerror="'+_REC_ONERR+'" style="width:100%;max-height:120px;object-fit:cover;border-radius:9px;border:1px solid var(--bd);display:block">'+
+    '<div style="display:none;padding:14px;text-align:center;color:var(--text2);font-size:11.5px;border:1px dashed var(--bd);border-radius:9px">Esa portada no se pudo cargar. Se usará el icono.</div>';
+}
+
+async function recSubirPortada(input){
+  const f = input && input.files && input.files[0];
+  input.value = '';
+  if(!f) return;
+  if(f.size > 3*1024*1024){ _recAviso('⚠️ Máximo 3MB para una portada.'); return; }
+  if(!window.StorageModule || !StorageModule.uploadFile){ _recAviso('No se puede subir ahora. Pega la URL de una imagen.'); return; }
+  _recAviso('⏳ Subiendo portada…', '#8b949e');
+  try{
+    // El id se fija ANTES de subir: sin él, dos portadas seguidas se pisarían
+    // en Storage por caer en el mismo nombre de archivo.
+    const id = _recEditId || ('r_'+Date.now()+'_'+Math.random().toString(36).slice(2,7));
+    _recEditId = _recEditId || id;
+    const doc = await StorageModule.uploadFile(f, 'portadas', id, 'recursos');
+    $('recFImg').value = doc.d;
+    recPrevia();
+    _recAviso('✅ Portada subida.', 'var(--green,#2ea043)');
+  }catch(e){
+    const t = window._authTextoMotivo && window._authTextoMotivo(e);
+    _recAviso(t || ('No se pudo subir: '+((e&&e.message)||'error')));
+  }
+}
+
+function recGuardar(){
+  const url = ($('recFUrl')||{value:''}).value.trim();
+  if(!Recursos.urlValida(url)){
+    _recAviso('El enlace tiene que empezar por https:// y ser una dirección completa.');
+    return;
+  }
+  const img = ($('recFImg')||{value:''}).value.trim();
+  if(img && !Recursos.urlValida(img)){
+    _recAviso('La portada tiene que ser una URL https:// de una imagen, o súbela con 📁.');
+    return;
+  }
+  const datos = {
+    t: ($('recFTit')||{value:''}).value.trim(),
+    u: url,
+    c: ($('recFCat')||{value:''}).value,
+    n: ($('recFNota')||{value:''}).value.trim(),
+    img: img
+  };
+  S.recursos = Array.isArray(S.recursos) ? S.recursos : [];
+  let i = -1;
+  if(_recEditId){
+    i = S.recursos.findIndex(x=>{ const l=Recursos.normalizar([x])[0]; return l && l.id===_recEditId; });
+  }
+  if(i >= 0) S.recursos[i] = Object.assign({}, S.recursos[i], datos);
+  else S.recursos.push(Object.assign({id: _recEditId || ('r_'+Date.now()+'_'+Math.random().toString(36).slice(2,7)),
+    publico:false}, datos));
+  save('config');            // ★ sube SOLO el documento de config
+  closeOverlay('recEditOverlay');
+  recRender();
+  // El fallo más probable de todo esto no es el código: es una carpeta de
+  // Drive sin compartir. Quien la abra vería "solicitar acceso" y pensaría
+  // que el panel está roto.
+  if(/drive\.google\.com|docs\.google\.com/.test(url))
+    toast('✅ Guardado — comprueba que en Drive esté compartido con «cualquiera con el enlace»');
+  else toast('✅ Guardado');
 }
 
 async function _pintarPuertaShalom(){
@@ -4381,12 +4549,12 @@ render();
 })();
 </script>
 <!-- ★ SHALOM tracking — cargado al final -->
-<script src="storage.js?v=4"></script>
+<script src="storage.js?v=5"></script>
 <!-- seleccion.js ya se cargó en la cabecera, ANTES del script en línea que
      lo usa. config.js, print.js y voz.js preguntan por los pedidos marcados,
      así que siguen yendo detrás. El orden de carga es un contrato
      (ver docs/ARQUITECTURA.md). -->
-<script src="config.js?v=29"></script>
+<script src="config.js?v=30"></script>
 <script src="print.js?v=16"></script>
 <script src="notify.js?v=4"></script>
 <script src="shalom.js?v=17"></script>
@@ -4398,7 +4566,7 @@ render();
 <script src="agencias-extractor.js?v=11"></script>
 <script src="respaldo.js?v=1"></script>
 <script src="ayuda.js?v=4"></script>
-<script src="recursos.js?v=1"></script>
+<script src="recursos.js?v=2"></script>
 <script src="dashboard.js?v=2"></script>
 <script src="voz.js?v=3"></script>
 <script src="cotizacion.js?v=3"></script>
