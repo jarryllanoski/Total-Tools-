@@ -268,4 +268,43 @@ module.exports = async ({bloque, ok}) => {
     ok(/require\("\.\/agencias"\)/.test(E.leer('functions/index.js')),
        'y el servidor');
   }
+
+  bloque('Tu agencia de ORIGEN: se elige una vez, con la misma reja');
+
+  {
+    const cfg  = E.leer('config.js');
+    const html = E.leer('index.html');
+    const fidx = E.leer('functions/index.js');
+
+    ok(/Agencias\.elegida\(ag, 'SHALOM'\)/.test(cfg),
+       'el origen se guarda con el MISMO `elegida()` que el destino: una ' +
+       'segunda forma de guardar un ter_id acabaría aceptando aquí lo que ' +
+       'allá se rechaza');
+    ok(/if\(!el\)\{ toast\('⚠️ Esa agencia no tiene un id utilizable'\); return; \}/
+        .test(cfg),
+       'y si esa agencia no da un id utilizable, no se guarda a medias');
+    ok(/Agencias\.identificada\(o\)/.test(cfg),
+       'el aviso de Config usa la misma comprobación, no una suya');
+    ok(/⚠️ Sin agencia de origen/.test(cfg),
+       'y sin origen lo dice, meses antes de que exista el botón de registrar');
+
+    /* Hermana de `config`, no dentro: ese objeto lo devuelve ENTERO la
+       función pública. La regla se comprueba antes de guardar, no después. */
+    ok(/agenciaOrigen:data\.agenciaOrigen\|\|null,/.test(html),
+       'viaja en el documento de configuración como clave hermana');
+    const sube = html.slice(html.indexOf("clave: 'config', path: cfgPath()"),
+        html.indexOf('for(const s of(data.shipments||[]))'));
+    ok(!/config:\s*\{[^}]*agenciaOrigen/.test(sube),
+       'y NO metida dentro de `config`');
+    const pub = fidx.slice(fidx.indexOf('async function handleConfig'),
+        fidx.indexOf('// ── action=formcfg'));
+    ok(pub.indexOf('agenciaOrigen') < 0,
+       'así que la función pública no la devuelve: el formulario del cliente ' +
+       'no la necesita');
+
+    ok((cfg.match(/save\('config'\)/g) || []).length >= 2,
+       'guardar y quitar el origen suben UN documento, no los 1170 pedidos');
+    ok(/_panelShalomSearch\(q\)/.test(cfg.slice(cfg.indexOf('function onOrigenInput'))),
+       'y reutiliza el buscador que ya existe: ni un widget nuevo');
+  }
 };

@@ -700,6 +700,90 @@ function onAddrInput(val){
     drop.style.display='block';
   },300);
 }
+/* ── TU AGENCIA DE ORIGEN ─────────────────────────────────────────────────
+   `POST /account/register` pide `origen`, y también es un `ter_id`. Como es
+   siempre la misma, se elige UNA VEZ aquí en vez de en cada envío.
+
+   Se guarda con el MISMO `Agencias.elegida()` que el destino: una segunda
+   forma de guardar un ter_id acabaría aceptando aquí lo que allá se rechaza.
+
+   Vive en `S.agenciaOrigen`, HERMANA de `config` y no dentro: ese objeto lo
+   devuelve entero la función pública, y aunque tu agencia de despacho no sea
+   un secreto, la regla se comprueba antes de guardar, no después. */
+let _orTimer = null;
+
+function _pintarOrigen(){
+  const b = $('cfgOrigenBadge'); if(!b) return;
+  const o = S.agenciaOrigen;
+  const ok = window.Agencias && Agencias.identificada(o);
+  if(!ok){
+    b.style.display='block';
+    b.innerHTML = '<span style="font-size:11px;color:#f59e0b">⚠️ Sin agencia de origen — hará falta para registrar envíos</span>';
+    return;
+  }
+  b.style.display='block';
+  b.innerHTML = '<div style="display:flex;align-items:center;gap:8px;background:rgba(46,160,67,.1);'+
+    'border:1px solid rgba(46,160,67,.3);border-radius:9px;padding:8px 11px">'+
+    '<div style="flex:1;min-width:0"><div style="font-size:12px;font-weight:700;color:#2ea043;'+
+    'overflow:hidden;text-overflow:ellipsis;white-space:nowrap">🏢 '+escH(o.agenciaNombre)+'</div>'+
+    '<div style="font-size:10px;color:var(--text2)">'+escH(String(o.agenciaGeo||'').split("|").join(" · "))+'</div></div>'+
+    '<button type="button" onclick="quitarOrigen()" style="background:none;border:none;color:#f87171;'+
+    'cursor:pointer;font-size:13px;padding:2px 5px;flex-shrink:0">✕</button></div>';
+}
+
+function onOrigenInput(val){
+  const drop = $('cfgOrigenDrop'); if(!drop) return;
+  clearTimeout(_orTimer);
+  const q = (val||'').trim();
+  if(q.length < 2){ drop.style.display='none'; return; }
+  _orTimer = setTimeout(async () => {
+    await _panelShalomLoad();
+    const res = _panelShalomSearch(q);
+    window._origenCache = res;
+    if(!res.length){
+      drop.innerHTML = '<div style="padding:12px 14px;text-align:center;font-size:12px;color:var(--text2)">🔍 Sin resultados</div>';
+      drop.style.display='block'; return;
+    }
+    drop.innerHTML = res.map((ag,i)=>{
+      const nombre = ag.lugar_over||ag.nombre||'—';
+      const geo = [ag.zona||ag.distrito, ag.provincia, ag.departamento].filter(Boolean).join(' · ');
+      return '<div onclick="pickOrigen('+i+')" style="padding:9px 12px;border-bottom:1px solid var(--bd);cursor:pointer">'+
+        '<div style="font-weight:700;font-size:12px;color:var(--text)">'+escH(nombre)+'</div>'+
+        (geo?'<div style="font-size:11px;color:var(--blue);margin-top:2px">'+escH(geo)+'</div>':'')+
+        (ag.direccion?'<div style="font-size:11px;color:var(--text2);margin-top:2px;line-height:1.4">'+escH(ag.direccion)+'</div>':'')+
+        '</div>';
+    }).join('');
+    drop.style.display='block';
+  }, 300);
+}
+
+function pickOrigen(i){
+  const ag = (window._origenCache||[])[i]; if(!ag) return;
+  // SHALOM fijo, no el courier del formulario: esta es TU agencia de
+  // despacho, y el registro que la va a usar es el de Shalom.
+  const el = window.Agencias ? Agencias.elegida(ag, 'SHALOM') : null;
+  if(!el){ toast('⚠️ Esa agencia no tiene un id utilizable'); return; }
+  S.agenciaOrigen = el;
+  save('config');
+  const inp = $('cfgOrigenInput'); if(inp) inp.value='';
+  const drop = $('cfgOrigenDrop'); if(drop) drop.style.display='none';
+  _pintarOrigen();
+  toast('🏢 Origen: '+el.agenciaNombre);
+}
+
+function quitarOrigen(){
+  S.agenciaOrigen = null;
+  save('config');
+  _pintarOrigen();
+  toast('🏢 Agencia de origen quitada');
+}
+
+document.addEventListener('click', function(e){
+  const drop = $('cfgOrigenDrop'); if(!drop) return;
+  if(e.target && (e.target.id==='cfgOrigenInput' || (e.target.closest && e.target.closest('#cfgOrigenDrop')))) return;
+  drop.style.display='none';
+});
+
 /* ── RENIEC: EL NOMBRE REAL A PARTIR DEL DNI ──────────────────────────────
    `POST /account/register` pide el nombre PARTIDO en nombres, apellido
    paterno y apellido materno. Partir "JARLYN LLANOS ARTEAGA" a ojo se
@@ -1515,6 +1599,7 @@ function loadCfgUI(){
     const ts=$('tglBarridoSimulacro'); if(ts) ts.classList.toggle('on', b.simulacro!==false);
   }
   if(typeof _pintarUltimoBarrido==='function') _pintarUltimoBarrido();
+  if(typeof _pintarOrigen==='function') _pintarOrigen();
   // Configuración Shalom: solo queda "Mostrar en el link del cliente". El motor
   // de rastreo, el modo de etiquetas y los intervalos se retiraron con el
   // rastreo viejo. Los campos que quedan en S.config (trackingMotor,

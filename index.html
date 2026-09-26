@@ -482,6 +482,12 @@
            internos a quien pidiera esa URL. Misma razón por la que
            `msgTemplates` y `labels` están fuera. */
         recursos:data.recursos||[],
+        /* ★ También HERMANA de `config`, por lo mismo: `handleConfig`
+           devuelve el objeto `config` entero al formulario público, y aunque
+           tu agencia de despacho no sea un secreto, la regla se comprueba
+           antes de guardar, no después. El formulario del cliente no la
+           necesita, así que no viaja. */
+        agenciaOrigen:data.agenciaOrigen||null,
         ts:saveTs // usar saveTs fijo para que _S_TS y config.ts coincidan tras la escritura
       }}];
       for(const s of(data.shipments||[])){
@@ -1093,6 +1099,18 @@
         font-size:13px;font-weight:700;background:rgba(56,139,253,.15);
         border:1px solid rgba(56,139,253,.35);color:#388bfd">&#128268; Verificar sesión de Shalom Pro</button>
       <div id="shalomInstEstado" style="display:none;margin-top:10px;font-size:12px;line-height:1.5"></div>
+    </div>
+
+    <!-- AGENCIA DE ORIGEN — de dónde despachas -->
+    <div style="border-top:1px solid var(--bd);margin-top:11px;padding-top:11px;position:relative">
+      <div style="font-size:11px;color:#8b949e;line-height:1.5;margin-bottom:8px">
+        <b style="color:var(--text)">Tu agencia de origen.</b> Desde dónde despachas.
+        Se elige una vez y la usan todos los envíos que registres.</div>
+      <input class="fi" id="cfgOrigenInput" autocomplete="off"
+        placeholder="Busca por ciudad, distrito o nombre…" oninput="onOrigenInput(this.value)"
+        onfocus="onOrigenInput(this.value)">
+      <div id="cfgOrigenDrop" style="display:none;position:absolute;left:0;right:0;top:100%;z-index:50;background:var(--bg2);border:1px solid var(--bd);border-radius:9px;margin-top:4px;max-height:230px;overflow-y:auto;box-shadow:0 8px 24px rgba(0,0,0,.4)"></div>
+      <div id="cfgOrigenBadge" style="display:none;margin-top:8px"></div>
     </div>
   </div>
 </div>
@@ -4555,7 +4573,7 @@ render();
      lo usa. config.js, print.js y voz.js preguntan por los pedidos marcados,
      así que siguen yendo detrás. El orden de carga es un contrato
      (ver docs/ARQUITECTURA.md). -->
-<script src="config.js?v=32"></script>
+<script src="config.js?v=33"></script>
 <script src="print.js?v=16"></script>
 <script src="notify.js?v=4"></script>
 <script src="shalom.js?v=18"></script>

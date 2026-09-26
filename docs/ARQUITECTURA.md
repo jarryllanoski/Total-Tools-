@@ -180,6 +180,11 @@ siendo basura, y tres campos sin el cuarto harían que el panel dijera
 "identificada" sobre algo que no se puede registrar: o entran los cuatro con un
 id válido, o no entra ninguno.
 
+**Tu agencia de ORIGEN** (`POST /account/register` pide `origen`, también un
+`ter_id`) se elige **una vez** en Config con el mismo buscador y el mismo
+`elegida()`, y vive en `S.agenciaOrigen` — **hermana** de `config`, no dentro,
+por la misma razón que los recursos.
+
 ### Nota · Centro de recursos (`recursos.js`)
 
 El botón 📚 de la cabecera abre **`page-recursos`**: una página con la misma
