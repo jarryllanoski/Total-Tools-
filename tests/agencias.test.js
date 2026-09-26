@@ -323,16 +323,27 @@ module.exports = async ({bloque, ok}) => {
     ok(/if\(isShalom\)\{ _claveAuto\(\);/.test(cfg),
        'se genera al aparecer el bloque de Shalom, no antes: en un DELIVERY ' +
        'sería un campo con un número que no significa nada');
-    ok(/includes\('SHALOM'\)\)\{\s*data\.shalomClave/.test(cfg),
-       'y solo se guarda con courier Shalom');
     {
-      // Vacía se guarda como cadena vacía, nunca `undefined`: así el borrado
-      // también viaja a la nube en vez de quedarse en el dispositivo.
-      const linea = /data\.shalomClave = [^\n]*/.exec(cfg);
-      ok(linea && /\|\|''\)/.test(linea[0]) && /replace\(\/\\D\/g,''\)/.test(linea[0]),
-         'se guarda vacía al borrarla y solo con dígitos, nunca undefined: ' +
-         'así el borrado también viaja a la nube');
-      ok(linea && /slice\(0, ?4\)/.test(linea[0]), 'y recortada a 4');
+      const guardado = cfg.slice(cfg.indexOf('La clave de recojo. Tres condiciones'),
+          cfg.indexOf("if(_sGuia)  { data.trackingOrderNumber"));
+      ok(/includes\('SHALOM'\)/.test(guardado),
+         'solo se guarda con courier Shalom: en un DELIVERY sería un número ' +
+         'sin sentido');
+
+      /* LA REGLA QUE PIDIÓ EL DUEÑO: los cambios de hoy no tocan lo de ayer.
+         Sin la segunda condición, abrir un pedido de Shalom de hace un mes y
+         guardarlo le añadía `shalomClave: ''` — un campo nuevo en un pedido
+         antiguo. */
+      ok(/_prevClv !== undefined && _prevClv !== ''/.test(guardado),
+         'y solo si HAY algo que escribir o el pedido YA la tenía: abrir un ' +
+         'pedido antiguo y guardarlo NO le añade el campo');
+      ok(/if\(_clv \|\| \(_prevClv/.test(guardado),
+         'esa condición es la que decide, no un comentario');
+      ok(/replace\(\/\\D\/g,''\)/.test(guardado) && /slice\(0, ?4\)/.test(guardado),
+         'solo dígitos y recortada a 4');
+      ok(/data\.shalomClave = _clv;/.test(guardado),
+         'y cuando sí se escribe, se escribe el valor tal cual — vacío ' +
+         'incluido, para que borrarla también viaje a la nube');
     }
 
     /* Y NO va en las listas de "conservar el valor previo": las dos dicen

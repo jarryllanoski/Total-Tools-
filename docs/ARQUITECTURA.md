@@ -69,6 +69,7 @@ Consecuencias que hay que tener presentes al tocar cualquier cosa:
 | `ayuda.js` | 468 | Ayuda dentro del panel |
 | `recursos.js` | 185 | Centro de recursos: enlaces a Drive, videos y catálogos |
 | `functions/agencias.js` | 180 | La agencia de destino identificada (compartido: panel, formulario público y servidor) |
+| `functions/pedidoPublico.js` | 120 | Qué ve el cliente de su pedido — lista blanca |
 | `delivery.js` | 417 | Rutas de motorizado |
 | `alertas.js` | 376 | Centro de alertas |
 | `loading-screen.js` | 361 | Pantalla de carga del seguimiento del cliente |
@@ -142,6 +143,42 @@ al terminar, salga bien o mal.
 Y una decisión pequeña que se nota: **si la acción falla, el diálogo NO se
 cierra.** El aviso se lee con él delante y se puede reintentar sin volver a
 buscar el pedido.
+
+### Nota · Qué ve el cliente (`functions/pedidoPublico.js`)
+
+El link de seguimiento es **público**: quien tenga la dirección ve lo que este
+archivo decida, y solo eso.
+
+**Es una lista BLANCA, y eso no es un detalle de estilo.** Antes `handleTrack`
+copiaba el pedido **entero** y borraba una lista de campos prohibidos. Con ese
+diseño **cada campo nuevo nace público**: nadie se acuerda de prohibir algo
+que aún no existe, y el fallo no se ve — el dato simplemente viaja.
+
+**Pasó de verdad:** la clave de recojo (`shalomClave`) se añadió al pedido y
+empezó a salir en la respuesta del link sin que nada avisara. Un link se
+reenvía, se queda en un historial y **no caduca**; una clave que viaja por ahí
+deja de proteger el paquete.
+
+Es **OWASP API3:2023 — Broken Object Property Level Authorization** (antes
+*Excessive Data Exposure*), cuya causa documentada es *"serializar objetos
+enteros y confiar en que el cliente filtre"* y cuyo remedio es exactamente
+este: **enumerar lo permitido.**
+
+**Dos rejas independientes, no una:**
+
+1. Solo salen los campos de `CAMPOS`.
+2. Y aunque alguien meta un secreto en `CAMPOS` por error, `SECRETOS` lo quita
+   igual. **Hacen falta dos equivocaciones para filtrar algo.**
+
+**Y la lista no se puede quedar corta sin que salte:** una prueba lee los
+campos que `formulario.html` usa **de verdad** (`ship.X`) y exige que estén
+permitidos. Si mañana la página lee uno nuevo y nadie lo declara, falla la
+suite — en vez de que el cliente vea un hueco en blanco.
+
+⚠️ **El respaldo `.json` sigue llevándolo todo, a propósito.** Un respaldo
+incompleto no sirve para restaurar, y ese archivo ya contiene DNIs,
+direcciones y teléfonos: la clave no cambia su naturaleza. Trátalo como lo que
+es.
 
 ### Nota · La agencia identificada (`functions/agencias.js`)
 

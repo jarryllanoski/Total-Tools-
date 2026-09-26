@@ -1004,11 +1004,20 @@ function saveShipment(){
     if(_agV) Object.assign(data, _agV);
     else Object.assign(data, Agencias.limpiar(_editId ? (S.shipments||[]).find(x=>x.id===_editId) : null));
   }
-  /* La clave de recojo. Solo con courier Shalom: en un DELIVERY sería un
-     campo con un número que no significa nada. Se guarda '' al vaciarla,
-     nunca undefined, para que borrarla también viaje a la nube. */
+  /* La clave de recojo. Tres condiciones para escribirla, y las tres
+     importan:
+       · solo con courier Shalom — en un DELIVERY sería un número sin sentido;
+       · solo si HAY algo que escribir, o si el pedido YA la tenía. Sin esta
+         segunda parte, abrir un pedido de Shalom de hace un mes y guardarlo
+         le añadía `shalomClave: ''` — un campo nuevo en un pedido antiguo,
+         que es justo lo que el dueño pidió que no pasara;
+       · y cuando sí se escribe, se escribe '' al vaciarla y nunca undefined,
+         para que BORRARLA también viaje a la nube. */
   if(($('fCourier').value||'').toUpperCase().includes('SHALOM')){
-    data.shalomClave = (($('fShalomClave')||{value:''}).value||'').replace(/\D/g,'').slice(0,4);
+    const _clv = (($('fShalomClave')||{value:''}).value||'').replace(/\D/g,'').slice(0,4);
+    const _prevClv = _editId ?
+      ((S.shipments||[]).find(x=>x.id===_editId)||{}).shalomClave : undefined;
+    if(_clv || (_prevClv !== undefined && _prevClv !== '')) data.shalomClave = _clv;
   }
   if(_sGuia)  { data.trackingOrderNumber=_sGuia;   data.shalomGuia=_sGuia; }
   if(_sCodigo){ data.trackingOrderCode  =_sCodigo; data.shalomCodigo=_sCodigo; }

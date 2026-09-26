@@ -25,6 +25,7 @@ const barrido = require("./barrido");
 // cabecera de etiquetas.js — dos copias de esta regla divergirian.
 const etiquetas = require("./etiquetas");
 const agencias = require("./agencias");
+const pedidoPublico = require("./pedidoPublico");
 
 setGlobalOptions({maxInstances: 10});
 initializeApp();
@@ -480,27 +481,25 @@ async function handleTrack(req, res) {
   const order = snap.data();
   const code = (order.id || "").slice(-4).toUpperCase();
   const frozen = ["ENTREGADO", "CANCELADO"].includes(order.status || "");
-  // A-2: no exponer datos que la vista de seguimiento no necesita
-  // (teléfono, costo, notas privadas, GPS, documentos internos, y los campos
-  // internos del Motor B de tracking).
-  const safe = Object.assign({}, order, {code, frozen});
-  // NOTA: DNI y notas (dni/dniRecoger/dniDestinatario, notes) SE MANTIENEN a
-  // pedido del operador — el cliente puede verlos en su link. Lo que NO se
-  // expone: fotos/firmas de entrega y datos internos del motorizado/cotización.
-  ["phone", "cost", "privateNote", "gpsCoords",
-    "docGuia", "docEmbalado", "docComprobante", "docTicket",
-    "sel", "chkGuia", "chkEmbalado", "chkComprobante", "fromForm",
-    // Entrega/motorizado (internos — no autorizados para el cliente):
-    "_dlvFoto", "_dlvFirma", "_dlvReceptor", "_dlvDriver",
-    "_dlvDriverPhone", "_dlvRutaLink", "_dlvDone", "_dlvFecha",
-    "_dlvOrden", "_dlvAsignadoTs",
-    "cotizItems", "extraccion",
-    "trackingWebRawStatus", "trackingWebEstadoNormalizado",
-    "trackingWebEtiquetaSugerida", "trackingWebCoincide",
-    "trackingWebUltimaConsulta", "trackingWebProximaConsulta",
-    "trackingWebError", "trackingWebFuente", "trackingWebActivo",
-    "erroresSeguidosWeb"]
-      .forEach((k) => delete safe[k]);
+
+  /* ★ LISTA BLANCA, no lista negra.
+     Aqui se copiaba el pedido ENTERO y se borraba una lista de campos
+     prohibidos. Con ese diseño CADA CAMPO NUEVO NACE PUBLICO: nadie se
+     acuerda de añadirlo a la lista de borrados, y el fallo no se ve — el
+     dato simplemente viaja.
+
+     Paso de verdad: la clave de recojo (`shalomClave`) se añadio al pedido y
+     empezo a salir en la respuesta de este endpoint sin que nada avisara. Un
+     link de seguimiento se reenvia, se queda en un historial y no caduca; una
+     clave que viaja por ahi deja de proteger el paquete.
+
+     Es OWASP API3:2023 (Broken Object Property Level Authorization), y su
+     remedio documentado es exactamente esto: enumerar lo permitido.
+
+     Lo que el cliente ve se decide en functions/pedidoPublico.js, y hay una
+     prueba que compara esa lista con los campos que el formulario lee de
+     verdad — asi no se puede quedar corta sin que salte. */
+  const safe = pedidoPublico.proyectar(order, {code, frozen});
 
   // Estado de Shalom: solo se muestra al cliente si el operador activo la
   // opcion "Mostrar en el link del cliente". Filtro MOTOR-AGNOSTICO: aplica
@@ -515,8 +514,6 @@ async function handleTrack(req, res) {
           .forEach((k) => delete safe[k]);
     }
   }
-  delete safe.trackingMotorOrigen;
-
   res.json({status: "ok", order: safe});
 }
 
