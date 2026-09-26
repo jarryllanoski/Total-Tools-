@@ -62,6 +62,19 @@ const PERMITIDAS = {
      En `soloMedir` hasta medir su forma: la doc dice 552 agencias con 48
      campos, y la doc de esta API ya se equivocó siete veces. */
   agencies: {metodo: "GET", ruta: "/public/agencies", publico: true},
+  /* RENIEC. Es lo que convierte el registro de envios en algo que no hay que
+     adivinar: `POST /account/register` pide el nombre PARTIDO en nombres,
+     apellido paterno y apellido materno, y partir "JARLYN LLANOS ARTEAGA" a
+     ojo se equivoca con cualquier nombre compuesto. RENIEC ya los da
+     separados.
+
+     ⚠️ EL DNI VA EN LA RUTA, y eso no es un detalle. Un parametro de ruta NO
+     se puede escapar: un "../" ahi no ensucia un valor, CAMBIA EL ENDPOINT al
+     que llamas — `/account/dni/../../instances` seria otra cosa. Por eso
+     `rutaParam` no codifica: EXIGE la forma, y si no cuadra la peticion no
+     sale. La forma es la que documenta su API: 8 digitos, ni uno mas. */
+  dni: {metodo: "GET", ruta: "/account/dni/{dni}",
+    rutaParam: {dni: /^[0-9]{8}$/}, soloMedir: true},
 };
 
 /**
@@ -215,6 +228,31 @@ async function llamar(op, clave, cuerpo) {
     return {ok: false, motivo: "BLOQUEADO", detalle: "sin clave"};
   }
 
+  /* Los parametros que van DENTRO de la ruta. Se validan contra la forma
+     declarada y se sustituyen; no se codifican. Codificar sirve para un
+     valor —un querystring, un cuerpo—, pero aqui el valor ES parte de la
+     direccion: lo unico seguro es no dejar pasar nada que no tenga la forma
+     exacta que se espera. */
+  let ruta = def.ruta;
+  if (def.rutaParam) {
+    const claves = Object.keys(def.rutaParam);
+    for (let i = 0; i < claves.length; i++) {
+      const k = claves[i];
+      const dato = (cuerpo && cuerpo[k] !== undefined && cuerpo[k] !== null) ?
+        String(cuerpo[k]).trim() : "";
+      if (!def.rutaParam[k].test(dato)) {
+        return {ok: false, motivo: "SIN_DATO",
+          detalle: sanear("el parametro '" + k + "' no tiene la forma pedida")};
+      }
+      ruta = ruta.split("{" + k + "}").join(dato);
+    }
+  }
+  // Un hueco sin rellenar significa que la declaracion y lo que llego no
+  // coinciden. Antes de llamar a una URL con una llave dentro, no se llama.
+  if (ruta.indexOf("{") >= 0 || ruta.indexOf("}") >= 0) {
+    return {ok: false, motivo: "SIN_DATO", detalle: "ruta incompleta"};
+  }
+
   let r;
   try {
     const opciones = {
@@ -226,7 +264,7 @@ async function llamar(op, clave, cuerpo) {
       opciones.headers["Content-Type"] = "application/json";
       opciones.body = JSON.stringify(cuerpo || {});
     }
-    r = await fetch(BASE + def.ruta, opciones);
+    r = await fetch(BASE + ruta, opciones);
   } catch (e) {
     const corte = e && (e.name === "TimeoutError" || e.name === "AbortError");
     return {

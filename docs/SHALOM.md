@@ -391,6 +391,31 @@ vez aparece una URL de Shalom en el código del panel.
 Las barreras viven en el módulo y no en `index.js` **para poder probarlas**.
 Un límite de seguridad sin pruebas es una intención.
 
+### ⚠️ Parámetros que van DENTRO de la ruta
+
+`GET /account/dni/{dni}` fue el primero que lleva el dato en la dirección, y
+eso cambia las reglas:
+
+> **Un parámetro de ruta no se puede escapar.** En un querystring o en un
+> cuerpo, un valor raro ensucia un dato. En la **ruta**, un `../` cambia el
+> endpoint al que llamas: `/account/dni/../../instances` es otra llamada
+> entera — con la clave adjunta.
+
+Por eso `rutaParam` **no codifica**: declara la forma y la **exige**. Si no
+cuadra, la petición **no sale** (`SIN_DATO`, sin tocar la red).
+
+```js
+dni: {metodo: "GET", ruta: "/account/dni/{dni}",
+  rutaParam: {dni: /^[0-9]{8}$/}, soloMedir: true},
+```
+
+Y una segunda reja: si tras sustituir queda un `{` o un `}` en la ruta, la
+declaración y lo que llegó no coinciden, y tampoco se llama. Antes de pedir
+una URL con una llave dentro, no se pide.
+
+Hay diez pruebas sobre esto, y la mutación que cambia el `test()` por un
+`encodeURIComponent()` —el error clásico— tumba las diez.
+
 ### Los códigos HTTP son de las barreras, no de Shalom
 
 Lo que pase con Shalom viaja siempre en **200** con `{ok:false, motivo}`.

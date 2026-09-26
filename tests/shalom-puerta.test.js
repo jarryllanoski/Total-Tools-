@@ -82,8 +82,8 @@ module.exports = async ({bloque, ok}) => {
        'y los destructivos siguen fuera por su nombre también');
   }
   ok(Object.keys(P.PERMITIDAS).join(',') ===
-     'validate,track,instances,agencies',
-     'hoy hay cuatro, y en el orden en que se reconstruyen');
+     'validate,track,instances,agencies,dni',
+     'hoy hay cinco, y en el orden en que se reconstruyen');
   ok(!P.PERMITIDAS.track.soloMedir,
      'track ya no es solo medible: su forma se midió y se tradujo');
   ok(P.PERMITIDAS.instances.metodo === 'GET' &&
@@ -125,6 +125,67 @@ module.exports = async ({bloque, ok}) => {
     f3.restaurar();
     ok(cab3['x-api-key'] === 'sk_la_clave_secreta',
        'pero a los que SÍ la necesitan se les sigue mandando');
+  }
+
+  {
+    /* ⚠️ UN PARAMETRO DE RUTA NO SE PUEDE ESCAPAR.
+       En un querystring o en un cuerpo, un valor raro ensucia un dato. En la
+       RUTA, un "../" cambia el endpoint al que llamas: `/account/dni/../..
+       /instances` es otra llamada entera, con la clave adjunta. Por eso no se
+       codifica: se EXIGE la forma y, si no cuadra, la peticion NO SALE. */
+    const d = P.PERMITIDAS.dni;
+    ok(d.ruta === '/account/dni/{dni}', 'el DNI viaja en la ruta');
+    ok(d.rutaParam && d.rutaParam.dni instanceof RegExp,
+       'y su forma va declarada, no improvisada en el sitio de uso');
+    ok(d.rutaParam.dni.test('12345678') && !d.rutaParam.dni.test('1234567') &&
+       !d.rutaParam.dni.test('123456789') && !d.rutaParam.dni.test('1234567a'),
+       'ocho dígitos exactos, que es lo que documenta su API');
+    ok(d.soloMedir === true, 'y en soloMedir hasta medir su forma');
+
+    {
+      const f = conFetch(resp(200, {}));
+      const r = await P.llamar('dni', 'k', {dni: '12345678'});
+      f.restaurar();
+      ok(r.ok === true, 'con un DNI válido, sale');
+      ok(String(f.url).indexOf('/account/dni/12345678') > 0,
+         'y a la ruta correcta, con el dato dentro');
+    }
+
+    const malos = ['../../instances', '1234567', '123456789', '1234567a',
+      '12345678/../x', '%2e%2e%2f', '', '   ', '1234 678'];
+    for (let i = 0; i < malos.length; i++) {
+      const f = conFetch(resp(200, {}));
+      const r = await P.llamar('dni', 'k', {dni: malos[i]});
+      f.restaurar();
+      ok(r.motivo === 'SIN_DATO' && f.llamadas === 0,
+         'y con «' + (malos[i] || '(vacío)').slice(0, 18) + '» NO sale ' +
+         'ninguna petición — ni siquiera se intenta');
+    }
+    {
+      const f = conFetch(resp(200, {}));
+      const r = await P.llamar('dni', 'k', {});
+      f.restaurar();
+      ok(r.motivo === 'SIN_DATO' && f.llamadas === 0, 'ni sin el parámetro');
+    }
+    {
+      // Un hueco sin rellenar: la declaración y lo que llegó no coinciden.
+      P.PERMITIDAS.__hueco = {metodo: 'GET', ruta: '/x/{falta}/y'};
+      const f = conFetch(resp(200, {}));
+      const r = await P.llamar('__hueco', 'k', {});
+      f.restaurar();
+      delete P.PERMITIDAS.__hueco;
+      ok(r.motivo === 'SIN_DATO' && f.llamadas === 0,
+         'y una ruta con una llave sin rellenar no se llama: antes de pedir ' +
+         'una URL con un `{` dentro, no se pide');
+    }
+    {
+      // Los que NO tienen parámetros de ruta siguen igual.
+      const f = conFetch(resp(200, {valid: true}));
+      await P.llamar('validate', 'k');
+      f.restaurar();
+      ok(String(f.url).indexOf('/validate') > 0 && String(f.url).indexOf('{') < 0,
+         'los endpoints de ruta fija no se enteran de nada');
+    }
   }
 
   bloque('Cada endpoint por su traductor, nunca por el de otro');
