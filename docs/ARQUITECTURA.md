@@ -68,6 +68,7 @@ Consecuencias que hay que tener presentes al tocar cualquier cosa:
 | `voz.js` | 496 | Asistente de voz |
 | `ayuda.js` | 468 | Ayuda dentro del panel |
 | `recursos.js` | 185 | Centro de recursos: enlaces a Drive, videos y catálogos |
+| `functions/agencias.js` | 180 | La agencia de destino identificada (compartido: panel, formulario público y servidor) |
 | `delivery.js` | 417 | Rutas de motorizado |
 | `alertas.js` | 376 | Centro de alertas |
 | `loading-screen.js` | 361 | Pantalla de carga del seguimiento del cliente |
@@ -141,6 +142,43 @@ al terminar, salga bien o mal.
 Y una decisión pequeña que se nota: **si la acción falla, el diálogo NO se
 cierra.** El aviso se lee con él delante y se puede reintentar sin volver a
 buscar el pedido.
+
+### Nota · La agencia identificada (`functions/agencias.js`)
+
+Registrar un envío en Shalom exige el **`ter_id`** de la agencia de destino
+(`POST /account/register`). Ese id **solo se conoce sin adivinar en el instante
+en que se elige la agencia de la lista**: después solo queda el texto, y en
+Lima hay siete "SJL" y tres en "Los Jardines".
+
+Vive en `functions/` por lo mismo que `etiquetas.js`: lo comparten **tres**
+consumidores —el panel, el formulario público y la Cloud Function que recibe
+los pedidos—. Una copia por lado divergiría, y divergir aquí es que el
+servidor acepte lo que el panel rechaza.
+
+**La regla:** el id y el texto **no pueden divergir nunca**. Y se hace cumplir
+comparando el **texto**, no escuchando eventos — `fAddr` dispara `onAddrInput`
+también **al recibir el foco**, así que colgarse de los eventos habría borrado
+el id por solo tocar el campo. Comparando el texto quedan cubiertos de una vez
+escribir, pegar, el relleno desde WhatsApp, cambiar de courier y cualquier
+cambio por código que venga mañana.
+
+**`verificar()` antes de gastar.** Medido con dos catálogos reales (19 jul y
+5 sep 2026): 539 de 546 ids estables, pero el **671** pasó de
+`CALLAO/VENTANILLA` ("POR DEFINIR") a `AREQUIPA/SACHACA` — Shalom **recicla los
+ids de los huecos**. Se compara por **departamento/provincia/distrito**, no por
+nombre: contra esos mismos catálogos el distrito da **1 aviso verdadero y 0
+falsas alarmas**; el nombre daría **13 falsas** ("HUARAZ" → "HUARAZ CO") y el
+aviso dejaría de leerse.
+
+**No toca nada antiguo.** `limpiar()` devuelve `{}` —no nulls— cuando el pedido
+nunca tuvo agencia, así que abrir y guardar un pedido viejo **no le añade ni un
+campo**. Solo escribe nulls cuando sí la tenía y se rompió, porque ahí el
+borrado tiene que viajar a la nube.
+
+**El servidor valida, no solo recorta.** `agenciaId: "../x"` recortado sigue
+siendo basura, y tres campos sin el cuarto harían que el panel dijera
+"identificada" sobre algo que no se puede registrar: o entran los cuatro con un
+id válido, o no entra ninguno.
 
 ### Nota · Centro de recursos (`recursos.js`)
 

@@ -396,6 +396,20 @@ function openForm(id){
   if(body) body.classList.remove('open');
   if(arrow) arrow.classList.remove('open');
   _editId=id;$('formTitle').textContent=id?'Editar Envío':'Nuevo Envío';
+  /* La agencia identificada del pedido que se abre. Un pedido antiguo no la
+     tiene y no pasa nada: funciona igual que siempre, solo que el aviso dirá
+     "sin identificar" mientras no elijas de la lista. */
+  _agElegida = null; _agTexto = '';
+  if(id && window.Agencias){
+    const _s0 = (S.shipments||[]).find(x=>x.id===id);
+    if(_s0 && Agencias.identificada(_s0)){
+      _agElegida = {agenciaId:_s0.agenciaId, agenciaNombre:_s0.agenciaNombre||'',
+        agenciaGeo:_s0.agenciaGeo||'', agenciaCourier:_s0.agenciaCourier};
+      // El texto de referencia es el que YA tiene el pedido: si no lo tocas,
+      // el id sobrevive a abrir y guardar.
+      _agTexto = _s0.address||'';
+    }
+  }
   if($('fPaste')) $('fPaste').value='';   // limpiar el pegado al abrir
   if(typeof _pasteClearToggle==='function') _pasteClearToggle();
   _clienteMatch=null; if($('clienteHint')){ $('clienteHint').style.display='none'; $('clienteHint').innerHTML=''; }
@@ -445,6 +459,7 @@ function openForm(id){
     const dbk = $('dlvDriverBlock');
     if(dbk) dbk.style.display = c.includes('DELIVERY') ? 'block' : 'none';
     const isEnc = c.includes('ENCOMIENDA');
+    _agPintar();
     const addrLbl = document.getElementById('fAddrLabel');
     const encGrp  = document.getElementById('fEncAgenciaGroup');
     if(addrLbl) addrLbl.textContent = isEnc ? 'Ciudad destino *' : 'Dirección *';
@@ -454,7 +469,7 @@ function openForm(id){
     else { const d=$('shDrop'); if(d) d.style.display='none'; }
     if(typeof _updateShalomMic==='function') _updateShalomMic();
   };
-  $('fCourier').onchange = _showShalomBlock;
+  $('fCourier').onchange = function(){ _showShalomBlock(); _agPintar(); };
   // Pedido nuevo: el mismo vigilante, con id vacío (no hay pedido que excluir).
   if(window.Guias && !id) Guias.vigilar('fShalomGuia', '');
   if(id){
@@ -652,6 +667,9 @@ function _panelShalomSearch(q){
   return res.slice(0,8);
 }
 function onAddrInput(val){
+  // Repinta el aviso mientras escribes: si rompiste la correspondencia con la
+  // agencia elegida, lo ves en el momento y no al intentar registrar.
+  _agPintar();
   const drop=$('shDrop'); if(!drop) return;
   // Si se pegó un pedido de WhatsApp, la dirección ya está completa: no buscar agencias
   if(window._waPasteUsed){ drop.style.display='none'; return; }
@@ -681,13 +699,65 @@ function onAddrInput(val){
     drop.style.display='block';
   },300);
 }
+/* ── LA AGENCIA IDENTIFICADA ──────────────────────────────────────────────
+   `_agElegida` guarda los cuatro campos mientras el formulario está abierto.
+   Se pone SOLO al elegir de la lista —el único momento en que el `ter_id` se
+   conoce sin adivinar— y se borra en cuanto la dirección cambia por
+   cualquier otra vía.
+
+   La regla que no se negocia: el id y el texto no pueden divergir. Un id
+   viejo pegado a una dirección nueva es exactamente cómo se manda un paquete
+   pagado a otra ciudad. Ver functions/agencias.js. */
+let _agElegida = null;
+let _agTexto   = '';   // la dirección EXACTA que escribió el selector
+
+/* La única puerta: el id sigue vivo solo si la dirección es literalmente la
+   que puso el selector Y el courier sigue siendo el del mismo catálogo.
+
+   Se compara el TEXTO y no se escucha ningún evento, a propósito: `fAddr`
+   dispara `onAddrInput` también al recibir el foco, así que colgarse de los
+   eventos borraría el id por solo tocar el campo. Comparando el texto quedan
+   cubiertos de una vez escribir, pegar, el relleno desde WhatsApp y
+   cualquier cambio por código que venga mañana — sin acordarse de nada. */
+function _agVigente(){
+  if(!_agElegida) return null;
+  const txt = ($('fAddr')||{value:''}).value;
+  const cur = window.Agencias ? Agencias.courierDe(($('fCourier')||{value:''}).value) : '';
+  // El courier importa tanto como el texto: el 3 de Olva no es el 3 de
+  // Shalom, y cambiar de courier deja el id apuntando a otro catálogo.
+  if(txt !== _agTexto || cur !== _agElegida.agenciaCourier){
+    _agElegida = null; _agTexto = '';
+  }
+  return _agElegida;
+}
+
+function _agPintar(){
+  const el = $('fAgenciaEstado'); if(!el) return;
+  const viva = _agVigente();
+  if(viva){
+    el.innerHTML = '🏢 <b>Agencia identificada</b> · '+escH(viva.agenciaNombre);
+    el.style.cssText = 'font-size:10.5px;line-height:1.5;margin-top:5px;color:#2ea043';
+  } else {
+    const c = window.Agencias ? Agencias.courierDe(($('fCourier')||{value:''}).value) : '';
+    // Sin catálogo (DELIVERY, ENCOMIENDA…) no hay nada que identificar: el
+    // aviso solo sale donde de verdad hace falta.
+    if(!c){ el.innerHTML=''; el.style.cssText='display:none'; return; }
+    el.innerHTML = '⚠️ Agencia sin identificar — elígela de la lista para poder registrar el envío';
+    el.style.cssText = 'font-size:10.5px;line-height:1.5;margin-top:5px;color:#8b949e';
+  }
+}
+
 function pickShalomAgency(i){
   const ag=(window._panelShCache||[])[i]; if(!ag) return;
   const nombre=ag.lugar_over||ag.nombre||'';
   const dir=ag.direccion||'';
   $('fAddr').value = dir ? (nombre+' – '+dir) : nombre;
+  // ★ El instante en que el ter_id se conoce sin adivinar. Antes se tiraba.
+  _agElegida = window.Agencias ? Agencias.elegida(ag, ($('fCourier')||{value:''}).value) : null;
+  _agTexto = $('fAddr').value;   // el texto contra el que se comparará después
+  _agPintar();
   const drop=$('shDrop'); if(drop) drop.style.display='none';
-  toast('🏢 Agencia seleccionada');
+  toast(_agElegida ? '🏢 Agencia identificada' : '🏢 Agencia seleccionada');
 }
 // Cerrar dropdown al hacer click fuera
 document.addEventListener('click',function(e){
@@ -726,6 +796,18 @@ function saveShipment(){
   // ★ SHALOM: leer campos guía
   const _sGuia   = ($('fShalomGuia')   ? $('fShalomGuia').value.trim()   : '')||'';
   const _sCodigo = ($('fShalomCodigo') ? $('fShalomCodigo').value.trim() : '')||'';
+  /* ★ LA AGENCIA IDENTIFICADA.
+     Si sigue vigente, viajan los cuatro campos. Si no, `limpiar()` decide:
+     devuelve {} cuando el pedido NUNCA tuvo agencia —así abrir y guardar un
+     pedido antiguo no le añade ni un campo vacío— y los cuatro en null
+     cuando sí la tenía y se rompió, porque ahí el borrado TIENE que viajar a
+     la nube: un id viejo pegado a una dirección nueva es cómo se manda un
+     paquete pagado a otra ciudad. */
+  if(window.Agencias){
+    const _agV = _agVigente();
+    if(_agV) Object.assign(data, _agV);
+    else Object.assign(data, Agencias.limpiar(_editId ? (S.shipments||[]).find(x=>x.id===_editId) : null));
+  }
   if(_sGuia)  { data.trackingOrderNumber=_sGuia;   data.shalomGuia=_sGuia; }
   if(_sCodigo){ data.trackingOrderCode  =_sCodigo; data.shalomCodigo=_sCodigo; }
   // ★ MEDIDAS DEL PAQUETE: se guardan tal cual (vacío → '', nunca undefined,

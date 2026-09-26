@@ -24,6 +24,7 @@ const barrido = require("./barrido");
 // Que etiqueta le toca a un pedido. LO COMPARTE CON EL PANEL: ver la
 // cabecera de etiquetas.js — dos copias de esta regla divergirian.
 const etiquetas = require("./etiquetas");
+const agencias = require("./agencias");
 
 setGlobalOptions({maxInstances: 10});
 initializeApp();
@@ -195,6 +196,11 @@ const ORDER_FIELDS = [
   "docGuia", "docEmbalado", "docComprobante", "links",
   "sel", "chkGuia", "chkEmbalado", "chkComprobante",
   "createdAt", "fromForm", "dni",
+  /* La agencia de destino IDENTIFICADA. Sin estos, registrar un envio en
+     Shalom es imposible: `POST /account/register` pide el `ter_id`, y ese id
+     solo se conoce sin adivinar en el instante en que el cliente elige la
+     agencia de la lista. Si no viajan aqui, ese instante se pierde. */
+  "agenciaId", "agenciaNombre", "agenciaGeo", "agenciaCourier",
 ];
 
 // Tamaño máximo por campo de texto — evita payloads gigantes (M-3).
@@ -203,6 +209,7 @@ const FIELD_MAX = {
   cost: 20, courier: 60, date: 30, status: 60, encAgencia: 200,
   ciudadDestino: 120, address: 600, referencia: 300, notes: 600,
   gpsCoords: 60, id: 60, createdAt: 40,
+  agenciaId: 10, agenciaNombre: 120, agenciaGeo: 200, agenciaCourier: 20,
 };
 const DEFAULT_MAX = 600;
 
@@ -223,6 +230,18 @@ function pickOrderFields(src) {
     }
     out[k] = v;
   });
+  /* La agencia: o entran los CUATRO campos con un id valido, o no entra
+     ninguno. Recortar no basta — `agenciaId: "../x"` recortado sigue siendo
+     basura, y un pedido con id malo y geo buena PARECE identificado sin
+     serlo. Se valida con el MISMO modulo que usa el panel, no con una copia
+     que se desincronice.
+     Y se limpia entero, porque tres campos sin el cuarto es peor que nada:
+     el panel diria "agencia identificada" sobre algo que no se puede
+     registrar, y eso se descubre con un envio pagado. */
+  if (!agencias.idValido(out.agenciaId) ||
+      !agencias.courierDe(out.agenciaCourier)) {
+    agencias.CAMPOS.forEach((k) => delete out[k]);
+  }
   return out;
 }
 

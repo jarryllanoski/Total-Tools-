@@ -196,6 +196,7 @@ textarea.fi{resize:vertical;line-height:1.5}
 .addr-pin-chip a{color:var(--blue);text-decoration:none;font-weight:700}
 .addr-pin-chip button{margin-left:auto;background:none;border:none;color:var(--text2);font-size:15px;cursor:pointer;font-family:inherit;line-height:1;padding:0 2px}
 </style>
+<script src="functions/agencias.js?v=1"></script>
 </head>
 <body>
 <script src="narrador/loader.js?v=1"></script>
@@ -1233,6 +1234,7 @@ function renderAgencyBox(courierName){
 function onAgencyManual(val){
   const txt=(val||'').trim();
   agState = {dept:'', prov:'', dist:'', addr:txt};
+  window._agIdent = null; window._agIdentTxt = '';
   if(txt){ $('err_agency')&&$('err_agency').classList.remove('show'); }
 }
 
@@ -1624,11 +1626,23 @@ async function submitOrder(){
   const now      = Date.now();
   const orderId  = `id_${now}`;
 
+  /* La identificación sobrevive solo si la dirección final es literalmente
+     la que puso el selector. Se compara el TEXTO y no se confía en eventos:
+     entre elegir y enviar puede haber pasado un cambio de courier, una
+     edición a mano o un relleno automático, y cualquiera de los tres deja el
+     id apuntando a otra agencia. Misma regla que el panel. */
+  const _agOk = (window._agIdent && window._agIdentTxt === finalAddress)
+    ? window._agIdent : null;
+
   const order = {
     id:             orderId,
     name,
     phone,
     address:        finalAddress,
+    agenciaId:      _agOk ? _agOk.agenciaId      : '',
+    agenciaNombre:  _agOk ? _agOk.agenciaNombre  : '',
+    agenciaGeo:     _agOk ? _agOk.agenciaGeo     : '',
+    agenciaCourier: _agOk ? _agOk.agenciaCourier : '',
     gpsCoords:      (_gpsLat&&_gpsLon) ? `${_gpsLat},${_gpsLon}` : null,
     referencia,
     dniRecoger,
@@ -2303,6 +2317,13 @@ function agSel(key, i){
     telefono: ag.telefono||'',
     id: ag.ter_id||''
   };
+  /* ★ LA AGENCIA IDENTIFICADA. El `ter_id` se capturaba aquí desde siempre
+     —en `_agSel.id`— y se TIRABA: nunca entraba en el pedido. Sin él,
+     registrar el envío en Shalom es imposible, porque `POST
+     /account/register` lo exige y después solo queda el texto, que es
+     adivinar. Ver functions/agencias.js. */
+  window._agIdent = (window.Agencias ? Agencias.elegida(ag, key) : null);
+  window._agIdentTxt = agState.addr;
   const drop = $('shalomDrop');
   if(drop) drop.style.display='none';
   const inp = $('shalomAgInput');
@@ -2319,11 +2340,14 @@ function agSel(key, i){
 function agManual(key, val){
   agState.addr = val.trim();
   window._agSel[key] = val.trim() ? {nombre:val.trim(),direccion:'',distrito:'',provincia:'',departamento:'',telefono:'',id:''} : null;
+  // Escrita a mano no hay agencia identificada, y no se adivina.
+  window._agIdent = null; window._agIdentTxt = '';
 }
 
 function agReset(key){
   agState.addr = '';
   window._agSel[key] = null;
+  window._agIdent = null; window._agIdentTxt = '';
   const inp = $('shalomAgInput');
   if(inp) inp.value = '';
   const drop = $('shalomDrop');
