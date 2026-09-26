@@ -1171,6 +1171,26 @@
         <div class="fg"><label class="fl">Número de guía</label><input class="fi" id="fShalomGuia" placeholder="Ej: 82037653" style="font-family:monospace" inputmode="numeric" oninput="if(typeof _updateShalomMic==='function')_updateShalomMic()"></div>
         <div class="fg"><label class="fl">Código</label><input class="fi" id="fShalomCodigo" placeholder="TT9C" style="font-family:monospace;text-transform:uppercase" oninput="this.value=this.value.toUpperCase()" maxlength="8"></div>
       </div>
+      <!-- ★ CLAVE DE RECOJO: los 4 dígitos que el destinatario necesita para
+           retirar el paquete. Se genera sola al abrir un pedido nuevo de
+           Shalom (del generador criptográfico, no de Math.random: es lo único
+           que separa el paquete de quien no debe llevárselo) y se puede
+           cambiar. Un pedido YA REGISTRADO no la regenera: la que se le dio a
+           Shalom es la que el cliente va a usar. -->
+      <div class="fg">
+        <label class="fl">🔑 Clave de recojo</label>
+        <div style="display:flex;gap:7px;align-items:center">
+          <input class="fi" id="fShalomClave" placeholder="4 dígitos" maxlength="4"
+            inputmode="numeric" style="flex:1;font-family:monospace;letter-spacing:3px"
+            oninput="this.value=this.value.replace(/\D/g,'')">
+          <button type="button" onclick="regenClaveRecojo()" title="Generar otra"
+            style="flex-shrink:0;padding:9px 12px;border-radius:9px;cursor:pointer;font-family:inherit;
+            font-size:14px;background:rgba(163,113,247,.15);border:1px solid rgba(163,113,247,.35);
+            color:#a78bfa">🎲</button>
+        </div>
+        <div style="font-size:10px;color:#8b949e;margin-top:4px;line-height:1.5">
+          La necesita tu cliente para retirar en la agencia. Se manda a Shalom al registrar el envío.</div>
+      </div>
       <!-- ★ MEDIDAS DEL PAQUETE: mismo patrón que "📎 Documentos del envío"
            (clase docs-accordion, genérica). El tipo se calcula al vuelo con
            Shalom.clasificarPaquete — nada se manda a ningún lado todavía; solo
@@ -4573,10 +4593,10 @@ render();
      lo usa. config.js, print.js y voz.js preguntan por los pedidos marcados,
      así que siguen yendo detrás. El orden de carga es un contrato
      (ver docs/ARQUITECTURA.md). -->
-<script src="config.js?v=33"></script>
+<script src="config.js?v=34"></script>
 <script src="print.js?v=16"></script>
 <script src="notify.js?v=4"></script>
-<script src="shalom.js?v=18"></script>
+<script src="shalom.js?v=19"></script>
 <script src="tracking.js?v=19"></script>
 <script src="floatpanel.js?v=4"></script>
 <script src="delivery.js?v=8"></script>

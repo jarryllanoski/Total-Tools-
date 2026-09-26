@@ -263,6 +263,81 @@ module.exports = async (t) => {
        'el nombre se escapa al pintarlo: viene de fuera, como todo');
   }
 
+  bloque('Ningún motivo se calla');
+
+  {
+    /* EL FALLO QUE OBLIGA A ESTO: el aviso de RENIEC tenía un `else` que
+       dejaba el mensaje en blanco cuando el motivo no estaba previsto. Salía
+       "Consultando…", desaparecía, y no pasaba nada más. Pasó de verdad con
+       SIN_TRADUCTOR, y es justo el patrón que este proyecto lleva semanas
+       cazando: algo falla y nadie se entera. */
+    const t = S.textoMotivo;
+    ok(typeof t === 'function', 'los motivos tienen palabras en un solo sitio');
+
+    const codigos = ['SIN_SESION', 'SIN_PERMISO', 'SIN_RED', 'SIN_DATO',
+      'NO_ENCONTRADO', 'BLOQUEADO', 'LIMITE', 'ERROR_SHALOM', 'DESCONECTADO',
+      'APAGADA', 'PUERTA_CERRADA', 'FORMATO_DESCONOCIDO', 'SIN_TRADUCTOR'];
+    const mudos = codigos.filter((c) => !t(c) || t(c).length < 10);
+    ok(mudos.length === 0,
+       'los 13 motivos conocidos dicen algo entendible' +
+       (mudos.length ? ' — mudos: ' + mudos.join(', ') : ''));
+
+    ok(t('SIN_TRADUCTOR').indexOf('servidor') > 0,
+       'y SIN_TRADUCTOR —el que provocó esto— dice lo que de verdad pasa: la ' +
+       'función del servidor está desplegada a medias');
+
+    // Lo importante no es lo que está en la lista: es lo que NO está.
+    ok(t('COSA_QUE_NO_EXISTE').indexOf('COSA_QUE_NO_EXISTE') > 0,
+       'un motivo desconocido sale CON SU CÓDIGO dentro. Feo, pero dice dónde ' +
+       'mirar; un aviso feo vale mil veces más que uno que se desvanece');
+    const vacios = ['', null, undefined, 0, {}].filter((x) => !t(x));
+    ok(vacios.length === 0,
+       'y NUNCA devuelve vacío, con nada: el silencio es el fallo, no el ' +
+       'mensaje raro');
+  }
+
+  bloque('La clave de recojo: 4 dígitos que no se adivinan');
+
+  {
+    /* Es lo único que separa el paquete de quien no debe llevárselo. */
+    const cs = [];
+    for (let i = 0; i < 300; i++) cs.push(S.claveRecojo());
+    ok(cs.every((c) => /^[0-9]{4}$/.test(c)),
+       'siempre 4 dígitos, con sus ceros a la izquierda');
+    ok(new Set(cs).size > 200,
+       'y no se repiten: 300 claves dan más de 200 distintas');
+
+    {
+      /* Que el CÓDIGO mencione `getRandomValues` no prueba nada: puede estar
+         en una rama muerta. Lo descubrió una mutación que sobrevivió —bastó
+         poner el objeto crypto a null para caer en `Math.random()` sin que
+         ninguna prueba se quejara—. Así que se comprueba que se LLAMA. */
+      const w = {};
+      let usos = 0;
+      w.crypto = {getRandomValues: (a) => { usos++; a[0] = 424242; return a; }};
+      E.cargar('shalom.js', w);
+      const c = w.Shalom.claveRecojo();
+      ok(usos > 0,
+         'la clave se pide al generador criptográfico DE VERDAD, no solo se ' +
+         'menciona en el código: `Math.random()` produce una secuencia que se ' +
+         'adivina a partir de las anteriores, y aquí lo que se adivinaría es ' +
+         'la clave del paquete de un cliente');
+      ok(c === '4242', 'y sale de ahí: 424242 % 10000 = 4242');
+    }
+    {
+      // El rechazo: un valor por encima del corte se descarta y se pide otro.
+      const w = {};
+      const cola = [4294967000, 1234];
+      let i = 0;
+      w.crypto = {getRandomValues: (a) => { a[0] = cola[i++]; return a; }};
+      E.cargar('shalom.js', w);
+      ok(w.Shalom.claveRecojo() === '1234',
+         'un valor por encima del corte se DESCARTA y se pide otro: sin eso, ' +
+         'del 0000 al 7295 saldrían más a menudo que el resto');
+      ok(i === 2, 'y hubo que pedir dos veces, que es el rechazo funcionando');
+    }
+  }
+
   bloque('Lo local sigue vivo sin conexión');
   {
     ok(JSON.stringify(S.clasificarPaquete(25, 15, 10, 1.5)) ===

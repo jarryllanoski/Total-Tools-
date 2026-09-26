@@ -307,4 +307,48 @@ module.exports = async ({bloque, ok}) => {
     ok(/_panelShalomSearch\(q\)/.test(cfg.slice(cfg.indexOf('function onOrigenInput'))),
        'y reutiliza el buscador que ya existe: ni un widget nuevo');
   }
+
+  bloque('La clave de recojo en el formulario');
+
+  {
+    const cfg = E.leer('config.js');
+    const html = E.leer('index.html');
+
+    ok(/if\(el\.value\) return;/.test(cfg),
+       'una clave que ya existe NO se pisa al abrir el pedido');
+    ok(/if\(\(\$\('fShalomGuia'\)\|\|\{value:''\}\)\.value\.trim\(\)\) return;/.test(cfg),
+       'y un pedido que YA tiene guía no genera una nueva: ese envío ya está ' +
+       'en Shalom, y cambiar la clave aquí le daría al cliente un número que ' +
+       'no abre nada');
+    ok(/if\(isShalom\)\{ _claveAuto\(\);/.test(cfg),
+       'se genera al aparecer el bloque de Shalom, no antes: en un DELIVERY ' +
+       'sería un campo con un número que no significa nada');
+    ok(/includes\('SHALOM'\)\)\{\s*data\.shalomClave/.test(cfg),
+       'y solo se guarda con courier Shalom');
+    {
+      // Vacía se guarda como cadena vacía, nunca `undefined`: así el borrado
+      // también viaja a la nube en vez de quedarse en el dispositivo.
+      const linea = /data\.shalomClave = [^\n]*/.exec(cfg);
+      ok(linea && /\|\|''\)/.test(linea[0]) && /replace\(\/\\D\/g,''\)/.test(linea[0]),
+         'se guarda vacía al borrarla y solo con dígitos, nunca undefined: ' +
+         'así el borrado también viaja a la nube');
+      ok(linea && /slice\(0, ?4\)/.test(linea[0]), 'y recortada a 4');
+    }
+
+    /* Y NO va en las listas de "conservar el valor previo": las dos dicen
+       «si no viene del otro lado, conserva el mío», y con '' —que es falso—
+       borrar la clave no se guardaría jamás. */
+    const merge = html.slice(html.indexOf("'trackingOrderNumber','trackingOrderCode'"),
+        html.indexOf("].forEach(k=>{"));
+    ok(merge.indexOf('shalomClave') < 0,
+       'no está en la lista de campos que se conservan del local: ahí, borrar ' +
+       'la clave no se guardaría nunca');
+    const editar = cfg.slice(cfg.indexOf('// Preservar campos tracking al editar'),
+        cfg.indexOf("'dniDestinatario'].forEach"));
+    ok(editar.indexOf('shalomClave') < 0, 'ni en la del editor, por lo mismo');
+
+    ok(/id="fShalomClave"/.test(html) && /maxlength="4"/.test(html),
+       'el campo existe y admite 4 dígitos');
+    ok(/onclick="regenClaveRecojo\(\)"/.test(html), 'con su botón 🎲');
+  }
 };

@@ -448,6 +448,37 @@ Se pregunta al llegar a **8 dígitos** y **una sola vez por DNI**. Un **404 es
 un DNI mal escrito**, y se avisa ahí mismo: un envío registrado con DNI malo
 es un envío que el cliente **no puede recoger**.
 
+### La clave de recojo
+
+Los 4 dígitos que el destinatario necesita para retirar en la agencia.
+`POST /account/register` la acepta como `clave`, **y es la razón por la que se
+eligió el endpoint individual y no el masivo: el masivo no la admite.**
+
+Sale del **generador criptográfico** del navegador, no de `Math.random()`:
+esta clave es lo único que separa el paquete de quien no debe llevárselo, y
+`Math.random` produce una secuencia que se adivina a partir de las anteriores.
+Con **rechazo**, para que los 10 000 valores salgan igual de a menudo — sin
+eso, del `0000` al `7295` saldrían más.
+
+Se genera **al aparecer el bloque de Shalom** (antes no se sabía que el pedido
+iba por ahí), se puede cambiar, y **un pedido que ya tiene guía no la
+regenera**: ese envío ya está en Shalom, y cambiarla aquí le daría al cliente
+un número que no abre nada.
+
+### ⚠️ Ningún motivo se calla
+
+`Shalom.textoMotivo()` traduce los motivos a palabras y **nunca devuelve
+vacío**. Un motivo que no está en la lista sale **con su código dentro**.
+
+Existe por un fallo real, y propio: el aviso de RENIEC tenía un `else` que
+dejaba el mensaje en blanco cuando el motivo no estaba previsto. Salía
+*"Consultando…"*, desaparecía, y no pasaba nada más — sin error y sin pista.
+Ocurrió con `SIN_TRADUCTOR` (la función estaba desplegada a medias) y costó
+una ronda entera averiguar por qué. Es justo el patrón que este repositorio
+lleva semanas cazando: **algo falla y nadie se entera.**
+
+Un aviso feo vale mil veces más que uno que se desvanece.
+
 ### ⚠️ Parámetros que van DENTRO de la ruta
 
 `GET /account/dni/{dni}` fue el primero que lleva el dato en la dirección, y

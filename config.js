@@ -401,6 +401,7 @@ function openForm(id){
      "sin identificar" mientras no elijas de la lista. */
   _agElegida = null; _agTexto = '';
   _dniPedido = ''; if(typeof _dniAviso==='function') _dniAviso('');
+  if($('fShalomClave')) $('fShalomClave').value = '';
   if(id && window.Agencias){
     const _s0 = (S.shipments||[]).find(x=>x.id===id);
     if(_s0 && Agencias.identificada(_s0)){
@@ -466,7 +467,10 @@ function openForm(id){
     if(addrLbl) addrLbl.textContent = isEnc ? 'Ciudad destino *' : 'Dirección *';
     if(encGrp)  encGrp.style.display = isEnc ? '' : 'none';
     // SHALOM: precargar agencias para búsqueda instantánea; si no, ocultar dropdown
-    if(isShalom){ if(typeof _panelShalomLoad==='function') _panelShalomLoad(); }
+    // Al aparecer el bloque de Shalom es cuando la clave hace falta: antes no
+    // se sabía que este pedido iba por ahí, y generarla en un pedido de
+    // DELIVERY sería un campo lleno que no significa nada.
+    if(isShalom){ _claveAuto(); if(typeof _panelShalomLoad==='function') _panelShalomLoad(); }
     else { const d=$('shDrop'); if(d) d.style.display='none'; }
     if(typeof _updateShalomMic==='function') _updateShalomMic();
   };
@@ -476,6 +480,7 @@ function openForm(id){
   if(id){
     const s=S.shipments.find(x=>x.id===id);
     if(s){
+      if($('fShalomClave'))  $('fShalomClave').value  = s.shalomClave||'';
       if($('fShalomGuia'))   $('fShalomGuia').value   = s.trackingOrderNumber||s.shalomGuia||'';
       if(window.Guias) Guias.vigilar('fShalomGuia', id); // avisos: formato y guía repetida
       if($('fShalomCodigo')) $('fShalomCodigo').value = s.trackingOrderCode||s.shalomCodigo||'';
@@ -700,6 +705,33 @@ function onAddrInput(val){
     drop.style.display='block';
   },300);
 }
+/* ── CLAVE DE RECOJO ─────────────────────────────────────────────────────
+   Los 4 dígitos que el destinatario necesita para retirar el paquete en la
+   agencia. `POST /account/register` la acepta como `clave`, y es la razón
+   por la que se eligió el endpoint individual y no el masivo: el masivo NO
+   la admite.
+
+   Se genera sola —una menos que inventar por pedido— pero se puede cambiar.
+   Y NO se regenera sola en un pedido que ya tiene guía: la clave que se le
+   dio a Shalom es la que el cliente va a usar, y cambiarla aquí dejaría al
+   cliente con un número que no abre nada. */
+function regenClaveRecojo(){
+  const el = $('fShalomClave'); if(!el) return;
+  if(!window.Shalom || typeof Shalom.claveRecojo !== 'function') return;
+  el.value = Shalom.claveRecojo();
+  toast('🔑 Clave nueva: '+el.value);
+}
+
+function _claveAuto(){
+  const el = $('fShalomClave'); if(!el) return;
+  if(el.value) return;                       // ya tiene una: no se pisa
+  // Un pedido con guía ya está registrado en Shalom: generarle una clave
+  // nueva aquí sería darle al cliente un número que no abre nada.
+  if(($('fShalomGuia')||{value:''}).value.trim()) return;
+  if(!window.Shalom || typeof Shalom.claveRecojo !== 'function') return;
+  el.value = Shalom.claveRecojo();
+}
+
 /* ── TU AGENCIA DE ORIGEN ─────────────────────────────────────────────────
    `POST /account/register` pide `origen`, y también es un `ter_id`. Como es
    siempre la misma, se elige UNA VEZ aquí en vez de en cada envío.
@@ -827,14 +859,19 @@ async function _dniReniec(valor){
   if(($('fDni')||{value:''}).value.replace(/\D/g,'') !== n) return;
   if(!r || !r.ok){
     const m = (r&&r.motivo)||'';
+    /* ★ NINGÚN MOTIVO SE CALLA.
+       Aquí había un `else` que dejaba el aviso en blanco cuando el motivo no
+       estaba previsto: salía "Consultando…", desaparecía, y no pasaba nada
+       más. Sin error, sin pista. Es el patrón que este proyecto lleva
+       semanas cazando —algo falla y nadie se entera— y lo escribí yo mismo,
+       con un comentario que lo justificaba. Pasó de verdad con
+       SIN_TRADUCTOR. `Shalom.textoMotivo` nunca devuelve vacío. */
     if(m === 'NO_ENCONTRADO'){
       _dniAviso('⚠️ <b>Ese DNI no existe en RENIEC.</b> Revísalo: un envío registrado con DNI malo no se puede recoger.', '#f59e0b');
-    } else if(m === 'SIN_SESION'){
-      _dniAviso('🔒 Tu sesión venció — ingresa de nuevo.', '#f87171');
-    } else if(m === 'SIN_RED'){
-      _dniAviso('📴 Sin conexión — el nombre se puede escribir a mano.');
     } else {
-      _dniAviso('');   // callado: no estorbar por algo que no sabemos explicar
+      const txt = (window.Shalom && Shalom.textoMotivo) ? Shalom.textoMotivo(m)
+        : ('No se pudo consultar ('+(m||'sin motivo')+').');
+      _dniAviso('🪪 '+escH(txt), m==='SIN_RED' ? '#8b949e' : '#f59e0b');
     }
     return;
   }
@@ -966,6 +1003,12 @@ function saveShipment(){
     const _agV = _agVigente();
     if(_agV) Object.assign(data, _agV);
     else Object.assign(data, Agencias.limpiar(_editId ? (S.shipments||[]).find(x=>x.id===_editId) : null));
+  }
+  /* La clave de recojo. Solo con courier Shalom: en un DELIVERY sería un
+     campo con un número que no significa nada. Se guarda '' al vaciarla,
+     nunca undefined, para que borrarla también viaje a la nube. */
+  if(($('fCourier').value||'').toUpperCase().includes('SHALOM')){
+    data.shalomClave = (($('fShalomClave')||{value:''}).value||'').replace(/\D/g,'').slice(0,4);
   }
   if(_sGuia)  { data.trackingOrderNumber=_sGuia;   data.shalomGuia=_sGuia; }
   if(_sCodigo){ data.trackingOrderCode  =_sCodigo; data.shalomCodigo=_sCodigo; }

@@ -239,6 +239,61 @@
       });
     },
 
+    /* Un motivo, en palabras. NUNCA devuelve vacío, y esa es toda la
+       gracia.
+
+       El fallo que obliga a esto: el aviso de RENIEC tenía un `else` que
+       dejaba el mensaje en blanco cuando el motivo no estaba previsto. Salía
+       "Consultando…", desaparecía, y no pasaba nada más — sin error, sin
+       pista. Es justo el patrón que este proyecto lleva semanas cazando:
+       algo falla y nadie se entera.
+
+       Un motivo desconocido sale con su código dentro. Feo, pero dice dónde
+       mirar; un aviso feo vale mil veces más que uno que se desvanece. */
+    textoMotivo: function (m) {
+      var k = String(m || '').toUpperCase();
+      var T = {
+        SIN_SESION:    'Tu sesión venció — ingresa de nuevo.',
+        SIN_PERMISO:   'Tu cuenta no está autorizada para esto.',
+        SIN_RED:       'Sin conexión. Reintenta en un momento.',
+        SIN_DATO:      'Faltan datos para consultar.',
+        NO_ENCONTRADO: 'Shalom no encontró ese dato.',
+        BLOQUEADO:     'Shalom rechazó la clave de la API, o el plan venció.',
+        LIMITE:        'Se agotó la cuota del plan de Shalom.',
+        ERROR_SHALOM:  'Shalom respondió con un error. Reintenta en unos minutos.',
+        DESCONECTADO:  'Esa parte de la integración todavía no está conectada.',
+        APAGADA:       'La puerta a Shalom está apagada en Config.',
+        PUERTA_CERRADA: 'La puerta se pausó sola tras varios fallos seguidos. Vuelve a intentar en unos minutos.',
+        FORMATO_DESCONOCIDO: 'Shalom respondió algo que no se reconoce. No se va a adivinar.',
+        SIN_TRADUCTOR: 'Esa operación está desplegada a medias: falta actualizar la función del servidor.'
+      };
+      if (T[k]) return T[k];
+      // Lo que no está en la lista se dice IGUAL, con su código: callarse
+      // aquí es como se pierde una tarde buscando qué pasó.
+      return 'No se pudo consultar' + (k ? ' (' + k + ')' : '') + '.';
+    },
+
+    /* La clave de recojo de un envío: 4 dígitos.
+
+       Del generador criptográfico del navegador, NO de `Math.random()`. Esta
+       clave es lo único que separa el paquete de quien no debe llevárselo, y
+       `Math.random` produce una secuencia que se puede adivinar a partir de
+       las anteriores. Con rechazo, para que los 10 000 valores salgan con la
+       misma probabilidad. */
+    claveRecojo: function () {
+      try {
+        var c = global.crypto || (global.msCrypto);
+        if (c && c.getRandomValues) {
+          var a = new Uint32Array(1);
+          // 429496 * 10000: el múltiplo de 10 000 más alto por debajo de
+          // 2^32. Sin esto, los valores 0000-7295 saldrían más a menudo.
+          do { c.getRandomValues(a); } while (a[0] >= 4294960000);
+          return String(a[0] % 10000).padStart(4, '0');
+        }
+      } catch (e) { /* cae al de abajo */ }
+      return String(Math.floor(Math.random() * 10000)).padStart(4, '0');
+    },
+
     /* Diagnóstico: la FORMA de la respuesta de un endpoint, sin un solo
        valor dentro. Es la herramienta con la que se escribe cada contrato
        contra lo que la API devuelve de verdad — la documentación y la
