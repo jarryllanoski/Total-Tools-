@@ -248,6 +248,45 @@ El centro de alertas cubre negocio (retrasados, sin guía, sin cerrar). **Ningun
 alerta observa si tus cambios llegan a Firestore.** La clase de fallo más cara
 es la única sin cobertura.
 
+### ✅ 25 · Storage dejaba escribir a cualquiera con cuenta de Google
+
+`storage.rules` exigía solo esto para subir un archivo:
+
+```js
+allow write: if request.auth != null;
+```
+
+**`request.auth != null` es cualquiera que inicie sesión.** Firebase Auth con
+Google acepta a todo el mundo: bastaba con entrar al proyecto con un Gmail
+cualquiera para poder subir archivos, **pisar las fotos de las guías** o
+llenar el bucket. Las reglas de **Firestore** ya exigían estar en la lista de
+administradores desde septiembre; las de Storage se habían quedado atrás.
+
+**Arreglado.** Los dos caminos (`shipments/` y `recursos/`) exigen ahora
+`esAdmin()`, con la misma comprobación que Firestore — **incluido
+`email_verified`**, sin el cual la lista se podría reclamar registrándose con
+uno de esos correos.
+
+**La lectura sigue siendo pública, a propósito:** esas URLs se mandan por
+WhatsApp y el formulario de seguimiento las muestra. Son documentos de envío,
+no secretos.
+
+**Se comprobó antes de restringir** que nadie más escribe: la única subida del
+proyecto está en `storage.js`, `formulario.html` no lo carga siquiera, y las
+Cloud Functions usan el Admin SDK, que se salta las reglas. Exigir
+administrador no le quita nada al cliente.
+
+⚠️ **La lista de administradores está DUPLICADA** en los dos archivos, porque
+Storage no puede leer de Firestore sin pagar una lectura por petición. Al
+agregar o quitar un administrador hay que **tocar los dos** y desplegar:
+
+```
+firebase deploy --only firestore:rules,storage
+```
+
+`tests/reglas.test.js` **falla si las dos listas dejan de coincidir** — una
+lista duplicada que nadie compara se desincroniza sola.
+
 ### ⬜ 24 · El webhook cobraba por cada golpe en la puerta
 
 `shalomWebhook` era **la única puerta pública sin autenticación del sistema**.

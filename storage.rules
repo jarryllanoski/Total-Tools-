@@ -1,24 +1,61 @@
 rules_version = '2';
+// ============================================================================
+// Total Tools — Reglas de Firebase Storage
+// ----------------------------------------------------------------------------
+// LECTURA PÚBLICA, ESCRITURA SOLO DE ADMINISTRADORES.
+//
+// La lectura es pública a propósito: estas URLs se mandan por WhatsApp y el
+// formulario de seguimiento las muestra al cliente. Son documentos de envío,
+// no secretos.
+//
+// La ESCRITURA exigía solo `request.auth != null` — o sea, CUALQUIERA con una
+// cuenta de Google que iniciara sesión en el proyecto podía subir archivos,
+// pisar las fotos de las guías o llenar el bucket. Firestore ya exigía estar
+// en la lista de administradores; Storage se había quedado atrás.
+//
+// ⚠️ EL CORREO SOLO VALE SI ESTÁ VERIFICADO, por la misma razón que en
+// firestore.rules: con correo/contraseña cualquiera puede registrarse con un
+// correo que no es suyo. `email_verified` solo es true cuando el proveedor
+// confirmó la identidad — Google siempre lo hace, un registro con contraseña
+// nunca. Así esta lista no se puede reclamar registrándose con uno de estos
+// correos.
+//
+// ⚠️ LA LISTA ESTÁ DUPLICADA con la de firestore.rules porque Storage no
+// puede leer de Firestore sin pagar una lectura por petición. Si agregas o
+// quitas un administrador, TÓCALAS LAS DOS y despliega:
+//     firebase deploy --only firestore:rules,storage
+// Hay una prueba que falla si las dos listas dejan de coincidir.
+//
+// Quién escribe de verdad: solo `storage.js`, y solo desde el panel. El
+// formulario público NO lo carga y nunca sube nada. Las Cloud Functions usan
+// el Admin SDK, que se salta estas reglas.
+// ============================================================================
 service firebase.storage {
   match /b/{bucket}/o {
+
+    // ── Quién es administrador ────────────────────────────────────────────
+    function esAdmin() {
+      return request.auth != null
+        && request.auth.token.email_verified == true
+        && request.auth.token.email in [
+          'jarryllanoski@gmail.com',
+          'redbolima@gmail.com'
+        ];
+    }
     // Documentos de envíos (guías, embalados, tickets)
     // Lectura pública: las URLs se comparten por WhatsApp y el formulario público las muestra
-    // Escritura: solo el operador autenticado del panel (request.auth != null)
+    // Escritura: solo un administrador de la lista de arriba
     match /shipments/{shipId}/{fileName} {
       allow read:  if true;
-      allow write: if request.auth != null;
+      allow write: if esAdmin();
     }
 
     // Portadas del centro de recursos
     // Lectura pública: igual que los documentos de envíos, y el día que el
     // cliente vea avisos en su link las va a necesitar.
-    // ⚠️ La escritura es `request.auth != null`, el MISMO nivel que arriba —
-    // y ese nivel es más flojo que el de Firestore, que sí exige estar en la
-    // lista de administradores. Se deja igual a propósito para no cambiar dos
-    // cosas a la vez; está anotado como deuda aparte.
     match /recursos/{grupo}/{fileName} {
       allow read:  if true;
-      allow write: if request.auth != null;
+      allow write: if esAdmin();
     }
 
     // Cualquier otro path: denegado por defecto

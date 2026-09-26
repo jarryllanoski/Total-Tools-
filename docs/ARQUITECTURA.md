@@ -189,10 +189,11 @@ escapa al pintar, en la fila **y** en la tarjeta del mosaico.
 `storage.rules`; sin ella la subida daría un 403 que parece un problema de
 sesión), con el `uploadFile` de siempre, que ahora acepta carpeta destino.
 
-⚠️ **Deuda anotada:** `storage.rules` permite escribir con
-`request.auth != null` — *cualquiera* con una cuenta de Google, no solo los
-administradores. Firestore sí exige la lista. Es anterior a esto y se arregla
-aparte.
+Las escrituras a Storage exigen ser administrador (`esAdmin()` en
+`storage.rules`, la misma comprobación que Firestore). La lista está duplicada
+en los dos archivos por obligación —Storage no puede leer de Firestore sin
+pagar una lectura por petición— y `tests/reglas.test.js` falla si dejan de
+coincidir.
 
 ### Nota · Avisos del número de guía (`guias.js`)
 
