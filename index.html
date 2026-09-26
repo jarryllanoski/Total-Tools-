@@ -1117,7 +1117,7 @@
       <div class="fg"><label class="fl">Teléfono *</label><input class="fi phone-norm" id="fPhone" placeholder="9XXXXXXXX o @usuario" inputmode="text" oninput="if(typeof _clienteHintUpdate==='function')_clienteHintUpdate()"></div>
     </div>
     <div class="frow">
-      <div class="fg"><label class="fl">DNI</label><input class="fi" id="fDni" placeholder="12345678" maxlength="8" inputmode="numeric" oninput="if(typeof _clienteHintUpdate==='function')_clienteHintUpdate()"></div>
+      <div class="fg"><label class="fl">DNI</label><input class="fi" id="fDni" placeholder="12345678" maxlength="8" inputmode="numeric" oninput="if(typeof _clienteHintUpdate==='function')_clienteHintUpdate();if(typeof _dniReniec==='function')_dniReniec(this.value)"><div id="fDniReniec" style="display:none"></div></div>
       <div class="fg" id="fEncAgenciaGroup" style="display:none"><label class="fl">Agencia</label><input class="fi" id="fEncAgencia" placeholder="Nombre de la agencia"></div>
     </div>
     <div id="clienteHint" style="display:none;margin-bottom:11px"></div>
@@ -4555,10 +4555,10 @@ render();
      lo usa. config.js, print.js y voz.js preguntan por los pedidos marcados,
      así que siguen yendo detrás. El orden de carga es un contrato
      (ver docs/ARQUITECTURA.md). -->
-<script src="config.js?v=31"></script>
+<script src="config.js?v=32"></script>
 <script src="print.js?v=16"></script>
 <script src="notify.js?v=4"></script>
-<script src="shalom.js?v=17"></script>
+<script src="shalom.js?v=18"></script>
 <script src="tracking.js?v=19"></script>
 <script src="floatpanel.js?v=4"></script>
 <script src="delivery.js?v=8"></script>

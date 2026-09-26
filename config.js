@@ -400,6 +400,7 @@ function openForm(id){
      tiene y no pasa nada: funciona igual que siempre, solo que el aviso dirá
      "sin identificar" mientras no elijas de la lista. */
   _agElegida = null; _agTexto = '';
+  _dniPedido = ''; if(typeof _dniAviso==='function') _dniAviso('');
   if(id && window.Agencias){
     const _s0 = (S.shipments||[]).find(x=>x.id===id);
     if(_s0 && Agencias.identificada(_s0)){
@@ -699,6 +700,80 @@ function onAddrInput(val){
     drop.style.display='block';
   },300);
 }
+/* ── RENIEC: EL NOMBRE REAL A PARTIR DEL DNI ──────────────────────────────
+   `POST /account/register` pide el nombre PARTIDO en nombres, apellido
+   paterno y apellido materno. Partir "JARLYN LLANOS ARTEAGA" a ojo se
+   equivoca con cualquier nombre compuesto; RENIEC ya los da separados.
+
+   TRES REGLAS, y las tres cuestan dinero o confianza si se rompen:
+   1. Se pregunta al llegar a 8 dígitos, y UNA SOLA VEZ por DNI. Cada consulta
+      gasta cuota del plan, así que disparar en cada tecla saldría carísimo.
+   2. NO SE PISA lo que escribiste. RENIEC se OFRECE con un botón; el nombre
+      con el que tú llamas a un cliente y el que dice su documento no tienen
+      por qué ser el mismo, y el tuyo es el que usas para hablarle.
+   3. Un 404 es un DNI MAL ESCRITO, y eso se avisa AQUÍ — un envío registrado
+      con DNI malo es un envío que tu cliente no puede recoger. */
+let _dniPedido = '';   // el último DNI por el que ya se preguntó
+
+function _dniAviso(html, color){
+  const el = $('fDniReniec'); if(!el) return;
+  if(!html){ el.style.display='none'; el.innerHTML=''; return; }
+  el.style.display='block';
+  el.style.cssText = 'display:block;font-size:10.5px;line-height:1.5;margin-top:5px;color:'+(color||'#8b949e');
+  el.innerHTML = html;
+}
+
+function _dniUsar(){
+  const p = window._dniUltima; if(!p) return;
+  $('fName').value = p.completo;
+  _dniAviso('✅ Nombre de RENIEC puesto', 'var(--green,#2ea043)');
+}
+
+async function _dniReniec(valor){
+  const n = String(valor||'').replace(/\D/g,'');
+  if(n.length !== 8){ _dniPedido=''; _dniAviso(''); return; }
+  // Una vez por DNI: volver a escribir el mismo número no vuelve a preguntar.
+  if(n === _dniPedido) return;
+  _dniPedido = n;
+  if(!window.Shalom || typeof Shalom.dni !== 'function'){ _dniAviso(''); return; }
+  _dniAviso('🪪 Consultando RENIEC…');
+  let r;
+  try{ r = await Shalom.dni(n); }catch(e){ r = null; }
+  // Si mientras consultaba cambiaste el DNI, este resultado ya no corresponde.
+  if(($('fDni')||{value:''}).value.replace(/\D/g,'') !== n) return;
+  if(!r || !r.ok){
+    const m = (r&&r.motivo)||'';
+    if(m === 'NO_ENCONTRADO'){
+      _dniAviso('⚠️ <b>Ese DNI no existe en RENIEC.</b> Revísalo: un envío registrado con DNI malo no se puede recoger.', '#f59e0b');
+    } else if(m === 'SIN_SESION'){
+      _dniAviso('🔒 Tu sesión venció — ingresa de nuevo.', '#f87171');
+    } else if(m === 'SIN_RED'){
+      _dniAviso('📴 Sin conexión — el nombre se puede escribir a mano.');
+    } else {
+      _dniAviso('');   // callado: no estorbar por algo que no sabemos explicar
+    }
+    return;
+  }
+  window._dniUltima = r.persona;
+  const actual = ($('fName')||{value:''}).value.trim();
+  if(!actual){
+    // Vacío: no hay nada que pisar, así que se rellena y se ahorra un toque.
+    $('fName').value = r.persona.completo;
+    _dniAviso('🪪 Nombre de RENIEC'+(r.cache?' (ya consultado antes)':''), 'var(--green,#2ea043)');
+    return;
+  }
+  if(actual.toUpperCase() === r.persona.completo.toUpperCase()){
+    _dniAviso('✅ Coincide con RENIEC', 'var(--green,#2ea043)');
+    return;
+  }
+  // Distinto: se OFRECE, no se impone.
+  _dniAviso('🪪 RENIEC dice: <b>'+escH(r.persona.completo)+'</b> '+
+    '<button type="button" onclick="_dniUsar()" style="background:rgba(56,139,253,.15);'+
+    'border:1px solid rgba(56,139,253,.4);border-radius:6px;color:var(--blue);'+
+    'font-size:10px;font-weight:700;padding:2px 7px;cursor:pointer;font-family:inherit;'+
+    'margin-left:4px">Usar este</button>');
+}
+
 /* ── LA AGENCIA IDENTIFICADA ──────────────────────────────────────────────
    `_agElegida` guarda los cuatro campos mientras el formulario está abierto.
    Se pone SOLO al elegir de la lista —el único momento en que el `ter_id` se

@@ -391,6 +391,63 @@ vez aparece una URL de Shalom en el código del panel.
 Las barreras viven en el módulo y no en `index.js` **para poder probarlas**.
 Un límite de seguridad sin pruebas es una intención.
 
+## El contrato de `GET /account/dni/{dni}` — medido, no supuesto (26 sep 2026) ✅
+
+El espejo de RENIEC. La documentación solo decía *"retorna espejo de datos
+registrales"* — **ni un campo**.
+
+```json
+{ "success": "boolean", "message": "string",
+  "data": {
+    "dni":               "string(########)",
+    "nombres":           "string",
+    "apellidoPaterno":   "string",
+    "apellidoMaterno":   "string | null",
+    "digitoVerificador": "number"
+} }
+```
+
+**Por qué desbloquea el registro:** `POST /account/register` pide el nombre
+**partido** en nombres, apellido paterno y apellido materno. Partir
+`"JARLYN LLANOS ARTEAGA"` a ojo se equivoca con cualquier nombre compuesto —
+y es lo que hacía inviable el endpoint individual, el único con **clave de
+recojo**. RENIEC los da separados.
+
+### ⚠️ `apellidoMaterno` puede venir `null`
+
+Se midió con el DNI de ejemplo `12345678` y llegó `null`. **Midiendo solo con
+el del dueño no se habría visto**, y el traductor habría reventado el día que
+le tocara un cliente sin apellido materno. Va como `""`, nunca como el texto
+`"null"` ni inventado, y `completo` se arma sin dobles espacios.
+
+`digitoVerificador` **no se devuelve**: el registro no lo pide, y lo que no
+hace falta no sale del servidor.
+
+### La caché, que no es un lujo
+
+Cada consulta **gasta cuota del plan**, y *"lo repetitivo son los mismos
+clientes"*. `Shalom.dni()` guarda en `localStorage` (`tt_reniec`, tope 400) y
+**un DNI ya consultado no se vuelve a preguntar nunca**. Un dato registral no
+caduca, así que no lleva vencimiento.
+
+**Solo se cachea lo que respondió bien.** Guardar un fallo de red convertiría
+un corte de diez segundos en un DNI que nunca más se puede consultar.
+
+### Y el autocompletado no pisa lo que escribiste
+
+El nombre con el que **tú** llamas a un cliente y el que dice su documento no
+tienen por qué ser el mismo, y el tuyo es el que usas para hablarle. Así que:
+
+| Campo nombre | Qué pasa |
+|---|---|
+| Vacío | Se rellena — no hay nada que pisar |
+| Igual a RENIEC | ✅ "Coincide con RENIEC" |
+| **Distinto** | RENIEC **se ofrece** con un botón *"Usar este"*. Nunca reemplaza |
+
+Se pregunta al llegar a **8 dígitos** y **una sola vez por DNI**. Un **404 es
+un DNI mal escrito**, y se avisa ahí mismo: un envío registrado con DNI malo
+es un envío que el cliente **no puede recoger**.
+
 ### ⚠️ Parámetros que van DENTRO de la ruta
 
 `GET /account/dni/{dni}` fue el primero que lleva el dato en la dirección, y

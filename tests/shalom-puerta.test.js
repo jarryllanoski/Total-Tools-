@@ -140,7 +140,8 @@ module.exports = async ({bloque, ok}) => {
     ok(d.rutaParam.dni.test('12345678') && !d.rutaParam.dni.test('1234567') &&
        !d.rutaParam.dni.test('123456789') && !d.rutaParam.dni.test('1234567a'),
        'ocho dígitos exactos, que es lo que documenta su API');
-    ok(d.soloMedir === true, 'y en soloMedir hasta medir su forma');
+    ok(!d.soloMedir,
+       'y ya no es solo medible: su forma se midió el 26/09/2026 y se tradujo');
 
     {
       const f = conFetch(resp(200, {}));
@@ -857,5 +858,73 @@ module.exports = async ({bloque, ok}) => {
        'se ignora');
     ok(P.traducir('agencies', cruda).total === 2,
        'y el despachador manda agencies a SU traductor');
+  }
+
+  bloque('Traducir el espejo de RENIEC — el nombre YA partido');
+
+  {
+    /* FORMA REAL, medida el 26/09/2026. La documentación solo decía "espejo
+       de datos registrales": ni un campo. */
+    const real = {success: true, message: 'ok', data: {
+      dni: '12345678', nombres: 'JARLYN ENRIQUE', apellidoPaterno: 'LLANOS',
+      apellidoMaterno: 'ARTEAGA', digitoVerificador: 3}};
+    const td = P.traducirDni;
+
+    {
+      const r = td(real);
+      ok(r.ok === true, 'la forma medida se traduce');
+      ok(r.persona.nombres === 'JARLYN ENRIQUE' &&
+         r.persona.apePaterno === 'LLANOS' &&
+         r.persona.apeMaterno === 'ARTEAGA',
+         'y el nombre llega PARTIDO en tres: es justo lo que pide ' +
+         '`POST /account/register`, y lo que partir a ojo se equivoca con ' +
+         'cualquier nombre compuesto');
+      ok(r.persona.completo === 'JARLYN ENRIQUE LLANOS ARTEAGA',
+         'y armado para mostrar');
+      ok(r.persona.digitoVerificador === undefined,
+         'el dígito verificador NO viaja: el registro no lo pide, y lo que no ' +
+         'hace falta no sale del servidor');
+    }
+
+    {
+      /* ⚠️ EL HALLAZGO. Se midió con un DNI de ejemplo y `apellidoMaterno`
+         llegó null. Midiendo solo con el del dueño no se habría visto, y el
+         traductor habría reventado el día que le tocara un cliente sin
+         apellido materno. */
+      const sinMat = JSON.parse(JSON.stringify(real));
+      sinMat.data.apellidoMaterno = null;
+      const r = td(sinMat);
+      ok(r.ok === true, 'un `apellidoMaterno` null NO rompe nada');
+      ok(r.persona.apeMaterno === '',
+         'queda vacío, no "null" de texto ni inventado');
+      ok(r.persona.completo === 'JARLYN ENRIQUE LLANOS',
+         'y el nombre completo se arma sin él, sin dobles espacios');
+    }
+
+    ok(td({success: true, data: {nombres: '  ANA  ', apellidoPaterno: ' PEREZ '}})
+        .persona.completo === 'ANA PEREZ',
+       'los espacios de sobra no llegan al formulario');
+
+    bloque('…y jamás se rellena un nombre que no se ha medido');
+
+    ok(td(null).motivo === 'FORMATO_DESCONOCIDO', 'sin respuesta, nada');
+    ok(td([]).motivo === 'FORMATO_DESCONOCIDO', 'un array tampoco');
+    ok(td({data: {nombres: 'ANA'}}).motivo === 'FORMATO_DESCONOCIDO',
+       'sin `success: true` no se afirma: no se ha medido qué significa un ' +
+       'success false, y suponerlo aquí sería rellenar el nombre de un ' +
+       'cliente con lo que sea');
+    ok(td({success: true}).motivo === 'FORMATO_DESCONOCIDO', 'sin `data` tampoco');
+    ok(td({success: true, data: {apellidoPaterno: 'LLANOS'}}).motivo ===
+       'FORMATO_DESCONOCIDO',
+       'y sin `nombres` NO se afirma con los apellidos sueltos: un nombre a ' +
+       'medias en el formulario es peor que no tener ninguno');
+    ok(td({success: true, data: {nombres: '   '}}).motivo === 'FORMATO_DESCONOCIDO',
+       'ni con unos espacios por nombre');
+    ok(td({success: true, data: {nombres: 123}}).motivo === 'FORMATO_DESCONOCIDO',
+       'ni con un número donde va un nombre');
+    ok(td({success: true, data: Object.assign({campoNuevo: 1}, real.data)}).ok === true,
+       'y un campo que añadan mañana no rompe nada');
+    ok(P.traducir('dni', real).persona.nombres === 'JARLYN ENRIQUE',
+       'el despachador manda dni a SU traductor');
   }
 };

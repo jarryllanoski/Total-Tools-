@@ -142,6 +142,127 @@ module.exports = async (t) => {
     }
   }
 
+  bloque('RENIEC: un cliente que vuelve no gasta otra consulta');
+
+  {
+    /* «Lo repetitivo son los mismos clientes» — palabras del dueño. Cada
+       consulta a RENIEC gasta cuota del plan, así que un DNI ya preguntado no
+       se vuelve a preguntar NUNCA. */
+    const montarDni = (op) => {
+      op = op || {};
+      const red = {llamadas: 0, cuerpo: null};
+      // El token de sesión hace falta: sin él, `_pedir` corta en SIN_SESION
+      // antes de tocar la red y la caché no se estaría probando.
+      const almacen = Object.assign({tt_id_token: 'TOKEN123'}, op.almacen || {});
+      const win = {_authEnsureToken: async () => true};
+      const extra = {
+        localStorage: {
+          getItem: (k) => (k in almacen ? almacen[k] : null),
+          setItem: (k, v) => { almacen[k] = String(v); }
+        },
+        fetch: async (url, o) => {
+          red.llamadas++;
+          red.cuerpo = JSON.parse(o.body);
+          if (op.revienta) throw new Error('sin red');
+          return {status: 200, json: async () => (op.json || {ok: true,
+            persona: {dni: '12345678', nombres: 'ANA', apePaterno: 'PEREZ',
+              apeMaterno: '', completo: 'ANA PEREZ'}})};
+        }
+      };
+      E.cargar('shalom.js', win, extra);
+      return {S: win.Shalom, red, almacen};
+    };
+
+    {
+      const m = montarDni({});
+      const r1 = await m.S.dni('12345678');
+      ok(r1.ok === true && r1.persona.nombres === 'ANA',
+         'la primera vez pregunta y devuelve la persona');
+      ok(m.red.llamadas === 1, 'una consulta');
+      ok(m.red.cuerpo.op === 'dni' && m.red.cuerpo.datos.dni === '12345678',
+         'por la puerta, con el DNI en `datos` — nunca pegado a la URL desde ' +
+         'el navegador');
+
+      const r2 = await m.S.dni('12345678');
+      ok(r2.ok === true && r2.cache === true,
+         'la segunda sale de la caché, y lo dice');
+      ok(m.red.llamadas === 1,
+         'y NO gasta otra consulta: es el ahorro, no un detalle');
+      ok(r2.persona.nombres === 'ANA', 'con el mismo dato');
+    }
+
+    {
+      const m = montarDni({});
+      await m.S.dni('12 345 678');
+      ok(m.red.cuerpo.datos.dni === '12345678',
+         'los espacios de un copiar-pegar no llegan a la API');
+      const r = await m.S.dni('1234567');
+      ok(r.motivo === 'SIN_DATO' && m.red.llamadas === 1,
+         'y con 7 dígitos no se gasta una consulta: se sabe de antemano que ' +
+         'la API lo va a rechazar');
+    }
+
+    {
+      /* Cachear un fallo de red convertiría un corte de diez segundos en un
+         DNI que nunca más se puede consultar. */
+      const m = montarDni({revienta: true});
+      const r = await m.S.dni('12345678');
+      ok(r.ok === false, 'sin red, falla');
+      ok(!m.almacen.tt_reniec || m.almacen.tt_reniec.indexOf('12345678') < 0,
+         'y NO se guarda en la caché: un corte de red no puede dejar un DNI ' +
+         'envenenado para siempre');
+      const m2 = montarDni({});
+      await m2.S.dni('12345678');
+      ok(m2.red.llamadas === 1, 'así que la próxima vez sí se pregunta');
+    }
+
+    {
+      // Lo que dejó una versión anterior del panel, o algo a medias.
+      const m = montarDni({almacen: {tt_reniec: '{"12345678":{"nombres":""}}'}});
+      await m.S.dni('12345678');
+      ok(m.red.llamadas === 1,
+         'una entrada de caché sin nombre se ignora y se vuelve a preguntar: ' +
+         'un nombre a medias en el formulario es peor que preguntar otra vez');
+      const m2 = montarDni({almacen: {tt_reniec: 'esto no es json'}});
+      const r = await m2.S.dni('12345678');
+      ok(r.ok === true, 'y una caché corrupta no rompe la consulta');
+    }
+  }
+
+  bloque('El autocompletado no pisa lo que escribiste');
+
+  {
+    /* El nombre con el que TÚ llamas a un cliente y el que dice su documento
+       no tienen por qué ser el mismo, y el tuyo es el que usas para hablarle.
+       Así que RENIEC se OFRECE con un botón; nunca reemplaza. */
+    const cfg = E.leer('config.js');
+    const bloqueDni = cfg.slice(cfg.indexOf('async function _dniReniec'),
+        cfg.indexOf('/* ── LA AGENCIA IDENTIFICADA'));
+
+    ok(/if\(n\.length !== 8\)/.test(bloqueDni),
+       'no se pregunta hasta tener los 8 dígitos: cada consulta gasta cuota ' +
+       'del plan, y disparar en cada tecla saldría carísimo');
+    ok(/if\(n === _dniPedido\) return;/.test(bloqueDni),
+       'y una sola vez por DNI: volver a escribir el mismo número no vuelve a ' +
+       'preguntar');
+    ok(/if\(!actual\)\{/.test(bloqueDni),
+       'con el nombre VACÍO se rellena: no hay nada que pisar y se ahorra un toque');
+    ok(/Usar este<\/button>/.test(bloqueDni),
+       'pero si ya escribiste algo distinto, RENIEC se OFRECE con un botón');
+    ok(bloqueDni.indexOf("$('fName').value = r.persona.completo") > 0 &&
+       (bloqueDni.match(/\$\('fName'\)\.value = /g) || []).length === 1,
+       'y solo hay UN sitio que escribe el nombre desde RENIEC, en el caso ' +
+       'del campo vacío — el otro está detrás del botón');
+    ok(/NO_ENCONTRADO/.test(bloqueDni) && /no existe en RENIEC/.test(bloqueDni),
+       'un DNI que no existe se avisa AQUÍ: un envío registrado con DNI malo ' +
+       'es un envío que el cliente no puede recoger');
+    ok(/\.value\.replace\(\/\\D\/g,''\) !== n\) return;/.test(bloqueDni),
+       'y si cambiaste el DNI mientras consultaba, el resultado viejo se ' +
+       'descarta: rellenar con el nombre del DNI anterior sería peor que nada');
+    ok(/escH\(r\.persona\.completo\)/.test(bloqueDni),
+       'el nombre se escapa al pintarlo: viene de fuera, como todo');
+  }
+
   bloque('Lo local sigue vivo sin conexión');
   {
     ok(JSON.stringify(S.clasificarPaquete(25, 15, 10, 1.5)) ===

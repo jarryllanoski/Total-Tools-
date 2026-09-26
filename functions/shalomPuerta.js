@@ -74,7 +74,7 @@ const PERMITIDAS = {
      `rutaParam` no codifica: EXIGE la forma, y si no cuadra la peticion no
      sale. La forma es la que documenta su API: 8 digitos, ni uno mas. */
   dni: {metodo: "GET", ruta: "/account/dni/{dni}",
-    rutaParam: {dni: /^[0-9]{8}$/}, soloMedir: true},
+    rutaParam: {dni: /^[0-9]{8}$/}},
 };
 
 /**
@@ -641,6 +641,63 @@ function traducirAgencias(j) {
 }
 
 /**
+ * Traduce `GET /account/dni/{dni}` (espejo de RENIEC) al contrato del panel.
+ *
+ * FORMA REAL MEDIDA (26 sep 2026, contra la API desplegada):
+ *   {success:boolean, message:string, data:{
+ *      dni:string(8), nombres:string, apellidoPaterno:string,
+ *      apellidoMaterno:string|null, digitoVerificador:number}}
+ *
+ * La documentacion solo decia "espejo de datos registrales" — ni un campo.
+ *
+ * POR QUE IMPORTA: `POST /account/register` pide el nombre PARTIDO en tres,
+ * y partir "JARLYN LLANOS ARTEAGA" a ojo se equivoca con cualquier nombre
+ * compuesto. RENIEC ya los da separados, asi que el registro deja de tener
+ * que adivinar.
+ *
+ * ⚠️ `apellidoMaterno` PUEDE VENIR null. Se midio con un DNI de ejemplo y
+ * llego null — si se hubiera medido solo con el del dueño, el traductor
+ * habria reventado el dia que le toque un cliente sin apellido materno. Va
+ * como "" y se dice que falta; nunca se inventa un apellido.
+ *
+ * `completo` es SOLO PARA MOSTRAR. El registro usa los tres campos por
+ * separado: juntarlos y volver a partirlos seria deshacer lo unico que este
+ * endpoint aporta.
+ *
+ * `digitoVerificador` no se devuelve: el registro no lo pide y lo que no hace
+ * falta no viaja al navegador.
+ * @param {*} j cuerpo JSON de Shalom
+ * @return {Object} respuesta del contrato
+ */
+function traducirDni(j) {
+  const raro = {ok: false, motivo: "FORMATO_DESCONOCIDO"};
+  if (!j || typeof j !== "object" || Array.isArray(j)) return raro;
+  // Jamas ok:true sin dato real. Un `success` que no es exactamente true no
+  // se interpreta: no se ha medido que significa, y suponerlo aqui seria
+  // rellenar el nombre de un cliente con lo que sea.
+  if (j.success !== true) return raro;
+  const d = j.data;
+  if (!d || typeof d !== "object" || Array.isArray(d)) return raro;
+  const txt = (x) => (typeof x === "string" ? x.trim() : "");
+  const nombres = txt(d.nombres);
+  // Sin nombres no hay nada que autocompletar, y afirmarlo con los apellidos
+  // sueltos daria un nombre a medias en el formulario.
+  if (!nombres) return raro;
+  const pat = txt(d.apellidoPaterno);
+  const mat = txt(d.apellidoMaterno);
+  return {
+    ok: true,
+    persona: {
+      dni: txt(d.dni),
+      nombres: nombres,
+      apePaterno: pat,
+      apeMaterno: mat,
+      completo: [nombres, pat, mat].filter(Boolean).join(" "),
+    },
+  };
+}
+
+/**
  * Traduce la respuesta cruda del endpoint que sea. Un endpoint sin traductor
  * NO devuelve su JSON: eso es justo lo que hace que una forma mal entendida
  * llegue a la pantalla como si fuera un dato bueno.
@@ -653,6 +710,7 @@ function traducir(op, json) {
   if (op === "track") return traducirTrack(json);
   if (op === "instances") return traducirInstancias(json);
   if (op === "agencies") return traducirAgencias(json);
+  if (op === "dni") return traducirDni(json);
   return {ok: false, motivo: "SIN_TRADUCTOR"};
 }
 
@@ -666,6 +724,7 @@ module.exports = {
   traducirTrack,
   traducirInstancias,
   traducirAgencias,
+  traducirDni,
   PASOS,
   esAdminDe,
   traducir,

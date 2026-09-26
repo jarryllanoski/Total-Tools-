@@ -87,6 +87,44 @@
     }
   }
 
+  /* ── CACHÉ DE DNI ──────────────────────────────────────────────────────
+     Cada consulta a RENIEC gasta cuota del plan, y los clientes se repiten.
+     Se guarda en localStorage con un tope: sin él, un año de pedidos llenaría
+     la cuota de almacenamiento del navegador y `lsSet` se tragaría el error.
+     Un dato registral no caduca —el nombre de una persona no cambia—, así que
+     no lleva fecha de vencimiento: solo se recorta cuando pasa del tope. */
+  var DNI_KEY = 'tt_reniec';
+  var DNI_TOPE = 400;
+
+  function _dniLeer() {
+    try {
+      var x = JSON.parse(localStorage.getItem(DNI_KEY) || '{}');
+      return (x && typeof x === 'object' && !Array.isArray(x)) ? x : {};
+    } catch (e) { return {}; }
+  }
+  function _dniCache(n) {
+    var p = _dniLeer()[n];
+    // Se exige la forma, no solo que exista: lo guardó una versión anterior
+    // del panel, o quedó a medias, y un nombre a medias en el formulario es
+    // peor que preguntar otra vez.
+    return (p && typeof p === 'object' && p.nombres) ? p : null;
+  }
+  function _dniGuardar(n, persona) {
+    try {
+      var todo = _dniLeer();
+      todo[n] = persona;
+      var claves = Object.keys(todo);
+      if (claves.length > DNI_TOPE) {
+        // Se sueltan los más viejos por orden de inserción, que es el que
+        // conserva Object.keys.
+        claves.slice(0, claves.length - DNI_TOPE).forEach(function (k) {
+          delete todo[k];
+        });
+      }
+      localStorage.setItem(DNI_KEY, JSON.stringify(todo));
+    } catch (e) { /* sin sitio: se consultará otra vez, no es grave */ }
+  }
+
   /* Una petición a la puerta. Nunca lanza: siempre resuelve con el contrato.
      Los códigos HTTP son de las barreras; lo que diga Shalom llega en 200
      dentro del cuerpo. */
@@ -174,6 +212,32 @@
        ⚠️ `limite: null` con `ilimitado: true` es PLAN ILIMITADO, no "sin
        cuota". La documentación muestra 1000; con plan ilimitado llega null. */
     validar: function () { return _pedir({op: 'validate'}); },
+
+    /* ✅ CONECTADO · GET /account/dni/{dni} — 2026-09-26
+       El espejo de RENIEC, con el nombre YA PARTIDO en nombres, apellido
+       paterno y apellido materno — que es justo lo que pide
+       `POST /account/register` y lo que partir a ojo se equivoca.
+       → {ok:true, persona:{dni, nombres, apePaterno, apeMaterno, completo}}
+
+       ⚠️ CON CACHÉ, y no es un lujo: cada consulta gasta cuota del plan, y
+       «lo repetitivo son los mismos clientes» (palabras del dueño). Un DNI ya
+       consultado no se vuelve a preguntar nunca. La caché vive en
+       localStorage, así que es de este dispositivo: en otro se pregunta una
+       vez y ya.
+
+       Solo se guarda lo que respondió BIEN. Cachear un fallo de red
+       convertiría un corte de diez segundos en un DNI que nunca más se puede
+       consultar. */
+    dni: function (numero) {
+      var n = String(numero || '').replace(/\D/g, '');
+      if (n.length !== 8) return Promise.resolve({ok: false, motivo: 'SIN_DATO'});
+      var enCache = _dniCache(n);
+      if (enCache) return Promise.resolve({ok: true, persona: enCache, cache: true});
+      return _pedir({op: 'dni', datos: {dni: n}}).then(function (r) {
+        if (r && r.ok && r.persona) _dniGuardar(n, r.persona);
+        return r;
+      });
+    },
 
     /* Diagnóstico: la FORMA de la respuesta de un endpoint, sin un solo
        valor dentro. Es la herramienta con la que se escribe cada contrato
