@@ -53,17 +53,53 @@ const ENVIO = {
   clave: '',             // clave de recojo, 4 dígitos
 };
 
+/**
+ * La clave, por dos caminos y en este orden.
+ *
+ * 1 · La variable de entorno SHALOM_API_KEY, si está puesta. Es el camino
+ *     fiable: PowerShell ya sabe leerla de Secret Manager, y así este script
+ *     no depende de que el CLI de Firebase se porte bien desde dentro de un
+ *     proceso hijo.
+ * 2 · Llamar al CLI de Firebase. Cómodo cuando funciona.
+ *
+ * ⚠️ Y SI FALLA, SE DICE POR QUÉ. La primera versión de esto se tragaba la
+ * salida de error del CLI (`stdio` con stderr en 'ignore') y solo imprimía
+ * "no se pudo": el mismo fallo en silencio que llevamos semanas cazando, otra
+ * vez escrito por mí. Ahora se enseña el error tal cual lo dio la orden.
+ */
 function clave() {
-  try {
-    return execSync(
-        'firebase functions:secrets:access SHALOM_API_KEY --project total-tools-24ce8',
-        {encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore']}).trim();
-  } catch (e) {
-    console.error('\n❌ No se pudo leer la clave de Secret Manager.');
-    console.error('   Comprueba que estás dentro de la carpeta del proyecto y');
-    console.error('   que `firebase login` sigue vivo.\n');
-    process.exit(1);
+  const delEntorno = String(process.env.SHALOM_API_KEY || '').trim();
+  if (delEntorno) {
+    console.log('   (leída de la variable de entorno SHALOM_API_KEY)');
+    return delEntorno;
   }
+  let detalle = '';
+  try {
+    const salida = execSync(
+        'firebase functions:secrets:access SHALOM_API_KEY --project total-tools-24ce8',
+        {encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe']});
+    // El CLI a veces imprime avisos antes del valor: se toma la última línea
+    // con contenido, que es el secreto.
+    const k = String(salida).split('\n').map((x) => x.trim())
+        .filter(Boolean).pop() || '';
+    if (k) return k;
+    detalle = 'la orden terminó bien pero no devolvió nada';
+  } catch (e) {
+    detalle = String((e && (e.stderr || e.stdout || e.message)) || '').trim();
+  }
+
+  console.error('\n❌ No se pudo leer la clave de Secret Manager.');
+  console.error('\n   Lo que dijo la orden:');
+  console.error('   ' + (detalle || '(sin mensaje)').split('\n').join('\n   '));
+  console.error('\n   El camino que sí funciona, en PowerShell:');
+  console.error('');
+  console.error('     $env:SHALOM_API_KEY = (firebase functions:secrets:access SHALOM_API_KEY --project total-tools-24ce8).Trim()');
+  console.error('     node medir-registro.js');
+  console.error('     Remove-Item Env:\\SHALOM_API_KEY');
+  console.error('');
+  console.error('   Así la lee PowerShell —que ya sabe hacerlo— y este script');
+  console.error('   la recoge del entorno. Sigue sin imprimirse nunca.\n');
+  process.exit(1);
 }
 
 async function pedir(metodo, ruta, cuerpo, k) {
