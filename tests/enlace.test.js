@@ -27,10 +27,32 @@ module.exports = async ({bloque, ok}) => {
     ok(L.tipoDe('id_1') === 'legado',
        'y uno corto tambien: el formato viejo no se le exige a nadie');
 
-    /* La forma exacta del legado se midio contra los pedidos REALES antes de
-       escribirla. Asumirla habria roto el link de algun cliente, que es
-       precisamente lo que este archivo existe para impedir. */
-    ok(L.LEGADO.test('id_1790617556159'), 'la forma del legado acepta lo medido');
+    /* ★ LAS DOS FAMILIAS DE ID, MEDIDAS SOBRE LOS 1197 PEDIDOS REALES
+       (30 sep 2026, contadas en el panel antes de escribir esta reja):
+
+           id_#############          879  (73%)  `id_` + el reloj
+           id_#############_xxxx     318  (27%)  ...y CUATRO caracteres mas
+
+       MEDIR ESTO NO FUE UN TRAMITE. Mi primer instinto fue exigir `id_` + 13
+       digitos, que es lo que produce `Date.now()`. Habria rechazado las 318
+       del segundo grupo: el 27% de los clientes con su link muerto, y sin
+       enterarnos hasta que alguno llamara. La reja se escribio ANCHA a
+       proposito —solo exige el prefijo `id_`— porque aqui el error caro es
+       rechazar de mas: lo que pase esta reja todavia tiene que EXISTIR en la
+       base de datos, asi que aceptar de mas no abre ninguna puerta. */
+    ok(L.LEGADO.test('id_1790617556159'),
+       'familia 1 (879 pedidos): `id_` + el reloj');
+    ok(L.LEGADO.test('id_1790617556159_a3f2'),
+       'familia 2 (318 pedidos): y con el sufijo de cuatro — la que casi rompo');
+    ok(L.tipoDe('id_1790617556159_a3f2') === 'legado',
+       'y se enruta como legado, no como basura');
+
+    ['id_1790617556159_aaaa', 'id_1790617556159_9999',
+      'id_1790617556159_a1b2', 'id_1790617556159_1a2b']
+        .forEach((real) => {
+          ok(L.tipoDe(real) === 'legado',
+             'todas las mezclas de letra y numero del sufijo: ' + real);
+        });
   }
 
   bloque('Un token nuevo no se adivina, y nunca se confunde con uno viejo');

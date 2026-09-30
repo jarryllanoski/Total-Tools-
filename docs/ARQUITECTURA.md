@@ -551,6 +551,22 @@ pedido se abriría por su id adivinable igual que antes y el token sería
 decoración. Por eso `aceptaLegado()`: un pedido **con** token solo se abre por
 su token; uno **sin** token —los de ayer— se sigue abriendo por su id.
 
+### Las dos familias de id, medidas antes de escribir la reja
+
+Contadas sobre los **1197 pedidos reales** (30 sep 2026), no supuestas:
+
+| Forma | Cuántos | |
+|---|---|---|
+| `id_#############` | 879 | 73% — `id_` + el reloj |
+| `id_#############_xxxx` | 318 | 27% — …y cuatro caracteres más |
+
+**Medir esto no fue un trámite.** El primer instinto fue exigir `id_` + 13
+dígitos, que es lo que produce `Date.now()`. Habría rechazado las 318 del
+segundo grupo: el 27% de los clientes con su link muerto, y sin enterarnos
+hasta que alguno llamara. Por eso `LEGADO` solo exige el prefijo `id_`: aquí
+el error caro es **rechazar de más**, porque lo que pase esa reja todavía
+tiene que existir en la base de datos — aceptar de más no abre ninguna puerta.
+
 ### Lo que NO se arregla, dicho en voz alta
 
 Los pedidos anteriores a este cambio siguen con link adivinable. Migrarlos
