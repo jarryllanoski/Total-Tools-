@@ -501,6 +501,70 @@ Un nombre que desaparece es un módulo que dejó de funcionar en silencio.
 
 ---
 
+## 7-bis. El link de seguimiento: por qué no se adivina
+
+El link que el cliente recibe por WhatsApp lleva un token, y ese token es lo
+único que separa su pedido —nombre, dirección, documento— del resto del mundo.
+La página es pública a propósito: obligar a alguien a iniciar sesión para ver
+dónde está su paquete no es una opción.
+
+**El fallo.** El token *era* `id_` + `Date.now()`. Eso no es un secreto: es un
+número que avanza solo. Y `handleTrack` no tenía freno de peticiones, así que
+nada impedía recorrer valores hasta dar con pedidos ajenos.
+
+**No existe un servicio de Google para esto**, y conviene saberlo para no
+buscarlo: Firebase Dynamic Links se apagó en agosto de 2025 y nunca sirvió
+para esto; las Signed URLs de Cloud Storage solo firman archivos de un bucket;
+Cloud Armor exige un balanceador de carga delante y se paga. Lo que hace
+Google por dentro es lo mismo que hacemos aquí: pedirle bytes al generador
+criptográfico. Son tres líneas y viven en `functions/enlaceSeguimiento.js`.
+
+### Las tres rejas de `handleTrack`, en este orden
+
+| # | Reja | Por qué en este sitio |
+|---|---|---|
+| 1 | **La forma** (`tipoDe`) | Lo que no parece token se rechaza **sin tocar Firestore**. Antes, `token=basura` costaba una lectura: el robot nos cobraba a nosotros cada intento |
+| 2 | **El freno** (`formApi_track`, 120/min) | Antes de leer nada |
+| 3 | **Buscar** | Token nuevo → consulta por campo. Token viejo → documento por id |
+
+### Por qué 120/min y no 30
+
+La página se refresca sola cada 30 s (2 peticiones/min por pestaña), y en Perú
+Claro y Movistar meten miles de usuarios detrás de una misma IP pública
+(CGNAT). Un freno de 30 habría **bloqueado clientes reales**: un autogol. Con
+120 caben 60 pestañas desde una misma IP y aun así recorrer un día de
+milisegundos le toma a un raspador medio año.
+
+### Por qué el token nuevo lleva el prefijo `t1_`
+
+Sin prefijo, un token al azar podría empezar por `id_` una vez cada 262.144. El
+servidor lo tomaría por un id viejo, no encontraría el documento, y el cliente
+vería "link no disponible" sin que nadie entendiera por qué. El prefijo lo hace
+**imposible por construcción**, no improbable. El `1` es la versión: si un día
+hace falta otro formato será `t2_`, y los `t1_` seguirán abriendo.
+
+### La puerta trasera, y cómo se cierra
+
+Un pedido nuevo guarda token al azar, pero **su id de documento sigue siendo
+`id_` + el reloj** (cambiarlo obligaría a tocar el panel entero). Sin más, ese
+pedido se abriría por su id adivinable igual que antes y el token sería
+decoración. Por eso `aceptaLegado()`: un pedido **con** token solo se abre por
+su token; uno **sin** token —los de ayer— se sigue abriendo por su id.
+
+### Lo que NO se arregla, dicho en voz alta
+
+Los pedidos anteriores a este cambio siguen con link adivinable. Migrarlos
+**rompería los más de mil links ya enviados por WhatsApp**, que es peor que el
+problema. Se van entregando y quedando congelados solos.
+
+Y el DNI sale recortado a 5 dígitos (`75162***`), no oculto: 5 de 8 dejan 1000
+combinaciones. Eso **no** convierte el documento en un secreto; reduce lo que
+se regala de un vistazo —una captura reenviada, alguien mirando la pantalla—.
+Lo que de verdad protege el dato es que el link no se pueda adivinar. Se
+enseña el **principio** y no el final porque en un DNI peruano los primeros
+dígitos van ligados a época y lugar de emisión, o sea que son los más
+deducibles; los últimos son los que más cuesta inferir.
+
 ## 8. Documentos relacionados
 
 | Documento | Para qué |

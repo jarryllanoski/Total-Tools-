@@ -104,6 +104,73 @@ module.exports = async ({bloque, ok}) => {
        (colados.length ? ': ' + colados.join(', ') : ''));
   }
 
+  bloque('El DNI sale recortado: 5 digitos, el resto tapado');
+
+  {
+    /* Tercera reja. Las dos primeras deciden QUE CAMPOS salen; esta decide
+       CUANTO de un campo sale. El dueño pidio que el cliente siguiera viendo
+       su DNI —lo necesita para recoger— pero no entero.
+
+       LIMITE HONESTO, escrito aqui para que nadie lo olvide: enseñar 5 de 8
+       digitos deja 1000 combinaciones. Quien tenga el link puede deducir el
+       resto probando. Esto NO convierte el DNI en un secreto; reduce lo que
+       se regala de un vistazo —una captura reenviada, alguien mirando la
+       pantalla—. Lo que de verdad protege el dato es que el link no se pueda
+       adivinar, y eso es otro paso. */
+    const r = P.proyectar({
+      dni: '75162882', dniRecoger: '75162882', dniDestinatario: '71613965',
+      name: 'Ana'
+    }, {});
+
+    ok(r.dni === '75162***',
+       'el DNI sale con 5 digitos y 3 tapados, no entero — salio: ' + r.dni);
+    ok(r.dniRecoger === '75162***',
+       'el DNI para recoger, igual — salio: ' + r.dniRecoger);
+    ok(r.dniDestinatario === '71613***',
+       'y el del destinatario, igual — salio: ' + r.dniDestinatario);
+
+    const json = JSON.stringify(r);
+    ok(json.indexOf('75162882') < 0 && json.indexOf('71613965') < 0,
+       'y NINGUN documento entero aparece en la respuesta, en ningun campo');
+  }
+
+  {
+    /* Se tapan SIEMPRE al menos 3. Sin esta regla, un documento corto —un
+       carne mal escrito, un campo a medio llenar— saldria completo justo por
+       ser corto, que es cuando menos hay que perder. */
+    ok(P.proyectar({dni: '1234'}, {}).dni === '1***',
+       'un documento de 4 sale con 3 tapados, no entero');
+    ok(P.proyectar({dni: '123'}, {}).dni === '***',
+       'uno de 3 sale entero tapado');
+    ok(P.proyectar({dni: '712345678'}, {}).dni === '71234****',
+       'uno de 9 —carne de extranjeria— enseña 5 y tapa 4');
+  }
+
+  {
+    /* Lo que no hay, no se inventa. Un campo ausente que saliera como '***'
+       le diria al cliente que hay un dato donde no lo hay, y a la pagina que
+       pinte una fila vacia. */
+    const sin = P.proyectar({name: 'Ana'}, {});
+    ok(!('dni' in sin), 'un pedido sin DNI no gana un campo dni');
+    ok(P.proyectar({dni: ''}, {}).dni === '',
+       'y un DNI vacio sigue vacio, no se convierte en asteriscos');
+    ok(P.proyectar({dni: null}, {}).dni === null,
+       'un DNI nulo se queda nulo: enmascarar no es inventar');
+  }
+
+  {
+    /* La reja vive en UN solo sitio. Si mañana otro camino de salida copia el
+       pedido sin pasar por aqui, el DNI vuelve a salir entero y nadie se
+       entera —que es exactamente como empezo lo de la clave de recojo. */
+    const usos = ['functions/index.js', 'formulario.html', 'index.html',
+      'print.js', 'respaldo.js', 'tracking.js']
+        .filter((f) => E.existe(f))
+        .filter((f) => /proyectar\s*\(/.test(E.leer(f)));
+    ok(usos.length === 1 && usos[0] === 'functions/index.js',
+       'solo `functions/index.js` proyecta; el resto no toca la reja' +
+       (usos.length !== 1 ? ' — tambien: ' + usos.join(', ') : ''));
+  }
+
   bloque('El endpoint usa la lista blanca, y solo esa');
 
   {

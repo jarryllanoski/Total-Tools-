@@ -1075,7 +1075,26 @@ function saveShipment(){
     if(window.DeliveryModule&&DeliveryModule.refrescar)DeliveryModule.refrescar(); // ruta al día si está abierta
     toast('✅ Actualizado');}
   else{
-    data.id='id_'+Date.now();data.createdAt=new Date().toISOString();data._localTs=Date.now();S.shipments.push(data);
+    data.id='id_'+Date.now();data.createdAt=new Date().toISOString();data._localTs=Date.now();
+    /* ★ EL TOKEN DEL LINK DE SEGUIMIENTO.
+       Antes el link era `?seg=` + este mismo id, o sea `id_` + el reloj: un
+       numero que avanza solo y que cualquiera puede recorrer. Ahora el link
+       lleva 128 bits al azar (functions/enlaceSeguimiento.js).
+
+       SOLO PEDIDOS NUEVOS. A los de ayer no se les escribe nada y su link
+       de siempre sigue abriendo — hay mas de mil ya enviados por WhatsApp.
+
+       Y SI EL MODULO NO CARGO, SE AVISA Y SE CREA IGUAL. El negocio no se
+       para porque falle un <script>: sin token, el link se comporta
+       exactamente como ayer. Pero callarselo seria crear pedidos con menos
+       proteccion durante semanas sin que nadie se entere, que es justo el
+       patron que llevamos meses cazando. */
+    try{
+      data.trackToken = window.EnlaceSeguimiento.generar();
+    }catch(e){
+      toast('⚠️ Pedido creado, pero su link de seguimiento es del tipo antiguo. Recarga con Ctrl+Shift+R y avisa.');
+    }
+    S.shipments.push(data);
     // ★ Sin _fbSaveShipmentNow(): ver el comentario de arriba. Un pedido nuevo
     // que aún no subió ya sobrevive al latido y al cierre de la pestaña.
     save(data.id);closeOverlay('formOverlay');

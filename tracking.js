@@ -919,7 +919,12 @@ Tracking.abrirManual = function() {
 Tracking.copiarLink = function(id) {
   var base = typeof getFormLink === 'function' ? getFormLink()
     : window.location.origin + window.location.pathname.replace(/\/[^\/]*$/, '/formulario.html');
-  var url = base + '?seg=' + id;
+  /* El token, no el id — ver functions/enlaceSeguimiento.js. Un pedido de
+     ayer no tiene token y se cae a su id, que es justo lo que queremos: su
+     link ya enviado sigue abriendo. */
+  var _ped = (window.S && S.shipments || []).filter(function(x){ return x && x.id === id; })[0];
+  var url = base + '?seg=' + (window.EnlaceSeguimiento
+    ? EnlaceSeguimiento.tokenDe(_ped || {id: id}) : id);
   var done = function() { if (typeof toast === 'function') toast('🔗 Link de seguimiento copiado'); };
   try {
     navigator.clipboard.writeText(url).then(done).catch(function() {

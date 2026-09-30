@@ -26,6 +26,7 @@ const barrido = require("./barrido");
 const etiquetas = require("./etiquetas");
 const agencias = require("./agencias");
 const pedidoPublico = require("./pedidoPublico");
+const enlace = require("./enlaceSeguimiento");
 
 setGlobalOptions({maxInstances: 10});
 initializeApp();
@@ -294,14 +295,22 @@ async function handleCreate(req, res) {
   const now = Date.now();
   const orderId = `id_${now}`;
   const trackCode = orderId.slice(-4).toUpperCase();
-  // trackToken = orderId → ?seg=orderId → panel/shipments/items/{orderId}
-  const trackToken = orderId;
+  /* El token del link ya NO es el id. Era `id_` + el reloj, o sea un numero
+     que avanza solo y que cualquiera puede recorrer. Ahora son 128 bits del
+     generador criptografico. Ver functions/enlaceSeguimiento.js. */
+  const trackToken = enlace.generar();
 
   const orderToSave = Object.assign({}, pickOrderFields(order), {
     id: orderId,
     status: order.status || "NUEVO PEDIDO",
     createdAt: order.createdAt || new Date().toISOString(),
     fromForm: true,
+    /* Se guarda en el pedido, no en una tabla aparte: asi la consulta es una
+       sola lectura (indice automatico de Firestore sobre un campo) y el
+       panel puede armar el link SIN CONEXION, porque el token ya viaja con
+       el pedido. Pedirselo al servidor para copiar un link dejaria a Jarry
+       sin poder mandarlo cuando se le cae internet. */
+    trackToken,
   });
 
   // Monto/adelanto vienen del TOKEN (los puso el operador), NO del cliente →
@@ -471,14 +480,61 @@ async function handleTrack(req, res) {
     return;
   }
 
-  // trackToken IS the orderId (set in handleCreate)
-  const snap = await db.doc(`${SHIP_COL}/${trackToken}`).get();
-  if (!snap.exists) {
+  /* ── REJA 1: LA FORMA, y antes que nada ────────────────────────────────
+     Lo que no tiene forma de token se responde aqui mismo, SIN tocar la
+     base de datos. Antes, `token=cualquiercosa` costaba una lectura de
+     Firestore: un robot recorriendo valores nos cobraba a nosotros cada
+     intento. Ahora la basura no cuesta nada.
+     De paso cierra algo que no era una fuga pero lo parecia: el token se
+     concatenaba a una ruta (`panel/shipments/items/<token>`) sin validarlo. */
+  const tipo = enlace.tipoDe(trackToken);
+  if (tipo === "invalido") {
+    res.json({status: "not_found"});
+    return;
+  }
+
+  /* ── REJA 2: EL FRENO, antes de leer ───────────────────────────────────
+     Se responde 429 y no un "no encontrado": decirle a alguien que su link
+     no existe cuando lo que pasa es que hay demasiadas consultas lo manda a
+     buscar el problema donde no esta. La pagina lo traduce a palabras. */
+  if (!(await checkRateLimit("formApi_track", req))) {
+    res.status(429).json({
+      status: "rate_limited",
+      error: "Demasiadas consultas. Espera un momento y vuelve a intentar.",
+    });
+    return;
+  }
+
+  /* ── REJA 3: BUSCAR, por el camino que toque ───────────────────────────
+     Dos formas de token conviven a proposito: hay mas de mil links ya
+     enviados por WhatsApp y tienen que seguir abriendo para siempre. */
+  let snap = null;
+  if (tipo === "legado") {
+    snap = await db.doc(`${SHIP_COL}/${trackToken}`).get();
+    if (!snap.exists) snap = null;
+  } else {
+    // Igualdad sobre un campo: usa el indice automatico de Firestore, no
+    // hace falta declarar ninguno (mismo patron que la busqueda por phone).
+    const q = await db.collection(SHIP_COL)
+        .where("trackToken", "==", trackToken).limit(1).get();
+    snap = q.empty ? null : q.docs[0];
+  }
+  if (!snap) {
     res.json({status: "not_found"});
     return;
   }
 
   const order = snap.data();
+
+  /* ⚠️ LA PUERTA TRASERA, cerrada aqui.
+     Un pedido nuevo guarda token al azar, pero su id de documento sigue
+     siendo `id_` + el reloj. Sin esta linea, ese pedido se abriria por su
+     id adivinable IGUAL QUE ANTES y el token al azar seria decoracion.
+     Los pedidos de ayer no tienen token, asi que su id les sigue valiendo. */
+  if (tipo === "legado" && !enlace.aceptaLegado(order)) {
+    res.json({status: "not_found"});
+    return;
+  }
   const code = (order.id || "").slice(-4).toUpperCase();
   const frozen = ["ENTREGADO", "CANCELADO"].includes(order.status || "");
 
@@ -526,6 +582,15 @@ const RATE_LIMITS = {
   // Consulta de cliente recurrente: 20/min alcanza de sobra para el uso real
   // (una consulta por pedido) y hace inviable cosechar la cartera.
   formApi_client: {windowMs: 60000, max: 20},
+  /* El link de seguimiento. 120/min y NO 30, que fue mi primer numero.
+     La pagina del cliente se refresca sola cada 30 s —2 peticiones por
+     minuto por pestaña abierta— y en Peru Claro y Movistar meten miles de
+     usuarios detras de una misma IP publica (CGNAT). Un freno de 30 habria
+     bloqueado CLIENTES REALES: un autogol, peor que el problema que
+     resuelve. Con 120 caben 60 pestañas desde una misma IP, muy por encima
+     del uso real, y aun asi recorrer un solo dia de milisegundos le tomaria
+     a un raspador medio año. */
+  formApi_track: {windowMs: 60000, max: 120},
 };
 
 /**

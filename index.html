@@ -28,6 +28,7 @@
      es mejor que dos reglas que deciden si tus pedidos retroceden. -->
 <script src="functions/etiquetas.js?v=1"></script>
 <script src="functions/agencias.js?v=1"></script>
+<script src="functions/enlaceSeguimiento.js?v=1"></script>
 <script src="appcheck.js?v=1"></script>
 <!-- FIREBASE via REST API — sin SDK, funciona en Brave/Chrome/Firefox/Safari -->
 <script>
@@ -4555,7 +4556,12 @@ function shalomTicketFoto(file){
 
 function copyCardLink(id){
   const base=typeof getFormLink==='function'?getFormLink():window.location.origin+window.location.pathname.replace(/\/[^\/]*$/,'/formulario.html');
-  const url=base+'?seg='+id;
+  /* El token, no el id. Un pedido nuevo lleva 128 bits al azar; uno de ayer
+     no tiene token y usa su id de siempre, así que su link ya enviado sigue
+     abriendo. La regla vive en functions/enlaceSeguimiento.js — aquí no se
+     copia, se llama. */
+  const _ped=(window.S&&S.shipments||[]).find(x=>x&&x.id===id);
+  const url=base+'?seg='+(window.EnlaceSeguimiento?EnlaceSeguimiento.tokenDe(_ped||{id}):id);
   const done=()=>toast('🔗 Link de seguimiento copiado');
   try{navigator.clipboard.writeText(url).then(done).catch(()=>{const t=document.createElement('textarea');t.value=url;document.body.appendChild(t);t.select();document.execCommand('copy');document.body.removeChild(t);done()});}
   catch(e){const t=document.createElement('textarea');t.value=url;document.body.appendChild(t);t.select();document.execCommand('copy');document.body.removeChild(t);done();}

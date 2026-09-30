@@ -218,6 +218,10 @@ async function _api(action, params, opts){
   let url = FORM_API + '?action=' + encodeURIComponent(action);
   if(params){ for(const k in params){ url += '&' + k + '=' + encodeURIComponent(params[k]); } }
   const r = await fetch(url, opts || {});
+  /* El 429 NO es un error tecnico: es el freno por IP haciendo su trabajo, y
+     trae en el cuerpo el motivo en palabras. Reventar aqui lo convertiria en
+     un "Error al buscar: API 429" que no le dice nada a nadie. */
+  if(r.status === 429){ return r.json().catch(()=>({status:'rate_limited'})); }
   if(!r.ok){ throw new Error('API ' + r.status); }
   return r.json();
 }
@@ -1750,7 +1754,23 @@ function renderTracking(token){
 
 function clearTrackRefresh(){
   if(trackRefreshId){ clearInterval(trackRefreshId); trackRefreshId=null; }
+  _trackTokenActivo = '';
 }
+
+/* ── EL SONDEO NO CORRE CON LA PESTAÑA ESCONDIDA ────────────────────────
+   Esta pagina se refresca sola cada 30 s. Una pestaña olvidada en segundo
+   plano hacia 2.880 peticiones al dia —una invocacion de Cloud Function y
+   una lectura de Firestore cada una— para actualizar algo que nadie estaba
+   mirando. Y encima comia del freno por IP: con el CGNAT de Claro y
+   Movistar, las pestañas olvidadas de varios clientes podian empujar contra
+   el tope a los que SI estaban mirando.
+
+   Parar mientras esta escondida y actualizar al volver da exactamente el
+   mismo servicio: cuando el cliente mira, el dato esta fresco. */
+let _trackTokenActivo = '';
+document.addEventListener('visibilitychange', function(){
+  if(!document.hidden && _trackTokenActivo) buscarPedido(_trackTokenActivo, true);
+});
 
 /* ─── SEARCH PEDIDO (por token único, lee 1 documento) ──────────── */
 async function buscarPedido(token, silent){
@@ -1771,11 +1791,27 @@ async function buscarPedido(token, silent){
       if(resp.order.frozen){
         clearTrackRefresh();
       } else if(!trackRefreshId){
-        trackRefreshId = setInterval(()=>{ buscarPedido(t, true); }, 30000);
+        _trackTokenActivo = t;
+        trackRefreshId = setInterval(()=>{
+          if(document.hidden) return; // nadie esta mirando: no se gasta nada
+          buscarPedido(t, true);
+        }, 30000);
       }
       return;
     }
     if(window.TTLoader) TTLoader.done();
+
+    /* ⚠️ EL FRENO NO ES UN LINK ROTO, y decirselo asi al cliente lo manda a
+       buscar el problema donde no esta: revisar el link, escribir por
+       WhatsApp, pensar que perdio su pedido. Lo unico que pasa es que hay
+       que esperar un minuto. Misma regla que `Shalom.textoMotivo()`: ningun
+       motivo se calla, y ninguno miente.
+       No se apaga el auto-refresco: el siguiente tiro ya pasa. */
+    if(resp && resp.status === 'rate_limited'){
+      setTrackContent('<div class="error-box" style="text-align:center">⏳ Demasiadas consultas ahora mismo<br><small style="font-weight:400;opacity:.8">Tu link está bien. Espera un momento y se actualiza solo.</small></div>');
+      return;
+    }
+
     clearTrackRefresh();
     const _bizPhone=((CFG&&(CFG.config&&CFG.config.phone||CFG.phone))||'').replace(/\D/g,'');
     const _waHref=_bizPhone?`https://wa.me/51${_bizPhone}?text=${encodeURIComponent('Hola, tengo una consulta sobre mi pedido')}`:'';
