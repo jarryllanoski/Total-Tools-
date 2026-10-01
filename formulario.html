@@ -1752,11 +1752,6 @@ function renderTracking(token){
   // El auto-refresh se decide en buscarPedido: solo si el pedido NO está finalizado
 }
 
-function clearTrackRefresh(){
-  if(trackRefreshId){ clearInterval(trackRefreshId); trackRefreshId=null; }
-  _trackTokenActivo = '';
-}
-
 /* ── EL SONDEO NO CORRE CON LA PESTAÑA ESCONDIDA ────────────────────────
    Esta pagina se refresca sola cada 30 s. Una pestaña olvidada en segundo
    plano hacia 2.880 peticiones al dia —una invocacion de Cloud Function y
@@ -1766,8 +1761,23 @@ function clearTrackRefresh(){
    el tope a los que SI estaban mirando.
 
    Parar mientras esta escondida y actualizar al volver da exactamente el
-   mismo servicio: cuando el cliente mira, el dato esta fresco. */
+   mismo servicio: cuando el cliente mira, el dato esta fresco.
+
+   ⚠️ ESTA DECLARACION VA ANTES DE `clearTrackRefresh()`, Y NO ES ESTILO.
+   La puse debajo y ROMPI EL FORMULARIO PUBLICO EN PRODUCCION. `init()`
+   corre al evaluar el script y llama a `renderForm()` -> `clearTrackRefresh()`,
+   que asigna esta variable. Un `let` todavia no inicializado lanza
+   ReferenceError («Cannot access before initialization»), asi que el
+   formulario de pedidos no pintaba nada. En la pagina de SEGUIMIENTO no se
+   veia, porque alli hay un `await` antes y para entonces ya existe — por eso
+   probe el seguimiento, lo vi bien, y el fallo paso. */
 let _trackTokenActivo = '';
+
+function clearTrackRefresh(){
+  if(trackRefreshId){ clearInterval(trackRefreshId); trackRefreshId=null; }
+  _trackTokenActivo = '';
+}
+
 document.addEventListener('visibilitychange', function(){
   if(!document.hidden && _trackTokenActivo) buscarPedido(_trackTokenActivo, true);
 });

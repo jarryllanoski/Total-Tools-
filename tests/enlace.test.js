@@ -405,6 +405,67 @@ module.exports = async ({bloque, ok}) => {
        'y se salta de verdad: sale sin consultar');
   }
 
+  bloque('Ninguna variable se usa antes de existir');
+
+  {
+    /* ⚠️ ESTO ROMPIO EL FORMULARIO PUBLICO EN PRODUCCION, por mi culpa.
+       Declare `let _trackTokenActivo` DEBAJO de `clearTrackRefresh()`, que
+       la asigna. `init()` corre al evaluar el script y llama a
+       `renderForm()` -> `clearTrackRefresh()`, asi que la asignacion ocurria
+       con el `let` todavia sin inicializar: ReferenceError, y el formulario
+       de pedidos no pintaba NADA.
+
+       Por que no lo vi: en la pagina de SEGUIMIENTO hay un `await` antes de
+       llegar ahi, asi que para entonces la variable ya existe. Probe el
+       seguimiento, lo vi perfecto, y di por bueno el cambio. Las dos
+       paginas salen del mismo archivo y una iba bien.
+
+       Esta prueba recorre las declaraciones de nivel superior y exige que
+       NADA las mencione antes de su linea. */
+    const f = E.leer('formulario.html');
+    const lineas = f.split('\n');
+    const fallos = [];
+    lineas.forEach((l, i) => {
+      const m2 = l.match(/^(let|const)\s+([A-Za-z_$][\w$]*)\s*=/);
+      if (!m2) return;
+      const nombre = m2[2];
+      const antes = lineas.slice(0, i).join('\n');
+      const usoAntes = new RegExp('(^|[^\\w$.])' + nombre + '\\s*=[^=]')
+          .test(antes);
+      if (usoAntes) fallos.push('linea ' + (i + 1) + ': ' + nombre);
+    });
+    ok(fallos.length === 0,
+       'ninguna variable de nivel superior se asigna antes de declararse' +
+       (fallos.length ? ' — ' + fallos.join('; ') : ''));
+  }
+
+  bloque('Si cambia un archivo, cambia su numero de version');
+
+  {
+    /* EL OTRO FALLO DE HOY. Toque `config.js` y `tracking.js` pero no subi
+       su `?v=`, asi que el navegador siguio sirviendo los viejos de cache:
+       el panel no generaba el token nuevo y parecia que el codigo no
+       funcionaba. Un Ctrl+Shift+R lo tapa en MI pantalla, pero no en la de
+       nadie mas — y ese es justo el fallo que no se ve.
+
+       Aqui se fija el numero que corresponde a la version actual del
+       codigo. Si alguien vuelve a tocar estos archivos sin subirlo, esta
+       prueba se lo recuerda. */
+    const idx = E.leer('index.html');
+    [['config.js', 36], ['tracking.js', 20],
+      ['functions/enlaceSeguimiento.js', 1]].forEach((par) => {
+      /* `src="` delante a proposito: sin eso, `config.js` casa dentro de
+         `firebase-config.js` y la prueba lee la version del archivo
+         equivocado. Me acaba de pasar. */
+      const re = new RegExp('src="' + par[0].replace(/[./]/g, '\\$&') +
+          '\\?v=(\\d+)"');
+      const m3 = idx.match(re);
+      ok(!!m3 && Number(m3[1]) >= par[1],
+         par[0] + ' va con su numero de version al dia (v' + par[1] + ')' +
+         (m3 ? ' — esta en v' + m3[1] : ' — NO LO CARGA'));
+    });
+  }
+
   bloque('Si el freno actua, se dice la verdad');
 
   {
