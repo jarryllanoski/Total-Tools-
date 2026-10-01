@@ -466,4 +466,42 @@ module.exports = async (t) => {
     ok(html.indexOf('id="shalomPuertaEstado"') > 0,
         'y debajo el estado REAL, que no siempre coincide con el interruptor');
   }
+
+  bloque('estadoSesion: pide por la puerta y manda el instanceId');
+
+  {
+    /* Que el metodo exista no basta: tiene que MANDAR el id. Sin el, Shalom
+       responde 403 y el panel lo leeria como "la clave no sirve" — mandando
+       a revisar justo donde no esta el problema. Medido: con un instanceId
+       inventado llega 403 "Invalid API Key or instance access". */
+    const red = {url: null, cuerpo: null};
+    const win = {_authEnsureToken: async () => true};
+    E.cargar('shalom.js', win, {
+      localStorage: {getItem: () => 'TOKEN123'},
+      fetch: async (url, o) => {
+        red.url = url; red.cuerpo = JSON.parse(o.body);
+        return {status: 200, json: async () => ({ok: true})};
+      }
+    });
+    await win.Shalom.estadoSesion('inst-abc');
+    ok(red.cuerpo && red.cuerpo.op === 'instanceStatus',
+       'pide la operacion correcta — salio: ' +
+       JSON.stringify(red.cuerpo && red.cuerpo.op));
+    ok(red.cuerpo && red.cuerpo.datos &&
+       red.cuerpo.datos.instanceId === 'inst-abc',
+       'y manda el instanceId dentro de `datos`');
+    ok(String(red.url).indexOf('api.shalom-api.lat') < 0,
+       'y NO habla directo con Shalom: va por la puerta unica, como todo');
+  }
+
+  {
+    /* Ningun motivo se calla, y el nuevo tampoco. */
+    const win2 = {};
+    E.cargar('shalom.js', win2);
+    const t = win2.Shalom.textoMotivo('SIN_INSTANCIA_VALIDA');
+    ok(t && t.length > 10, 'SIN_INSTANCIA_VALIDA tiene palabras, no un codigo');
+    ok(/instancia/i.test(t), 'y nombra la instancia, que es lo que falla');
+    ok(!/^No se pudo consultar/.test(t),
+       'y no cae en el texto generico: ese manda a buscar a ciegas');
+  }
 };

@@ -125,13 +125,16 @@ module.exports = async ({bloque, ok}) => {
 
   {
     /* soloMedir de verdad: se puede MIRAR la forma, no USAR la operacion. */
-    const f = conFetch(resp(200, {isLoggedIn: true}));
-    const r = await P.llamar('instanceStatus', 'sk_clave', {instanceId: 'a'});
+    const f = conFetch(resp(400, {error: 'x'}));
+    const r = await P.llamar('instanceLogin', 'sk_clave', {});
     f.restaurar();
-    ok(r.ok === true, 'llamar() si deja medir (es lo que usa `esquema`)');
-    const t = P.traducir('instanceStatus', {isLoggedIn: true});
+    ok(f.llamadas === 1, 'llamar() si deja medir (es lo que usa `esquema`)');
+    /* `instanceStatus` ya tiene traductor (S2), asi que el ejemplo de
+       soloMedir es ahora `instanceLogin`, que sigue sin el. */
+    const t = P.traducir('instanceLogin', {ok: true});
     ok(t && t.ok === false && t.motivo === 'SIN_TRADUCTOR',
-       'pero traducir() responde SIN_TRADUCTOR, no un a-medio-entender');
+       'una operacion en soloMedir responde SIN_TRADUCTOR, no un ' +
+       'a-medio-entender');
   }
 
 
@@ -153,6 +156,112 @@ module.exports = async ({bloque, ok}) => {
     f.restaurar();
     ok(r.detalle.indexOf('sk_live_SECRETA123') < 0,
        'si Shalom devolviera la clave en su mensaje de error, tampoco sale');
+  }
+
+  bloque('El estado de la sesion, traducido contra lo MEDIDO');
+
+  {
+    /* Forma medida el 01/10/2026 contra la instancia real:
+         { isLoggedIn: "boolean", username: "null", url: "string" }
+       OJO con `username`: llego NULL con la sesion conectada. La
+       documentacion lo listaba como si siempre viniera. Es el mismo caso que
+       el `apellidoMaterno: null` de RENIEC — darlo por seguro revienta el
+       dia que toque, y ese dia nadie se acuerda de por que. */
+    const r = P.traducirInstanceStatus({
+      isLoggedIn: true, username: null, url: 'https://pro.shalom.pe/panel'
+    });
+    ok(r.ok === true, 'una respuesta buena se traduce');
+    ok(r.sesion.conectada === true, 'y dice que la sesion esta viva');
+    ok(r.sesion.usuario === null,
+       'un username nulo se queda NULO, nunca el texto "null"');
+    ok(r.sesion.enLogin === false, 'y no esta parada en la pantalla de entrar');
+  }
+
+  {
+    /* LO QUE ESTE ENDPOINT APORTA sobre el `GET /instances` que ya teniamos
+       es la `url`: donde quedo parado el navegador headless de Shalom. Si
+       termina en /login, se deslogueo. Eso es un diagnostico; un booleano
+       solo, no. */
+    const r = P.traducirInstanceStatus({
+      isLoggedIn: false, username: 'jarry', url: 'https://pro.shalom.pe/login'
+    });
+    ok(r.sesion.enLogin === true,
+       'una url terminada en /login dice que se deslogueo');
+    ok(r.sesion.conectada === false, 'y la sesion figura caida');
+
+    ['https://pro.shalom.pe/login?next=x', 'https://pro.shalom.pe/login#a',
+      'https://pro.shalom.pe/login/'].forEach((u) => {
+      ok(P.traducirInstanceStatus({isLoggedIn: false, username: null, url: u})
+          .sesion.enLogin === true, 'tambien con cola: ' + u);
+    });
+    ['https://pro.shalom.pe/loginata', 'https://pro.shalom.pe/panel/logins']
+        .forEach((u) => {
+          ok(P.traducirInstanceStatus({isLoggedIn: false, username: null,
+            url: u}).sesion.enLogin === false,
+          'y no confunde una ruta que solo EMPIEZA parecido: ' + u);
+        });
+  }
+
+  {
+    /* Caida en un sitio raro: no es /login, asi que no se dice "vuelve a
+       entrar". Se devuelve la url para poder mirarla. */
+    const r = P.traducirInstanceStatus({
+      isLoggedIn: false, username: null, url: 'https://pro.shalom.pe/error500'
+    });
+    ok(r.sesion.enLogin === false && r.sesion.url === 'https://pro.shalom.pe/error500',
+       'una caida rara conserva la url, que es lo unico que permite mirarla');
+  }
+
+  {
+    /* El mismo vocabulario que `traducirInstancias`. Dos fuentes para lo
+       mismo que hablaran distinto obligarian al panel a saber de cual vino. */
+    const a = P.traducirInstancias({instances: [{id: 'i1', name: 'n',
+      username: 'u', isLoggedIn: true}]});
+    const b = P.traducirInstanceStatus({isLoggedIn: true, username: 'u',
+      url: 'https://x/panel'});
+    ok(Object.keys(a.sesion).sort().join(',') ===
+       Object.keys(b.sesion).sort().join(','),
+       'las dos fuentes devuelven EXACTAMENTE los mismos campos — ' +
+       Object.keys(a.sesion).sort().join(',') + ' vs ' +
+       Object.keys(b.sesion).sort().join(','));
+  }
+
+  {
+    ['', null, [], {isLoggedIn: 'si'}, {url: 'x'}].forEach((malo) => {
+      const r = P.traducirInstanceStatus(malo);
+      ok(r.ok === false && r.motivo === 'FORMATO_DESCONOCIDO',
+         'lo que no tiene la forma medida no se adivina: ' + JSON.stringify(malo));
+    });
+  }
+
+  bloque('Un 403 de instancia NO es una clave bloqueada');
+
+  {
+    /* ⚠️ MEDIDO DE VERDAD, con un instanceId inventado:
+         403 · "Invalid API Key or instance access"
+       La puerta lo traducia a BLOQUEADO, que el panel muestra como "tu clave
+       de API no sirve". Pero la clave estaba PERFECTA: lo malo era el id.
+       Mandar a revisar el sitio equivocado es exactamente el fallo que este
+       proyecto persigue. */
+    ok(P.motivoDeHttp(403, 'Invalid API Key or instance access') ===
+       'SIN_INSTANCIA_VALIDA',
+       'un 403 que habla de instancia dice SIN_INSTANCIA_VALIDA');
+    ok(P.motivoDeHttp(403, 'Forbidden') === 'BLOQUEADO',
+       'pero un 403 cualquiera sigue siendo BLOQUEADO: no se cambia lo que ya ' +
+       'estaba bien');
+    ok(P.motivoDeHttp(403) === 'BLOQUEADO',
+       'y sin texto tambien — la firma vieja sigue valiendo');
+    ok(P.motivoDeHttp(401, 'instance') === 'BLOQUEADO',
+       'y un 401 no se toca: ese si es de credenciales');
+  }
+
+  {
+    /* De comportamiento, por la puerta entera. */
+    const f = conFetch(resp(403, {message: 'Invalid API Key or instance access'}));
+    const r = await P.llamar('instanceStatus', 'sk_clave', {instanceId: 'malo'});
+    f.restaurar();
+    ok(r.ok === false && r.motivo === 'SIN_INSTANCIA_VALIDA',
+       'y llega asi hasta quien llama — salio: ' + r.motivo);
   }
 
   bloque('Solo se puede pedir lo de la lista blanca');

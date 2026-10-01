@@ -204,6 +204,21 @@
        uno tras otro sin decir por qué. Esto contesta la pregunta correcta. */
     estadoInstancia: function () { return _pedir({op: 'instances'}); },
 
+    /* ✅ CONECTADO · POST /instances/status — 2026-10-01
+       El estado de UNA instancia. Lo que aporta sobre `estadoInstancia()`
+       es `url`: dónde quedó parado el navegador headless de Shalom. Si
+       termina en /login, se deslogueó — y eso es un diagnóstico, no un
+       booleano.
+       → {ok:true, sesion:{conocido, conectada, usuario, nombre, id, url,
+                           enLogin}}
+       ⚠️ `usuario` puede venir NULO con la sesión conectada: medido.
+       ⚠️ `enLogin: null` = no se sabe (no hubo url), que no es lo mismo
+          que `false`.
+       Necesita el instanceId, que sale de `estadoInstancia()`. */
+    estadoSesion: function (instanceId) {
+      return _pedir({op: 'instanceStatus', datos: {instanceId: instanceId}});
+    },
+
     /* ✅ CONECTADO · GET /validate — 2026-09-13
        Dice si la clave sirve y cuánto se ha consumido. Es el primero a
        propósito: no toca ni un envío, así que si algo está mal en la
@@ -259,6 +274,10 @@
         SIN_DATO:      'Faltan datos para consultar.',
         NO_ENCONTRADO: 'Shalom no encontró ese dato.',
         BLOQUEADO:     'Shalom rechazó la clave de la API, o el plan venció.',
+        /* Medido: con un instanceId malo, Shalom responde 403 "Invalid API
+           Key or instance access". Antes se traducía como BLOQUEADO y
+           mandaba a revisar la clave, que estaba perfecta. */
+        SIN_INSTANCIA_VALIDA: 'El id de instancia de Shalom Pro no sirve. La clave de la API puede estar bien: compruébala con «Verificar sesión».',
         LIMITE:        'Se agotó la cuota del plan de Shalom.',
         ERROR_SHALOM:  'Shalom respondió con un error. Reintenta en unos minutos.',
         DESCONECTADO:  'Esa parte de la integración todavía no está conectada.',

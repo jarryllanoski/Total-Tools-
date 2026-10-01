@@ -766,6 +766,59 @@ Se salta **el reloj**, no el interruptor: si el seguimiento automático está
 apagado, responde `BARRIDO_APAGADO`. Y solo por POST — un barrido no se
 dispara abriendo una URL.
 
+## El estado de la sesión de Shalom Pro
+
+Dos fuentes, **un solo vocabulario**:
+
+| Endpoint | Qué aporta |
+|---|---|
+| `GET /instances` | la lista, el `id` de la instancia, `isLoggedIn` |
+| `POST /instances/status` | **la `url`**: dónde quedó parado el navegador headless |
+
+Las dos devuelven el mismo objeto `sesion`. Dos fuentes de lo mismo que
+hablaran distinto obligarían al panel a saber de cuál vino, y eso es estado
+que no hace falta mantener.
+
+### Lo medido el 01/10/2026
+
+```json
+{ "isLoggedIn": "boolean", "username": "null", "url": "string" }
+```
+
+⚠️ **`username` llegó `null` con la sesión conectada.** La documentación lo
+listaba como si siempre viniera. Mismo caso que el `apellidoMaterno: null` de
+RENIEC: nulo es nulo, nunca el texto `"null"`.
+
+### `enLogin`: tres estados, no dos
+
+| Valor | Significa |
+|---|---|
+| `true` | la url termina en `/login` → **se deslogueó** |
+| `false` | está parado en otro sitio → sesión caída de otra forma |
+| `null` | **no se sabe** — no hubo url (es lo que devuelve el `GET`) |
+
+`null` y `false` no son lo mismo, y confundirlos haría que el panel afirmara
+"no está en la pantalla de entrar" cuando lo cierto es "no tengo ni idea".
+
+Se compara **la ruta**, no la url entera, y sin la barra final: buscar
+`"/login"` dentro del texto daría por deslogueado un `/panel/logins`.
+
+### ⚠️ Un 403 de instancia NO es una clave bloqueada
+
+Medido con un `instanceId` inventado:
+
+```
+403 · "Invalid API Key or instance access"
+```
+
+La puerta lo traducía a `BLOQUEADO`, que el panel muestra como *"tu clave de
+API no sirve"* — con la clave perfecta y el id malo. **Mandaba a revisar el
+sitio equivocado**, que es el fallo que este proyecto persigue.
+
+Ahora: un **403 cuyo mensaje menciona `instance`** → `SIN_INSTANCIA_VALIDA`.
+Un 403 cualquiera sigue siendo `BLOQUEADO`, y el **401 no se toca**: ese sí
+es de credenciales.
+
 ## El webhook — etapa 4a: recibir y medir · ⏸ APARCADO
 
 `functions/webhook.js` + `_shalomWebhook`, detrás de `WEBHOOK_ACTIVO = false`.

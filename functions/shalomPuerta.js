@@ -80,7 +80,7 @@ const PERMITIDAS = {
      Shalom. Si termina en `/login`, se deslogueo — eso es un diagnostico de
      verdad, no un booleano. Pide el `instanceId` y NADA MAS. */
   instanceStatus: {metodo: "POST", ruta: "/instances/status",
-    soloMedir: true, cuerpoCampos: ["instanceId"]},
+    cuerpoCampos: ["instanceId"]},
   /* ⚠️ EL LOGIN, Y POR QUE SU LISTA DE CAMPOS ESTA VACIA.
      `POST /instances/login` pide usuario y contraseña de Shalom Pro. El
      cuerpo de una operacion llega DEL NAVEGADOR (`paso.datos` en
@@ -125,9 +125,20 @@ function sanear(texto) {
  * Los motivos del lado de Shalom van aparte de los del panel a propósito:
  * mezclarlos manda a revisar la cuenta cuando el problema es la sesión.
  * @param {number} status código HTTP
+ * @param {string} [texto] cuerpo crudo, para distinguir 403 que se parecen
  * @return {string} motivo del contrato
  */
-function motivoDeHttp(status) {
+function motivoDeHttp(status, texto) {
+  /* ⚠️ UN 403 QUE HABLA DE INSTANCIA NO ES UNA CLAVE BLOQUEADA.
+     Medido el 01/10/2026 con un `instanceId` inventado: Shalom responde
+     403 "Invalid API Key or instance access". Traducirlo a BLOQUEADO hace
+     que el panel diga "tu clave de API no sirve" cuando la clave esta
+     perfecta y lo malo es el id — o sea, manda a revisar el sitio
+     equivocado, que es el fallo que este proyecto persigue.
+     Solo el 403: un 401 si es de credenciales y no se toca. */
+  if (status === 403 && /instance/i.test(String(texto || ""))) {
+    return "SIN_INSTANCIA_VALIDA";
+  }
   if (status === 401 || status === 403) return "BLOQUEADO";
   if (status === 429) return "LIMITE";
   if (status === 404) return "NO_ENCONTRADO";
@@ -348,7 +359,10 @@ async function llamar(op, clave, cuerpo) {
   if (!r.ok) {
     return {
       ok: false,
-      motivo: motivoDeHttp(r.status),
+      // El texto va a `motivoDeHttp` porque hay 403 que significan cosas
+      // distintas y solo el mensaje los separa. Ver el comentario de allí.
+      motivo: motivoDeHttp(r.status,
+          (json && (json.message || json.error)) || texto),
       http: r.status,
       detalle: sanear((json && (json.message || json.error)) || texto),
     };
@@ -612,6 +626,65 @@ function traducirInstancias(j) {
       // rehace. Menos estado que mantener, y nunca desfasado.
       id: txt(it.id),
       url: null,
+      /* NULO, no `false`, y la diferencia importa: el `GET /instances` no
+         dice dónde quedó parado el navegador de Shalom, así que no lo sabe.
+         Poner `false` sería afirmar "no está en la pantalla de entrar"
+         cuando lo cierto es "no tengo ni idea" — y el panel se lo creería.
+         Para saberlo hace falta `POST /instances/status`. */
+      enLogin: null,
+    },
+  };
+}
+
+/**
+ * `POST /instances/status` — el estado de UNA instancia.
+ *
+ * Forma MEDIDA el 01/10/2026 contra la instancia real:
+ *   { isLoggedIn: boolean, username: string|null, url: string }
+ *
+ * ⚠️ `username` LLEGO NULL con la sesión conectada. La documentación lo
+ * listaba como si siempre viniera; medirlo dijo otra cosa. Es el mismo caso
+ * que el `apellidoMaterno: null` de RENIEC, y se trata igual: nulo es nulo,
+ * nunca el texto "null" ni un inventado.
+ *
+ * LO QUE ESTE ENDPOINT APORTA sobre el `GET /instances` que ya teníamos es
+ * la `url`: dónde quedó parado el navegador headless de Shalom. Si termina
+ * en /login, se deslogueó. Eso es un diagnóstico; un booleano solo, no.
+ *
+ * Devuelve EXACTAMENTE los mismos campos que `traducirInstancias`: dos
+ * fuentes de lo mismo que hablaran distinto obligarían al panel a saber de
+ * cuál vino, y eso es estado que no hace falta mantener.
+ *
+ * @param {Object} j JSON crudo de Shalom
+ * @return {Object} {ok:true, sesion:{…}} o {ok:false, motivo}
+ */
+function traducirInstanceStatus(j) {
+  const raro = {ok: false, motivo: "FORMATO_DESCONOCIDO"};
+  if (!j || typeof j !== "object" || Array.isArray(j)) return raro;
+  if (typeof j.isLoggedIn !== "boolean") return raro;
+  const txt = (x) => (typeof x === "string" && x ? x : null);
+  const url = txt(j.url);
+  /* Se compara la RUTA, no la url entera, y se le quita la barra final.
+     Buscar "/login" dentro del texto daría por deslogueado un
+     `/panel/logins` o un `/loginata`, y mandaría a volver a entrar cuando el
+     problema es otro. */
+  let ruta = "";
+  if (url) {
+    ruta = url.split("#")[0].split("?")[0].replace(/\/+$/, "");
+  }
+  return {
+    ok: true,
+    sesion: {
+      conocido: true,
+      conectada: j.isLoggedIn,
+      usuario: txt(j.username),
+      // Este endpoint no los devuelve. Nulo y no inventado: el panel ya sabe
+      // pedirlos al `GET /instances`, que sí los trae.
+      nombre: null,
+      id: null,
+      url: url,
+      // Sin url no se sabe, y no saber se dice: nulo, no `false`.
+      enLogin: url ? /\/login$/.test(ruta) : null,
     },
   };
 }
@@ -769,6 +842,7 @@ function traducir(op, json) {
   if (op === "instances") return traducirInstancias(json);
   if (op === "agencies") return traducirAgencias(json);
   if (op === "dni") return traducirDni(json);
+  if (op === "instanceStatus") return traducirInstanceStatus(json);
   return {ok: false, motivo: "SIN_TRADUCTOR"};
 }
 
@@ -782,6 +856,7 @@ module.exports = {
   traducirTrack,
   traducirInstancias,
   traducirAgencias,
+  traducirInstanceStatus,
   traducirDni,
   PASOS,
   esAdminDe,
