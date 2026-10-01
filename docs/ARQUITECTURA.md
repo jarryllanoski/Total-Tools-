@@ -581,6 +581,45 @@ enseña el **principio** y no el final porque en un DNI peruano los primeros
 dígitos van ligados a época y lugar de emisión, o sea que son los más
 deducibles; los últimos son los que más cuesta inferir.
 
+## 7-ter. "Llévame a ese pedido" — una sola puerta
+
+`irAlPedido(id)` en `index.html`. La usan el **botón Ver** de la campana
+(`notify.js`) y **crear un pedido** (`config.js`). Antes eran dos caminos, y
+uno estaba roto.
+
+**El fallo (30 sep 2026).** Al guardar un pedido nuevo, el panel no saltaba a
+él ni lo resaltaba. `config.js` hacía `setFilt(data.status)` esperando que
+repintara, y luego buscaba la tarjeta en el DOM. Pero `setFilt` tiene una
+optimización legítima:
+
+```js
+if (v === _filt) return;   // tocar el chip ya activo no reconstruye 1200 tarjetas
+```
+
+Si el filtro **ya** estaba en "NUEVO PEDIDO" —lo normal tras crear dos
+pedidos seguidos— `setFilt` se salía por ahí y no repintaba. La tarjeta nunca
+llegaba al DOM, `querySelector` devolvía null, y el resaltado hacía
+`if(!c) return;`: se callaba.
+
+**El error de fondo no es ese `return`.** Es que un camino dependía de un
+**efecto secundario** de `setFilt` en vez de pedir el repintado que
+necesitaba. El repintado ahora está garantizado porque `clearAdvSearch()`
+llama a `render()` siempre, pase lo que pase con el filtro — esa era la pieza
+que a `notify.js` sí le sobraba y al otro camino le faltaba.
+
+**Por qué una sola puerta.** `notify.js` llevaba meses haciéndolo bien.
+Mantener dos versiones de "llévame a ese pedido" garantiza que la que no se
+usa a diario se pudra sin que nadie lo note — que es exactamente lo que pasó.
+
+**Y ya no se calla.** Si la tarjeta no aparece tras tres intentos por frame,
+se avisa, y se distinguen los dos casos porque tienen arreglos distintos: que
+el pedido no exista es un problema de guardado; que exista y no se vea es de
+filtro o de repintado.
+
+**Reintentos por frame, no `setTimeout(250)`.** Con 1200 pedidos el repintado
+puede tardar más que cualquier número elegido a ojo — y un número a ojo falla
+justo en el equipo más lento, que es donde menos se prueba.
+
 ## 8. Documentos relacionados
 
 | Documento | Para qué |

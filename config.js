@@ -1098,9 +1098,14 @@ function saveShipment(){
     // ★ Sin _fbSaveShipmentNow(): ver el comentario de arriba. Un pedido nuevo
     // que aún no subió ya sobrevive al latido y al cierre de la pestaña.
     save(data.id);closeOverlay('formOverlay');
-    // Mostrar el pedido nuevo en SU etiqueta (sin scroll) + resaltarlo
-    if(typeof setFilt==='function') setFilt(data.status); else render();
-    if(typeof _highlightCard==='function') _highlightCard(data.id);
+    /* Llevar al pedido nuevo y resaltarlo, por LA MISMA puerta que usa el
+       boton "Ver" de la campana.
+       Antes esto era `setFilt(data.status)` + `_highlightCard(data.id)`, y
+       fallaba en silencio cuando el filtro YA estaba en ese estado: setFilt
+       se salia por su optimizacion, no repintaba, y la tarjeta nunca
+       llegaba al DOM. Ver el comentario de `irAlPedido` en index.html. */
+    if(typeof irAlPedido==='function') irAlPedido(data.id);
+    else if(typeof render==='function') render();
     // Notificar (campana), igual que los pedidos del formulario público
     if(window.NotifyModule && data.status==='NUEVO PEDIDO'){
       window.NotifyModule.add({icon:'📦',title:'Nuevo pedido — '+data.name,sub:(data.courier||'')+' · '+String(data.address||data.ciudadDestino||'—').substring(0,45),shipId:data.id,ts:Date.now(),link:(data.links&&data.links[0]&&data.links[0].u)||''});

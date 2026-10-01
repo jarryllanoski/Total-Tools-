@@ -187,28 +187,18 @@
   function _verShipment(id){
     _closePanel();
 
-    var ship = window.S && window.S.shipments && window.S.shipments.find(function(s){ return s.id===id; });
+    /* "Ver" es navegación determinista: llevar a la ETIQUETA donde vive el
+       pedido y destrabar lo que pudiera ocultarlo (búsqueda + filtros
+       avanzados), para que SIEMPRE aparezca.
 
-    // "Ver" es navegación determinista: llevar a la ETIQUETA donde vive el pedido
-    // y destrabar lo que pudiera ocultarlo (búsqueda + filtros avanzados), para
-    // que SIEMPRE aparezca. (Antes iba a TODOS y podía quedar oculto por una
-    // búsqueda activa.)
-    var srch = document.getElementById('fSearch');
-    if(srch && srch.value){ srch.value=''; }
-    if(typeof window.clearAdvSearch === 'function') window.clearAdvSearch(); // resetea avanzados + render
-    if(typeof window.setFilt === 'function') window.setFilt(ship ? ship.status : ''); // su estado (o TODOS si no está) + render
+       ESTA LÓGICA YA NO VIVE AQUÍ. Vivía solo aquí, y el camino de crear un
+       pedido tenía su propia versión —peor— que fallaba cuando el filtro ya
+       estaba puesto en el estado del pedido nuevo: `setFilt` no repintaba y
+       la tarjeta no llegaba al DOM. Dos caminos para lo mismo y uno roto.
+       Ahora es uno: `irAlPedido()` en index.html, que es ESTE código
+       promovido tal cual. Ver el comentario de allí. */
+    if(typeof window.irAlPedido === 'function') window.irAlPedido(id);
     else if(typeof window.render === 'function') window.render();
-
-    // Buscar la card por su id ESTABLE (data-id ya existe en el render), no
-    // escaneando innerHTML (frágil: el id podía coincidir dentro de otra card).
-    // Scroll + resaltado tras el render, en el siguiente frame (sin timeouts mágicos).
-    requestAnimationFrame(function(){
-      var target = document.querySelector('.card[data-id="' + String(id).replace(/["\\]/g,'\\$&') + '"]');
-      if(!target) return;
-      try{ target.scrollIntoView({behavior:'smooth', block:'center'}); }catch(e){ try{ target.scrollIntoView(); }catch(_){} }
-      target.classList.add('notify-card-highlight');
-      setTimeout(function(){ target.classList.remove('notify-card-highlight'); }, 3000);
-    });
   }
 
   /* ── IMPRIMIR ────────────────────────────────────────────────────── */

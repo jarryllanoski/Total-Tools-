@@ -3408,19 +3408,85 @@ function _copiarFallback(txt,listo){
   }catch(e){ toast('No se pudo copiar — selecciona el texto a mano'); }
 }
 /* Resaltar (y centrar) una tarjeta por su id — se usa al crear un pedido nuevo */
-function _highlightCard(id){
-  setTimeout(function(){
-    try{
-      const c=document.querySelector('.card[data-id="'+String(id).replace(/"/g,'')+'"]');
-      if(!c) return;
-      c.scrollIntoView({behavior:'smooth',block:'center'});
-      c.style.transition='background .3s';
-      const prev=c.style.background;
-      c.style.background='rgba(56,139,253,.18)';
-      setTimeout(function(){ c.style.background=prev||''; }, 1800);
-    }catch(e){}
-  }, 250);
+/* ══════════════════════════════════════════════════════════════════════
+   LLÉVAME A ESE PEDIDO — la única puerta
+   ══════════════════════════════════════════════════════════════════════
+   ⚠️ EXISTE POR UN FALLO REAL (30 sep 2026): al guardar un pedido nuevo, el
+   panel no saltaba a él ni lo resaltaba. Y la causa es fina.
+
+   `config.js` hacía esto:
+       setFilt(data.status);      // esperando que repinte
+       _highlightCard(data.id);   // y buscaba la tarjeta en el DOM
+
+   Pero `setFilt` tiene una optimización legítima: `if (v === _filt) return;`
+   —tocar el chip que ya está activo no debe reconstruir 1200 tarjetas—. Si
+   el filtro YA estaba en "NUEVO PEDIDO", que es lo normal tras crear dos
+   pedidos seguidos, `setFilt` se salía por ahí y NO REPINTABA. La tarjeta
+   nueva no llegaba al DOM, `querySelector` devolvía null, y el resaltado
+   hacía `if(!c) return;`: se callaba. Ni scroll, ni resaltado, ni tarjeta.
+
+   EL ERROR DE FONDO NO ES ESE `return`. Es que el camino de creación
+   dependía de un EFECTO SECUNDARIO de `setFilt` en vez de pedir el
+   repintado que necesitaba. Y había DOS caminos para lo mismo: el de
+   `notify.js` (botón Ver) lo hacía bien desde hace meses. Ahora es uno.
+
+   El repintado está GARANTIZADO porque `clearAdvSearch()` siempre llama a
+   `render()`, pase lo que pase con el filtro. Esa es la pieza que al camino
+   de creación le faltaba.
+   ══════════════════════════════════════════════════════════════════════ */
+function irAlPedido(id, opciones){
+  const o = opciones || {};
+  const ped = ((window.S && S.shipments) || []).filter(function(x){
+    return x && x.id === id; })[0];
+
+  /* 1 · Destrabar lo que pudiera esconderlo. La razón está escrita en el
+     comentario original de notify.js: "antes podía quedar oculto por una
+     búsqueda activa". Un pedido recién creado que no aparece porque hay
+     texto en el buscador es el mismo fallo con otra cara. */
+  const srch = document.getElementById('fSearch');
+  if(srch && srch.value){ srch.value=''; }
+  if(typeof clearAdvSearch === 'function') clearAdvSearch(); // ← repinta SIEMPRE
+  else if(typeof render === 'function') render();
+
+  /* 2 · Llevar a la etiqueta donde vive el pedido (o TODOS si no está). */
+  if(typeof setFilt === 'function') setFilt(ped ? ped.status : '');
+
+  /* 3 · Buscarla y resaltarla. Con reintentos por frame en vez de un
+     `setTimeout(250)` mágico: con 1200 pedidos el repintado puede tardar
+     más que cualquier número que uno elija a ojo, y un número a ojo falla
+     justo en el equipo más lento, que es donde menos se prueba. */
+  var intentos = 0;
+  (function buscar(){
+    const c = document.querySelector('.card[data-id="' +
+      String(id).replace(/["\\]/g,'\\$&') + '"]');
+    if(c){
+      try{ c.scrollIntoView({behavior:'smooth', block:'center'}); }
+      catch(e){ try{ c.scrollIntoView(); }catch(_){} }
+      c.classList.add('notify-card-highlight');
+      setTimeout(function(){ c.classList.remove('notify-card-highlight'); },
+        o.ms || 3000);
+      return;
+    }
+    if(++intentos <= 3){ requestAnimationFrame(buscar); return; }
+
+    /* ⚠️ Y SI NO APARECE, SE DICE. El fallo original era invisible: un
+       `if(!c) return;` y a otra cosa. Se distinguen los dos casos porque
+       tienen arreglos distintos: que el pedido no exista es un problema de
+       guardado; que exista y no se vea es de filtro o de repintado. */
+    if(ped){
+      console.warn('[irAlPedido] no encontré la tarjeta de ' + id +
+        ' — el pedido SÍ existe, así que lo esconde un filtro o el ' +
+        'repintado no llegó');
+      if(typeof toast === 'function'){
+        toast('⚠️ El pedido se guardó, pero no pude mostrarlo en la lista');
+      }
+    } else {
+      console.warn('[irAlPedido] el pedido ' + id +
+        ' no está en S.shipments — no es cosa de la vista');
+    }
+  })();
 }
+/* fin irAlPedido */
 
 /* Barra de pegar WhatsApp: botón ✕ para limpiar lo pegado */
 function _pasteClearToggle(){ const p=document.getElementById('fPaste'),b=document.getElementById('fPasteClear'); if(!p||!b) return; b.style.display=(p.value&&p.value.trim())?'block':'none'; }
@@ -4599,9 +4665,9 @@ render();
      lo usa. config.js, print.js y voz.js preguntan por los pedidos marcados,
      así que siguen yendo detrás. El orden de carga es un contrato
      (ver docs/ARQUITECTURA.md). -->
-<script src="config.js?v=36"></script>
+<script src="config.js?v=37"></script>
 <script src="print.js?v=16"></script>
-<script src="notify.js?v=4"></script>
+<script src="notify.js?v=5"></script>
 <script src="shalom.js?v=19"></script>
 <script src="tracking.js?v=20"></script>
 <script src="floatpanel.js?v=4"></script>
