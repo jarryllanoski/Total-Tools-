@@ -46,16 +46,23 @@
   /**
    * LA FORMA VIEJA — los links que ya están en el WhatsApp de tus clientes.
    *
-   * Deliberadamente ANCHA. Podría exigir `id_` + 13 dígitos, que es lo que
-   * produce `Date.now()` hoy, pero un solo pedido importado con otro formato
-   * se quedaría sin poder abrir su link y **nadie se enteraría hasta que un
-   * cliente llamara**. Aquí el error caro es rechazar de más, no aceptar de
-   * más: lo que pase esta reja todavía tiene que existir en la base de datos.
+   * NO EXIGE NINGÚN PREFIJO, y eso es una corrección pagada con un fallo
+   * real. La primera versión exigía `id_`, porque medí los ids del panel con
+   * un script que reemplazaba las letras por `a` — así que `id_` y `xl_`
+   * salían los dos como `aa_` y la medición **destruyó justo el dato que
+   * importaba**. Los pedidos importados de Excel empiezan por `xl_`, su link
+   * dejó de abrir, y la tabla que yo mismo pedí no lo mostraba.
    *
-   * Lo único que sí se exige es el prefijo `id_`, y eso se comprobó contra
-   * los pedidos REALES antes de escribirlo — no se dio por supuesto.
+   * La lección no es "añadir `xl_`": es que **enumerar prefijos es apostar a
+   * haberlos visto todos**. Lo que esta reja tiene que impedir es texto que
+   * se cuele en una ruta de base de datos (`/`, `..`) y basura que cueste
+   * una lectura. Para eso no hace falta saber qué prefijos existen.
+   *
+   * Y aceptar de más aquí no abre ninguna puerta: lo que pase esta reja
+   * todavía tiene que EXISTIR en la base de datos, y los pedidos nuevos
+   * están protegidos aparte por `aceptaLegado()`.
    */
-  const LEGADO = /^id_[A-Za-z0-9_-]{1,64}$/;
+  const LEGADO = /^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/;
 
   /**
    * LA FORMA NUEVA — 128 bits del generador criptográfico.

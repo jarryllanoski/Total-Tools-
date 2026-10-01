@@ -41,9 +41,30 @@ module.exports = async ({bloque, ok}) => {
        rechazar de mas: lo que pase esta reja todavia tiene que EXISTIR en la
        base de datos, asi que aceptar de mas no abre ninguna puerta. */
     ok(L.LEGADO.test('id_1790617556159'),
-       'familia 1 (879 pedidos): `id_` + el reloj');
+       'familia 1: `id_` + el reloj, los que crea el panel');
+    ok(L.LEGADO.test('xl_1783091211461_2r83'),
+       'familia 2: `xl_`, los IMPORTADOS DE EXCEL — estos SI se rompieron');
     ok(L.LEGADO.test('id_1790617556159_a3f2'),
-       'familia 2 (318 pedidos): y con el sufijo de cuatro — la que casi rompo');
+       'y los que llevan sufijo de cuatro');
+
+    /* ★ EL FALLO QUE PAGO ESTA REJA, escrito para no repetirlo.
+       Pedi medir los ids reales antes de escribir esto, y estuvo bien. Pero
+       el script que escribi reemplazaba las letras por `a`, asi que `id_` y
+       `xl_` salian LOS DOS como `aa_`: la medicion destruyo exactamente el
+       dato que la decision necesitaba. La tabla decia "dos familias" cuando
+       en realidad eran cuatro, y yo exigi `id_`. Los pedidos de Excel
+       dejaron de abrir su link.
+
+       La leccion NO es "añadir xl_". Es que enumerar prefijos es apostar a
+       haberlos visto todos — y medir mal da la misma confianza que medir
+       bien. Esta reja ya no mira prefijos: solo impide lo que de verdad
+       tiene que impedir. */
+    ['xl_1783091211461_2r83', 'id_1790617556159', 'ped_99', 'A1', '7',
+      'loquesea_2026_abc']
+        .forEach((real) => {
+          ok(L.tipoDe(real) === 'legado',
+             'cualquier prefijo historico pasa: ' + real);
+        });
     ok(L.tipoDe('id_1790617556159_a3f2') === 'legado',
        'y se enruta como legado, no como basura');
 
@@ -150,8 +171,13 @@ module.exports = async ({bloque, ok}) => {
   bloque('Lo que no tiene forma de token no toca la base de datos');
 
   {
-    ['', '   ', 'basura', 'id_', 't1_', 'x'.repeat(200), 'id_1790 ',
-      't1_corto', 'ID_1790617556159']
+    /* Lo que se rechaza es lo que NO PUEDE ser un id de documento: vacio,
+       con espacios, con barras, o absurdamente largo. Un texto corto y
+       limpio como `basura` SI pasa la forma — y debe pasar: rechazarlo
+       exigiria saber que prefijos existen, que es el error que ya cometi.
+       No cuesta nada: tiene que existir en la base de datos igual. */
+    ['', '   ', ' ', 'x'.repeat(200), 'id_1790 ', 'id 1790',
+      '_empieza_mal', '-tampoco']
         .forEach((malo) => {
           ok(L.tipoDe(malo) === 'invalido',
              'rechazado antes de consultar nada: ' + JSON.stringify(malo));
