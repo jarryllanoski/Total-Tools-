@@ -242,15 +242,6 @@ function traducirValidate(j) {
 }
 
 /**
- * Llama a Shalom. Devuelve el JSON crudo o un motivo; NO traduce.
- * Separado a propósito: así la traducción se prueba sin red y la red se
- * prueba sin traducción.
- * @param {string} op nombre de la operación en PERMITIDAS
- * @param {string} clave API key
- * @param {Object} [cuerpo] cuerpo para las operaciones POST
- * @return {Promise<Object>} {ok:true, json} o {ok:false, motivo, detalle}
- */
-/**
  * El cuerpo que de verdad sale, segun lo declarado por la operacion.
  * Sin `cuerpoCampos` va tal cual (las operaciones de siempre no cambian).
  * @param {Object} def la entrada de PERMITIDAS
@@ -267,6 +258,15 @@ function filtrarCuerpo(def, cuerpo) {
   return out;
 }
 
+/**
+ * Llama a Shalom. Devuelve el JSON crudo o un motivo; NO traduce.
+ * Separado a propósito: así la traducción se prueba sin red y la red se
+ * prueba sin traducción.
+ * @param {string} op nombre de la operación en PERMITIDAS
+ * @param {string} clave API key
+ * @param {Object} [cuerpo] cuerpo para las operaciones POST
+ * @return {Promise<Object>} {ok:true, json} o {ok:false, motivo, detalle}
+ */
 async function llamar(op, clave, cuerpo) {
   const def = PERMITIDAS[op];
   if (!def) return {ok: false, motivo: "NO_PERMITIDO"};
