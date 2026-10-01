@@ -55,6 +55,48 @@ module.exports = async ({bloque, ok}) => {
         });
   }
 
+  bloque('El linter no tumba el despliegue');
+
+  {
+    /* `firebase deploy` corre `eslint .` ANTES de subir nada, asi que un
+       error de estilo no es cosmetico: PARA EL DESPLIEGUE EN SECO. Me paso
+       con este mismo archivo — declare `btoa` y `Buffer` en el comentario de
+       globales y ESLint los rechazo con `no-redeclare`, porque ya los conoce.
+       Jarry se comio el error en su terminal por mi culpa.
+
+       Los modulos de functions/ que llevan meses pasando el linter declaran
+       EXACTAMENTE dos globales. Esta prueba exige lo mismo de los nuevos. */
+    const YA_CONOCIDOS = ['btoa', 'atob', 'Buffer', 'console', 'process',
+      'URL', 'TextEncoder', 'TextDecoder', 'setTimeout', 'require', 'module'];
+    ['enlaceSeguimiento', 'pedidoPublico', 'agencias', 'etiquetas']
+        .forEach((nombre) => {
+          const src = E.leer('functions/' + nombre + '.js');
+          const m = src.match(/\/\* global ([^*]*)\*\//);
+          if (!m) return;
+          const listados = m[1].split(',').map((x) => x.trim()).filter(Boolean);
+          const malos = listados.filter((g) => YA_CONOCIDOS.indexOf(g) >= 0);
+          ok(malos.length === 0,
+             nombre + '.js no redeclara globales que ESLint ya conoce' +
+             (malos.length ? ' — tumbaria el despliegue: ' + malos.join(', ') : ''));
+        });
+  }
+
+  {
+    /* Y el largo de linea, que es la otra regla que corta despliegues.
+       Google pone el tope en 80 CARACTERES — contados en caracteres, no en
+       bytes: las tildes y los `─` de los titulos ocupan 2 y 3 bytes, asi que
+       medirlo con herramientas de bytes da falsos positivos. */
+    ['enlaceSeguimiento', 'pedidoPublico'].forEach((nombre) => {
+      const largas = E.leer('functions/' + nombre + '.js')
+          .split('\n').map((l, i) => [i + 1, l.length])
+          .filter((x) => x[1] > 80);
+      ok(largas.length === 0,
+         nombre + '.js no pasa de 80 caracteres por linea' +
+         (largas.length ? ' — lineas: ' +
+           largas.slice(0, 4).map((x) => x[0]).join(', ') : ''));
+    });
+  }
+
   bloque('Un token nuevo no se adivina, y nunca se confunde con uno viejo');
 
   {

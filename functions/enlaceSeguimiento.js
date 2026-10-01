@@ -35,7 +35,7 @@
  * pedirle bytes al generador criptográfico.
  */
 
-/* global globalThis, window, btoa, Buffer */
+/* global globalThis, window */
 (function(raiz, fabrica) {
   if (typeof module === "object" && module.exports) {
     module.exports = fabrica();
