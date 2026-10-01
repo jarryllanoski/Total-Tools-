@@ -75,6 +75,38 @@ const PERMITIDAS = {
      sale. La forma es la que documenta su API: 8 digitos, ni uno mas. */
   dni: {metodo: "GET", ruta: "/account/dni/{dni}",
     rutaParam: {dni: /^[0-9]{8}$/}},
+  /* El estado de UNA instancia. Lo que aporta sobre el `GET /instances` que
+     ya tenemos es la `url`: donde quedo parado el navegador headless de
+     Shalom. Si termina en `/login`, se deslogueo — eso es un diagnostico de
+     verdad, no un booleano. Pide el `instanceId` y NADA MAS. */
+  instanceStatus: {metodo: "POST", ruta: "/instances/status",
+    soloMedir: true, cuerpoCampos: ["instanceId"]},
+  /* ⚠️ EL LOGIN, Y POR QUE SU LISTA DE CAMPOS ESTA VACIA.
+     `POST /instances/login` pide usuario y contraseña de Shalom Pro. El
+     cuerpo de una operacion llega DEL NAVEGADOR (`paso.datos` en
+     functions/index.js), asi que sin esta reja existiria el camino "la
+     contraseña de Jarry viaja por el panel" — aunque hoy nadie lo usara. Y
+     los caminos que existen se acaban usando.
+
+     Con `cuerpoCampos: []` el navegador NO PUEDE mandar nada. Las
+     credenciales las pondra el servidor desde Secret Manager, igual que la
+     clave de la API: nunca tocan el navegador, ni Firestore, ni el respaldo.
+
+     En soloMedir: con cuerpo vacio su API devuelve la forma del error, que
+     es medio contrato gratis — el mismo truco que con `register`. */
+  instanceLogin: {metodo: "POST", ruta: "/instances/login",
+    soloMedir: true, cuerpoCampos: []},
+  /* ⚠️ LO QUE NO ESTA, Y ES UNA DECISION:
+
+     · `POST /instances/logout` — su doc dice "borra la sesion Y LAS
+       CREDENCIALES GUARDADAS -> se acaba el auto-login", y dos lineas antes,
+       sobre el 401 por sesion caida: "ese es el fallo mas repetido de esta
+       API". Un boton cuyo unico efecto es recrear el fallo mas comun tiene
+       valor negativo.
+
+     · `POST /instances` (crear) — el boton se llamaria "Obtener instancia" y
+       eso suena a crear, pero ya hay UNA y su `id` sale del `GET /instances`
+       que ya esta traducido. Crear otra devuelve 403 por limite. */
 };
 
 /**
@@ -218,6 +250,23 @@ function traducirValidate(j) {
  * @param {Object} [cuerpo] cuerpo para las operaciones POST
  * @return {Promise<Object>} {ok:true, json} o {ok:false, motivo, detalle}
  */
+/**
+ * El cuerpo que de verdad sale, segun lo declarado por la operacion.
+ * Sin `cuerpoCampos` va tal cual (las operaciones de siempre no cambian).
+ * @param {Object} def la entrada de PERMITIDAS
+ * @param {Object} cuerpo lo que llego, que puede venir del navegador
+ * @return {Object} solo lo permitido
+ */
+function filtrarCuerpo(def, cuerpo) {
+  if (!def.cuerpoCampos) return cuerpo || {};
+  const dentro = (cuerpo && typeof cuerpo === "object") ? cuerpo : {};
+  const out = {};
+  def.cuerpoCampos.forEach((k) => {
+    if (Object.prototype.hasOwnProperty.call(dentro, k)) out[k] = dentro[k];
+  });
+  return out;
+}
+
 async function llamar(op, clave, cuerpo) {
   const def = PERMITIDAS[op];
   if (!def) return {ok: false, motivo: "NO_PERMITIDO"};
@@ -262,7 +311,16 @@ async function llamar(op, clave, cuerpo) {
     };
     if (def.metodo === "POST") {
       opciones.headers["Content-Type"] = "application/json";
-      opciones.body = JSON.stringify(cuerpo || {});
+      /* LISTA BLANCA DEL CUERPO, donde se declara.
+         Misma idea que `pedidoPublico.CAMPOS` y que `ORDER_FIELDS`: se
+         enumera lo permitido y lo demas no sale. Aqui protege algo muy
+         concreto — que una contraseña mandada desde el navegador no llegue
+         a viajar— y por eso `instanceLogin` la tiene VACIA.
+
+         Solo se aplica donde esta declarada: `track` lleva meses funcionando
+         con su cuerpo y no se toca. Arreglar lo que no esta roto es como se
+         rompen las cosas; extenderla a `track` tiene su propio turno. */
+      opciones.body = JSON.stringify(filtrarCuerpo(def, cuerpo));
     }
     r = await fetch(BASE + ruta, opciones);
   } catch (e) {

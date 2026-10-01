@@ -35,6 +35,106 @@ const resp = (status, cuerpo) => ({
 
 module.exports = async ({bloque, ok}) => {
 
+  bloque('La sesion de Shalom Pro: medible, y sin que una contraseña pase por el navegador');
+
+  {
+    /* ⚠️ EL MOTIVO POR EL QUE ESTO SE HACE AHORA Y NO DESPUES.
+       `POST /instances/login` pide usuario y contraseña de Shalom Pro, y el
+       cuerpo de una operacion llega DEL NAVEGADOR (`paso.datos` en
+       functions/index.js). Sin una reja, el camino "la contraseña viaja por
+       el panel" existiria aunque hoy nadie lo use — y los caminos que
+       existen se acaban usando.
+
+       `cuerpoCampos` es la misma idea que `pedidoPublico.CAMPOS` y que
+       `ORDER_FIELDS`: lista blanca. Lo que no esta declarado no sale. Para
+       `login` la lista esta VACIA a proposito: el navegador no puede mandar
+       NADA. Las credenciales las pondra el servidor desde Secret Manager. */
+    ok(P.PERMITIDAS.instanceLogin && P.PERMITIDAS.instanceLogin.soloMedir === true,
+       '`instanceLogin` existe y entra en soloMedir, como todo endpoint nuevo');
+    ok(Array.isArray(P.PERMITIDAS.instanceLogin.cuerpoCampos) &&
+       P.PERMITIDAS.instanceLogin.cuerpoCampos.length === 0,
+       'y su lista de campos permitidos esta VACIA: el navegador no manda nada');
+  }
+
+  {
+    /* De comportamiento: aunque alguien mande credenciales, NO SALEN. */
+    const f = conFetch(resp(400, {error: 'x', message: 'y'}));
+    await P.llamar('instanceLogin', 'sk_clave', {
+      username: 'jarry@totaltools', password: 'laQueSea123', instanceId: 'abc'
+    });
+    const enviado = f.opciones.body;
+    f.restaurar();
+    ok(enviado === '{}',
+       'una contraseña mandada desde fuera NO llega a Shalom — se envio: ' + enviado);
+    ok(enviado.indexOf('laQueSea123') < 0 && enviado.indexOf('password') < 0,
+       'y no queda ni rastro de ella en el cuerpo');
+  }
+
+  {
+    /* `instances/status` si necesita el instanceId, y SOLO eso. */
+    const f = conFetch(resp(200, {isLoggedIn: true, username: 'x', url: 'y'}));
+    await P.llamar('instanceStatus', 'sk_clave', {
+      instanceId: 'inst-123', password: 'secreta', loQueSea: 1
+    });
+    const cuerpo = JSON.parse(f.opciones.body);
+    f.restaurar();
+    ok(cuerpo.instanceId === 'inst-123',
+       'el instanceId si viaja: sin el, la consulta no significa nada');
+    ok(Object.keys(cuerpo).length === 1,
+       'y NADA MAS: lo que no esta declarado se cae — ' +
+       Object.keys(cuerpo).join(', '));
+  }
+
+  {
+    /* La lista blanca solo aplica donde se declara. `track` lleva meses
+       funcionando con su cuerpo y no se toca: arreglar lo que no esta roto
+       es como se rompen las cosas. Queda anotado para su propio turno. */
+    const f = conFetch(resp(200, {}));
+    await P.llamar('track', 'sk_clave',
+        {orderNumber: '97698639', orderCode: 'MCHN'});
+    const cuerpo = JSON.parse(f.opciones.body);
+    f.restaurar();
+    ok(cuerpo.orderNumber === '97698639' && cuerpo.orderCode === 'MCHN',
+       'track sigue mandando su cuerpo igual que siempre');
+  }
+
+  {
+    /* ⚠️ `POST /instances/logout` NO ESTA, Y ES DELIBERADO.
+       Su documentacion: "borra la sesion Y LAS CREDENCIALES GUARDADAS -> se
+       acaba el auto-login". Y dos lineas antes, sobre el 401 por sesion
+       caida: "ese es el fallo mas repetido de esta API".
+       Un boton cuyo unico efecto es recrear el fallo mas comun de la API
+       tiene valor negativo. Si algun dia entra, que sea una decision y no un
+       descuido — por eso esta prueba. */
+    ok(!P.PERMITIDAS.instanceLogout,
+       'logout NO esta en la puerta: borraria las credenciales y mataria el ' +
+       'auto-login, que es el fallo mas repetido de esta API');
+    const r = await P.llamar('instanceLogout', 'sk_clave', {});
+    ok(r.ok === false && r.motivo === 'NO_PERMITIDO',
+       'y pedirlo se rechaza, no se intenta');
+  }
+
+  {
+    /* ⚠️ `POST /instances` (CREAR) tampoco. El boton de la otra app se llama
+       "Obtener instancia" y eso suena a crear, pero Jarry YA TIENE una: el
+       `id` sale del `GET /instances` que ya esta traducido. Crear una
+       segunda devuelve 403 por limite, y deja un lio que desenredar. */
+    ok(!P.PERMITIDAS.instanceCrear && !P.PERMITIDAS.instanceNueva,
+       'crear instancias no esta en la puerta: ya hay una, y el limite da 403');
+  }
+
+  {
+    /* soloMedir de verdad: se puede MIRAR la forma, no USAR la operacion. */
+    const f = conFetch(resp(200, {isLoggedIn: true}));
+    const r = await P.llamar('instanceStatus', 'sk_clave', {instanceId: 'a'});
+    f.restaurar();
+    ok(r.ok === true, 'llamar() si deja medir (es lo que usa `esquema`)');
+    const t = P.traducir('instanceStatus', {isLoggedIn: true});
+    ok(t && t.ok === false && t.motivo === 'SIN_TRADUCTOR',
+       'pero traducir() responde SIN_TRADUCTOR, no un a-medio-entender');
+  }
+
+
   bloque('La clave no sale de aquí ni dentro de un error');
 
   ok(P.sanear('falló con sk_live_ABCdef123456 dentro') ===
@@ -75,15 +175,55 @@ module.exports = async ({bloque, ok}) => {
     ok(metodos.every((m) => m === 'GET' || m === 'POST'),
        'ni un DELETE ni un PUT en la lista: la puerta no puede borrar nada, ' +
        'y eso no depende de acordarse de un nombre');
-    ok(rutas.every((r) => !/logout|login|subscriptions|webhooks/i.test(r)),
-       'ni cerrar sesión, ni entrar, ni tocar webhooks o suscripciones');
+    ok(rutas.every((r) => !/logout|subscriptions|webhooks/i.test(r)),
+       'ni cerrar sesión, ni tocar webhooks o suscripciones');
+
+    /* ⚠️ `login` SALIÓ DE LA LISTA NEGRA DE NOMBRES, Y NO ES UN AFLOJE.
+       Prohibirlo por el nombre decía "aquí no entra una contraseña". Pero el
+       dueño necesita el login, así que prohibirlo por nombre solo habría
+       obligado a borrar esta línea el día que hiciera falta — y borrar una
+       reja es más fácil que razonarla.
+       Se cambia por la condición que de verdad importaba todo el tiempo:
+       puede existir, pero el NAVEGADOR NO PUEDE MANDARLE NADA. Las
+       credenciales las pone el servidor desde Secret Manager. Esto es más
+       estricto que el nombre, no menos: cubre también cualquier ruta futura
+       que pida credenciales aunque no se llame "login". */
+    claves.filter((k) => /login|password|credencial/i.test(
+        k + ' ' + P.PERMITIDAS[k].ruta)).forEach((k) => {
+      const cc = P.PERMITIDAS[k].cuerpoCampos;
+      ok(Array.isArray(cc) && cc.length === 0,
+         k + ': una ruta de credenciales existe SOLO si el navegador no ' +
+         'puede mandarle nada (cuerpoCampos vacío)');
+    });
     ok(!P.PERMITIDAS['instances/logout'] && !P.PERMITIDAS['webhooks'] &&
        !P.PERMITIDAS['tracking/subscriptions'],
        'y los destructivos siguen fuera por su nombre también');
   }
+  {
+    /* ⚠️ LA REGLA DE FONDO, y es la numero 10 del proyecto: una operacion sin
+       traductor tiene que estar en `soloMedir`. Sin esto, abrir un endpoint
+       nuevo y olvidarse del traductor devuelve al panel algo a medio
+       entender — que es peor que un error, porque parece que funciona.
+
+       Se comprueba la REGLA y no los nombres: asi cubre tambien el endpoint
+       que alguien añada dentro de seis meses. Una mutacion se me escapo
+       justo por nombrar `instanceLogin` en vez de preguntar por la regla. */
+    Object.keys(P.PERMITIDAS).forEach((op) => {
+      const r = P.traducir(op, {});
+      const sinTraductor = !!(r && r.motivo === 'SIN_TRADUCTOR');
+      const soloMedir = P.PERMITIDAS[op].soloMedir === true;
+      ok(!sinTraductor || soloMedir,
+         op + ': no tiene traductor, asi que DEBE estar en soloMedir — si no, ' +
+         'el panel recibe algo a medio entender y parece que funciona');
+      ok(!(soloMedir && !sinTraductor),
+         op + ': ya tiene traductor, asi que sobra el soloMedir — dejarlo ' +
+         'puesto esconde una conexion que ya se podria usar');
+    });
+  }
+
   ok(Object.keys(P.PERMITIDAS).join(',') ===
-     'validate,track,instances,agencies,dni',
-     'hoy hay cinco, y en el orden en que se reconstruyen');
+     'validate,track,instances,agencies,dni,instanceStatus,instanceLogin',
+     'hoy hay siete, y en el orden en que se reconstruyen');
   ok(!P.PERMITIDAS.track.soloMedir,
      'track ya no es solo medible: su forma se midió y se tradujo');
   ok(P.PERMITIDAS.instances.metodo === 'GET' &&
