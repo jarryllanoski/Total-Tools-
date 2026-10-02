@@ -3372,6 +3372,25 @@ function verificarInstanciaShalom(){
       return;
     }
 
+    /* ★ RESOLVER NO ES GUARDAR, y confundirlos dejo ciego al servidor.
+       La cuenta declarada vive en shalom.js, que es codigo de NAVEGADOR. El
+       panel la resolvia y la enseñaba conectada, pero la Cloud Function que
+       registra envios lee Firestore — y ahi no habia nada. Decia "falta la
+       cuenta de Shalom Pro" con la cuenta a la vista, y el fallo estaba
+       tres pasos antes.
+       Se guarda SOLO cuando se resolvio sola: declarada (tu la declaraste)
+       o unica (no hay otra). Ante duda nunca — eso sigue siendo tuyo. */
+    if(elec && elec.instancia &&
+       (elec.estado==='declarada' || elec.estado==='una' ||
+        elec.estado==='elegida') && window.S){
+      const _ya = (S.shalomInstancia||{}).id;
+      if(_ya !== elec.instancia.id){
+        S.shalomInstancia = {id: elec.instancia.id,
+          nombre: elec.instancia.nombre||''};
+        if(typeof save==='function') save('config');
+      }
+    }
+
     if(ses&&ses.conocido){
       _pintarSesionShalom(caja,ses);
       if(elec && elec.instancia && elec.instancias.length>1){
@@ -4755,7 +4774,7 @@ render();
      lo usa. config.js, print.js y voz.js preguntan por los pedidos marcados,
      así que siguen yendo detrás. El orden de carga es un contrato
      (ver docs/ARQUITECTURA.md). -->
-<script src="config.js?v=39"></script>
+<script src="config.js?v=40"></script>
 <script src="print.js?v=16"></script>
 <script src="notify.js?v=5"></script>
 <script src="shalom.js?v=24"></script>

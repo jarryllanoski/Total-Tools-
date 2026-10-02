@@ -428,6 +428,14 @@ function openForm(id){
     const s=S.shipments.find(x=>x.id===id);
     if(!s){toast('⚠️ Recarga la página e intenta de nuevo');return;}
     $('fName').value=s.name;$('fPhone').value=s.phone;if($('fDni'))$('fDni').value=s.dni||'';
+    /* ★ Al abrir un pedido con DNI, se vuelve a consultar RENIEC.
+       No cuesta: `Shalom.dni` cachea en el navegador y un DNI ya consultado
+       no se vuelve a preguntar nunca. Lo que SI consigue es que el pedido
+       gane el nombre PARTIDO al guardarlo — sin esto, un pedido creado
+       antes de que existiera ese campo no lo gana jamas aunque tenga el DNI
+       puesto y el nombre en pantalla, y el registro dice "falta el nombre
+       de RENIEC" sin que se entienda por que. */
+    if(s.dni && typeof _dniReniec==='function') _dniReniec(s.dni);
     const _isEncEdit=(s.courier||'').toUpperCase().includes('ENCOMIENDA');
     $('fAddr').value=_isEncEdit?(s.ciudadDestino||s.address||''):s.address;
     if($('fEncAgencia'))$('fEncAgencia').value=s.encAgencia||'';

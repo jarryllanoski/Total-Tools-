@@ -264,6 +264,36 @@ module.exports = async ({bloque, ok}) => {
     'un apellido materno vacio se guarda vacio, no se inventa');
   }
 
+  bloque('Lo que el panel RESUELVE, el servidor tiene que poder LEERLO');
+
+  {
+    /* ⚠️ DOS FALLOS DE DISEÑO MIOS, los dos destapados por el primer
+       simulacro de verdad.
+
+       1 · La cuenta de Shalom "Total" esta DECLARADA en shalom.js, que es
+           codigo de navegador. El panel la resuelve y la enseña conectada,
+           pero la Cloud Function lee Firestore y ahi no hay nada: decia
+           "falta la cuenta de Shalom Pro" con la cuenta a la vista.
+           RESOLVER NO ES GUARDAR, y confundirlos deja al servidor ciego.
+
+       2 · El nombre de RENIEC no se vuelve a consultar al abrir un pedido,
+           asi que un pedido guardado antes nunca gana el campo aunque
+           tenga el DNI puesto y el nombre en pantalla. */
+    const idx = E.leer('index.html');
+    const fn = idx.slice(idx.indexOf('function verificarInstanciaShalom'),
+        idx.indexOf('function _pintarElectorInstancia'));
+    ok(/S\.shalomInstancia\s*=/.test(fn),
+       'al resolver la cuenta, se GUARDA para que el servidor la vea');
+    ok(/declarada|una/.test(fn),
+       'y solo cuando se resolvio sola (declarada o unica), nunca ante duda');
+
+    const cfg = E.leer('config.js');
+    ok(/_dniReniec\s*\(/.test(cfg.slice(cfg.indexOf('$(\'fDni\').value=s.dni'),
+        cfg.indexOf('$(\'fDni\').value=s.dni') + 600)) ||
+       /abrirDni|_dniAlAbrir/.test(cfg),
+    'al abrir un pedido con DNI, se consulta RENIEC (la cache lo hace gratis)');
+  }
+
   bloque('La orquestacion: el navegador manda un id, el servidor hace todo');
 
   /* Un mundo de mentira. Todo lo que toca disco o red se inyecta, asi que la

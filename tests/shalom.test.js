@@ -956,10 +956,62 @@ module.exports = async (t) => {
     /* ⚠️ Y NADIE GUARDA UNA ELECCION SIN QUE LA HAGAS. Si el panel
        autoguardara "la primera" o "la unica conectada" al verificar,
        habriamos vuelto al problema de raiz pero escondido en otra capa. */
-    const idx = E.leer('index.html');
-    const fn = idx.slice(idx.indexOf('function verificarInstanciaShalom'),
-        idx.indexOf('function _pintarSesionShalom'));
-    ok(!/S\.shalomInstancia\s*=/.test(fn),
-       'verificar NO guarda ninguna eleccion: solo la hace el dueño al pulsar');
+    /* ⚠️ LA REGLA SE AFINO, y conviene saber por que: decia "verificar NO
+       guarda NADA". La intencion era "nunca guardes una ADIVINANZA", y
+       asi escrita tambien prohibia guardar una resolucion LEGITIMA.
+       Eso dejo ciego al servidor: la cuenta declarada vive en shalom.js
+       —navegador—, el panel la resolvia, y la Cloud Function leia Firestore
+       y no encontraba nada. Decia "falta la cuenta de Shalom Pro" con la
+       cuenta a la vista.
+       La regla de verdad, y la que se prueba ahora EJECUTANDO: si se
+       resolvio sola (declarada o unica) SE GUARDA, para que el servidor la
+       vea; si hay duda NO SE GUARDA NADA. */
+    const codigo = E.trozo('index.html', 'function verificarInstanciaShalom(',
+        '/* La lista de cuentas de Shalom Pro');
+    const correr = (instancias) => {
+      const guardado = {valor: undefined, guardados: 0};
+      const caja = {set innerHTML(v) {}, get innerHTML() { return ''; },
+        style: {}};
+      const btn = {style: {}, disabled: false, textContent: ''};
+      const doc = {getElementById: (id2) => (id2 === 'shalomInstBtn' ? btn :
+        (id2 === 'shalomInstEstado' ? caja : null))};
+      const winS = {}; E.cargar('shalom.js', winS);
+      const S2 = {};
+      Object.defineProperty(S2, 'shalomInstancia', {
+        get() { return guardado.valor; },
+        set(v) { guardado.valor = v; }, configurable: true});
+      const win = {S: S2, Shalom: {
+        INSTANCIA_PREFERIDA: winS.Shalom.INSTANCIA_PREFERIDA,
+        elegirInstancia: winS.Shalom.elegirInstancia,
+        estadoInstancia: () => Promise.resolve(
+            {ok: false, motivo: 'VARIAS_INSTANCIAS', instancias})
+      }};
+      // eslint-disable-next-line no-new-func
+      const fn2 = new Function('window', 'document', 'S', 'Shalom', 'esc',
+          'save', '_pintarSesionShalom', '_pintarElectorInstancia',
+          '_pintarRespuestaCruda',
+          codigo + '\n; return verificarInstanciaShalom;')(
+          win, doc, S2, win.Shalom, (x) => String(x),
+          () => { guardado.guardados++; }, () => {}, () => {}, () => {});
+      return fn2().then(() => guardado);
+    };
+
+    const declarada = await correr([
+      {id: 'd14b120a-983d-4369-b519-c9d6bcf70d6a', nombre: 'Total',
+        conectada: true},
+      {id: 'otra', nombre: 'Yapaitas', conectada: true}
+    ]);
+    ok(declarada.valor && declarada.valor.id ===
+       'd14b120a-983d-4369-b519-c9d6bcf70d6a',
+    'la cuenta DECLARADA se guarda, para que el servidor pueda leerla');
+    ok(declarada.guardados > 0, 'y se persiste de verdad');
+
+    const ambigua = await correr([
+      {id: 'a', nombre: 'Yapaitas', conectada: true},
+      {id: 'b', nombre: 'Tercera', conectada: true}
+    ]);
+    ok(ambigua.valor === undefined,
+       '⚠️ pero ante DUDA no se guarda nada: esa eleccion sigue siendo tuya');
+    ok(ambigua.guardados === 0, 'ni se persiste');
   }
 };
