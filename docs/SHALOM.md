@@ -829,8 +829,20 @@ La primera versión de esto montó un **selector** cuando lo que hacía falta er
 | **Adivinar** | el código elige entre varias cuando no sabe cuál. Registraría el envío de un cliente en el otro negocio, cobrado a ellos. **Prohibido.** |
 | **Configurar** | el dueño declara una vez cuál es la suya, y el código la respeta sin volver a preguntar |
 
-`Shalom.INSTANCIA_PREFERIDA = 'Total'` es un **dato del negocio**, no una
-suposición. Este panel es el de Total Tools.
+`Shalom.INSTANCIA_PREFERIDA` es un **dato del negocio**, no una suposición.
+Este panel es el de Total Tools:
+
+```js
+{ id: 'd14b120a-983d-4369-b519-c9d6bcf70d6a', nombre: 'Total' }
+```
+
+**Los dos, y cada uno cubre lo que el otro no:** el `id` es exacto y
+sobrevive a que se renombre la cuenta; el `nombre` sobrevive a que la
+instancia se rehaga y cambie de id.
+
+Ese UUID está en un repo público y **no es una credencial**: sin la clave de
+la API —que vive en Secret Manager y nunca sale del servidor— no sirve para
+nada, igual que el id de proyecto de Firebase que está al lado.
 
 **Y la frontera no se mueve.** La declarada se usa sola solo si hay
 **exactamente una** que se llame así. Si no está, o si hay **dos con el mismo

@@ -622,14 +622,60 @@ module.exports = async (t) => {
         conectada: false}
     ];
 
-    const r = S.elegirInstancia(dos, '', 'Total');
+    const r = S.elegirInstancia(dos, '', {id: 'd14b', nombre: 'Total'});
     ok(r.estado === 'declarada' && r.instancia.id === 'd14b',
        'con la cuenta declarada se usa SOLA, sin pulsar — salio: ' + r.estado);
 
-    ok(S.elegirInstancia(dos, '', ' total ').instancia.id === 'd14b',
-       'y no se pierde por mayusculas ni espacios');
-    ok(S.elegirInstancia(dos, '', 'Tot').estado === 'falta_elegir',
-       'pero EXACTA: un trozo del nombre no vale, o "Tot" cazaria "Total 2"');
+    /* POR ID, que es lo que el dueño dio (d14b120a-983d-…). El id no cambia
+       si renombra la cuenta, y no choca si algun dia hay dos con el mismo
+       nombre. El nombre se declara tambien, pero para poder decir CUAL
+       cuando algo falle: un UUID en un aviso no le dice nada a nadie. */
+    ok(S.elegirInstancia(dos, '', {id: 'd14b', nombre: 'Renombrada'})
+        .instancia.id === 'd14b',
+       'el id manda: renombrar la cuenta en Shalom no rompe nada');
+
+    ok(S.elegirInstancia(dos, '', {id: 'ya-no-existe', nombre: 'Total'})
+        .instancia.id === 'd14b',
+       'y si el id cambio porque se rehizo la instancia, el nombre declarado ' +
+       'la vuelve a encontrar');
+
+    /* EL ID TAMBIEN EXACTO. Una mutacion que lo casaba por prefijo
+       sobrevivio porque mis ids de prueba eran cortos y coincidian enteros.
+       Con UUIDs reales, un prefijo casa varias: los de Shalom empiezan por
+       el mismo bloque mas veces de lo que uno cree, y "casi el id correcto"
+       es el otro negocio. */
+    const uuids = [
+      {id: 'd14b120a-983d-4369-b519-c9d6bcf70d6a', nombre: 'Total'},
+      {id: 'd14b120a-983d-4369-b519-ffffffffffff', nombre: 'Otra'}
+    ];
+    ok(S.elegirInstancia(uuids, '', {id: 'd14b120a-983d'}).estado ===
+       'falta_elegir',
+       'un id a medias NO casa: con UUIDs, medio id apunta a dos sitios');
+
+    /* EL CASO QUE DE VERDAD SEPARA exacto de prefijo, y que se me escapo a
+       la primera: un id truncado que casa con UNA SOLA. Es justo lo que
+       pasa si alguien copia el id del panel de Shalom, que lo muestra
+       cortado ("d14b120a-983d-4369-b519-c9d6b…"). Con prefijo resolveria y
+       parecería que funciona; con exacto se para y se pregunta, que es lo
+       correcto: un id a medias no es el id. */
+    const dosDistintos = [
+      {id: 'd14b120a-983d-4369-b519-c9d6bcf70d6a', nombre: 'Total'},
+      {id: '29bf1b07-a3b0-4e29-a01f-5c7bc0000000', nombre: 'Yapaitas'}
+    ];
+    ok(S.elegirInstancia(dosDistintos, '', {id: 'd14b120a-983d-4369-b519-c9d6b'})
+        .estado === 'falta_elegir',
+    'un id CORTADO no resuelve aunque solo pudiera ser uno: a medias no es el id');
+    ok(S.elegirInstancia(uuids, '',
+        {id: 'd14b120a-983d-4369-b519-c9d6bcf70d6a'}).instancia.nombre ===
+        'Total',
+    'y el id entero si, aunque compartan prefijo');
+
+    ok(S.elegirInstancia(dos, '', {nombre: ' total '}).instancia.id === 'd14b',
+       'el nombre no se pierde por mayusculas ni espacios');
+    ok(S.elegirInstancia(dos, '', {nombre: 'Tot'}).estado === 'falta_elegir',
+       'pero EXACTO: un trozo no vale, o "Tot" cazaria "Total 2"');
+    ok(S.elegirInstancia(dos, '', 'Total').instancia.id === 'd14b',
+       'y un texto suelto se sigue aceptando como nombre');
   }
 
   {
@@ -642,17 +688,30 @@ module.exports = async (t) => {
       {id: 'a', nombre: 'Total', conectada: true},
       {id: 'b', nombre: 'Yapaitas', conectada: true}
     ];
-    ok(S.elegirInstancia(dos, '', 'NoExiste').estado === 'falta_elegir',
+    ok(S.elegirInstancia(dos, '', {id: 'x', nombre: 'NoExiste'}).estado ===
+       'falta_elegir',
        'una declarada que no esta NO se sustituye por otra: se pide elegir');
 
     const repes = [
       {id: 'a', nombre: 'Total', conectada: true},
       {id: 'b', nombre: 'Total', conectada: false}
     ];
-    ok(S.elegirInstancia(repes, '', 'Total').estado === 'falta_elegir',
+    ok(S.elegirInstancia(repes, '', {nombre: 'Total'}).estado === 'falta_elegir',
        'y con DOS llamadas igual tampoco: ahi el nombre ya no identifica nada');
 
-    ok(S.elegirInstancia(dos, 'b', 'Total').instancia.id === 'b',
+    /* Caso fino: el id declarado apunta a una, y el nombre declarado a OTRA.
+       Eso no es una eleccion, es una contradiccion. Se pregunta. */
+    const cruce = [
+      {id: 'a', nombre: 'Yapaitas', conectada: true},
+      {id: 'b', nombre: 'Total', conectada: true}
+    ];
+    ok(S.elegirInstancia(cruce, '', {id: 'a', nombre: 'Total'}).estado ===
+       'falta_elegir',
+       'si el id declarado y el nombre declarado señalan a DISTINTAS, se ' +
+       'pregunta: eso no es una eleccion, es una contradiccion');
+
+    ok(S.elegirInstancia(dos, 'b', {id: 'd14b', nombre: 'Total'})
+        .instancia.id === 'b',
        'lo que elegiste a mano MANDA sobre lo declarado: es mas reciente y ' +
        'mas explicito');
   }
@@ -660,12 +719,14 @@ module.exports = async (t) => {
   {
     const win = {}; E.cargar('shalom.js', win);
     const S = win.Shalom;
-    ok(typeof S.INSTANCIA_PREFERIDA === 'string' && S.INSTANCIA_PREFERIDA,
-       'la cuenta declarada vive en UN sitio con nombre, no esparcida');
-    ok(S.elegirInstancia([{id: 'x', nombre: 'Otra'}], '', 'Total')
-        .estado === 'una',
+    const D = S.INSTANCIA_PREFERIDA;
+    ok(D && typeof D === 'object' && D.id && D.nombre,
+       'la cuenta declarada vive en UN sitio, con id Y nombre');
+    ok(/^[0-9a-f-]{36}$/.test(D.id),
+       'y su id es el UUID real que dio el dueño, no un hueco por rellenar');
+    ok(S.elegirInstancia([{id: 'x', nombre: 'Otra'}], '', D).estado === 'una',
        'con una sola instancia da igual como se llame: se usa, como siempre');
-    ok(S.elegirInstancia([], '', 'Total').estado === 'ninguna',
+    ok(S.elegirInstancia([], '', D).estado === 'ninguna',
        'y sin ninguna no se inventa');
   }
 

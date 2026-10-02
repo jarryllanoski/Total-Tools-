@@ -245,7 +245,10 @@
                        código la respeta sin volver a preguntar.
        La frontera no se mueve: si la declarada NO está, o si hay DOS con el
        mismo nombre, se vuelve a pedir que elija. Nunca se sustituye. */
-    INSTANCIA_PREFERIDA: 'Total',
+    INSTANCIA_PREFERIDA: {
+      id: 'd14b120a-983d-4369-b519-c9d6bcf70d6a',
+      nombre: 'Total'
+    },
 
     elegirInstancia: function (lista, idGuardado, preferida) {
       var L = Array.isArray(lista) ? lista.filter(function (x) {
@@ -266,15 +269,33 @@
       if (L.length === 1) {
         return {estado: 'una', instancia: L[0], instancias: L};
       }
-      /* La declarada. EXACTA, sin distinguir mayúsculas ni espacios de más:
-         un trozo del nombre valdría para "Total 2" y volveríamos a elegir
-         por parecido, que es adivinar con otro nombre.
-         Y si hay DOS que se llaman igual, el nombre ya no identifica nada:
-         se pide elegir, como si no hubiera declarada. */
-      var pref = String(preferida || '').trim().toLowerCase();
-      if (pref) {
+      /* LA DECLARADA, por id o por nombre — los dos son datos que puso el
+         dueño, no deducciones del código.
+
+         POR QUÉ LOS DOS Y NO SOLO UNO:
+           · el `id` es exacto y sobrevive a que renombre la cuenta;
+           · el `nombre` sobrevive a que la instancia se rehaga y cambie de
+             id, que es justo lo que este archivo no quería dar por perdido.
+
+         EXACTO en los dos casos. Por prefijo, "Tot" cazaría "Total 2" y
+         volveríamos a elegir por parecido, que es adivinar con otro nombre.
+
+         Y SE EXIGE UNA SOLA CANDIDATA. Si hay dos cuentas con el mismo
+         nombre, o si el id declarado apunta a una y el nombre a OTRA, eso
+         no es una elección: es una contradicción, y se pregunta. */
+      var pid = '';
+      var pnom = '';
+      if (preferida && typeof preferida === 'object') {
+        pid = String(preferida.id || '').trim();
+        pnom = String(preferida.nombre || '').trim().toLowerCase();
+      } else {
+        pnom = String(preferida || '').trim().toLowerCase();
+      }
+      if (pid || pnom) {
         var casan = L.filter(function (x) {
-          return String(x.nombre || '').trim().toLowerCase() === pref;
+          if (pid && x.id === pid) return true;
+          return !!pnom &&
+            String(x.nombre || '').trim().toLowerCase() === pnom;
         });
         if (casan.length === 1) {
           return {estado: 'declarada', instancia: casan[0], instancias: L};
