@@ -39,6 +39,28 @@ const sin = (campo) => {
 
 module.exports = async ({bloque, ok}) => {
 
+  /* Un mundo de mentira. Todo lo que toca disco o red se inyecta, asi que la
+     orquestacion ENTERA se prueba sin Firestore y sin llamar a Shalom. */
+  const mundo = (op) => {
+    op = op || {};
+    const visto = {llamadas: 0, cuerpo: null, guardado: null, pendientes: 0};
+    return {
+      visto,
+      deps: {
+        leerPedido: async () => (op.pedido === undefined ? PEDIDO_OK : op.pedido),
+        leerConfig: async () => (op.cfg === undefined ? CFG_OK : op.cfg),
+        llamar: async (c) => {
+          visto.llamadas++; visto.cuerpo = c;
+          return op.respuesta || {ok: true, json: {guia: '98014733',
+            codigo: 'MCHN', quote: 12.5}};
+        },
+        pendientes: async () => { visto.pendientes++; return op.pendientes || []; },
+        guardar: async (campos) => { visto.guardado = campos; }
+      }
+    };
+  };
+
+
   bloque('Que falta para poder registrar — y se dice CUAL, no "no se puede"');
 
   {
@@ -188,6 +210,84 @@ module.exports = async ({bloque, ok}) => {
        'el contenido siempre es uno de los que Shalom acepta — salio: ' + c);
   }
 
+  bloque('UN SOLO extractor de guia — dos reglas costaron un envio real');
+
+  {
+    /* ⚠️ FALLO REAL, 02/10/2026, con dinero de por medio.
+       `resultado()` buscaba la guia en cinco sitios, INCLUIDO `json.data`.
+       La orquestacion la buscaba en TRES, sin `data`. Shalom la devuelve
+       anidada en `data`, asi que:
+         · resultado() la encontro  -> dijo "exito"
+         · orquestar()  no la vio   -> guardo shalomGuia: ""
+       El envio se creo y se pago, el pedido quedo marcado REGISTRADO sin
+       guia, y el candado de "ya tiene guia" —que mira justo ese campo—
+       quedo desarmado. Lo que salvo el cobro doble fue la OTRA reja: el
+       pedido paso a ALISTADO y el registro exige POR ALISTAR.
+
+       Dos sitios con la misma regla escrita distinta. Es lo que este
+       proyecto lleva semanas castigando, y lo escribi yo. Ahora hay UNO. */
+    const anidada = {data: {guia: '98014733', codigo: 'MCHN', quote: 12.5}};
+    const g = R.guiaDe(anidada);
+    ok(g.guia === '98014733', 'la guia se encuentra dentro de `data`');
+    ok(g.codigo === 'MCHN', 'y el codigo');
+    ok(g.monto === 12.5, 'y el monto');
+
+    ok(R.guiaDe({guia: '1', codigo: 'A'}).guia === '1',
+       'y tambien al primer nivel, por si cambia');
+    ok(R.guiaDe({orderNumber: '2', orderCode: 'B'}).guia === '2',
+       'y con los nombres del rastreo');
+    ok(R.guiaDe({data: {orderNumber: '3'}}).guia === '3',
+       'anidados tambien');
+    ok(R.guiaDe({}).guia === '', 'sin guia devuelve vacio, no inventa');
+    ok(R.guiaDe(null).guia === '', 'y con basura tampoco');
+  }
+
+  {
+    /* Y LOS DOS CAMINOS USAN EL MISMO. Es la unica forma de que no vuelvan
+       a divergir: no hay dos listas que mantener sincronizadas. */
+    const r = R.resultado({ok: true, json: {data: {guia: '98014733'}}});
+    ok(r === 'exito', 'resultado() ve la guia anidada');
+
+    const m2 = mundo({respuesta: {ok: true,
+      json: {data: {guia: '98014733', codigo: 'MCHN', quote: 12.5}}}});
+    const o = await R.orquestar({pedidoId: 'id_1'}, m2.deps, {simulacro: false});
+    ok(o.estado === 'exito', 'y la orquestacion tambien');
+    ok(m2.visto.guardado.shalomGuia === '98014733',
+       '⚠️ Y LA GUARDA — esto es lo que fallo: salio "" — ahora: ' +
+       m2.visto.guardado.shalomGuia);
+    ok(m2.visto.guardado.shalomCodigo === 'MCHN', 'con su codigo');
+    ok(m2.visto.guardado.shalomMonto === 12.5, 'y su monto');
+  }
+
+  {
+    /* ⚠️ Y SI LA GUIA SALE VACIA, NO SE ESCRIBE NADA. Un pedido marcado
+       REGISTRADO sin guia es lo peor de los dos mundos: el candado de "ya
+       tiene guia" queda desarmado y el cliente no tiene nada que rastrear.
+       Antes que eso, se dice duda y se consulta pendientes. */
+    const m3 = mundo({respuesta: {ok: true, json: {mensaje: 'creado'}},
+      pendientes: []});
+    const o = await R.orquestar({pedidoId: 'id_1'}, m3.deps, {simulacro: false});
+    ok(o.estado === 'duda',
+       'un ok sin guia NO es exito — salio: ' + o.estado);
+    ok(m3.visto.guardado === null,
+       'y no se marca REGISTRADO sin guia: eso desarma el candado');
+  }
+
+  {
+    /* Que la proxima vez SE APRENDA la forma. Con `forma: true` no se
+       aprendia nada; ahora vuelven los NOMBRES de los campos, sin un solo
+       valor, que es lo que hacia falta para cerrar el traductor. */
+    const m4 = mundo({respuesta: {ok: true,
+      json: {ok: 1, data: {guia: '9', codigo: 'X'}}}});
+    const o = await R.orquestar({pedidoId: 'id_1'}, m4.deps, {simulacro: false});
+    ok(Array.isArray(o.forma) && o.forma.indexOf('data.guia') >= 0,
+       'la respuesta dice que CAMPOS trajo Shalom — salio: ' +
+       JSON.stringify(o.forma));
+    ok(JSON.stringify(o.forma).indexOf('98014733') < 0 &&
+       JSON.stringify(o.forma).indexOf('"9"') < 0,
+    'solo los nombres, ni un valor: se puede pegar en el chat');
+  }
+
   bloque('TRES resultados, no dos — y el del medio es el caro');
 
   {
@@ -317,27 +417,6 @@ module.exports = async ({bloque, ok}) => {
 
   bloque('La orquestacion: el navegador manda un id, el servidor hace todo');
 
-  /* Un mundo de mentira. Todo lo que toca disco o red se inyecta, asi que la
-     orquestacion ENTERA se prueba sin Firestore y sin llamar a Shalom. */
-  const mundo = (op) => {
-    op = op || {};
-    const visto = {llamadas: 0, cuerpo: null, guardado: null, pendientes: 0};
-    return {
-      visto,
-      deps: {
-        leerPedido: async () => (op.pedido === undefined ? PEDIDO_OK : op.pedido),
-        leerConfig: async () => (op.cfg === undefined ? CFG_OK : op.cfg),
-        llamar: async (c) => {
-          visto.llamadas++; visto.cuerpo = c;
-          return op.respuesta || {ok: true, json: {guia: '98014733',
-            codigo: 'MCHN', quote: 12.5}};
-        },
-        pendientes: async () => { visto.pendientes++; return op.pendientes || []; },
-        guardar: async (campos) => { visto.guardado = campos; }
-      }
-    };
-  };
-
   {
     const m = mundo();
     const r = await R.orquestar({pedidoId: 'id_1'}, m.deps, {simulacro: false});
@@ -432,6 +511,57 @@ module.exports = async ({bloque, ok}) => {
     ok(m.visto.guardado === null, 'ni se escribe nada');
     ok(/origen/.test(String(r.detalle || '')),
        'y se enseña lo que dijo Shalom, no un error generico');
+  }
+
+  bloque('Recuperar una guia perdida — sin registrar nada');
+
+  {
+    /* ⚠️ EXISTE POR UN ENVIO REAL QUE SE QUEDO SIN GUIA (02/10/2026).
+       Shalom lo creo y se pago, pero mi fallo guardo `shalomGuia: ""`.
+       El pedido quedo marcado REGISTRADO sin guia: ni el cliente tiene que
+       rastrear ni el candado de "ya tiene guia" protege.
+
+       Esto SOLO LEE: consulta pendientes, busca por clave Y destino, y
+       rellena. Nunca llama a `register`. Es la operacion que uno quiere
+       tener cuando algo salio a medias, y tenerla evita la tentacion de
+       "registrar otra vez a ver si ahora si". */
+    const visto = {registros: 0, guardado: null};
+    const deps = {
+      leerPedido: async () => Object.assign({}, PEDIDO_OK,
+          {status: 'ALISTADO', shalomEstado: 'REGISTRADO'}),
+      leerConfig: async () => CFG_OK,
+      llamar: async () => { visto.registros++; return {ok: true}; },
+      pendientes: async () => ({'0': {
+        code_val: '5773',
+        destination_station: {ter_id: 499},
+        service_order_guia_empresarial: '98014733',
+        code_service_order_empresarial: 'MCHN',
+        quote: 12.5
+      }}),
+      guardar: async (c) => { visto.guardado = c; }
+    };
+    const r = await R.recuperarEnvio({pedidoId: 'id_1'}, deps);
+    ok(visto.registros === 0,
+       '⚠️ NO llama a register: solo lee — llamadas: ' + visto.registros);
+    ok(r.ok === true && visto.guardado.shalomGuia === '98014733',
+       'y rellena la guia que ya existia en Shalom');
+    ok(visto.guardado.shalomCodigo === 'MCHN', 'con su codigo');
+    ok(visto.guardado.shalomMonto === 12.5, 'y el monto que se pago');
+  }
+
+  {
+    /* Si no aparece, no se inventa ni se marca nada. */
+    const visto = {guardado: null};
+    const r = await R.recuperarEnvio({pedidoId: 'id_1'}, {
+      leerPedido: async () => PEDIDO_OK,
+      leerConfig: async () => CFG_OK,
+      llamar: async () => ({ok: true}),
+      pendientes: async () => ({}),
+      guardar: async (c) => { visto.guardado = c; }
+    });
+    ok(r.ok === false && /no apar|no se encontr/i.test(String(r.detalle||'')),
+       'si no esta en pendientes se dice, no se inventa — ' + r.detalle);
+    ok(visto.guardado === null, 'y no se escribe nada');
   }
 
   bloque('Buscar en pendientes: por clave Y destino, nunca por parecido');

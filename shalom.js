@@ -351,6 +351,14 @@
       return _pedir({op: 'registrarEnvio', datos: {pedidoId: pedidoId}});
     },
 
+    /* Rellenar la guía de un envío que YA está en Shalom. SOLO LEE: busca
+       en pendientes por clave y destino, y rellena. Nunca registra, así que
+       no puede costar nada ni duplicar un envío.
+       Para cuando algo salió a medias y el pedido quedó sin guía. */
+    recuperarEnvio: function (pedidoId) {
+      return _pedir({op: 'recuperarEnvio', datos: {pedidoId: pedidoId}});
+    },
+
     estadoSesion: function (instanceId) {
       return _pedir({op: 'instanceStatus', datos: {instanceId: instanceId}});
     },

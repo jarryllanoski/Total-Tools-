@@ -143,7 +143,7 @@ const PERMITIDAS = {
  * llamar, y escribir el resultado. El navegador manda SOLO el id del
  * pedido — no puede falsificar el cuerpo ni saltarse un candado.
  */
-const ORQUESTADAS = {registrarEnvio: true};
+const ORQUESTADAS = {registrarEnvio: true, recuperarEnvio: true};
 
 /**
  * Quita de un texto cualquier cosa con forma de clave antes de devolverlo.

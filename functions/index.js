@@ -1233,13 +1233,14 @@ exports.shalomPuerta = onRequest(
          cuerpo, se llama y se escribe el resultado. Asi nadie puede
          falsificar un campo ni saltarse un candado desde la consola.
          Arranca en SIMULACRO: se enciende desde Config, a conciencia. */
-      if (paso.orquestar === "registrarEnvio") {
+      if (paso.orquestar === "registrarEnvio" ||
+          paso.orquestar === "recuperarEnvio") {
         try {
           const cfgSnap = await db.doc(CFG_DOC).get();
           const cfgDoc = cfgSnap.exists ? cfgSnap.data() : {};
           const pid = String((paso.datos && paso.datos.pedidoId) || "").trim();
           const ref = db.doc(`${SHIP_COL}/${pid}`);
-          const salida = await registroShalom.orquestar(paso.datos, {
+          const depsReg = {
             leerPedido: async () => {
               if (enlace.tipoDe(pid) === "invalido") return null;
               const s2 = await ref.get();
@@ -1258,8 +1259,15 @@ exports.shalomPuerta = onRequest(
               return (pr && pr.ok && pr.json) || null;
             },
             guardar: (campos) => ref.set(campos, {merge: true}),
-          }, {simulacro: cfgDoc.shalomRegistroSimulacro !== false});
-          res.status(200).json(salida);
+          };
+          /* `recuperarEnvio` SOLO LEE: busca el envio en pendientes y
+             rellena la guia. Nunca llama a `register`, asi que no tiene
+             simulacro ni puede costar nada. */
+          const salida2 = paso.orquestar === "recuperarEnvio" ?
+            await registroShalom.recuperarEnvio(paso.datos, depsReg) :
+            await registroShalom.orquestar(paso.datos, depsReg,
+                {simulacro: cfgDoc.shalomRegistroSimulacro !== false});
+          res.status(200).json(salida2);
         } catch (e) {
           console.error("registrarEnvio:", e);
           /* ⚠️ Un error AQUI tampoco es "fallo": si revento despues de

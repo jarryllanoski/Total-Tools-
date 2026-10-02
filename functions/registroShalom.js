@@ -244,6 +244,72 @@
   }
 
   /**
+   * La guía, el código y el monto de una respuesta de Shalom.
+   *
+   * ⚠️ ESTE ES EL ÚNICO SITIO QUE SABE DÓNDE MIRAR, y existe por un fallo
+   * real que costó un envío (02/10/2026). Había DOS reglas escritas
+   * distinto: `resultado()` miraba también dentro de `data`, y la
+   * orquestación no. Shalom devuelve la guía anidada en `data`, así que
+   * una la encontró —dijo "éxito"— y la otra guardó `shalomGuia: ""`.
+   * El envío se creó y se pagó, el pedido quedó marcado REGISTRADO sin
+   * guía, y el candado de "ya tiene guía" —que mira justo ese campo— quedó
+   * desarmado. Lo que evitó el cobro doble fue la otra reja, la del estado.
+   *
+   * Dos sitios con la misma regla escrita distinta es exactamente lo que
+   * este proyecto lleva semanas castigando. Ahora hay uno.
+   *
+   * @param {*} json la respuesta de Shalom
+   * @return {Object} {guia, codigo, monto} — vacíos si no vienen
+   */
+  function guiaDe(json) {
+    const j = (json && typeof json === "object") ? json : {};
+    const d = (j.data && typeof j.data === "object") ? j.data : {};
+    const buscar = (nombres) => {
+      for (let i = 0; i < nombres.length; i++) {
+        const n = nombres[i];
+        if (_txt(j[n])) return _txt(j[n]);
+        if (_txt(d[n])) return _txt(d[n]);
+      }
+      return "";
+    };
+    const monto = Number(
+        j.quote !== undefined ? j.quote :
+          (d.quote !== undefined ? d.quote :
+            (j.costo !== undefined ? j.costo : d.costo)));
+    return {
+      guia: buscar(["guia", "orderNumber", "tracking_number",
+        "service_order_guia_empresarial"]),
+      codigo: buscar(["codigo", "orderCode", "tracking_code",
+        "code_service_order_empresarial"]),
+      monto: (isFinite(monto) && monto > 0) ? monto : 0,
+    };
+  }
+
+  /**
+   * Los NOMBRES de los campos que trajo una respuesta, sin un solo valor.
+   *
+   * Antes aquí iba `forma: true`, que no enseñaba nada. Para cerrar el
+   * traductor hace falta saber QUÉ campos manda Shalom de verdad, y esto
+   * se puede pegar en un chat sin que salga el dato de nadie.
+   *
+   * @param {*} json la respuesta
+   * @return {Array<string>} los nombres, anidados con punto
+   */
+  function camposDe(json) {
+    const j = (json && typeof json === "object") ? json : {};
+    const out = [];
+    Object.keys(j).forEach((k) => {
+      const v = j[k];
+      if (v && typeof v === "object" && !Array.isArray(v)) {
+        Object.keys(v).forEach((k2) => out.push(k + "." + k2));
+      } else {
+        out.push(k);
+      }
+    });
+    return out;
+  }
+
+  /**
    * Cómo acabó un intento de registro. TRES resultados, nunca dos.
    *
    * ⚠️ EL DEL MEDIO ES EL CARO. Shalom no anula y no tiene idempotencia, así
@@ -261,12 +327,11 @@
   function resultado(r) {
     if (!r || typeof r !== "object") return "duda";
     if (r.ok === true) {
-      const j = (r.json && typeof r.json === "object") ? r.json : {};
-      const guia = _txt(j.guia || j.orderNumber || j.tracking_number ||
-        (j.data && (j.data.guia || j.data.orderNumber)));
+      // El MISMO extractor que usa la orquestación. Dos listas que hay que
+      // mantener sincronizadas acaban divergiendo, y eso costó un envío.
       // Un "ok" sin guía no es un envío: no hay nada que enseñarle al
       // cliente ni con qué rastrear. Se trata como duda, no como éxito.
-      return guia ? "exito" : "duda";
+      return guiaDe(r.json).guia ? "exito" : "duda";
     }
     const http = Number(r.http) || 0;
     // Un 4xx es un NO explícito de Shalom: no se creó nada.
@@ -405,17 +470,18 @@
     const est = resultado(r);
 
     if (est === "exito") {
-      const j = (r && r.json) || {};
+      const g = guiaDe(r && r.json);
       const campos = _deEnvio({
-        service_order_guia_empresarial: j.guia || j.orderNumber ||
-          j.tracking_number,
-        code_service_order_empresarial: j.codigo || j.orderCode ||
-          j.tracking_code,
-        quote: j.quote !== undefined ? j.quote : j.costo,
+        service_order_guia_empresarial: g.guia,
+        code_service_order_empresarial: g.codigo,
+        quote: g.monto,
       });
       await deps.guardar(campos);
+      // Los NOMBRES de los campos que trajo Shalom, sin un solo valor: es
+      // lo que hace falta para cerrar el traductor, y se puede pegar en un
+      // chat sin exponer nada.
       return {ok: true, estado: "exito", campos: campos,
-        forma: r && r.json ? true : false};
+        forma: camposDe(r && r.json)};
     }
 
     if (est === "fallo") {
@@ -447,7 +513,58 @@
         "anular un envío. Verifica en pro.shalom.pe antes de reintentar."};
   }
 
+  /**
+   * Rellenar la guía de un envío que YA está en Shalom. SOLO LEE.
+   *
+   * ⚠️ EXISTE POR UN ENVÍO REAL QUE SE QUEDÓ SIN GUÍA (02/10/2026). Shalom
+   * lo creó y se pagó, pero un fallo mío guardó `shalomGuia: ""`: el
+   * pedido quedó marcado REGISTRADO sin guía, el cliente sin nada que
+   * rastrear y el candado de "ya tiene guía" desarmado.
+   *
+   * Esta operación consulta pendientes, busca por clave Y destino, y
+   * rellena. **Nunca llama a `register`.** Tenerla evita la tentación de
+   * "registrar otra vez a ver si ahora sí", que es como se paga dos veces.
+   *
+   * @param {Object} datos {pedidoId}
+   * @param {Object} deps {leerPedido, leerConfig, pendientes, guardar}
+   * @return {Promise<Object>} el resultado, con motivo en palabras
+   */
+  async function recuperarEnvio(datos, deps) {
+    const pedidoId = _txt(datos && datos.pedidoId);
+    if (!pedidoId) return {ok: false, motivo: "SIN_DATO"};
+    const pedido = await deps.leerPedido(pedidoId);
+    if (!pedido) return {ok: false, motivo: "NO_ENCONTRADO"};
+    const cfg = await deps.leerConfig();
+
+    /* Hace falta la clave y el destino para poder identificarlo sin
+       equivocarse de paquete. Lo demás —el estado, las medidas— da igual:
+       el envío ya existe, no se va a crear nada. */
+    const clave = _dig(pedido.shalomClave);
+    const destino = parseInt(_txt(pedido.agenciaId), 10);
+    if (clave.length !== 4 || !(destino > 0)) {
+      return {ok: false, motivo: "SIN_DATO",
+        detalle: "Hacen falta la clave de recojo y la agencia de destino " +
+          "para reconocer el envío entre los pendientes."};
+    }
+    let lista = null;
+    try {
+      lista = await deps.pendientes(cfg);
+    } catch (e) {
+      lista = null;
+    }
+    const env = buscarEnPendientes(lista, {clave: clave, destino: destino});
+    if (!env) {
+      return {ok: false, motivo: "NO_ENCONTRADO",
+        detalle: "Ese envío no aparece en los pendientes de Shalom. No se " +
+          "registró nada de nuevo. Míralo en pro.shalom.pe: si está, " +
+          "copia la guía a mano; si no está, no llegó a crearse."};
+    }
+    const campos = _deEnvio(env);
+    await deps.guardar(campos);
+    return {ok: true, estado: "exito", recuperado: true, campos: campos};
+  }
+
   return {ESTADO_PUERTA, CAJAS, CONTENIDOS, clasificar, contenidoDe,
     faltantes, cuerpo, resultado, buscarEnPendientes, orquestar,
-    reniecDe};
+    reniecDe, guiaDe, camposDe, recuperarEnvio};
 });
