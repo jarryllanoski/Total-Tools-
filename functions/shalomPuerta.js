@@ -96,6 +96,34 @@ const PERMITIDAS = {
      es medio contrato gratis — el mismo truco que con `register`. */
   instanceLogin: {metodo: "POST", ruta: "/instances/login",
     soloMedir: true, cuerpoCampos: []},
+  /* ⚠️ `register` — SOLO EL SERVIDOR, Y NI SIQUIERA SE PUEDE MEDIR.
+     `POST /account/register` CREA UN ENVIO DE VERDAD: se paga, Shalom no
+     tiene endpoint para anularlo y no hay clave de idempotencia.
+
+     Si estuviera aquí como las demás, bastaría con
+     `{op:"esquema", de:"register", datos:{…cuerpo completo…}}` desde la
+     consola del navegador para crear un envío — "medir" lo habría
+     registrado. Y medir tiene que ser gratis SIEMPRE: es la regla sobre la
+     que se construyó toda esta integración.
+
+     Por eso `soloServidor`: la barrera lo corta antes incluso de mirar si
+     es diagnóstico. Lo llama únicamente la orquestación, que lee el pedido
+     de Firestore y arma el cuerpo ella misma — así el navegador no puede
+     falsificar ni un campo.
+
+     La forma del ERROR ya está medida y salió gratis: `medir-registro.js`
+     lo llama con cuerpo vacío y Shalom responde 400 {error, message}. */
+  register: {metodo: "POST", ruta: "/account/register", soloServidor: true,
+    cuerpoCampos: ["instanceId", "origen", "destino", "documento", "name",
+      "firstname", "lastname", "phone", "content", "cantidad", "clave",
+      "declaracion_jurada"]},
+  /* Los envios pendientes. Solo LEE, no crea nada, y es la pieza que hace
+     posible el candado de la duda: tras una respuesta dudosa se consulta
+     aqui para saber si el envio llego a crearse, en vez de reintentar.
+     Su forma esta medida (01/10/2026) y llega como OBJETO {"0":…,"1":…},
+     no como array. Va en soloServidor porque solo la orquestacion la usa. */
+  pendientes: {metodo: "POST", ruta: "/account/pending-shipments",
+    soloServidor: true, cuerpoCampos: ["instanceId"]},
   /* ⚠️ LO QUE NO ESTA, Y ES UNA DECISION:
 
      · `POST /instances/logout` — su doc dice "borra la sesion Y LAS
@@ -108,6 +136,14 @@ const PERMITIDAS = {
        eso suena a crear, pero ya hay UNA y su `id` sale del `GET /instances`
        que ya esta traducido. Crear otra devuelve 403 por limite. */
 };
+
+/**
+ * Operaciones que NO son un reenvío a Shalom, sino una orquestación del
+ * servidor: leer el pedido de Firestore, decidir con `registroShalom.js`,
+ * llamar, y escribir el resultado. El navegador manda SOLO el id del
+ * pedido — no puede falsificar el cuerpo ni saltarse un candado.
+ */
+const ORQUESTADAS = {registrarEnvio: true};
 
 /**
  * Quita de un texto cualquier cosa con forma de clave antes de devolverlo.
@@ -556,9 +592,22 @@ async function barreras(entrada, deps) {
   const cuerpo = (entrada.cuerpo && typeof entrada.cuerpo === "object") ?
     entrada.cuerpo : {};
   const op = String(cuerpo.op || "");
+
+  /* Las orquestaciones salen por aquí: ya pasaron sesión y administrador,
+     y de ellas el navegador solo manda el id del pedido. */
+  if (Object.prototype.hasOwnProperty.call(ORQUESTADAS, op)) {
+    return {ok: true, orquestar: op, datos: cuerpo.datos, correo: correo};
+  }
+
   const diagnostico = op === "esquema";
   const destino = diagnostico ? String(cuerpo.de || "") : op;
   if (!Object.prototype.hasOwnProperty.call(PERMITIDAS, destino)) {
+    return cortar(200, "NO_PERMITIDO");
+  }
+  /* ⚠️ SOLO-SERVIDOR SE CORTA ANTES QUE NADA, incluido el diagnóstico.
+     `register` crea un envío que se paga y no se anula: si se pudiera
+     "medir" con un cuerpo del navegador, medir costaría dinero. */
+  if (PERMITIDAS[destino].soloServidor) {
     return cortar(200, "NO_PERMITIDO");
   }
   // Medible sí, usable todavía no. Sin esta guarda, un endpoint recién
@@ -877,6 +926,7 @@ function traducir(op, json) {
 module.exports = {
   BASE,
   PERMITIDAS,
+  ORQUESTADAS,
   sanear,
   motivoDeHttp,
   forma,

@@ -223,4 +223,210 @@ module.exports = async ({bloque, ok}) => {
     ok(R.resultado({ok: true, json: {}}) === 'duda',
        'un "ok" sin guia es duda, no exito: sin guia no hay envio que mostrar');
   }
+
+  bloque('La orquestacion: el navegador manda un id, el servidor hace todo');
+
+  /* Un mundo de mentira. Todo lo que toca disco o red se inyecta, asi que la
+     orquestacion ENTERA se prueba sin Firestore y sin llamar a Shalom. */
+  const mundo = (op) => {
+    op = op || {};
+    const visto = {llamadas: 0, cuerpo: null, guardado: null, pendientes: 0};
+    return {
+      visto,
+      deps: {
+        leerPedido: async () => (op.pedido === undefined ? PEDIDO_OK : op.pedido),
+        leerConfig: async () => (op.cfg === undefined ? CFG_OK : op.cfg),
+        llamar: async (c) => {
+          visto.llamadas++; visto.cuerpo = c;
+          return op.respuesta || {ok: true, json: {guia: '98014733',
+            codigo: 'MCHN', quote: 12.5}};
+        },
+        pendientes: async () => { visto.pendientes++; return op.pendientes || []; },
+        guardar: async (campos) => { visto.guardado = campos; }
+      }
+    };
+  };
+
+  {
+    const m = mundo();
+    const r = await R.orquestar({pedidoId: 'id_1'}, m.deps, {simulacro: false});
+    ok(r.ok === true && r.estado === 'exito', 'un registro bueno sale exito');
+    ok(m.visto.llamadas === 1, 'y llama a Shalom UNA sola vez');
+    ok(m.visto.cuerpo.destino === 499, 'con el cuerpo que arma el servidor');
+    ok(m.visto.guardado && m.visto.guardado.shalomGuia === '98014733',
+       'se guarda la guia');
+    ok(m.visto.guardado.shalomEstado === 'REGISTRADO',
+       'y el estado de Shalom, aparte del estado del pedido');
+    ok(m.visto.guardado.status === 'ALISTADO',
+       'y el pedido pasa a ALISTADO, como pidio el dueño');
+  }
+
+  {
+    /* ⚠️ EL SIMULACRO ES EL ESTADO POR DEFECTO. Una operacion que cuesta
+       dinero y no se deshace no puede estar encendida porque si. */
+    const m = mundo();
+    const r = await R.orquestar({pedidoId: 'id_1'}, m.deps, {});
+    ok(r.ok === true && r.simulacro === true,
+       'sin decir nada, SIMULACRO — salio: ' + JSON.stringify(r.simulacro));
+    ok(m.visto.llamadas === 0, 'y NO se llama a Shalom');
+    ok(m.visto.guardado === null, 'ni se escribe nada');
+    ok(r.cuerpo && r.cuerpo.destino === 499 && r.cuerpo.clave === '5773',
+       'pero se devuelve el cuerpo EXACTO, para poder revisarlo antes');
+  }
+
+  {
+    /* Lo que falta se dice antes de llamar a nadie. */
+    const m = mundo({pedido: sin('shalomClave')});
+    const r = await R.orquestar({pedidoId: 'id_1'}, m.deps, {simulacro: false});
+    ok(r.ok === false && Array.isArray(r.faltan) && r.faltan.length > 0,
+       'con datos incompletos se para y se dice que falta');
+    ok(m.visto.llamadas === 0, 'sin llamar a Shalom');
+  }
+
+  {
+    const m = mundo({pedido: null});
+    const r = await R.orquestar({pedidoId: 'id_x'}, m.deps, {simulacro: false});
+    ok(r.ok === false && r.motivo === 'NO_ENCONTRADO',
+       'un pedido que no existe no se inventa');
+    ok(m.visto.llamadas === 0, 'y no se llama a nadie');
+  }
+
+  bloque('⚠️ ANTE DUDA NO SE REINTENTA: SE CONSULTA');
+
+  {
+    /* El caso caro. Se corto la red DESPUES de que Shalom pudo crear el
+       envio. Reintentar seria un segundo envio y un segundo cobro que nadie
+       puede anular. Asi que se consulta `pending-shipments` y se busca. */
+    const m = mundo({
+      respuesta: {ok: false, motivo: 'SIN_RED'},
+      pendientes: [{
+        code_val: '5773',
+        destination_station: {ter_id: 499},
+        service_order_guia_empresarial: '98014733',
+        code_service_order_empresarial: 'MCHN',
+        quote: 12.5
+      }]
+    });
+    const r = await R.orquestar({pedidoId: 'id_1'}, m.deps, {simulacro: false});
+    ok(m.visto.llamadas === 1, 'se llamo UNA vez, no dos');
+    ok(m.visto.pendientes === 1, 'y ante la duda se CONSULTO pendientes');
+    ok(r.estado === 'exito' && r.recuperado === true,
+       'el envio SI se habia creado: se recupera, no se duplica — salio: ' +
+       r.estado);
+    ok(m.visto.guardado && m.visto.guardado.shalomGuia === '98014733',
+       'y se guarda la guia que ya existia');
+  }
+
+  {
+    /* Y si al consultar NO aparece, tampoco se afirma que fallo: se dice
+       que no se sabe, y NO se reintenta solo. */
+    const m = mundo({respuesta: {ok: false, motivo: 'SIN_RED'}, pendientes: []});
+    const r = await R.orquestar({pedidoId: 'id_1'}, m.deps, {simulacro: false});
+    ok(r.ok === false && r.estado === 'duda',
+       'si no aparece en pendientes, sigue siendo DUDA, no fallo');
+    ok(m.visto.guardado === null,
+       'y NO se escribe nada: no se da por registrado lo que no se vio');
+    ok(/no sab|verific|comprob/i.test(String(r.detalle || '')),
+       'y el texto lo dice con todas las letras — dijo: ' + r.detalle);
+  }
+
+  {
+    /* Un NO de Shalom si es un fallo, y se dice una vez. */
+    const m = mundo({respuesta: {ok: false, motivo: 'SIN_DATO', http: 400,
+      detalle: "body must have required property 'origen'"}});
+    const r = await R.orquestar({pedidoId: 'id_1'}, m.deps, {simulacro: false});
+    ok(r.ok === false && r.estado === 'fallo', 'un 400 es fallo de verdad');
+    ok(m.visto.pendientes === 0,
+       'y NO se consulta pendientes: Shalom dijo que no creo nada');
+    ok(m.visto.guardado === null, 'ni se escribe nada');
+    ok(/origen/.test(String(r.detalle || '')),
+       'y se enseña lo que dijo Shalom, no un error generico');
+  }
+
+  bloque('Buscar en pendientes: por clave Y destino, nunca por parecido');
+
+  {
+    const mios = [
+      {code_val: '1111', destination_station: {ter_id: 499},
+        service_order_guia_empresarial: '1'},
+      {code_val: '5773', destination_station: {ter_id: 111},
+        service_order_guia_empresarial: '2'},
+      {code_val: '5773', destination_station: {ter_id: 499},
+        service_order_guia_empresarial: '3'}
+    ];
+    const c = {clave: '5773', destino: 499};
+    ok(R.buscarEnPendientes(mios, c).service_order_guia_empresarial === '3',
+       'encuentra el que coincide en clave Y destino');
+    ok(R.buscarEnPendientes(mios, {clave: '9999', destino: 499}) === null,
+       'y si no esta, devuelve null — no el mas parecido');
+    ok(R.buscarEnPendientes([], c) === null, 'una lista vacia no inventa');
+    ok(R.buscarEnPendientes(null, c) === null, 'ni una lista que no es lista');
+
+    /* ⚠️ DOS IGUALES = NO SE ELIGE. Si hubiera dos envios con la misma clave
+       al mismo destino, quedarse con uno seria adivinar cual — y aqui
+       adivinar significa darle al cliente la guia de otro paquete. */
+    const dobles = [
+      {code_val: '5773', destination_station: {ter_id: 499},
+        service_order_guia_empresarial: 'a'},
+      {code_val: '5773', destination_station: {ter_id: 499},
+        service_order_guia_empresarial: 'b'}
+    ];
+    ok(R.buscarEnPendientes(dobles, c) === null,
+       'con dos candidatos identicos NO se elige: seria darle al cliente la ' +
+       'guia de otro paquete');
+  }
+
+  {
+    /* `pending-shipments` llega como OBJETO con claves "0","1","2", no como
+       array — medido el 01/10/2026. Un `.filter` directo habria devuelto
+       vacio SIEMPRE y habriamos creido que el envio no se creo. */
+    const comoObjeto = {
+      '0': {code_val: '1111', destination_station: {ter_id: 1},
+        service_order_guia_empresarial: 'x'},
+      '1': {code_val: '5773', destination_station: {ter_id: 499},
+        service_order_guia_empresarial: 'y'}
+    };
+    ok(R.buscarEnPendientes(comoObjeto, {clave: '5773', destino: 499})
+        .service_order_guia_empresarial === 'y',
+    'tambien funciona con el OBJETO {"0":…,"1":…} que devuelve Shalom');
+  }
+
+  bloque('Desde el panel solo viaja el ID — nada mas');
+
+  {
+    /* Si el navegador mandara el cuerpo, podria falsificar el destino, la
+       clave o saltarse el candado de "ya tiene guia" editandolo en la
+       consola. Manda el id y punto; el servidor lee la verdad de Firestore. */
+    const red = {cuerpo: null};
+    const win = {_authEnsureToken: async () => true};
+    E.cargar('shalom.js', win, {
+      localStorage: {getItem: () => 'TOKEN123'},
+      fetch: async (url, o) => {
+        red.cuerpo = JSON.parse(o.body);
+        return {status: 200, json: async () => ({ok: true})};
+      }
+    });
+    await win.Shalom.registrarEnvio('id_1790817830666');
+    ok(red.cuerpo.op === 'registrarEnvio', 'pide la orquestacion');
+    ok(JSON.stringify(red.cuerpo.datos) ===
+       JSON.stringify({pedidoId: 'id_1790817830666'}),
+    'y manda SOLO el id del pedido — salio: ' +
+       JSON.stringify(red.cuerpo.datos));
+  }
+
+  {
+    /* Y la funcion lee la cuenta y el origen de Firestore, no del navegador. */
+    const fidx = E.leer('functions/index.js');
+    const i = fidx.indexOf('paso.orquestar === "registrarEnvio"');
+    const orq = fidx.slice(i, i + 2200);
+    ok(i > 0, 'la orquestacion esta conectada en la funcion');
+    ok(/cfgDoc\.agenciaOrigen/.test(orq),
+       'la agencia de origen sale de Firestore');
+    ok(/cfgDoc\.shalomInstancia/.test(orq),
+       'y la cuenta de Shalom tambien');
+    ok(/shalomRegistroSimulacro !== false/.test(orq),
+       'y el simulacro esta encendido salvo que Config diga lo contrario');
+    ok(/estado: "duda"/.test(orq),
+       'y si algo revienta a mitad se dice DUDA, no fallo: el envio pudo crearse');
+  }
 };

@@ -331,6 +331,26 @@
        ⚠️ `enLogin: null` = no se sabe (no hubo url), que no es lo mismo
           que `false`.
        Necesita el instanceId, que sale de `estadoInstancia()`. */
+    /* ⚠️ REGISTRAR UN ENVIO — LA UNICA OPERACION QUE CUESTA DINERO.
+       Shalom NO tiene endpoint para anular y NO tiene clave de
+       idempotencia: dos llamadas son dos envios y dos cobros.
+
+       Por eso aqui solo viaja el ID DEL PEDIDO. El servidor lo lee de
+       Firestore, comprueba los candados contra lo que hay AHORA, arma el
+       cuerpo y llama. Desde la consola del navegador no se puede falsificar
+       ni un campo ni saltarse un candado.
+
+       ARRANCA EN SIMULACRO: decide todo igual, devuelve el cuerpo exacto
+       que mandaria, y no llama a nadie. Se apaga desde Config.
+       → simulacro: {ok:true, simulacro:true, cuerpo:{…}}
+       → exito:     {ok:true, estado:'exito', campos:{shalomGuia,…}}
+       → fallo:     {ok:false, estado:'fallo', motivo, detalle}
+       → duda:      {ok:false, estado:'duda', detalle} ← NO reintentar
+       → faltan:    {ok:false, motivo:'SIN_DATO', faltan:[textos]} */
+    registrarEnvio: function (pedidoId) {
+      return _pedir({op: 'registrarEnvio', datos: {pedidoId: pedidoId}});
+    },
+
     estadoSesion: function (instanceId) {
       return _pedir({op: 'instanceStatus', datos: {instanceId: instanceId}});
     },
@@ -395,6 +415,8 @@
            mandaba a revisar la clave, que estaba perfecta. */
         VARIAS_INSTANCIAS: 'Tienes más de una cuenta de Shalom Pro. Elige en Config cuál usa el panel: registrar en la equivocada cobra al otro negocio.',
         INSTANCIA_NO_EXISTE: 'La cuenta de Shalom Pro que elegiste ya no está. Elige otra en Config — no se cambia sola, porque sería cambiarte de negocio sin avisar.',
+        SIN_DATO:      'Faltan datos para registrar. Abajo dice cuáles.',
+        NO_ENCONTRADO_PEDIDO: 'Ese pedido ya no está en la base de datos.',
         SIN_INSTANCIA_VALIDA: 'El id de instancia de Shalom Pro no sirve. La clave de la API puede estar bien: compruébala con «Verificar sesión».',
         LIMITE:        'Se agotó la cuota del plan de Shalom.',
         ERROR_SHALOM:  'Shalom respondió con un error. Reintenta en unos minutos.',

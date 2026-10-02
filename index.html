@@ -489,6 +489,13 @@
            antes de guardar, no después. El formulario del cliente no la
            necesita, así que no viaja. */
         agenciaOrigen:data.agenciaOrigen||null,
+        /* ★ También HERMANA de `config`, y por el mismo motivo.
+           ⚠️ Y TIENE QUE ESTAR AQUÍ SÍ O SÍ: la Cloud Function que registra
+           envíos en Shalom lee esta cuenta de Firestore. Si solo viviera en
+           memoria y en el respaldo local —como estuvo hasta ahora— el panel
+           la recordaría, pero el servidor diría "falta la cuenta de Shalom
+           Pro" con la cuenta ya elegida, y nadie entendería por qué. */
+        shalomInstancia:data.shalomInstancia||null,
         ts:saveTs // usar saveTs fijo para que _S_TS y config.ts coincidan tras la escritura
       }}];
       for(const s of(data.shipments||[])){
@@ -4750,7 +4757,7 @@ render();
 <script src="config.js?v=38"></script>
 <script src="print.js?v=16"></script>
 <script src="notify.js?v=5"></script>
-<script src="shalom.js?v=23"></script>
+<script src="shalom.js?v=24"></script>
 <script src="tracking.js?v=20"></script>
 <script src="floatpanel.js?v=4"></script>
 <script src="delivery.js?v=8"></script>

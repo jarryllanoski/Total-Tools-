@@ -27,6 +27,7 @@ const etiquetas = require("./etiquetas");
 const agencias = require("./agencias");
 const pedidoPublico = require("./pedidoPublico");
 const enlace = require("./enlaceSeguimiento");
+const registroShalom = require("./registroShalom");
 
 setGlobalOptions({maxInstances: 10});
 initializeApp();
@@ -1226,6 +1227,51 @@ exports.shalomPuerta = onRequest(
             .json({ok: false, motivo: paso.corte.motivo});
         return;
       }
+      /* ★ REGISTRAR UN ENVIO — no es un reenvio, es una orquestacion.
+         El navegador manda SOLO el id del pedido: aqui se lee de Firestore,
+         se comprueban los candados contra lo que hay AHORA, se arma el
+         cuerpo, se llama y se escribe el resultado. Asi nadie puede
+         falsificar un campo ni saltarse un candado desde la consola.
+         Arranca en SIMULACRO: se enciende desde Config, a conciencia. */
+      if (paso.orquestar === "registrarEnvio") {
+        try {
+          const cfgSnap = await db.doc(CFG_DOC).get();
+          const cfgDoc = cfgSnap.exists ? cfgSnap.data() : {};
+          const pid = String((paso.datos && paso.datos.pedidoId) || "").trim();
+          const ref = db.doc(`${SHIP_COL}/${pid}`);
+          const salida = await registroShalom.orquestar(paso.datos, {
+            leerPedido: async () => {
+              if (enlace.tipoDe(pid) === "invalido") return null;
+              const s2 = await ref.get();
+              return s2.exists ? s2.data() : null;
+            },
+            leerConfig: async () => ({
+              agenciaOrigen: cfgDoc.agenciaOrigen || null,
+              instanceId: (cfgDoc.shalomInstancia &&
+                cfgDoc.shalomInstancia.id) || "",
+            }),
+            llamar: (c) => _porLaPuerta("register", c),
+            pendientes: async () => {
+              const pr = await _porLaPuerta("pendientes", {
+                instanceId: (cfgDoc.shalomInstancia &&
+                  cfgDoc.shalomInstancia.id) || ""});
+              return (pr && pr.ok && pr.json) || null;
+            },
+            guardar: (campos) => ref.set(campos, {merge: true}),
+          }, {simulacro: cfgDoc.shalomRegistroSimulacro !== false});
+          res.status(200).json(salida);
+        } catch (e) {
+          console.error("registrarEnvio:", e);
+          /* ⚠️ Un error AQUI tampoco es "fallo": si revento despues de
+             llamar a Shalom, el envio pudo crearse. Se dice duda. */
+          res.status(200).json({ok: false, estado: "duda",
+            motivo: "ERROR_SHALOM",
+            detalle: "Algo se rompio a mitad y NO SABEMOS si el envio llego " +
+              "a crearse. Verifica en pro.shalom.pe antes de reintentar."});
+        }
+        return;
+      }
+
       const destino = paso.destino;
       const diagnostico = paso.diagnostico;
 

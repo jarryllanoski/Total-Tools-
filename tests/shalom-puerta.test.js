@@ -306,6 +306,87 @@ module.exports = async ({bloque, ok}) => {
        'y llega asi hasta quien llama — salio: ' + r.motivo);
   }
 
+  bloque('`register` NO es alcanzable desde el navegador, ni para medir');
+
+  {
+    /* ⚠️ EL RIESGO QUE ESTO CIERRA, y no es teorico.
+       `POST /account/register` CREA UN ENVIO DE VERDAD, se paga y no se
+       puede anular. Si estuviera en la puerta como las demas, bastaria con
+       {op:"esquema", de:"register", datos:{…cuerpo completo…}} desde la
+       consola del navegador para crear un envio — "medir" lo habria
+       registrado. Medir tiene que ser gratis SIEMPRE.
+
+       Por eso `soloServidor`: la barrera lo corta ANTES de mirar si es
+       diagnostico. Solo lo llama la orquestacion del servidor, que lee el
+       pedido de Firestore y arma el cuerpo ella misma. */
+    ok(P.PERMITIDAS.register && P.PERMITIDAS.register.soloServidor === true,
+       '`register` esta marcado solo-servidor');
+
+    const comoOperacion = await P.barreras({
+      metodo: 'POST', authorization: 'Bearer t',
+      cuerpo: {op: 'register', datos: {instanceId: 'x'}}
+    }, {verificar: async () => ({email: 'jarryllanoski@gmail.com',
+      email_verified: true}), admins: ['jarryllanoski@gmail.com']});
+    ok(comoOperacion.corte && comoOperacion.corte.motivo === 'NO_PERMITIDO',
+       'pedirlo como operacion se corta');
+
+    const comoEsquema = await P.barreras({
+      metodo: 'POST', authorization: 'Bearer t',
+      cuerpo: {op: 'esquema', de: 'register', datos: {instanceId: 'x'}}
+    }, {verificar: async () => ({email: 'jarryllanoski@gmail.com',
+      email_verified: true}), admins: ['jarryllanoski@gmail.com']});
+    ok(comoEsquema.corte && comoEsquema.corte.motivo === 'NO_PERMITIDO',
+       'y MEDIRLO tambien: medir no puede costar un envio');
+  }
+
+  {
+    /* La orquestacion si pasa — pero es otra cosa: no reenvia un cuerpo del
+       navegador, lee el pedido de Firestore y lo arma ella. */
+    const r = await P.barreras({
+      metodo: 'POST', authorization: 'Bearer t',
+      cuerpo: {op: 'registrarEnvio', datos: {pedidoId: 'id_1'}}
+    }, {verificar: async () => ({email: 'jarryllanoski@gmail.com',
+      email_verified: true}), admins: ['jarryllanoski@gmail.com']});
+    ok(!r.corte && r.orquestar === 'registrarEnvio',
+       'la orquestacion pasa la barrera y se enruta aparte');
+    ok(r.datos && r.datos.pedidoId === 'id_1',
+       'y lleva el id del pedido, que es LO UNICO que manda el navegador');
+  }
+
+  {
+    /* Y sigue exigiendo sesion y administrador, como todo lo demas. */
+    const sinSesion = await P.barreras({
+      metodo: 'POST', authorization: '', cuerpo: {op: 'registrarEnvio'}
+    }, {verificar: async () => ({}), admins: ['x@y.com']});
+    ok(sinSesion.corte && sinSesion.corte.motivo === 'SIN_SESION',
+       'sin sesion no se registra nada');
+    const noAdmin = await P.barreras({
+      metodo: 'POST', authorization: 'Bearer t', cuerpo: {op: 'registrarEnvio'}
+    }, {verificar: async () => ({email: 'otro@x.com', email_verified: true}),
+      admins: ['jarryllanoski@gmail.com']});
+    ok(noAdmin.corte && noAdmin.corte.motivo === 'SIN_PERMISO',
+       'y sin ser administrador, tampoco');
+  }
+
+  {
+    /* El cuerpo que SI sale cuando lo arma el servidor. */
+    const f = conFetch(resp(200, {guia: '98014733'}));
+    await P.llamar('register', 'sk_clave', {
+      instanceId: 'i', origen: 576, destino: 499, documento: '73483547',
+      name: 'JARLYN', firstname: 'LLANOS', lastname: 'ARTEAGA',
+      phone: '918642656', content: 'PAQUETE S', cantidad: 1, clave: '5773',
+      declaracion_jurada: '', loQueSea: 'basura'
+    });
+    const c = JSON.parse(f.opciones.body);
+    f.restaurar();
+    ok(c.destino === 499 && typeof c.destino === 'number',
+       'el ter_id viaja como NUMERO: un numero no lleva cero delante, y un ' +
+       'cero delante significa AEREO en esta API');
+    ok(c.clave === '5773', 'la clave de recojo viaja');
+    ok(!('loQueSea' in c),
+       'y lo que no esta declarado se cae, aunque lo arme el servidor');
+  }
+
   bloque('Solo se puede pedir lo de la lista blanca');
 
   {
@@ -363,8 +444,15 @@ module.exports = async ({bloque, ok}) => {
       const r = P.traducir(op, {});
       const sinTraductor = !!(r && r.motivo === 'SIN_TRADUCTOR');
       const soloMedir = P.PERMITIDAS[op].soloMedir === true;
-      ok(!sinTraductor || soloMedir,
-         op + ': no tiene traductor, asi que DEBE estar en soloMedir — si no, ' +
+      const soloServidor = P.PERMITIDAS[op].soloServidor === true;
+      /* `soloServidor` tambien vale como exencion, y es MAS fuerte que
+         `soloMedir`: con soloMedir el navegador puede pedir la forma cruda;
+         con soloServidor no puede llegar al endpoint de ninguna manera, y
+         quien interpreta la respuesta es la orquestacion con
+         `registroShalom.resultado()`, no el panel. El riesgo que la regla
+         evita —que al panel le llegue algo a medio entender— no existe. */
+      ok(!sinTraductor || soloMedir || soloServidor,
+         op + ': sin traductor, debe ser soloMedir o soloServidor — si no, ' +
          'el panel recibe algo a medio entender y parece que funciona');
       ok(!(soloMedir && !sinTraductor),
          op + ': ya tiene traductor, asi que sobra el soloMedir — dejarlo ' +
@@ -373,8 +461,9 @@ module.exports = async ({bloque, ok}) => {
   }
 
   ok(Object.keys(P.PERMITIDAS).join(',') ===
-     'validate,track,instances,agencies,dni,instanceStatus,instanceLogin',
-     'hoy hay siete, y en el orden en que se reconstruyen');
+     'validate,track,instances,agencies,dni,instanceStatus,instanceLogin,' +
+     'register,pendientes',
+  'hoy hay nueve, y en el orden en que se reconstruyen');
   ok(!P.PERMITIDAS.track.soloMedir,
      'track ya no es solo medible: su forma se midió y se tradujo');
   ok(P.PERMITIDAS.instances.metodo === 'GET' &&

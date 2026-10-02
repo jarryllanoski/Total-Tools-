@@ -891,6 +891,30 @@ module.exports = async (t) => {
     ok(pintado.sesion === null, 'y no se afirma ninguna sesion');
   }
 
+  bloque('La cuenta elegida LLEGA a la nube, o el servidor no la ve');
+
+  {
+    /* ⚠️ FALLO MIO, invisible hasta que el servidor la necesito.
+       `elegirInstanciaShalom` hace `S.shalomInstancia = {...}` y
+       `save('config')`. Pero el subidor de config NO manda el estado
+       entero: arma un objeto con una lista EXPLICITA de campos
+       —config, trash, recursos, agenciaOrigen, ts—. `shalomInstancia` no
+       estaba, asi que vivia en memoria y en el respaldo local y NUNCA
+       llegaba a Firestore.
+
+       Se veia bien: el panel la recordaba. Pero no sincronizaba a otro
+       dispositivo, y sobre todo la Cloud Function —que es quien registra el
+       envio— no podia leerla. Habria fallado el dia del primer registro,
+       diciendo "falta la cuenta de Shalom Pro" con la cuenta elegida. */
+    const idx = E.leer('index.html');
+    const i = idx.indexOf('agenciaOrigen:data.agenciaOrigen');
+    const bloqueSubida = idx.slice(i - 1200, i + 600);
+    ok(/shalomInstancia\s*:/.test(bloqueSubida),
+       'shalomInstancia viaja a Firestore con los demas campos de config');
+    ok(/agenciaOrigen\s*:/.test(bloqueSubida),
+       'y la agencia de origen tambien, como ya hacia');
+  }
+
   bloque('El selector en Config: guarda tu eleccion, y no elige solo');
 
   {

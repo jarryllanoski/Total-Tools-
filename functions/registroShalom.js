@@ -268,6 +268,148 @@
     return "duda";
   }
 
+  /**
+   * Busca un envío en la lista de pendientes de Shalom.
+   *
+   * ⚠️ POR CLAVE **Y** DESTINO, y si hay dos candidatos NO SE ELIGE.
+   * Esto corre justo después de una respuesta dudosa, para saber si el
+   * envío llegó a crearse. Equivocarse aquí significa darle al cliente la
+   * guía de OTRO paquete, así que "el más parecido" no vale: o hay una sola
+   * coincidencia exacta, o no hay ninguna.
+   *
+   * ⚠️ Y LA LISTA LLEGA COMO OBJETO, no como array: `{"0":…,"1":…}`, estilo
+   * PHP. Medido el 01/10/2026. Un `.filter` directo habría devuelto vacío
+   * SIEMPRE y habríamos creído que el envío no se creó — y entonces se
+   * registra otra vez. De ahí sale el cobro doble.
+   *
+   * @param {*} lista lo que devolvió pending-shipments
+   * @param {Object} cuerpoEnviado el cuerpo que se mandó (clave, destino)
+   * @return {Object} el envío, o null
+   */
+  function buscarEnPendientes(lista, cuerpoEnviado) {
+    if (!lista || typeof lista !== "object") return null;
+    const c = (cuerpoEnviado && typeof cuerpoEnviado === "object") ?
+      cuerpoEnviado : {};
+    const clave = _dig(c.clave);
+    const destino = parseInt(c.destino, 10);
+    if (clave.length !== 4 || !(destino > 0)) return null;
+    const todos = Array.isArray(lista) ? lista : Object.keys(lista)
+        .map((k) => lista[k]);
+    const casan = todos.filter((x) => {
+      if (!x || typeof x !== "object") return false;
+      const est = (x.destination_station && typeof x.destination_station ===
+        "object") ? x.destination_station : {};
+      return _dig(x.code_val) === clave &&
+        parseInt(est.ter_id, 10) === destino;
+    });
+    return casan.length === 1 ? casan[0] : null;
+  }
+
+  /** Lo que se guarda de un envío ya creado.
+   * @param {Object} env el envío de Shalom
+   * @return {Object} campos del pedido */
+  function _deEnvio(env) {
+    const e = env || {};
+    const guia = _txt(e.service_order_guia_empresarial || e.guia ||
+      e.orderNumber);
+    const cod = _txt(e.code_service_order_empresarial || e.codigo ||
+      e.orderCode);
+    const monto = Number(e.quote);
+    const campos = {
+      shalomGuia: guia,
+      shalomCodigo: cod,
+      shalomEstado: "REGISTRADO",
+      status: "ALISTADO",
+    };
+    if (isFinite(monto) && monto > 0) campos.shalomMonto = monto;
+    return campos;
+  }
+
+  /**
+   * Registrar un envío, de principio a fin.
+   *
+   * El navegador manda SOLO el id del pedido. Todo lo demás —leer el pedido,
+   * decidir, armar el cuerpo, llamar, interpretar y escribir— pasa aquí, en
+   * el servidor: así nadie puede falsificar un campo ni saltarse un candado
+   * desde la consola.
+   *
+   * ⚠️ ARRANCA EN SIMULACRO. Una operación que cuesta dinero y no se deshace
+   * no puede estar encendida por defecto. En simulacro decide todo igual,
+   * devuelve el cuerpo exacto que mandaría, y NO llama a nadie.
+   *
+   * @param {Object} datos {pedidoId}
+   * @param {Object} deps {leerPedido, leerConfig, llamar, pendientes, guardar}
+   * @param {Object} [opc] {simulacro}
+   * @return {Promise<Object>} el resultado, siempre con motivo en palabras
+   */
+  async function orquestar(datos, deps, opc) {
+    const o = opc || {};
+    const pedidoId = _txt(datos && datos.pedidoId);
+    if (!pedidoId) return {ok: false, motivo: "SIN_DATO"};
+
+    const pedido = await deps.leerPedido(pedidoId);
+    if (!pedido) return {ok: false, motivo: "NO_ENCONTRADO"};
+    const cfg = await deps.leerConfig();
+
+    /* Los candados, contra lo que hay AHORA en la base de datos — no contra
+       lo que el navegador creía hace un rato. */
+    const faltan = faltantes(pedido, cfg);
+    if (faltan.length) return {ok: false, motivo: "SIN_DATO", faltan};
+
+    const c = cuerpo(pedido, cfg);
+    if (!c) {
+      return {ok: false, motivo: "SIN_DATO", faltan: faltantes(pedido, cfg)};
+    }
+
+    // El simulacro es lo normal; registrar de verdad es la excepción.
+    if (o.simulacro !== false) return {ok: true, simulacro: true, cuerpo: c};
+
+    const r = await deps.llamar(c);
+    const est = resultado(r);
+
+    if (est === "exito") {
+      const j = (r && r.json) || {};
+      const campos = _deEnvio({
+        service_order_guia_empresarial: j.guia || j.orderNumber ||
+          j.tracking_number,
+        code_service_order_empresarial: j.codigo || j.orderCode ||
+          j.tracking_code,
+        quote: j.quote !== undefined ? j.quote : j.costo,
+      });
+      await deps.guardar(campos);
+      return {ok: true, estado: "exito", campos: campos,
+        forma: r && r.json ? true : false};
+    }
+
+    if (est === "fallo") {
+      /* Shalom dijo que NO. No se consulta pendientes —no creó nada— y no
+         se escribe. Se dice el motivo UNA vez, con sus palabras. */
+      return {ok: false, estado: "fallo",
+        motivo: (r && r.motivo) || "ERROR_SHALOM",
+        detalle: (r && r.detalle) || ""};
+    }
+
+    /* ⚠️ DUDA. Aquí NO se reintenta: Shalom no anula y no tiene clave de
+       idempotencia, así que un segundo intento sería un segundo envío y un
+       segundo cobro. Se consulta la lista de pendientes y se busca. */
+    let encontrado = null;
+    try {
+      encontrado = buscarEnPendientes(await deps.pendientes(), c);
+    } catch (e) {
+      encontrado = null;
+    }
+    if (encontrado) {
+      const campos = _deEnvio(encontrado);
+      await deps.guardar(campos);
+      return {ok: true, estado: "exito", recuperado: true, campos: campos};
+    }
+    return {ok: false, estado: "duda",
+      motivo: (r && r.motivo) || "SIN_RED",
+      detalle: "Se cortó la conexión y NO SABEMOS si el envío llegó a " +
+        "crearse. No se registró de nuevo a propósito: Shalom no puede " +
+        "anular un envío. Verifica en pro.shalom.pe antes de reintentar."};
+  }
+
   return {ESTADO_PUERTA, CAJAS, CONTENIDOS, clasificar, contenidoDe,
-    faltantes, cuerpo, resultado};
+    faltantes, cuerpo, resultado, buscarEnPendientes, orquestar};
 });
