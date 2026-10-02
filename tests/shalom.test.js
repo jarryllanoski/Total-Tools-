@@ -746,6 +746,109 @@ module.exports = async (t) => {
        'y el tercero es la cuenta declarada');
   }
 
+  bloque('EL ORDEN de verificar: la cuenta declarada manda sobre el aviso');
+
+  {
+    /* ⚠️ FALLO REAL EN PRODUCCION (02/10/2026), y de los que no se ven
+       leyendo el fuente por encima.
+       Con dos instancias, el servidor responde {ok:false,
+       motivo:'VARIAS_INSTANCIAS', instancias:[…]} — la negativa es correcta,
+       porque el servidor no sabe cual quiere el dueño. El NAVEGADOR si lo
+       sabe: la tiene declarada. Pero yo deje el aviso de VARIAS_INSTANCIAS
+       ANTES de resolver la declarada, asi que salia el aviso y la resolucion
+       no llegaba a ejecutarse nunca.
+
+       No era cache —el diagnostico lo confirmo: shalom.js v22 cargado y la
+       cuenta declarada en memoria—, era orden. Se prueba EJECUTANDO la
+       funcion, porque leyendo el fuente yo mismo no lo vi. */
+    const codigo = E.trozo('index.html', 'function verificarInstanciaShalom(',
+        '/* La lista de cuentas de Shalom Pro');
+    const pintado = {sesion: null, elector: null, crudo: null, html: ''};
+    const caja = {set innerHTML(v) { pintado.html = String(v); },
+      get innerHTML() { return pintado.html; }, style: {}};
+    const btn = {style: {}, disabled: false, textContent: ''};
+    const doc = {getElementById: (id) =>
+      (id === 'shalomInstBtn' ? btn : (id === 'shalomInstEstado' ? caja : null))};
+
+    const dos = [
+      {id: 'd14b120a-983d-4369-b519-c9d6bcf70d6a', nombre: 'Total',
+        usuario: 'Totaltools@gmail.com', conectada: true},
+      {id: '29bf1b07-a3b0-4e29-a01f-5c7bc0000000', nombre: 'Yapaitas',
+        usuario: 'ramossuyin@gmail.com', conectada: false}
+    ];
+    const winS = {};
+    E.cargar('shalom.js', winS);
+    const win = {
+      S: {},
+      Shalom: {
+        INSTANCIA_PREFERIDA: winS.Shalom.INSTANCIA_PREFERIDA,
+        elegirInstancia: winS.Shalom.elegirInstancia,
+        // Lo que responde el servidor con DOS instancias: se niega a elegir,
+        // pero entrega la lista.
+        estadoInstancia: () => Promise.resolve(
+            {ok: false, motivo: 'VARIAS_INSTANCIAS', instancias: dos})
+      }
+    };
+    // eslint-disable-next-line no-new-func
+    const fn = new Function('window', 'document', 'S', 'Shalom', 'esc',
+        '_pintarSesionShalom', '_pintarElectorInstancia',
+        '_pintarRespuestaCruda',
+        codigo + '\n; return verificarInstanciaShalom;')(
+        win, doc, win.S, win.Shalom, (x) => String(x),
+        (c, ses) => { pintado.sesion = ses; },
+        (c, l, a, t) => { pintado.elector = {lista: l, titulo: t}; },
+        (c, r, t) => { pintado.crudo = r; });
+
+    await fn();
+
+    ok(pintado.sesion !== null,
+       'con la cuenta declarada, se PINTA LA SESION — no el aviso de varias');
+    ok(pintado.sesion && pintado.sesion.nombre === 'Total',
+       'y es Total, la declarada — salio: ' +
+       (pintado.sesion && pintado.sesion.nombre));
+    ok(pintado.elector === null,
+       'y no se le pide elegir nada: ya esta configurado');
+    ok(!/mas de una cuenta|más de una cuenta/i.test(pintado.html),
+       'y NO sale el aviso de "tienes mas de una cuenta": ese era el fallo');
+  }
+
+  {
+    /* Y si la declarada NO esta en la lista, el aviso SI tiene que salir:
+       arreglar un caso rompiendo el otro no es arreglar. */
+    const codigo = E.trozo('index.html', 'function verificarInstanciaShalom(',
+        '/* La lista de cuentas de Shalom Pro');
+    const pintado = {sesion: null, elector: null, html: ''};
+    const caja = {set innerHTML(v) { pintado.html = String(v); },
+      get innerHTML() { return pintado.html; }, style: {}};
+    const btn = {style: {}, disabled: false, textContent: ''};
+    const doc = {getElementById: (id) =>
+      (id === 'shalomInstBtn' ? btn : (id === 'shalomInstEstado' ? caja : null))};
+    const otras = [
+      {id: 'aaa', nombre: 'Yapaitas', conectada: true},
+      {id: 'bbb', nombre: 'Tercera', conectada: true}
+    ];
+    const winS = {}; E.cargar('shalom.js', winS);
+    const win = {S: {}, Shalom: {
+      INSTANCIA_PREFERIDA: winS.Shalom.INSTANCIA_PREFERIDA,
+      elegirInstancia: winS.Shalom.elegirInstancia,
+      estadoInstancia: () => Promise.resolve(
+          {ok: false, motivo: 'VARIAS_INSTANCIAS', instancias: otras})
+    }};
+    // eslint-disable-next-line no-new-func
+    const fn = new Function('window', 'document', 'S', 'Shalom', 'esc',
+        '_pintarSesionShalom', '_pintarElectorInstancia',
+        '_pintarRespuestaCruda',
+        codigo + '\n; return verificarInstanciaShalom;')(
+        win, doc, win.S, win.Shalom, (x) => String(x),
+        (c, ses) => { pintado.sesion = ses; },
+        (c, l, a, t) => { pintado.elector = {lista: l, titulo: t}; },
+        () => {});
+    await fn();
+    ok(pintado.elector !== null,
+       'si la declarada no esta, SE PIDE ELEGIR — no se usa otra');
+    ok(pintado.sesion === null, 'y no se afirma ninguna sesion');
+  }
+
   bloque('El selector en Config: guarda tu eleccion, y no elige solo');
 
   {

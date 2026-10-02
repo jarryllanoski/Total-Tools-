@@ -3345,16 +3345,25 @@ function verificarInstanciaShalom(){
       return;
     }
 
-    if(r && r.ok===false && nuestros[r.motivo]){
-      caja.innerHTML='<span style="color:#f87171">❌ '+nuestros[r.motivo]+'</span>';
-      return;
-    }
-
+    /* ⚠️ ESTO VA ANTES DEL AVISO, y el orden no es un detalle de estilo:
+       fue un fallo real en producción (02/10/2026).
+       Con dos instancias el servidor responde `VARIAS_INSTANCIAS` —y hace
+       bien, porque ÉL no sabe cuál quiere el dueño—. Pero el navegador SÍ
+       lo sabe: la tiene declarada. Yo dejé el aviso antes de resolverla, así
+       que salía "tienes más de una cuenta" y la resolución no llegaba a
+       ejecutarse nunca. La negativa del servidor es correcta; lo que
+       faltaba era usarla aquí en vez de repetirla. */
     const ses=(elec && (elec.estado==='elegida' || elec.estado==='declarada'))
       ? {conocido:true, conectada:elec.instancia.conectada,
          usuario:elec.instancia.usuario, nombre:elec.instancia.nombre,
          id:elec.instancia.id, url:null, enLogin:null}
       : (r&&r.sesion);
+
+    if(!ses && r && r.ok===false && nuestros[r.motivo]){
+      caja.innerHTML='<span style="color:#f87171">❌ '+nuestros[r.motivo]+'</span>';
+      return;
+    }
+
     if(ses&&ses.conocido){
       _pintarSesionShalom(caja,ses);
       if(elec && elec.instancia && elec.instancias.length>1){
