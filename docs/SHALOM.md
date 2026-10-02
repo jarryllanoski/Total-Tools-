@@ -836,9 +836,21 @@ Este panel es el de Total Tools:
 { id: 'd14b120a-983d-4369-b519-c9d6bcf70d6a', nombre: 'Total' }
 ```
 
-**Los dos, y cada uno cubre lo que el otro no:** el `id` es exacto y
-sobrevive a que se renombre la cuenta; el `nombre` sobrevive a que la
-instancia se rehaga y cambie de id.
+**Los dos, pero NO como alternativas — con precedencia:**
+
+1. el **`id`** declarado casa una → esa, y punto
+2. el id no casa ninguna → se prueba el **`nombre`**; si casa UNA, esa
+3. ni una ni otra → **se pregunta**
+
+El id es exacto y sobrevive a que renombres la cuenta. El nombre es el plan
+B, para cuando la instancia se rehaga y cambie de id.
+
+⚠️ **El orden no es un detalle.** Tratarlos como alternativas (id **o**
+nombre) costó un fallo real el 02/10/2026: la cuenta pasó a tener **dos
+instancias llamadas "Total"** —la segunda la creó otra aplicación con un
+botón que decía *"Obtener instancia"* y en realidad **creaba**— y el nombre
+casaba una segunda fila, saltaba la guardia de ambigüedad y el panel volvía
+a pedir elegir. La guardia estaba bien; la precedencia estaba mal.
 
 Ese UUID está en un repo público y **no es una credencial**: sin la clave de
 la API —que vive en Secret Manager y nunca sale del servidor— no sirve para

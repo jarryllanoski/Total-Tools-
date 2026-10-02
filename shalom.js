@@ -291,14 +291,30 @@
       } else {
         pnom = String(preferida || '').trim().toLowerCase();
       }
-      if (pid || pnom) {
-        var casan = L.filter(function (x) {
-          if (pid && x.id === pid) return true;
-          return !!pnom &&
-            String(x.nombre || '').trim().toLowerCase() === pnom;
+      /* ★ PRECEDENCIA: PRIMERO EL ID, Y EL NOMBRE SOLO SI EL ID NO ESTÁ.
+         No son alternativas, y confundirlas me costó un fallo real
+         (02/10/2026): la cuenta pasó a tener DOS instancias llamadas
+         "Total" —una la creó otra aplicación con un botón que decía
+         "Obtener" y en realidad creaba— y, al tratar id y nombre como
+         alternativas, el nombre casaba una segunda fila, saltaba la
+         guardia de ambigüedad y el panel volvía a pedir elegir.
+         La guardia estaba bien; la precedencia estaba mal. El id es el
+         dato más específico: si resuelve UNA, no hay nada que preguntar. */
+      if (pid) {
+        var porId = L.filter(function (x) { return x.id === pid; });
+        if (porId.length === 1) {
+          return {estado: 'declarada', instancia: porId[0], instancias: L};
+        }
+      }
+      /* Plan B: el nombre, para cuando la instancia se rehízo y cambió de
+         id. Sigue exigiendo UNA sola: si dos se llaman igual y el id ya no
+         está, el nombre de verdad no identifica nada y se pregunta. */
+      if (pnom) {
+        var porNombre = L.filter(function (x) {
+          return String(x.nombre || '').trim().toLowerCase() === pnom;
         });
-        if (casan.length === 1) {
-          return {estado: 'declarada', instancia: casan[0], instancias: L};
+        if (porNombre.length === 1) {
+          return {estado: 'declarada', instancia: porNombre[0], instancias: L};
         }
       }
       return {estado: 'falta_elegir', instancia: null, instancias: L};

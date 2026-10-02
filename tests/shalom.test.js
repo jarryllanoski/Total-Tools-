@@ -699,16 +699,58 @@ module.exports = async (t) => {
     ok(S.elegirInstancia(repes, '', {nombre: 'Total'}).estado === 'falta_elegir',
        'y con DOS llamadas igual tampoco: ahi el nombre ya no identifica nada');
 
-    /* Caso fino: el id declarado apunta a una, y el nombre declarado a OTRA.
-       Eso no es una eleccion, es una contradiccion. Se pregunta. */
-    const cruce = [
-      {id: 'a', nombre: 'Yapaitas', conectada: true},
-      {id: 'b', nombre: 'Total', conectada: true}
+    /* ★ EL CASO REAL DEL 02/10/2026, y el que destapo un fallo mio.
+       La cuenta paso a tener TRES instancias y DOS SE LLAMAN "Total":
+         Total     d14b120a…  Totaltools@gmail.com   conectada
+         Total     d0fd86da…  (sin usuario)          requiere login
+         Yapaitas  29bf1b07…  ramossuyin@gmail.com   conectada
+       La segunda la creo su otra aplicacion con un boton "Obtener
+       instancia" que en realidad CREA.
+
+       Yo habia declarado id y nombre como ALTERNATIVAS (id === X O
+       nombre === "Total"). Con dos filas llamadas igual, el nombre casaba
+       una segunda fila, saltaba mi guardia de ambiguedad, y el panel volvia
+       a pedir elegir — justo lo que el dueño pidio quitar.
+
+       La guardia estaba bien; LA PRECEDENCIA estaba mal. El id es el dato
+       mas especifico: si resuelve UNA, no hay nada que preguntar. El nombre
+       es el plan B, para cuando el id ya no exista. */
+    const tres = [
+      {id: 'd14b120a', nombre: 'Total', usuario: 'Totaltools@gmail.com',
+        conectada: true},
+      {id: 'd0fd86da', nombre: 'Total', usuario: null, conectada: false},
+      {id: '29bf1b07', nombre: 'Yapaitas', usuario: 'ramossuyin@gmail.com',
+        conectada: true}
     ];
-    ok(S.elegirInstancia(cruce, '', {id: 'a', nombre: 'Total'}).estado ===
+    const real = S.elegirInstancia(tres, '', {id: 'd14b120a', nombre: 'Total'});
+    ok(real.estado === 'declarada' && real.instancia.id === 'd14b120a',
+       'con DOS llamadas "Total", el id declarado manda y no se pregunta — ' +
+       'salio: ' + real.estado);
+    ok(real.instancia.conectada === true,
+       'y es la conectada, no la que quedo sin usuario');
+
+    /* Defensivo: dos filas con el MISMO id no deberian existir —Shalom no
+       repite ids— pero si llegaran, elegir "la primera" seria volver a
+       adivinar. La guardia se sostiene igual, y por eso se prueba. */
+    ok(S.elegirInstancia([
+      {id: 'mismo', nombre: 'A', conectada: true},
+      {id: 'mismo', nombre: 'B', conectada: false}
+    ], '', {id: 'mismo', nombre: 'A'}).estado === 'declarada',
+    'con ids repetidos, el nombre desempata');
+    ok(S.elegirInstancia([
+      {id: 'mismo', nombre: 'A', conectada: true},
+      {id: 'mismo', nombre: 'A', conectada: false}
+    ], '', {id: 'mismo', nombre: 'A'}).estado === 'falta_elegir',
+    'y si ni el id ni el nombre desempatan, se pregunta — nunca la primera');
+
+    /* El nombre sigue siendo el plan B — pero solo si el id NO esta. */
+    ok(S.elegirInstancia(tres, '', {id: 'borrada', nombre: 'Yapaitas'})
+        .instancia.id === '29bf1b07',
+    'si el id declarado desaparecio, el nombre lo vuelve a encontrar');
+    ok(S.elegirInstancia(tres, '', {id: 'borrada', nombre: 'Total'}).estado ===
        'falta_elegir',
-       'si el id declarado y el nombre declarado señalan a DISTINTAS, se ' +
-       'pregunta: eso no es una eleccion, es una contradiccion');
+    'pero si el nombre casa DOS y el id ya no esta, se pregunta: ahi el ' +
+    'nombre de verdad no identifica nada');
 
     ok(S.elegirInstancia(dos, 'b', {id: 'd14b', nombre: 'Total'})
         .instancia.id === 'b',
