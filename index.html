@@ -3322,8 +3322,13 @@ function verificarInstanciaShalom(){
        La decisión vive en `Shalom.elegirInstancia`, UN solo sitio: dos
        pantallas decidiendo lo mismo divergen, y divergir aquí cuesta eso. */
     const guardada = (window.S && S.shalomInstancia && S.shalomInstancia.id) || '';
+    /* La cuenta declarada de este panel. Config la puede pisar sin
+       desplegar; si no hay nada en Config, vale la del módulo. */
+    const preferida = (window.S && S.shalomInstanciaPreferida) ||
+      (window.Shalom && Shalom.INSTANCIA_PREFERIDA) || '';
     const elec = (window.Shalom && Shalom.elegirInstancia)
-      ? Shalom.elegirInstancia((r && r.instancias) || [], guardada) : null;
+      ? Shalom.elegirInstancia((r && r.instancias) || [], guardada, preferida)
+      : null;
 
     if(elec && elec.estado==='falta_elegir'){
       _pintarElectorInstancia(caja, elec.instancias, '',
@@ -3345,14 +3350,14 @@ function verificarInstanciaShalom(){
       return;
     }
 
-    const ses=(elec && elec.estado==='elegida')
+    const ses=(elec && (elec.estado==='elegida' || elec.estado==='declarada'))
       ? {conocido:true, conectada:elec.instancia.conectada,
          usuario:elec.instancia.usuario, nombre:elec.instancia.nombre,
          id:elec.instancia.id, url:null, enLogin:null}
       : (r&&r.sesion);
     if(ses&&ses.conocido){
       _pintarSesionShalom(caja,ses);
-      if(elec && elec.estado==='elegida' && elec.instancias.length>1){
+      if(elec && elec.instancia && elec.instancias.length>1){
         caja.innerHTML += '<div style="margin-top:8px;text-align:right">'+
           '<button type="button" onclick="verificarInstanciaShalom._cambiar()" '+
           'style="background:none;border:none;color:#58a6ff;cursor:pointer;'+
@@ -4736,7 +4741,7 @@ render();
 <script src="config.js?v=38"></script>
 <script src="print.js?v=16"></script>
 <script src="notify.js?v=5"></script>
-<script src="shalom.js?v=20"></script>
+<script src="shalom.js?v=21"></script>
 <script src="tracking.js?v=20"></script>
 <script src="floatpanel.js?v=4"></script>
 <script src="delivery.js?v=8"></script>

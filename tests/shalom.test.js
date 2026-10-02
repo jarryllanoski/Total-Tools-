@@ -601,6 +601,90 @@ module.exports = async (t) => {
     });
   }
 
+  bloque('La cuenta declarada: se usa sola, SIN pulsar nada');
+
+  {
+    /* ⚠️ LA DISTINCION QUE ME FALTABA, y es la clave de todo este archivo.
+         ADIVINAR  = el codigo elige entre varias cuando no sabe cual.
+                     Eso registraria el envio de un cliente en el negocio
+                     equivocado. Prohibido.
+         CONFIGURAR = el dueño declara UNA VEZ cual es la suya, y el codigo
+                     la respeta sin preguntar mas.
+       Le monte un selector cuando lo que necesitaba era configuracion. Su
+       panel es el de Total Tools y su cuenta se llama `Total`: eso no lo
+       supongo yo, me lo dijo el. */
+    const win = {}; E.cargar('shalom.js', win);
+    const S = win.Shalom;
+    const dos = [
+      {id: 'd14b', nombre: 'Total', usuario: 'Totaltools@gmail.com',
+        conectada: true},
+      {id: '29bf', nombre: 'Yapaitas', usuario: 'ramossuyin@gmail.com',
+        conectada: false}
+    ];
+
+    const r = S.elegirInstancia(dos, '', 'Total');
+    ok(r.estado === 'declarada' && r.instancia.id === 'd14b',
+       'con la cuenta declarada se usa SOLA, sin pulsar — salio: ' + r.estado);
+
+    ok(S.elegirInstancia(dos, '', ' total ').instancia.id === 'd14b',
+       'y no se pierde por mayusculas ni espacios');
+    ok(S.elegirInstancia(dos, '', 'Tot').estado === 'falta_elegir',
+       'pero EXACTA: un trozo del nombre no vale, o "Tot" cazaria "Total 2"');
+  }
+
+  {
+    const win = {}; E.cargar('shalom.js', win);
+    const S = win.Shalom;
+    /* ⚠️ Y LA NEGATIVA SIGUE DONDE DEBE: si la declarada no esta, o si hay
+       DOS con el mismo nombre, no se elige. Configurar no es adivinar, y
+       esta frontera es la que no se puede mover. */
+    const dos = [
+      {id: 'a', nombre: 'Total', conectada: true},
+      {id: 'b', nombre: 'Yapaitas', conectada: true}
+    ];
+    ok(S.elegirInstancia(dos, '', 'NoExiste').estado === 'falta_elegir',
+       'una declarada que no esta NO se sustituye por otra: se pide elegir');
+
+    const repes = [
+      {id: 'a', nombre: 'Total', conectada: true},
+      {id: 'b', nombre: 'Total', conectada: false}
+    ];
+    ok(S.elegirInstancia(repes, '', 'Total').estado === 'falta_elegir',
+       'y con DOS llamadas igual tampoco: ahi el nombre ya no identifica nada');
+
+    ok(S.elegirInstancia(dos, 'b', 'Total').instancia.id === 'b',
+       'lo que elegiste a mano MANDA sobre lo declarado: es mas reciente y ' +
+       'mas explicito');
+  }
+
+  {
+    const win = {}; E.cargar('shalom.js', win);
+    const S = win.Shalom;
+    ok(typeof S.INSTANCIA_PREFERIDA === 'string' && S.INSTANCIA_PREFERIDA,
+       'la cuenta declarada vive en UN sitio con nombre, no esparcida');
+    ok(S.elegirInstancia([{id: 'x', nombre: 'Otra'}], '', 'Total')
+        .estado === 'una',
+       'con una sola instancia da igual como se llame: se usa, como siempre');
+    ok(S.elegirInstancia([], '', 'Total').estado === 'ninguna',
+       'y sin ninguna no se inventa');
+  }
+
+  {
+    /* El panel tiene que PASARLE la preferida, o no sirve de nada. */
+    /* LA LLAMADA, no la palabra. Una mutacion que quitaba el tercer
+       argumento sobrevivio porque la linea de arriba —`const preferida =
+       ...`— seguia mencionando INSTANCIA_PREFERIDA. Quinta vez hoy que
+       confundo un nombre en el fuente con una llamada. */
+    const idx = E.leer('index.html').replace(/\/\*[\s\S]*?\*\//g, '');
+    const llamada = idx.match(/Shalom\.elegirInstancia\(([^;]*?)\)\s*\n?\s*:/);
+    ok(!!llamada, 'la pantalla llama a `elegirInstancia`');
+    const args = llamada ? llamada[1].split(',').length : 0;
+    ok(args === 3,
+       'y le pasa TRES argumentos: lista, elegida y declarada — pasa ' + args);
+    ok(llamada && /preferida/.test(llamada[1]),
+       'y el tercero es la cuenta declarada');
+  }
+
   bloque('El selector en Config: guarda tu eleccion, y no elige solo');
 
   {

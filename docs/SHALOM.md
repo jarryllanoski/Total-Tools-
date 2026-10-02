@@ -819,12 +819,36 @@ que fallara habría registrado el envío de un cliente **en la cuenta del otro
 negocio, cobrado a ellos** — sin que nadie se enterara hasta que el paquete
 no apareciera.
 
-`Shalom.elegirInstancia(lista, idGuardado)` tiene **cinco estados**:
+### Adivinar no es lo mismo que configurar
+
+La primera versión de esto montó un **selector** cuando lo que hacía falta era
+**configuración**. La diferencia no es de estilo:
+
+| | |
+|---|---|
+| **Adivinar** | el código elige entre varias cuando no sabe cuál. Registraría el envío de un cliente en el otro negocio, cobrado a ellos. **Prohibido.** |
+| **Configurar** | el dueño declara una vez cuál es la suya, y el código la respeta sin volver a preguntar |
+
+`Shalom.INSTANCIA_PREFERIDA = 'Total'` es un **dato del negocio**, no una
+suposición. Este panel es el de Total Tools.
+
+**Y la frontera no se mueve.** La declarada se usa sola solo si hay
+**exactamente una** que se llame así. Si no está, o si hay **dos con el mismo
+nombre**, se vuelve a pedir que elija — porque ahí el nombre ya no identifica
+nada. El nombre se compara **exacto** (sin mayúsculas ni espacios de más): por
+prefijo, `Tot` cazaría `Total 2` y volveríamos a elegir por parecido.
+
+Lo elegido a mano **manda** sobre lo declarado: es más reciente y más
+explícito. Y `S.shalomInstanciaPreferida` en Config pisa la constante sin
+desplegar.
+
+`Shalom.elegirInstancia(lista, idGuardado, preferida)` tiene **seis estados**:
 
 | Estado | Qué significa |
 |---|---|
 | `ninguna` | no hay cuenta de Shalom Pro |
 | `una` | hay una sola: se usa, sin preguntar (como siempre) |
+| `declarada` | varias, y una se llama como la cuenta declarada: **se usa sola** |
 | `falta_elegir` | hay varias y no elegiste |
 | `elegida` | tu elección sigue existiendo |
 | `elegida_no_existe` | tu elección ya no está. **Se dice.** |

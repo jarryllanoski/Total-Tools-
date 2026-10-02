@@ -232,7 +232,22 @@
        @param {Array} lista instancias traducidas
        @param {string} idGuardado la elección de Config, si hay
        @return {Object} {estado, instancia, instancias} */
-    elegirInstancia: function (lista, idGuardado) {
+    /* ★ LA CUENTA DE SHALOM PRO DE ESTE PANEL, DECLARADA.
+       Este panel es el de Total Tools, y su cuenta en Shalom Pro se llama
+       `Total`. No es una suposición del código: es un dato del negocio,
+       escrito donde se pueda leer y cambiar.
+
+       ⚠️ LA DISTINCIÓN QUE HACE QUE ESTO NO SEA ADIVINAR:
+         · Adivinar  = el código elige entre varias cuando no sabe cuál.
+                       Eso registraría el envío de un cliente en el otro
+                       negocio, cobrado a ellos. Sigue prohibido.
+         · Configurar = el dueño declara una vez cuál es la suya, y el
+                       código la respeta sin volver a preguntar.
+       La frontera no se mueve: si la declarada NO está, o si hay DOS con el
+       mismo nombre, se vuelve a pedir que elija. Nunca se sustituye. */
+    INSTANCIA_PREFERIDA: 'Total',
+
+    elegirInstancia: function (lista, idGuardado, preferida) {
       var L = Array.isArray(lista) ? lista.filter(function (x) {
         return x && typeof x === 'object' && x.id;
       }) : [];
@@ -250,6 +265,20 @@
       if (!L.length) return vacio;
       if (L.length === 1) {
         return {estado: 'una', instancia: L[0], instancias: L};
+      }
+      /* La declarada. EXACTA, sin distinguir mayúsculas ni espacios de más:
+         un trozo del nombre valdría para "Total 2" y volveríamos a elegir
+         por parecido, que es adivinar con otro nombre.
+         Y si hay DOS que se llaman igual, el nombre ya no identifica nada:
+         se pide elegir, como si no hubiera declarada. */
+      var pref = String(preferida || '').trim().toLowerCase();
+      if (pref) {
+        var casan = L.filter(function (x) {
+          return String(x.nombre || '').trim().toLowerCase() === pref;
+        });
+        if (casan.length === 1) {
+          return {estado: 'declarada', instancia: casan[0], instancias: L};
+        }
       }
       return {estado: 'falta_elegir', instancia: null, instancias: L};
     },
