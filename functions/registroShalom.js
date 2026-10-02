@@ -98,12 +98,20 @@
     return CONTENIDOS.indexOf(txt) >= 0 ? txt : null;
   }
 
-  /** Solo dígitos de un valor, o "". @param {*} v valor @return {string} d */
+  /**
+   * Solo los dígitos de un valor.
+   * @param {*} v valor de origen
+   * @return {string} sus dígitos, o "" si no hay
+   */
   function _dig(v) {
     return String(v === null || v === undefined ? "" : v).replace(/\D/g, "");
   }
 
-  /** Texto recortado de un valor. @param {*} v valor @return {string} t */
+  /**
+   * El texto de un valor, sin espacios a los lados.
+   * @param {*} v valor de origen
+   * @return {string} el texto, o "" si no hay
+   */
   function _txt(v) {
     return String(v === null || v === undefined ? "" : v).trim();
   }
@@ -305,9 +313,11 @@
     return casan.length === 1 ? casan[0] : null;
   }
 
-  /** Lo que se guarda de un envío ya creado.
-   * @param {Object} env el envío de Shalom
-   * @return {Object} campos del pedido */
+  /**
+   * Lo que se guarda en el pedido a partir de un envío ya creado.
+   * @param {Object} env el envío, como lo devuelve Shalom
+   * @return {Object} los campos a escribir
+   */
   function _deEnvio(env) {
     const e = env || {};
     const guia = _txt(e.service_order_guia_empresarial || e.guia ||

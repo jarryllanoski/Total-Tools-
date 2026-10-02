@@ -81,13 +81,99 @@ module.exports = async ({bloque, ok}) => {
       const lineas = E.leer('functions/' + f).split('\n');
       const sinDoc = [];
       lineas.forEach((l, i) => {
-        if (!/^(async\s+)?function\s+[A-Za-z_$]/.test(l)) return;
+        /* ⚠️ CON INDENTACION. Mi primera version exigia que `function`
+           empezara en la COLUMNA 0, asi que no miraba NINGUNA funcion de
+           los modulos UMD —`registroShalom.js`, `pedidoPublico.js`,
+           `agencias.js`, `enlaceSeguimiento.js`—, que van dentro de una
+           fabrica y por tanto indentadas. Esos son justo los archivos
+           nuevos. La guardia existia y no cubria lo que hacia falta. */
+        if (!/^\s*(async\s+)?function\s+[A-Za-z_$]/.test(l)) return;
         const previa = (lineas[i - 1] || '').trim();
-        if (previa !== '*/') sinDoc.push(i + 1);
+        if (previa !== '*/' && !/^\/\*\*.*\*\/$/.test(previa)) {
+          sinDoc.push(i + 1);
+        }
       });
       ok(sinDoc.length === 0,
          f + ': toda funcion de nivel superior lleva su JSDoc pegado' +
          (sinDoc.length ? ' — sin el, lineas ' + sinDoc.join(', ') : ''));
+    });
+  }
+
+  bloque('valid-jsdoc: el comentario no solo existe, se puede LEER');
+
+  {
+    /* CUARTA CLASE DE ERROR DEL LINTER QUE ME MUERDE, y la mas sutil:
+       `require-jsdoc` solo exige que HAYA un comentario; `valid-jsdoc`
+       exige que ESLint pueda leer sus etiquetas. Y no las lee si estan en
+       la misma linea que la descripcion:
+
+           /** Solo digitos. @param {*} v valor @return {string} d *\/   ✗
+           /**
+            * Solo digitos.
+            * @param {*} v valor
+            * @return {string} sus digitos
+            *\/                                                          ✓
+
+       Mi guardia anterior comprobaba que el JSDoc EXISTIERA y lo daba por
+       bueno. Paro un despliegue. Ahora se exige una etiqueta por linea y
+       una `@param` por cada parametro de verdad. */
+    archivos.forEach((f) => {
+      const lineas = E.leer('functions/' + f).split('\n');
+      const malos = [];
+      lineas.forEach((l, i) => {
+        const m2 = l.match(/^\s*(?:async\s+)?function\s+[A-Za-z_$][\w$]*\s*\(([^)]*)\)/);
+        if (!m2) return;
+        /* ⚠️ EL JSDOC DE UNA SOLA LINEA HAY QUE CAZARLO AQUI, Y SE ME
+           ESCAPO A LA PRIMERA: al buscar hacia atras una linea que sea
+           exactamente `/**`, un comentario de una linea no la tiene, asi
+           que el bucle seguia subiendo y acababa leyendo el comentario de
+           la funcion ANTERIOR —que si estaba bien— y daba verde.
+           Es el mismo error de siempre: mirar cerca en vez de mirar lo
+           que es. */
+        const encima = (lineas[i - 1] || '').trim();
+        if (/^\/\*\*.*\*\/$/.test(encima)) {
+          if (/@(param|returns?)\b/.test(encima)) {
+            malos.push('linea ' + i + ': JSDoc de UNA LINEA con etiquetas — ' +
+              'ESLint no las lee asi (valid-jsdoc)');
+          }
+          return;
+        }
+        let j = i - 1;
+        const doc = [];
+        while (j >= 0 && lineas[j].trim() !== '/**') {
+          doc.unshift(lineas[j]);
+          if (doc.length > 60) break;
+          j--;
+        }
+        if (j < 0) return; // sin JSDoc: lo caza la otra prueba
+        const txt = doc.join('\n');
+        const params = m2[1].split(',').map((x) => x.trim()).filter(Boolean);
+        params.forEach((nombre) => {
+          const limpio = nombre.replace(/^\.\.\./, '').split('=')[0].trim();
+          const re = new RegExp('^\\s*\\*\\s*@param\\s+\\{[^}]*\\}\\s+\\[?' +
+            limpio.replace(/\$/g, '\\$'), 'm');
+          if (!re.test(txt)) {
+            malos.push('linea ' + (i + 1) + ': falta @param ' + limpio);
+          }
+        });
+        /* ⚠️ SE COMPRUEBA LA FORMA, NO LA PRESENCIA. Si HACE FALTA un
+           `@return` ya lo decide ESLint, y mi primera version lo exigia mas
+           a menudo que el: marcaba `setCORS` (que no devuelve nada) y
+           `handleClient` (cuyo `return vacio()` es una salida temprana, no
+           un valor). Una regla propia mas dura que la real es ruido, y el
+           ruido acaba con que alguien desactive la prueba entera.
+           Lo que SI es mio: si el comentario menciona `@return`, tiene que
+           estar en su propia linea — porque ahi es donde ESLint no lo lee y
+           donde me paro un despliegue. */
+        if (/@returns?\b/.test(txt) && !/^\s*\*\s*@returns?\s/m.test(txt)) {
+          malos.push('linea ' + (i + 1) +
+            ': el @return no esta en su propia linea');
+        }
+      });
+      ok(malos.length === 0,
+         f + ': cada funcion documenta sus parametros y su retorno, una ' +
+         'etiqueta por linea' +
+         (malos.length ? ' — ' + malos.slice(0, 4).join('; ') : ''));
     });
   }
 
