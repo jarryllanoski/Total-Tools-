@@ -158,6 +158,48 @@ module.exports = async ({bloque, ok}) => {
        'si Shalom devolviera la clave en su mensaje de error, tampoco sale');
   }
 
+  bloque('Con varias instancias: se niega a elegir, PERO entrega la lista');
+
+  {
+    /* Caso real del 01/10/2026: dos instancias, LAS DOS CONECTADAS, de dos
+       negocios distintos. El traductor seguia negandose a elegir —bien— pero
+       TIRABA LA LISTA, asi que el panel no podia ni ofrecerla. La negativa se
+       mantiene intacta; lo que se añade es el dato para poder decidir. */
+    const r = P.traducirInstancias({instances: [
+      {id: 'd14b120a', name: 'Total', username: 'Totaltools@gmail.com',
+        isLoggedIn: true},
+      {id: '29bf1b07', name: 'Yapaitas', username: 'ramossuyin@gmail.com',
+        isLoggedIn: true}
+    ]});
+    ok(r.ok === false && r.motivo === 'VARIAS_INSTANCIAS',
+       'LA NEGATIVA SIGUE: con dos, no se elige por nadie');
+    ok(Array.isArray(r.instancias) && r.instancias.length === 2,
+       'pero ahora viene la lista, para poder elegir');
+    ok(r.instancias[0].nombre === 'Total' &&
+       r.instancias[0].usuario === 'Totaltools@gmail.com' &&
+       r.instancias[0].conectada === true && r.instancias[0].id === 'd14b120a',
+       'con lo justo para distinguirlas: id, nombre, correo y estado');
+    ok(!('isLoggedIn' in r.instancias[0]) && !('name' in r.instancias[0]),
+       'y en el vocabulario del panel, no en el de Shalom');
+  }
+
+  {
+    const r = P.traducirInstancias({instances: [
+      {id: 'i1', name: 'Total', username: 'a@b', isLoggedIn: true}]});
+    ok(r.ok === true && r.sesion.id === 'i1',
+       'con UNA sola, todo sigue exactamente igual que antes');
+    ok(Array.isArray(r.instancias) && r.instancias.length === 1,
+       'y tambien viene la lista, para pintarla sin otra consulta');
+  }
+
+  {
+    const r = P.traducirInstancias({instances: []});
+    ok(r.ok === false && r.motivo === 'SIN_INSTANCIA',
+       'sin ninguna, se dice que no hay cuenta');
+    ok(Array.isArray(r.instancias) && r.instancias.length === 0,
+       'y la lista viene vacia, no ausente: el panel no tiene que adivinar');
+  }
+
   bloque('El estado de la sesion, traducido contra lo MEDIDO');
 
   {

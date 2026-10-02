@@ -12,6 +12,20 @@
 'use strict';
 const E = require('./_entorno.js');
 
+/* El cuerpo de una funcion de nivel superior, SIN comentarios.
+   Preguntar por "los N caracteres siguientes" mete dentro la funcion de al
+   lado, y no quitar los comentarios hace que una explicacion valga por una
+   llamada. Las dos cosas me han dejado pasar mutaciones hoy. */
+function cuerpoDeFuncion(src, nombre) {
+  const i = src.indexOf('function ' + nombre + '(');
+  if (i < 0) return '';
+  const resto = src.slice(i);
+  const fin = resto.search(/\n\}/);
+  const cuerpo = fin < 0 ? resto : resto.slice(0, fin + 2);
+  return cuerpo.replace(/\/\*[\s\S]*?\*\//g, '')
+      .replace(/(^|[^:"'`\\])\/\/[^\n]*/g, '$1');
+}
+
 module.exports = async (t) => {
   const {ok, bloque} = t;
 
@@ -503,5 +517,135 @@ module.exports = async (t) => {
     ok(/instancia/i.test(t), 'y nombra la instancia, que es lo que falla');
     ok(!/^No se pudo consultar/.test(t),
        'y no cae en el texto generico: ese manda a buscar a ciegas');
+  }
+
+  bloque('Elegir instancia: NUNCA por su cuenta');
+
+  {
+    /* ⚠️ POR QUE ESTO EXISTE, con nombres reales (01/10/2026).
+       La cuenta del dueño devuelve DOS instancias y LAS DOS CONECTADAS:
+           Total     — Totaltools@gmail.com
+           Yapaitas  — ramossuyin@gmail.com
+       Son dos negocios distintos. Elegir "la primera" o "la que esta
+       conectada" habria acertado o no AL AZAR, y el dia que fallara habria
+       registrado el envio de un cliente en la cuenta del otro negocio,
+       cobrado a ellos, sin que nadie se enterara hasta que el paquete no
+       apareciera. Por eso aqui no se adivina nunca. */
+    const win = {}; E.cargar('shalom.js', win);
+    const S = win.Shalom;
+    const dos = [
+      {id: 'd14b120a', nombre: 'Total', usuario: 'Totaltools@gmail.com',
+        conectada: true},
+      {id: '29bf1b07', nombre: 'Yapaitas', usuario: 'ramossuyin@gmail.com',
+        conectada: true}
+    ];
+
+    const r = S.elegirInstancia(dos, '');
+    ok(r.estado === 'falta_elegir',
+       'con dos y sin elegir, se PIDE elegir — salio: ' + r.estado);
+    ok(r.instancia === null, 'y no se devuelve ninguna por defecto');
+    ok(r.instancias.length === 2, 'pero si la lista, para poder elegir');
+
+    const b = S.elegirInstancia(dos, 'd14b120a');
+    ok(b.estado === 'elegida' && b.instancia.nombre === 'Total',
+       'con eleccion guardada, se usa ESA');
+
+    /* Y si la guardada ya no existe, SE DICE. No se cae a la otra: caer a
+       la otra es registrar en el negocio equivocado en silencio, que es
+       exactamente el fallo que esto evita. */
+    const c = S.elegirInstancia(dos, 'borrada-hace-meses');
+    ok(c.estado === 'elegida_no_existe',
+       'una eleccion que ya no existe se dice, no se sustituye — salio: ' +
+       c.estado);
+    ok(c.instancia === null, 'y NO se cae a la otra instancia');
+  }
+
+  {
+    /* Con UNA sola, el comportamiento es el de siempre: no se molesta a
+       nadie con una eleccion que no existe. */
+    const win = {}; E.cargar('shalom.js', win);
+    const S = win.Shalom;
+    const una = [{id: 'i1', nombre: 'Total', usuario: 'a@b', conectada: true}];
+    const r = S.elegirInstancia(una, '');
+    ok(r.estado === 'una' && r.instancia.id === 'i1',
+       'con una sola se usa, sin preguntar nada');
+
+    ok(S.elegirInstancia([], '').estado === 'ninguna',
+       'sin ninguna, se dice que no hay cuenta — no es lo mismo que caida');
+
+    /* Caso fino: tenia dos, eligio Yapaitas, borraron Yapaitas y queda Total.
+       Quedarse callado y usar Total seria cambiarle el negocio sin avisar. */
+    const d = S.elegirInstancia(una, 'yapaitas-borrada');
+    ok(d.estado === 'elegida_no_existe',
+       'si tu eleccion desaparecio, se avisa AUNQUE quede solo una — ' +
+       'usarla en silencio seria cambiarte de negocio sin decirlo');
+  }
+
+  {
+    /* Entradas rotas no inventan una instancia. */
+    [null, undefined, 'x', {}].forEach((malo) => {
+      ok(S0().elegirInstancia(malo, '').estado === 'ninguna',
+         'una lista que no es lista no produce una eleccion: ' +
+         JSON.stringify(malo));
+    });
+    function S0() { const w = {}; E.cargar('shalom.js', w); return w.Shalom; }
+  }
+
+  {
+    /* El motivo tiene palabras, como todos. */
+    const win = {}; E.cargar('shalom.js', win);
+    ['VARIAS_INSTANCIAS', 'INSTANCIA_NO_EXISTE'].forEach((m) => {
+      const t = win.Shalom.textoMotivo(m);
+      ok(t && !/^No se pudo consultar/.test(t),
+         m + ' tiene texto propio, no el generico');
+    });
+  }
+
+  bloque('El selector en Config: guarda tu eleccion, y no elige solo');
+
+  {
+    /* La decision ya esta probada arriba (`elegirInstancia`). Lo que se
+       prueba aqui es que la pantalla la USE y no se invente la suya: dos
+       sitios decidiendo lo mismo divergen, y divergir AQUI significa
+       registrar en el negocio equivocado. */
+    const idx = E.leer('index.html');
+    const fn = idx.slice(idx.indexOf('function verificarInstanciaShalom'),
+        idx.indexOf('function _pintarSesionShalom'));
+    ok(/Shalom\.elegirInstancia\(/.test(fn),
+       'la pantalla pregunta a `Shalom.elegirInstancia`, no decide por su cuenta');
+    ok(/instancias/.test(fn),
+       'y le pasa la lista que ahora devuelve el traductor');
+  }
+
+  {
+    /* Guardar la eleccion: en Config, como la agencia de origen. */
+    /* ⚠️ EL CUERPO EXACTO, Y SIN COMENTARIOS.
+       Dos mutaciones se me escaparon aqui por mirar "los 900 caracteres
+       siguientes": el trozo se metia en la funcion de al lado —que tambien
+       llama a save('config')— y encima incluia mis propios comentarios, que
+       mencionan las palabras que la prueba buscaba. Cuarta vez hoy con el
+       mismo error: confundir texto cercano con codigo de esta funcion. */
+    const cfg = E.leer('config.js');
+    ok(/function elegirInstanciaShalom/.test(cfg),
+       'existe el guardado de la eleccion');
+    const fn = cuerpoDeFuncion(cfg, 'elegirInstanciaShalom');
+    ok(fn.length > 0, 'y se puede aislar su cuerpo');
+    ok(/S\.shalomInstancia\s*=/.test(fn), 'se guarda en S.shalomInstancia');
+    ok(/save\(\s*['"`]config['"`]\s*\)/.test(fn),
+       "y se persiste con save('config'), igual que la agencia de origen");
+    ok(/nombre\s*:/.test(fn),
+       'se guarda tambien el nombre: un UUID suelto no le dice nada a nadie ' +
+       'el dia que esa cuenta desaparezca y haya que avisar de cual era');
+  }
+
+  {
+    /* ⚠️ Y NADIE GUARDA UNA ELECCION SIN QUE LA HAGAS. Si el panel
+       autoguardara "la primera" o "la unica conectada" al verificar,
+       habriamos vuelto al problema de raiz pero escondido en otra capa. */
+    const idx = E.leer('index.html');
+    const fn = idx.slice(idx.indexOf('function verificarInstanciaShalom'),
+        idx.indexOf('function _pintarSesionShalom'));
+    ok(!/S\.shalomInstancia\s*=/.test(fn),
+       'verificar NO guarda ninguna eleccion: solo la hace el dueño al pulsar');
   }
 };

@@ -3313,13 +3313,58 @@ function verificarInstanciaShalom(){
       LIMITE:'Se agotó la cuota del plan de Shalom.',
       ERROR_SHALOM:'Shalom respondió con un error. Reintenta en unos minutos.'
     };
+    /* ★ CUÁL DE TUS CUENTAS DE SHALOM PRO USA EL PANEL.
+       Caso real (01/10/2026): la cuenta devuelve DOS instancias y las DOS
+       conectadas —`Total` y `Yapaitas`, dos negocios distintos—. Elegir una
+       por su cuenta habría registrado el envío de un cliente en la cuenta
+       del otro negocio, cobrado a ellos, y nadie se habría enterado hasta
+       que el paquete no apareciera.
+       La decisión vive en `Shalom.elegirInstancia`, UN solo sitio: dos
+       pantallas decidiendo lo mismo divergen, y divergir aquí cuesta eso. */
+    const guardada = (window.S && S.shalomInstancia && S.shalomInstancia.id) || '';
+    const elec = (window.Shalom && Shalom.elegirInstancia)
+      ? Shalom.elegirInstancia((r && r.instancias) || [], guardada) : null;
+
+    if(elec && elec.estado==='falta_elegir'){
+      _pintarElectorInstancia(caja, elec.instancias, '',
+        'Tienes más de una cuenta de Shalom Pro. <b>Elige cuál usa el panel</b> — '+
+        'registrar en la equivocada le cobra al otro negocio.');
+      return;
+    }
+    if(elec && elec.estado==='elegida_no_existe'){
+      /* No se cae a otra, ni aunque quede una sola: sería cambiarte de
+         negocio sin avisar. */
+      _pintarElectorInstancia(caja, elec.instancias, '',
+        '⚠️ La cuenta que elegiste (<b>'+esc((S.shalomInstancia&&S.shalomInstancia.nombre)||guardada)+
+        '</b>) ya no está. <b>No se cambia sola.</b> Elige otra:');
+      return;
+    }
+
     if(r && r.ok===false && nuestros[r.motivo]){
       caja.innerHTML='<span style="color:#f87171">❌ '+nuestros[r.motivo]+'</span>';
       return;
     }
 
-    const ses=r&&r.sesion;
-    if(ses&&ses.conocido){ _pintarSesionShalom(caja,ses); return; }
+    const ses=(elec && elec.estado==='elegida')
+      ? {conocido:true, conectada:elec.instancia.conectada,
+         usuario:elec.instancia.usuario, nombre:elec.instancia.nombre,
+         id:elec.instancia.id, url:null, enLogin:null}
+      : (r&&r.sesion);
+    if(ses&&ses.conocido){
+      _pintarSesionShalom(caja,ses);
+      if(elec && elec.estado==='elegida' && elec.instancias.length>1){
+        caja.innerHTML += '<div style="margin-top:8px;text-align:right">'+
+          '<button type="button" onclick="verificarInstanciaShalom._cambiar()" '+
+          'style="background:none;border:none;color:#58a6ff;cursor:pointer;'+
+          'font-family:inherit;font-size:11px;text-decoration:underline">'+
+          'Cambiar de cuenta</button></div>';
+        verificarInstanciaShalom._cambiar=function(){
+          _pintarElectorInstancia(caja, elec.instancias, elec.instancia.id,
+            'Elige qué cuenta de Shalom Pro usa el panel:');
+        };
+      }
+      return;
+    }
 
     // Forma no reconocida: se enseña tal cual y no se afirma nada.
     _pintarRespuestaCruda(caja,r,
@@ -3330,6 +3375,29 @@ function verificarInstanciaShalom(){
     btn.disabled=false;
     btn.textContent='🔌 Verificar sesión de Shalom Pro';
   });
+}
+
+/* La lista de cuentas de Shalom Pro, para que el dueño elija UNA.
+   No marca ninguna por defecto a propósito: un radio preseleccionado es una
+   elección que nadie hizo, y aquí elegir mal cuesta registrar el envío de un
+   cliente en la cuenta de otro negocio. */
+function _pintarElectorInstancia(caja, lista, idActual, titulo){
+  const filas=(lista||[]).map(function(x){
+    const esta = x.id===idActual;
+    return '<button type="button" onclick="elegirInstanciaShalom('+
+      JSON.stringify(JSON.stringify({id:x.id,nombre:x.nombre}))+')" '+
+      'style="display:block;width:100%;text-align:left;margin-top:6px;padding:9px 10px;'+
+      'border-radius:9px;cursor:pointer;font-family:inherit;background:'+
+      (esta?'rgba(34,197,94,.12)':'var(--bg2)')+';border:1px solid '+
+      (esta?'rgba(34,197,94,.35)':'var(--bd)')+'">'+
+      '<div style="font-size:12.5px;font-weight:700;color:var(--text)">'+
+      (esta?'✅ ':'')+esc(x.nombre||'(sin nombre)')+'</div>'+
+      '<div style="font-size:10.5px;color:#8b949e;margin-top:2px">'+
+      esc(x.usuario||'')+' · '+(x.conectada?'🟢 conectada':'🔴 desconectada')+
+      '</div></button>';
+  }).join('');
+  caja.innerHTML='<div style="font-size:12px;color:#f59e0b;line-height:1.5">'+
+    titulo+'</div>'+filas;
 }
 
 /* Pinta el resultado cuando la forma SÍ es la conocida. */
@@ -4665,10 +4733,10 @@ render();
      lo usa. config.js, print.js y voz.js preguntan por los pedidos marcados,
      así que siguen yendo detrás. El orden de carga es un contrato
      (ver docs/ARQUITECTURA.md). -->
-<script src="config.js?v=37"></script>
+<script src="config.js?v=38"></script>
 <script src="print.js?v=16"></script>
 <script src="notify.js?v=5"></script>
-<script src="shalom.js?v=19"></script>
+<script src="shalom.js?v=20"></script>
 <script src="tracking.js?v=20"></script>
 <script src="floatpanel.js?v=4"></script>
 <script src="delivery.js?v=8"></script>

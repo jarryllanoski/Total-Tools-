@@ -803,6 +803,23 @@ function pickOrigen(i){
   toast('🏢 Origen: '+el.agenciaNombre);
 }
 
+/* ★ CUAL de tus cuentas de Shalom Pro usa el panel.
+   Se guarda el id Y EL NOMBRE. El id solo es un UUID que no le dice nada a
+   nadie: el nombre es lo que permite avisar con sentido el dia que esa
+   cuenta desaparezca ("la cuenta Total ya no esta"), en vez de escupir un
+   identificador.
+   La decision de CUAL no se toma aqui — vive en `Shalom.elegirInstancia`,
+   un solo sitio. Esto solo persiste lo que el dueño eligio. */
+function elegirInstanciaShalom(json){
+  let el=null;
+  try{ el=JSON.parse(json); }catch(e){}
+  if(!el||!el.id){ toast('⚠️ Esa cuenta no tiene un id utilizable'); return; }
+  S.shalomInstancia={id:String(el.id), nombre:String(el.nombre||'')};
+  save('config');
+  toast('🔌 Cuenta de Shalom: '+(el.nombre||el.id));
+  if(typeof verificarInstanciaShalom==='function') verificarInstanciaShalom();
+}
+
 function quitarOrigen(){
   S.agenciaOrigen = null;
   save('config');

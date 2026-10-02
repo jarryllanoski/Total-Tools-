@@ -607,8 +607,35 @@ function traducirInstancias(j) {
   if (!j || typeof j !== "object" || Array.isArray(j)) return raro;
   const lista = j.instances;
   if (!Array.isArray(lista)) return raro;
-  if (!lista.length) return {ok: false, motivo: "SIN_INSTANCIA"};
-  if (lista.length > 1) return {ok: false, motivo: "VARIAS_INSTANCIAS"};
+
+  /* ★ LA LISTA SALE SIEMPRE, incluso cuando la respuesta es una negativa.
+     Antes, con varias instancias, esto devolvía solo `VARIAS_INSTANCIAS` y
+     TIRABA los datos — así que el panel ni siquiera podía ofrecerte la
+     elección que le estaba pidiendo. La negativa se queda intacta: lo que
+     se añade es con qué decidir.
+     En el vocabulario del panel y no en el de Shalom: `isLoggedIn` y `name`
+     no cruzan esta frontera, que es la razón de ser de este archivo. */
+  const tx = (x) => (typeof x === "string" && x ? x : null);
+  const instancias = lista
+      .filter((x) => x && typeof x === "object" && !Array.isArray(x))
+      .map((x) => ({
+        id: tx(x.id),
+        nombre: tx(x.name),
+        usuario: tx(x.username),
+        conectada: x.isLoggedIn === true,
+      }))
+      .filter((x) => x.id);
+
+  if (!lista.length) return {ok: false, motivo: "SIN_INSTANCIA", instancias};
+  /* ⚠️ Y CON VARIAS NO SE ELIGE, aunque ahora haya lista. Caso real del
+     01/10/2026: dos instancias conectadas, `Total` y `Yapaitas`, de dos
+     negocios distintos. Elegir "la primera" o "la conectada" habría
+     registrado el envío de un cliente en la cuenta del otro negocio, cobrado
+     a ellos, y nadie se habría enterado hasta que el paquete no apareciera.
+     Quien elige es el dueño, en Config. */
+  if (lista.length > 1) {
+    return {ok: false, motivo: "VARIAS_INSTANCIAS", instancias};
+  }
   const it = lista[0];
   if (!it || typeof it !== "object" || Array.isArray(it)) return raro;
   if (typeof it.isLoggedIn !== "boolean") return raro;
@@ -633,6 +660,7 @@ function traducirInstancias(j) {
          Para saberlo hace falta `POST /instances/status`. */
       enLogin: null,
     },
+    instancias,
   };
 }
 

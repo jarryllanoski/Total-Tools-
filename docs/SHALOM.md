@@ -803,6 +803,44 @@ RENIEC: nulo es nulo, nunca el texto `"null"`.
 Se compara **la ruta**, no la url entera, y sin la barra final: buscar
 `"/login"` dentro del texto daría por deslogueado un `/panel/logins`.
 
+### Cuál de tus cuentas usa el panel — y por qué no se decide sola
+
+Caso real del **01/10/2026**: la cuenta devuelve **dos instancias y las dos
+conectadas**.
+
+| Instancia | Correo |
+|---|---|
+| **Total** | Totaltools@gmail.com |
+| Yapaitas | ramossuyin@gmail.com |
+
+Son **dos negocios distintos**. "La primera" o "la que está conectada" no
+desempatan. Elegir por cuenta propia habría acertado o no al azar, y el día
+que fallara habría registrado el envío de un cliente **en la cuenta del otro
+negocio, cobrado a ellos** — sin que nadie se enterara hasta que el paquete
+no apareciera.
+
+`Shalom.elegirInstancia(lista, idGuardado)` tiene **cinco estados**:
+
+| Estado | Qué significa |
+|---|---|
+| `ninguna` | no hay cuenta de Shalom Pro |
+| `una` | hay una sola: se usa, sin preguntar (como siempre) |
+| `falta_elegir` | hay varias y no elegiste |
+| `elegida` | tu elección sigue existiendo |
+| `elegida_no_existe` | tu elección ya no está. **Se dice.** |
+
+⚠️ **`elegida_no_existe` no se cae a otra instancia, ni aunque quede una
+sola.** Caer a otra es cambiarte de negocio en silencio.
+
+Y resuelve la razón por la que el id **no** se guardaba —*"un id guardado
+puede quedar viejo"*—: ahora hace falta guardarlo, así que el riesgo se
+**gestiona** (se comprueba contra la lista viva en cada consulta) en vez de
+evitarse.
+
+El traductor **entrega la lista incluso cuando se niega**: antes devolvía
+solo `VARIAS_INSTANCIAS` y tiraba los datos, así que el panel ni siquiera
+podía ofrecer la elección que estaba pidiendo.
+
 ### ⚠️ Un 403 de instancia NO es una clave bloqueada
 
 Medido con un `instanceId` inventado:

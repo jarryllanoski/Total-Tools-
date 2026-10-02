@@ -204,6 +204,56 @@
        uno tras otro sin decir por qué. Esto contesta la pregunta correcta. */
     estadoInstancia: function () { return _pedir({op: 'instances'}); },
 
+    /* ★ CUAL DE TUS INSTANCIAS USA EL PANEL — y nunca se decide sola.
+       ───────────────────────────────────────────────────────────────
+       ⚠️ POR QUE, con el caso real del 01/10/2026. La cuenta devuelve DOS
+       instancias y LAS DOS CONECTADAS:
+           Total     — Totaltools@gmail.com
+           Yapaitas  — ramossuyin@gmail.com
+       Son dos negocios distintos. Elegir "la primera" o "la que está
+       conectada" habría acertado o no AL AZAR, y el día que fallara habría
+       registrado el envío de un cliente en la cuenta del OTRO negocio,
+       cobrado a ellos, sin que nadie se enterara hasta que el paquete no
+       apareciera.
+
+       Cinco estados, y cada uno pide una cosa distinta:
+         ninguna            → no hay cuenta de Shalom Pro
+         una                → hay una sola: se usa, sin preguntar
+         falta_elegir       → hay varias y no elegiste
+         elegida            → tu elección sigue existiendo
+         elegida_no_existe  → tu elección ya no está. SE DICE.
+
+       ⚠️ `elegida_no_existe` NO se cae a otra instancia, ni siquiera si
+       queda una sola. Caer a otra es cambiarte de negocio en silencio.
+       Y esto resuelve la razón por la que el id NO se guardaba: un id
+       guardado puede quedar viejo. Guardarlo ahora hace falta, así que el
+       riesgo se gestiona —se comprueba contra la lista viva cada vez— en
+       vez de evitarse.
+       @param {Array} lista instancias traducidas
+       @param {string} idGuardado la elección de Config, si hay
+       @return {Object} {estado, instancia, instancias} */
+    elegirInstancia: function (lista, idGuardado) {
+      var L = Array.isArray(lista) ? lista.filter(function (x) {
+        return x && typeof x === 'object' && x.id;
+      }) : [];
+      var id = String(idGuardado || '').trim();
+      var vacio = {estado: 'ninguna', instancia: null, instancias: L};
+      if (id) {
+        var hallada = null;
+        for (var i = 0; i < L.length; i++) {
+          if (L[i].id === id) { hallada = L[i]; break; }
+        }
+        if (hallada) return {estado: 'elegida', instancia: hallada, instancias: L};
+        // No está. Y NO se sustituye por otra, pase lo que pase.
+        return {estado: 'elegida_no_existe', instancia: null, instancias: L};
+      }
+      if (!L.length) return vacio;
+      if (L.length === 1) {
+        return {estado: 'una', instancia: L[0], instancias: L};
+      }
+      return {estado: 'falta_elegir', instancia: null, instancias: L};
+    },
+
     /* ✅ CONECTADO · POST /instances/status — 2026-10-01
        El estado de UNA instancia. Lo que aporta sobre `estadoInstancia()`
        es `url`: dónde quedó parado el navegador headless de Shalom. Si
@@ -277,6 +327,8 @@
         /* Medido: con un instanceId malo, Shalom responde 403 "Invalid API
            Key or instance access". Antes se traducía como BLOQUEADO y
            mandaba a revisar la clave, que estaba perfecta. */
+        VARIAS_INSTANCIAS: 'Tienes más de una cuenta de Shalom Pro. Elige en Config cuál usa el panel: registrar en la equivocada cobra al otro negocio.',
+        INSTANCIA_NO_EXISTE: 'La cuenta de Shalom Pro que elegiste ya no está. Elige otra en Config — no se cambia sola, porque sería cambiarte de negocio sin avisar.',
         SIN_INSTANCIA_VALIDA: 'El id de instancia de Shalom Pro no sirve. La clave de la API puede estar bien: compruébala con «Verificar sesión».',
         LIMITE:        'Se agotó la cuota del plan de Shalom.',
         ERROR_SHALOM:  'Shalom respondió con un error. Reintenta en unos minutos.',
