@@ -497,6 +497,16 @@
            la recordaría, pero el servidor diría "falta la cuenta de Shalom
            Pro" con la cuenta ya elegida, y nadie entendería por qué. */
         shalomInstancia:data.shalomInstancia||null,
+        /* ★ El interruptor del simulacro de REGISTRO. Hermana de `config`
+           por lo mismo que las dos de arriba, y aquí sí o sí: lo lee la
+           Cloud Function. Si no viajara, apagarlo en el panel no lo
+           apagaría en el servidor y el registro se quedaría en simulacro
+           para siempre sin que nada lo explicara.
+           ⚠️ Se guarda tal cual, y el servidor solo lo apaga con un `false`
+           EXPLÍCITO: ausente, nulo o con basura deja el simulacro puesto.
+           En una operación que cuesta dinero, la duda se resuelve del lado
+           de no gastar. */
+        shalomRegistroSimulacro:data.shalomRegistroSimulacro,
         ts:saveTs // usar saveTs fijo para que _S_TS y config.ts coincidan tras la escritura
       }}];
       for(const s of(data.shipments||[])){

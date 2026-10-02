@@ -294,6 +294,27 @@ module.exports = async ({bloque, ok}) => {
     'al abrir un pedido con DNI, se consulta RENIEC (la cache lo hace gratis)');
   }
 
+  bloque('El interruptor del simulacro llega a Firestore');
+
+  {
+    /* Mismo fallo que con la cuenta de Shalom, y lo busque a proposito en
+       vez de esperar a tropezarlo: el subidor de config lleva una lista
+       EXPLICITA de campos. Si el interruptor no esta en ella, apagarlo en
+       el panel no lo apaga en el servidor — y el registro real se quedaria
+       en simulacro para siempre, sin que nada lo explicara. */
+    const idx = E.leer('index.html');
+    const i = idx.indexOf('agenciaOrigen:data.agenciaOrigen');
+    const subida = idx.slice(i - 1400, i + 2000);
+    ok(/shalomRegistroSimulacro\s*:/.test(subida),
+       'el interruptor del simulacro viaja a Firestore');
+
+    /* Y el DEFECTO es simulacro: solo se apaga si vale exactamente false.
+       Un campo ausente, nulo o con basura deja el simulacro puesto. */
+    const fidx = E.leer('functions/index.js');
+    ok(/shalomRegistroSimulacro !== false/.test(fidx),
+       'y solo se apaga con un false explicito: ausente o raro = simulacro');
+  }
+
   bloque('La orquestacion: el navegador manda un id, el servidor hace todo');
 
   /* Un mundo de mentira. Todo lo que toca disco o red se inyecta, asi que la
