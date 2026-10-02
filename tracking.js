@@ -518,6 +518,20 @@ function _injectOverlays() {
 function _estadoChip(ship) {
   var st = ship.trackingStatus;
   if (!st || st === '—') {
+    /* ★ EL HUECO ENTRE REGISTRAR Y RASTREAR.
+       Al registrar en Shalom el envío ya EXISTE —tiene guía, código y
+       monto— pero todavía no se ha movido, así que no hay nada que
+       rastrear. Decir "Sin consultas aún — presiona Consultar" invita a
+       consultar algo que aún no puede responder, y calla lo único que
+       importa: que está registrado y que hay un plazo para dejarlo.
+       En cuanto Shalom lo mueve, manda el rastreo: el estado del
+       transporte es más fresco que "lo registré yo". */
+    if (String(ship.shalomEstado || '').toUpperCase() === 'REGISTRADO') {
+      return '<div class="trk-chip trk-chip-pend" style="margin-top:4px">'+
+        '📦 Registrado en Shalom'+
+        '<span style="opacity:.75;font-weight:400"> — déjalo en la agencia'+
+        '</span></div>';
+    }
     return '<div style="font-size:11px;color:#8b949e;margin-top:4px;padding:4px 0">Sin consultas aún — presiona Consultar</div>';
   }
   var u = st.toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');

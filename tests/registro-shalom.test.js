@@ -137,6 +137,40 @@ module.exports = async ({bloque, ok}) => {
        'con un solo apellido se registra: hay personas sin apellido materno');
   }
 
+  bloque('Un envio ya registrado se CONGELA: la clave no se toca');
+
+  {
+    /* ⚠️ LA CLAVE YA ESTA EN SHALOM. Cambiarla en el panel le daria al
+       cliente cuatro digitos que no abren nada, y el paquete se queda en la
+       agencia. `_claveAuto` ya lo respetaba, pero el boton 🎲 no: podia
+       regenerarla sobre un envio registrado. Lo vio el dueño.
+
+       Y la AGENCIA DE DESTINO igual: Shalom ya la tiene. Cambiarla aqui
+       haria que la etiqueta diga una cosa y el paquete vaya a otra. */
+    ok(R.estaRegistrado({shalomGuia: '98173469'}) === true,
+       'con guia, el envio esta registrado');
+    ok(R.estaRegistrado({shalomGuia: ''}) === false, 'sin guia, no');
+    ok(R.estaRegistrado({}) === false && R.estaRegistrado(null) === false,
+       'y sin pedido tampoco');
+
+    /* LA MISMA REGLA que usa el candado del registro: si fueran dos, el dia
+       que divergieran una congelaria y la otra dejaria registrar. */
+    const conGuia = Object.assign({}, PEDIDO_OK, {shalomGuia: '98173469'});
+    ok(R.faltantes(conGuia, CFG_OK).length > 0 &&
+       R.estaRegistrado(conGuia) === true,
+    'el candado del registro y el congelado usan la MISMA regla');
+  }
+
+  {
+    const cfg = E.leer('config.js');
+    const fn = cfg.slice(cfg.indexOf('function regenClaveRecojo'),
+        cfg.indexOf('function regenClaveRecojo') + 700);
+    ok(/estaRegistrado|shalomGuia/.test(fn),
+       'el boton de regenerar comprueba si ya esta registrado');
+    ok(/toast/.test(fn),
+       'y si lo esta, lo DICE en vez de no hacer nada en silencio');
+  }
+
   bloque('El cuerpo que se manda, campo por campo');
 
   {

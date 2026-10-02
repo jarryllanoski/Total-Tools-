@@ -36,6 +36,36 @@ module.exports = (t) => {
       puente)(win, dom.doc, {getItem: () => null, setItem() {}}, setTimeout, clearTimeout, console);
   const T = win.__t;
 
+  bloque('Un envio recien registrado dice REGISTRADO, no "sin consultas"');
+
+  {
+    /* ⚠️ EL HUECO ENTRE REGISTRAR Y RASTREAR. Al registrar en Shalom el
+       envio EXISTE —tiene guia, codigo y monto— pero todavia no se ha
+       movido, asi que no hay nada que rastrear. El chip decia "Sin
+       consultas aun — presiona Consultar", que invita a consultar algo que
+       aun no puede responder, y no dice lo unico que importa: que ya esta
+       registrado y que hay un plazo para dejarlo. */
+    const reg = T._estadoChip({id: '1', shalomEstado: 'REGISTRADO',
+      shalomGuia: '98173469'});
+    ok(/REGISTRAD/i.test(reg),
+       'con shalomEstado REGISTRADO y sin rastreo, el chip lo dice');
+    ok(!/Sin consultas/i.test(reg),
+       'y ya no invita a consultar algo que todavia no puede responder');
+
+    /* En cuanto Shalom empieza a moverlo, manda el rastreo de verdad: el
+       estado del transporte es mas fresco que "lo registre yo". */
+    const mov = T._estadoChip({id: '1', shalomEstado: 'REGISTRADO',
+      trackingStatus: 'En transito',
+      trackingLastUpdate: '2026-10-02T10:00:00'});
+    ok(/transito/i.test(mov) && !/REGISTRAD/i.test(mov),
+       'y cuando ya se movio, manda el rastreo — no se queda en REGISTRADO');
+
+    /* Un pedido de siempre, sin nada de esto, se comporta igual que ayer. */
+    const viejo = T._estadoChip({id: '1'});
+    ok(/Sin consultas/i.test(viejo),
+       'un pedido sin registrar sigue diciendo lo de siempre');
+  }
+
   bloque('El chip muestra la fecha del cambio, siempre');
   {
     let chip = T._estadoChip({id: '1', trackingStatus: 'En tránsito',

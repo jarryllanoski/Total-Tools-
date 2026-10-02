@@ -489,6 +489,7 @@ function openForm(id){
     const s=S.shipments.find(x=>x.id===id);
     if(s){
       if($('fShalomClave'))  $('fShalomClave').value  = s.shalomClave||'';
+    if(typeof _congelarSiRegistrado==='function') _congelarSiRegistrado(s);
       if($('fShalomGuia'))   $('fShalomGuia').value   = s.trackingOrderNumber||s.shalomGuia||'';
       if(window.Guias) Guias.vigilar('fShalomGuia', id); // avisos: formato y guía repetida
       if($('fShalomCodigo')) $('fShalomCodigo').value = s.trackingOrderCode||s.shalomCodigo||'';
@@ -725,9 +726,44 @@ function onAddrInput(val){
    cliente con un número que no abre nada. */
 function regenClaveRecojo(){
   const el = $('fShalomClave'); if(!el) return;
+  /* ⚠️ UN ENVÍO YA REGISTRADO NO CAMBIA DE CLAVE. Esos cuatro dígitos ya
+     están en Shalom: generar otros aquí le daría al cliente un número que
+     no abre nada y el paquete se quedaría en la agencia.
+     `_claveAuto` ya lo respetaba; este botón no, y se podía pulsar. Lo vio
+     el dueño en la primera prueba real.
+     Y SE DICE, no se ignora en silencio: un botón que no hace nada y no
+     explica por qué se vuelve a pulsar. */
+  const _g = ($('fShalomGuia')||{value:''}).value.trim();
+  if(_g || (window.RegistroShalom &&
+      RegistroShalom.estaRegistrado({shalomGuia:_g}))){
+    toast('🔒 Ya está registrado en Shalom con la clave '+el.value+
+      ' — cambiarla aquí le daría al cliente un número que no abre nada.');
+    return;
+  }
   if(!window.Shalom || typeof Shalom.claveRecojo !== 'function') return;
   el.value = Shalom.claveRecojo();
   toast('🔑 Clave nueva: '+el.value);
+}
+
+/* Congela lo que Shalom ya tiene. Se llama al abrir el formulario.
+   La clave y la agencia de destino dejan de poder cambiarse en cuanto hay
+   guía: Shalom las tiene, y que el panel diga una cosa y el paquete vaya a
+   otra es peor que no poder editarlo. */
+function _congelarSiRegistrado(s){
+  const reg = window.RegistroShalom ?
+    RegistroShalom.estaRegistrado(s||{}) : !!(s&&s.shalomGuia);
+  const cl = $('fShalomClave');
+  if(cl){
+    cl.readOnly = reg;
+    cl.style.opacity = reg ? '.65' : '';
+    cl.title = reg ? 'Ya registrado en Shalom: esta clave no se cambia' : '';
+  }
+  const btn = $('btnRegenClave');
+  if(btn) btn.style.display = reg ? 'none' : '';
+  const ag = $('fAddr');
+  if(ag && reg){
+    ag.title = 'Ya registrado en Shalom: la agencia de destino no se cambia';
+  }
 }
 
 function _claveAuto(){

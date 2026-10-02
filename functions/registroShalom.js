@@ -117,6 +117,26 @@
   }
 
   /**
+   * ¿Este envío ya está registrado en Shalom?
+   *
+   * LA GUÍA ES LA PRUEBA. Si existe, Shalom ya creó el envío: se pagó, no
+   * se puede anular, y hay cosas que dejan de poder cambiarse —la clave de
+   * recojo y la agencia de destino, porque Shalom ya las tiene y
+   * cambiarlas aquí le daría al cliente datos que no sirven.
+   *
+   * Una sola regla para el candado del registro Y para el congelado del
+   * formulario: si fueran dos, el día que divergieran una congelaría y la
+   * otra dejaría registrar de nuevo.
+   *
+   * @param {Object} pedido el pedido
+   * @return {boolean} true si ya tiene guía de Shalom
+   */
+  function estaRegistrado(pedido) {
+    const p = (pedido && typeof pedido === "object") ? pedido : {};
+    return !!_txt(p.shalomGuia);
+  }
+
+  /**
    * TODO lo que impide registrar este pedido, en palabras.
    *
    * Devuelve una lista de textos, no un booleano: con un botón que cuesta
@@ -137,7 +157,7 @@
        cobro que nadie puede anular. En la otra aplicación del dueño este
        candado no existe: su pedido #1 tiene guía 98014733 y el botón
        "Registrar envío Shalom" sigue ahí. */
-    if (_txt(p.shalomGuia)) {
+    if (estaRegistrado(p)) {
       f.push("Este pedido ya tiene guía de Shalom (" + _txt(p.shalomGuia) +
         "): ya está registrado y no se vuelve a registrar.");
       return f; // lo demás ya no importa
@@ -566,5 +586,5 @@
 
   return {ESTADO_PUERTA, CAJAS, CONTENIDOS, clasificar, contenidoDe,
     faltantes, cuerpo, resultado, buscarEnPendientes, orquestar,
-    reniecDe, guiaDe, camposDe, recuperarEnvio};
+    reniecDe, guiaDe, camposDe, recuperarEnvio, estaRegistrado};
 });
