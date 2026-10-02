@@ -1049,6 +1049,30 @@ function saveShipment(){
   data.pkgLargo=_pkgL; data.pkgAncho=_pkgA; data.pkgAlto=_pkgH; data.pkgPeso=_pkgP;
   const _pkgClasif=(window.Shalom&&Shalom.clasificarPaquete)?Shalom.clasificarPaquete(_pkgL,_pkgA,_pkgH,_pkgP):null;
   data.pkgTipo=_pkgClasif?_pkgClasif.tipo:'';
+
+  /* ★ EL NOMBRE DE RENIEC, PARTIDO, SE GUARDA CON EL PEDIDO.
+     Hasta ahora la consulta vivía solo en `window._dniUltima` —memoria
+     volátil— y lo único que quedaba era el nombre COMPLETO en el campo de
+     texto. Pero `POST /account/register` pide el nombre en TRES campos
+     (`name`, `firstname`, `lastname`), y partir "JOSE LUIS DE LA CRUZ" a
+     ojo se equivoca: es exactamente lo que hace la otra aplicación del
+     dueño, que con un nombre de una sola palabra manda el mismo valor en
+     dos campos.
+
+     Sin esto, la reja del registro habría dicho "falta el nombre de RENIEC"
+     en TODOS los pedidos, con el DNI consultado y el nombre a la vista —y
+     se habría leído como un fallo del registro cuando el fallo estaba tres
+     pasos antes.
+
+     ⚠️ SOLO SI CORRESPONDE AL DNI QUE SE ESTÁ GUARDANDO. Si consultaste un
+     DNI y luego escribiste otro, pegar el nombre del primero sería darle a
+     Shalom el nombre de otra persona: peor que no tener ninguno.
+
+     Y los pedidos de ayer no se tocan: solo gana el campo el que se guarda
+     de hoy en adelante. */
+  const _rn = window.RegistroShalom
+    ? RegistroShalom.reniecDe(window._dniUltima, data.dni) : null;
+  if(_rn) data.reniec = _rn;
   // (La cola del seguimiento automático se retiró: escribía
   // trackingWebProximaConsulta para el Motor B, que ya no existe. Ver shalom.js.)
   // ★ DELIVERY: motorizado (nombre, teléfono) + link inDriver. Solo se tocan si el

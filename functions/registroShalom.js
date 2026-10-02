@@ -314,6 +314,33 @@
   }
 
   /**
+   * El nombre de RENIEC que corresponde a ESTE pedido, o null.
+   *
+   * ⚠️ SOLO SI EL DNI COINCIDE. La consulta a RENIEC vive en memoria
+   * mientras el formulario está abierto; si consultaste un DNI y luego
+   * escribiste otro, pegar el nombre del primero sería darle a Shalom el
+   * nombre de OTRA persona — y un envío a nombre de quien no es, no lo
+   * puede recoger nadie. Peor que no tener nombre.
+   *
+   * @param {Object} persona lo que devolvió RENIEC
+   * @param {*} dniDelPedido el DNI que se está guardando
+   * @return {Object} {dni, nombres, apePaterno, apeMaterno} o null
+   */
+  function reniecDe(persona, dniDelPedido) {
+    const pe = (persona && typeof persona === "object") ? persona : null;
+    const dni = _dig(dniDelPedido);
+    if (!pe || dni.length !== 8) return null;
+    if (_dig(pe.dni) !== dni) return null;
+    if (!_txt(pe.nombres)) return null;
+    return {
+      dni: dni,
+      nombres: _txt(pe.nombres),
+      apePaterno: _txt(pe.apePaterno),
+      apeMaterno: _txt(pe.apeMaterno),
+    };
+  }
+
+  /**
    * Lo que se guarda en el pedido a partir de un envío ya creado.
    * @param {Object} env el envío, como lo devuelve Shalom
    * @return {Object} los campos a escribir
@@ -421,5 +448,6 @@
   }
 
   return {ESTADO_PUERTA, CAJAS, CONTENIDOS, clasificar, contenidoDe,
-    faltantes, cuerpo, resultado, buscarEnPendientes, orquestar};
+    faltantes, cuerpo, resultado, buscarEnPendientes, orquestar,
+    reniecDe};
 });

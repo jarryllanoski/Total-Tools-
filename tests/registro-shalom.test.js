@@ -224,6 +224,46 @@ module.exports = async ({bloque, ok}) => {
        'un "ok" sin guia es duda, no exito: sin guia no hay envio que mostrar');
   }
 
+  bloque('El nombre de RENIEC se GUARDA en el pedido, o no sirve de nada');
+
+  {
+    /* ⚠️ BLOQUEANTE QUE CASI DEJA EL REGISTRO INUTIL.
+       `_dniReniec` consulta RENIEC, deja la persona en `window._dniUltima`
+       —memoria volatil— y rellena el campo de nombre con el nombre
+       COMPLETO. El nombre PARTIDO nunca llegaba al pedido.
+
+       Y el registro lo necesita partido en tres: `name`, `firstname`,
+       `lastname`. Sin guardarlo, la reja habria dicho "falta el nombre de
+       RENIEC" en TODOS los pedidos, con el DNI consultado y el nombre a la
+       vista. Se habria leido como un fallo del registro cuando el fallo
+       estaba tres pasos antes. */
+    const cfg = E.leer('config.js');
+    ok(/data\.reniec\s*=/.test(cfg),
+       'al guardar un pedido se guarda tambien el nombre partido de RENIEC');
+    ok(/RegistroShalom\.reniecDe\(/.test(cfg),
+       'y la regla la decide el modulo probado, no la pantalla');
+
+    /* ⚠️ DE COMPORTAMIENTO. Mi primera version comprobaba que apareciera la
+       palabra `dni` cerca, y la mutacion que QUITABA la comprobacion
+       sobrevivio: `dni` aparecia igual en `data.dni`. Enesima vez. La regla
+       se movio al modulo justo para poder EJECUTARLA. */
+    const persona = {dni: '73483547', nombres: 'JARLYN',
+      apePaterno: 'LLANOS', apeMaterno: 'ARTEAGA'};
+    const r1 = R.reniecDe(persona, '73483547');
+    ok(r1 && r1.nombres === 'JARLYN' && r1.apePaterno === 'LLANOS',
+       'con el DNI que coincide, se guarda el nombre partido');
+    ok(R.reniecDe(persona, '71613965') === null,
+       '⚠️ con OTRO DNI no se guarda: seria darle a Shalom el nombre de otra ' +
+       'persona, y un envio a nombre de quien no es no lo recoge nadie');
+    ok(R.reniecDe(null, '73483547') === null, 'sin consulta, nada');
+    ok(R.reniecDe(persona, '') === null, 'sin DNI, nada');
+    ok(R.reniecDe({dni: '73483547', nombres: ''}, '73483547') === null,
+       'y una consulta sin nombre tampoco sirve');
+    ok(R.reniecDe({dni: '73483547', nombres: 'ANA', apePaterno: 'TORRES',
+      apeMaterno: ''}, '73483547').apeMaterno === '',
+    'un apellido materno vacio se guarda vacio, no se inventa');
+  }
+
   bloque('La orquestacion: el navegador manda un id, el servidor hace todo');
 
   /* Un mundo de mentira. Todo lo que toca disco o red se inyecta, asi que la
