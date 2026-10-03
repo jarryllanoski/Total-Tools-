@@ -1172,11 +1172,11 @@
       <div class="fg"><label class="fl">Teléfono *</label><input class="fi phone-norm" id="fPhone" placeholder="9XXXXXXXX o @usuario" inputmode="text" oninput="if(typeof _clienteHintUpdate==='function')_clienteHintUpdate()"></div>
     </div>
     <div class="frow">
-      <div class="fg"><label class="fl">DNI</label><input class="fi" id="fDni" placeholder="12345678" maxlength="8" inputmode="numeric" oninput="if(typeof _clienteHintUpdate==='function')_clienteHintUpdate();if(typeof _dniReniec==='function')_dniReniec(this.value)"><div id="fDniReniec" style="display:none"></div></div>
+      <div class="fg"><label class="fl">DNI <span id="fDniMarca"></span></label><input class="fi" id="fDni" placeholder="12345678" maxlength="8" inputmode="numeric" oninput="if(typeof _clienteHintUpdate==='function')_clienteHintUpdate();if(typeof _dniReniec==='function')_dniReniec(this.value)"><div id="fDniReniec" style="display:none"></div></div>
       <div class="fg" id="fEncAgenciaGroup" style="display:none"><label class="fl">Agencia</label><input class="fi" id="fEncAgencia" placeholder="Nombre de la agencia"></div>
     </div>
     <div id="clienteHint" style="display:none;margin-bottom:11px"></div>
-    <div class="fg" style="position:relative"><label class="fl" id="fAddrLabel">Dirección *</label><input class="fi" id="fAddr" placeholder="Av., Mz., Lote..." autocomplete="off" oninput="onAddrInput(this.value)" onfocus="onAddrInput(this.value)"><div id="shDrop" style="display:none;position:absolute;left:0;right:0;top:100%;z-index:50;background:var(--bg2);border:1px solid var(--bd);border-radius:9px;margin-top:4px;max-height:230px;overflow-y:auto;box-shadow:0 8px 24px rgba(0,0,0,.4)"></div><div id="fAgenciaEstado" style="display:none"></div></div>
+    <div class="fg" style="position:relative"><label class="fl" id="fAddrLabel"><span id="fAddrLabelTxt">Dirección *</span> <span id="fAgenciaMarca"></span></label><input class="fi" id="fAddr" placeholder="Av., Mz., Lote..." autocomplete="off" oninput="onAddrInput(this.value)" onfocus="onAddrInput(this.value)"><div id="shDrop" style="display:none;position:absolute;left:0;right:0;top:100%;z-index:50;background:var(--bg2);border:1px solid var(--bd);border-radius:9px;margin-top:4px;max-height:230px;overflow-y:auto;box-shadow:0 8px 24px rgba(0,0,0,.4)"></div><div id="fAgenciaEstado" style="display:none"></div></div>
     <div class="frow">
       <div class="fg"><label class="fl">Courier</label><select class="fs" id="fCourier"></select></div>
       <div class="fg"><label class="fl">Fecha</label><input class="fi" id="fDate" type="date"></div>
@@ -1208,36 +1208,47 @@
         <div class="fg"><label class="fl">Número de guía</label><input class="fi" id="fShalomGuia" placeholder="Ej: 82037653" style="font-family:monospace" inputmode="numeric" oninput="if(typeof _updateShalomMic==='function')_updateShalomMic()"></div>
         <div class="fg"><label class="fl">Código</label><input class="fi" id="fShalomCodigo" placeholder="TT9C" style="font-family:monospace;text-transform:uppercase" oninput="this.value=this.value.toUpperCase()" maxlength="8"></div>
       </div>
-      <!-- ★ CLAVE DE RECOJO: los 4 dígitos que el destinatario necesita para
-           retirar el paquete. Se genera sola al abrir un pedido nuevo de
-           Shalom (del generador criptográfico, no de Math.random: es lo único
-           que separa el paquete de quien no debe llevárselo) y se puede
-           cambiar. Un pedido YA REGISTRADO no la regenera: la que se le dio a
-           Shalom es la que el cliente va a usar. -->
-      <div class="fg">
-        <label class="fl">🔑 Clave de recojo</label>
-        <div style="display:flex;gap:7px;align-items:center">
-          <input class="fi" id="fShalomClave" placeholder="4 dígitos" maxlength="4"
-            inputmode="numeric" style="flex:1;font-family:monospace;letter-spacing:3px"
-            oninput="this.value=this.value.replace(/\D/g,'')">
-          <button type="button" id="btnRegenClave" onclick="regenClaveRecojo()" title="Generar otra"
-            style="flex-shrink:0;padding:9px 12px;border-radius:9px;cursor:pointer;font-family:inherit;
-            font-size:14px;background:rgba(163,113,247,.15);border:1px solid rgba(163,113,247,.35);
-            color:#a78bfa">🎲</button>
-        </div>
-        <div style="font-size:10px;color:#8b949e;margin-top:4px;line-height:1.5">
-          La necesita tu cliente para retirar en la agencia. Se manda a Shalom al registrar el envío.</div>
-      </div>
-      <!-- ★ MEDIDAS DEL PAQUETE: mismo patrón que "📎 Documentos del envío"
-           (clase docs-accordion, genérica). El tipo se calcula al vuelo con
-           Shalom.clasificarPaquete — nada se manda a ningún lado todavía; solo
-           se guarda con el pedido para cuando exista el registro automático. -->
+      <!-- ★ UN SOLO DESPLEGABLE PARA TODO LO DEL ENVÍO.
+           Antes esto eran tres bloques abiertos a la vez —clave, medidas y
+           registro— con sus explicaciones permanentes: unas quince líneas en
+           pantalla para decir, casi siempre, «todo bien».
+
+           El principio: una CONFIRMACIÓN se encoge a una marca; un PROBLEMA
+           conserva sus palabras. Cerrado, la cabecera resume en una línea y
+           la clave sigue a la vista —la necesitas para dictársela al
+           cliente—. Si falta algo estando en POR ALISTAR, la cabecera se
+           pone ámbar: sabes que hay que abrirlo sin tener que abrirlo.
+
+           Las explicaciones se fueron a 📖 Ayuda ('registroShalom'). -->
       <div class="docs-accordion" style="margin-top:9px">
         <div class="docs-accordion-hdr" onclick="togglePkgAccordion()">
-          <span class="docs-accordion-ttl">📦 Medidas del paquete</span>
-          <span class="docs-accordion-arrow" id="pkgArrow">▾</span>
+          <span class="docs-accordion-ttl" id="pkgResumen">📦 Paquete y envío</span>
+          <span style="display:flex;align-items:center;gap:8px">
+            <!-- stopPropagation: la ayuda no abre ni cierra el acordeón. -->
+            <span onclick="event.stopPropagation();if(window.Ayuda)Ayuda.abrir('registroShalom')"
+              title="Ayuda" style="font-size:12px;color:#8b949e;cursor:pointer">📖</span>
+            <span class="docs-accordion-arrow" id="pkgArrow">▾</span>
+          </span>
         </div>
         <div class="docs-accordion-body" id="pkgBody">
+          <!-- ★ CLAVE DE RECOJO: los 4 dígitos que el destinatario necesita
+               para retirar el paquete. Se genera sola al abrir un pedido
+               nuevo de Shalom (del generador criptográfico, no de
+               Math.random: es lo único que separa el paquete de quien no
+               debe llevárselo). Un pedido YA REGISTRADO no la regenera: la
+               que se le dio a Shalom es la que el cliente va a usar. -->
+          <div class="fg" style="margin-bottom:11px">
+            <label class="fl">🔑 Clave de recojo</label>
+            <div style="display:flex;gap:7px;align-items:center">
+              <input class="fi" id="fShalomClave" placeholder="4 dígitos" maxlength="4"
+                inputmode="numeric" style="flex:1;font-family:monospace;letter-spacing:3px"
+                oninput="this.value=this.value.replace(/\D/g,'');if(typeof _pintarRegistroShalom==='function')_pintarRegistroShalom()">
+              <button type="button" id="btnRegenClave" onclick="regenClaveRecojo()" title="Generar otra"
+                style="flex-shrink:0;padding:9px 12px;border-radius:9px;cursor:pointer;font-family:inherit;
+                font-size:14px;background:rgba(163,113,247,.15);border:1px solid rgba(163,113,247,.35);
+                color:#a78bfa">🎲</button>
+            </div>
+          </div>
           <div class="frow">
             <div class="fg"><label class="fl">Largo (cm)</label><input class="fi" id="fPkgLargo" type="number" min="0" step="0.5" inputmode="decimal" placeholder="0" oninput="_pkgClasificar()"></div>
             <div class="fg"><label class="fl">Ancho (cm)</label><input class="fi" id="fPkgAncho" type="number" min="0" step="0.5" inputmode="decimal" placeholder="0" oninput="_pkgClasificar()"></div>
@@ -1247,19 +1258,10 @@
             <div class="fg"><label class="fl">Peso (kg)</label><input class="fi" id="fPkgPeso" type="number" min="0" step="0.05" inputmode="decimal" placeholder="0" oninput="_pkgClasificar()"></div>
           </div>
           <div id="pkgTipoResultado" style="display:none;margin-top:10px;padding:9px 12px;border-radius:9px;font-size:12.5px;font-weight:700;text-align:center"></div>
+          <div id="shalomRegBlock" style="margin-top:11px;border-top:1px solid rgba(56,139,253,.18);padding-top:11px"></div>
         </div>
       </div>
 
-      <!-- ★ REGISTRAR EN SHALOM — la cara del registro automático.
-           VA AQUÍ Y NO DENTRO DEL ACORDEÓN DE MEDIDAS a propósito: ese
-           acordeón se pliega, y un botón que a veces no existe es un botón
-           que no se encuentra el día que hace falta. Dentro de
-           `shalomGuiaBlock` hereda gratis la regla de courier: si el pedido
-           no va por Shalom, no se ve.
-           Todo el contenido lo pinta `_pintarRegistroShalom()` en config.js:
-           qué falta, de dónde a dónde, y el botón. Un solo sitio que decide
-           es un solo sitio que puede equivocarse. -->
-      <div id="shalomRegBlock" style="margin-top:11px;border-top:1px solid rgba(56,139,253,.18);padding-top:11px"></div>
     </div>
     <!-- ★ DELIVERY: bloque motorizado (mismo patrón que Guía Shalom) -->
     <div id="dlvDriverBlock" style="display:none;background:rgba(163,113,247,.06);border:1px solid rgba(163,113,247,.18);border-radius:10px;padding:12px;margin-bottom:11px">
@@ -4818,7 +4820,7 @@ render();
      lo usa. config.js, print.js y voz.js preguntan por los pedidos marcados,
      así que siguen yendo detrás. El orden de carga es un contrato
      (ver docs/ARQUITECTURA.md). -->
-<script src="config.js?v=46"></script>
+<script src="config.js?v=47"></script>
 <script src="print.js?v=16"></script>
 <script src="notify.js?v=5"></script>
 <script src="shalom.js?v=29"></script>
@@ -4829,7 +4831,7 @@ render();
 <script src="ticket.js?v=5"></script>
 <script src="agencias-extractor.js?v=11"></script>
 <script src="respaldo.js?v=1"></script>
-<script src="ayuda.js?v=4"></script>
+<script src="ayuda.js?v=5"></script>
 <script src="recursos.js?v=2"></script>
 <script src="dashboard.js?v=2"></script>
 <script src="voz.js?v=3"></script>

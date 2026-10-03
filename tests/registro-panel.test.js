@@ -32,7 +32,7 @@ function montar(op) {
   op = op || {};
   const ped = op.pedido === undefined ? PEDIDO() : op.pedido;
   const dom = E.domFalso({ids: ['shalomRegBlock', 'regShalomSalida',
-    'btnRegistrarShalom', 'regOrigenCaja', 'regOrigenInput']});
+    'btnRegistrarShalom', 'regOrigenCaja', 'regOrigenInput', 'pkgResumen']});
   const visto = {toasts: [], guardados: [], renders: 0, confirmado: null,
     llamadas: 0, recuperaciones: 0, programados: [], comprobaciones: 0};
 
@@ -80,12 +80,63 @@ function montar(op) {
       '\nsalida.recuperar = recuperarEnvioPanel;' +
       '\nsalida.toggle = regToggleSimulacro;')(...n.map((k) => ctx[k]));
   return {api: ctx.salida, dom, visto, S, ped, sucios: ctx._dirtyShips,
+    resumen: () => dom.porId.pkgResumen.innerHTML,
     html: () => dom.porId.shalomRegBlock.innerHTML};
 }
 
 const tick = () => new Promise((r) => setTimeout(r, 0));
 
 module.exports = async ({bloque, ok}) => {
+
+  bloque('La cabecera: lo que se lee con el desplegable CERRADO');
+
+  {
+    /* ⚠️ POR QUE ESTO IMPORTA. Al meter la clave, las medidas, la cuenta, el
+       origen y el boton dentro de UN desplegable, la pantalla paso de ~15
+       lineas a 2 — pero esconder cosas solo vale si lo que queda fuera dice
+       la verdad. Si la cabecera miente, el desplegable es una trampa. */
+    const m = montar();
+    m.api.pintar();
+    ok(/clave/.test(m.resumen()) && /5773/.test(m.resumen()),
+       'la CLAVE se lee sin abrir: la necesitas para dictarsela al cliente, ' +
+       'asi que esconderla detras de un clic seria esconder lo que mas se mira');
+    ok(/Paquete/.test(m.resumen()),
+       'y la caja que saldria, que es lo que decide cuanto te cobran');
+    ok(/listo para registrar/i.test(m.resumen()), 'y que no falta nada');
+  }
+  {
+    const m = montar({pedido: Object.assign(PEDIDO(), {shalomClave: '',
+      pkgPeso: ''})});
+    m.api.pintar();
+    ok(/faltan 2 datos/.test(m.resumen()),
+       'con cosas pendientes se dice CUANTAS, no un generico "revisa"');
+    ok(/d29922/.test(m.dom.porId.pkgResumen.style.cssText || ''),
+       'y en POR ALISTAR la cabecera se pone ambar: te enteras SIN abrir, ' +
+       'que es el unico motivo por el que se puede cerrar sin perder nada');
+  }
+  {
+    // Fuera de POR ALISTAR no hay nada que hacer hoy: se dice, pero sin gritar.
+    const m = montar({pedido: Object.assign(PEDIDO(), {status: 'ALISTADO',
+      shalomClave: ''})});
+    m.api.pintar();
+    ok(/faltan/.test(m.resumen()), 'se sigue diciendo que falta');
+    ok(!/d29922/.test(m.dom.porId.pkgResumen.style.cssText || ''),
+       'pero sin ambar: no se puede registrar igual, asi que no es una alarma');
+  }
+  {
+    const m = montar({pedido: Object.assign(PEDIDO(), {shalomGuia: '98173469',
+      shalomCodigo: 'WKKH', status: 'ALISTADO'})});
+    m.api.pintar();
+    ok(/registrado/.test(m.resumen()), 'y un pedido ya registrado lo dice');
+    ok(!/faltan/.test(m.resumen()), 'sin pedirte datos que ya no hacen falta');
+  }
+  {
+    const m = montar({sinEditar: true});
+    m.api.pintar();
+    ok(!/faltan|listo|registrado/.test(m.resumen()),
+       'en un pedido sin guardar la cabecera no afirma nada: todavia no hay ' +
+       'de que opinar');
+  }
 
   bloque('⚠️ Lo guardado no es lo comprobado');
 

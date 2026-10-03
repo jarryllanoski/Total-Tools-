@@ -470,7 +470,9 @@ function openForm(id){
     if(dbk) dbk.style.display = c.includes('DELIVERY') ? 'block' : 'none';
     const isEnc = c.includes('ENCOMIENDA');
     _agPintar();
-    const addrLbl = document.getElementById('fAddrLabel');
+    /* El TEXTO, no la etiqueta entera: dentro vive ahora la marca de agencia
+       identificada, y `textContent` sobre el padre se la llevaba por delante. */
+    const addrLbl = document.getElementById('fAddrLabelTxt');
     const encGrp  = document.getElementById('fEncAgenciaGroup');
     if(addrLbl) addrLbl.textContent = isEnc ? 'Ciudad destino *' : 'Dirección *';
     if(encGrp)  encGrp.style.display = isEnc ? '' : 'none';
@@ -860,13 +862,50 @@ function _regLink(txt, fn){
     'cursor:pointer;font-weight:700;white-space:nowrap">'+txt+'</span>';
 }
 
+/* ★ EL RESUMEN DE LA CABECERA. Lo que se lee con el desplegable CERRADO.
+   La clave va aquí a propósito: la necesitas para dictársela al cliente, así
+   que esconderla detrás de un clic sería esconder justo lo que más se mira.
+   Y si falta algo estando en POR ALISTAR —o sea, ahora es cuando se puede
+   hacer algo— la cabecera se pone ámbar: te enteras sin abrir.
+   @param {Object} ped el pedido guardado, o null
+   @param {Array} faltan lo que falta, o null si no aplica
+   @param {boolean} registrado si ya tiene guía */
+function _pintarResumenPaquete(ped, faltan, registrado){
+  const h = $('pkgResumen'); if(!h) return;
+  const p = ped || {};
+  const R = window.RegistroShalom;
+  const caja = (R && R.clasificar) ?
+    R.clasificar(p.pkgLargo, p.pkgAncho, p.pkgAlto, p.pkgPeso) : null;
+  const clave = String(p.shalomClave || '').trim();
+  const trozos = [];
+  if(caja) trozos.push(escH(caja.etiqueta));
+  if(clave) trozos.push('clave <b>'+escH(clave)+'</b>');
+
+  let color = '';
+  if(registrado){
+    trozos.push('<span style="color:#3fb950">registrado</span>');
+  } else if(faltan && faltan.length){
+    trozos.push('<span style="color:#d29922">faltan '+faltan.length+
+      (faltan.length === 1 ? ' dato' : ' datos')+'</span>');
+    // Ámbar solo si se puede hacer algo YA: en POR ALISTAR.
+    if(String(p.status||'').trim().toUpperCase() === 'POR ALISTAR'){
+      color = 'color:#d29922';
+    }
+  } else if(faltan){
+    trozos.push('<span style="color:#3fb950">listo para registrar</span>');
+  }
+  h.innerHTML = '📦 Paquete y envío' +
+    (trozos.length ? '<span style="font-weight:400;opacity:.85"> · '+
+      trozos.join(' · ')+'</span>' : '');
+  h.style.cssText = color;
+}
+
 /* ★ EL PINTOR. Único sitio que decide qué se ve en ese bloque. */
 function _pintarRegistroShalom(reintento){
   const box = $('shalomRegBlock'); if(!box) return;
   const R = window.RegistroShalom;
-  const tit = '<div style="font-size:10px;font-weight:700;color:#388bfd;'+
-    'letter-spacing:.8px;text-transform:uppercase;margin-bottom:9px">'+
-    '🚚 Registrar en Shalom</div>';
+  // Sin título propio: el del desplegable ya dice qué es esto.
+  const tit = '';
   const aviso = (ico, txt, col) =>
     '<div style="font-size:11.5px;color:'+(col||'var(--text2)')+';line-height:1.5">'+
     ico+' '+txt+'</div>';
@@ -883,6 +922,7 @@ function _pintarRegistroShalom(reintento){
      existe, que es la única forma de que un clic no pueda crear un segundo
      envío con un segundo cobro. */
   if(R.estaRegistrado(ped)){
+    _pintarResumenPaquete(ped, null, true);
     const m = parseFloat(ped.shalomMonto);
     box.innerHTML = tit +
       '<div style="background:rgba(63,185,80,.09);border:1px solid rgba(63,185,80,.25);'+
@@ -933,14 +973,16 @@ function _pintarRegistroShalom(reintento){
   }
   html += _regFila(icoC, txtC, _regLink(accC, 'regComprobarSesion()'));
 
-  /* ── TU AGENCIA DE ORIGEN. Se puede cambiar desde aquí, pero el texto dice
-     lo que es: UNA sola para todo el negocio. Sin ese aviso, un día se cambia
-     "para este envío" y todos los siguientes salen del sitio equivocado. */
+  /* ── TU AGENCIA DE ORIGEN. Se puede cambiar desde aquí, y es UNA sola para
+     todo el negocio: cambiarla «para este envío» cambia todos los
+     siguientes. Eso ya no se repite en pantalla —estaba fijo, ocupando una
+     línea cada vez— y vive en 📖 Ayuda, que es donde se lee una vez. */
   const orgOk = !!(org.agenciaId);
   html += _regFila(orgOk ? '🏢' : '⚠️',
-    orgOk ? 'Despachas desde <b style="color:var(--text)">'+escH(org.agenciaNombre||org.agenciaId)+'</b>'+
-            '<span style="opacity:.7"> — vale para todos tus envíos</span>'
-          : '<span style="color:#f59e0b">Sin agencia de origen</span>',
+    orgOk ?
+      'Despachas desde <b style="color:var(--text)">'+
+        escH(org.agenciaNombre||org.agenciaId)+'</b>' :
+      '<span style="color:#f59e0b">Sin agencia de origen</span>',
     _regLink('cambiar', 'regOrigenAbrir()'));
   html += '<div id="regOrigenCaja" style="display:none;position:relative;margin:2px 0 8px">'+
     '<input class="fi" id="regOrigenInput" autocomplete="off" placeholder="Busca por ciudad, distrito o nombre…" '+
@@ -951,6 +993,7 @@ function _pintarRegistroShalom(reintento){
 
   /* ── LO QUE FALTA, EN PALABRAS. Mismo archivo que el servidor. */
   const faltan = R.faltantes(ped, cfg);
+  _pintarResumenPaquete(ped, faltan, false);
   if(faltan.length){
     html += '<div style="background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.25);'+
       'border-radius:9px;padding:9px 11px;margin-top:4px">'+
@@ -958,9 +1001,14 @@ function _pintarRegistroShalom(reintento){
       'Falta esto para poder registrar:</div><ul style="margin:0;padding-left:16px;'+
       'font-size:11.5px;color:var(--text2);line-height:1.6">'+
       faltan.map(f=>'<li>'+escH(f)+'</li>').join('')+'</ul>'+
-      '<div style="font-size:10.5px;color:var(--text2);margin-top:6px;font-style:italic">'+
-      'Se comprueba lo guardado, que es lo que Shalom va a leer. Si acabas de '+
-      'escribir algo, guarda el pedido primero.</div></div>';
+      /* Esta nota SOLO cuando aplica. Permanente era ruido; con cambios sin
+         subir es justo lo que explica por qué la lista no cuadra con lo que
+         ves en pantalla. */
+      (_regSinSubir(ped.id) ?
+        '<div style="font-size:10.5px;color:var(--text2);margin-top:6px;font-style:italic">'+
+        'Se comprueba lo guardado, y acabas de escribir algo que aún no sube.'+
+        '</div>' : '')+
+      '</div>';
     box.innerHTML = html;
     return;
   }
@@ -1409,6 +1457,24 @@ document.addEventListener('click', function(e){
       con DNI malo es un envío que tu cliente no puede recoger. */
 let _dniPedido = '';   // el último DNI por el que ya se preguntó
 
+/* ★ UNA CONFIRMACIÓN SE ENCOGE A UNA MARCA; UN PROBLEMA CONSERVA SUS
+   PALABRAS. «✅ Coincide con RENIEC» ocupaba una línea entera del formulario
+   para decir que todo estaba bien — y casi siempre está bien. Ahora es un ✓
+   dentro de la etiqueta del campo: cero líneas, y el dato sigue ahí para
+   quien lo busque (con `title`, y leíble por un lector de pantalla).
+   Lo que NO se encoge: que RENIEC diga otro nombre (es una decisión tuya) y
+   que el DNI esté mal escrito (bloquea el envío).
+   @param {string} marca el símbolo corto, o '' para quitarlo
+   @param {string} titulo qué significa, al pasar el ratón */
+function _dniMarca(marca, titulo){
+  const m = $('fDniMarca'); if(!m) return;
+  m.textContent = marca || '';
+  m.title = titulo || '';
+  m.setAttribute('aria-label', titulo || '');
+  m.style.cssText = marca ?
+    'color:var(--green,#2ea043);font-weight:700;font-size:11px' : 'display:none';
+}
+
 function _dniAviso(html, color){
   const el = $('fDniReniec'); if(!el) return;
   if(!html){ el.style.display='none'; el.innerHTML=''; return; }
@@ -1420,17 +1486,17 @@ function _dniAviso(html, color){
 function _dniUsar(){
   const p = window._dniUltima; if(!p) return;
   $('fName').value = p.completo;
-  _dniAviso('✅ Nombre de RENIEC puesto', 'var(--green,#2ea043)');
+  _dniMarca('✓', 'Nombre puesto desde RENIEC'); _dniAviso('');
 }
 
 async function _dniReniec(valor){
   const n = String(valor||'').replace(/\D/g,'');
-  if(n.length !== 8){ _dniPedido=''; _dniAviso(''); return; }
+  if(n.length !== 8){ _dniPedido=''; _dniAviso(''); _dniMarca(''); return; }
   // Una vez por DNI: volver a escribir el mismo número no vuelve a preguntar.
   if(n === _dniPedido) return;
   _dniPedido = n;
   if(!window.Shalom || typeof Shalom.dni !== 'function'){ _dniAviso(''); return; }
-  _dniAviso('🪪 Consultando RENIEC…');
+  _dniMarca('…', 'Consultando RENIEC'); _dniAviso('');
   let r;
   try{ r = await Shalom.dni(n); }catch(e){ r = null; }
   // Si mientras consultaba cambiaste el DNI, este resultado ya no corresponde.
@@ -1458,14 +1524,15 @@ async function _dniReniec(valor){
   if(!actual){
     // Vacío: no hay nada que pisar, así que se rellena y se ahorra un toque.
     $('fName').value = r.persona.completo;
-    _dniAviso('🪪 Nombre de RENIEC'+(r.cache?' (ya consultado antes)':''), 'var(--green,#2ea043)');
+    _dniMarca('✓', 'Nombre puesto desde RENIEC'); _dniAviso('');
     return;
   }
   if(actual.toUpperCase() === r.persona.completo.toUpperCase()){
-    _dniAviso('✅ Coincide con RENIEC', 'var(--green,#2ea043)');
+    _dniMarca('✓', 'Coincide con RENIEC'); _dniAviso('');
     return;
   }
-  // Distinto: se OFRECE, no se impone.
+  // Distinto: se OFRECE, no se impone. Esto SÍ conserva sus palabras.
+  _dniMarca('', '');
   _dniAviso('🪪 RENIEC dice: <b>'+escH(r.persona.completo)+'</b> '+
     '<button type="button" onclick="_dniUsar()" style="background:rgba(56,139,253,.15);'+
     'border:1px solid rgba(56,139,253,.4);border-radius:6px;color:var(--blue);'+
@@ -1507,17 +1574,33 @@ function _agVigente(){
 
 function _agPintar(){
   const el = $('fAgenciaEstado'); if(!el) return;
+  const marca = $('fAgenciaMarca');
+  const ponMarca = (t, tit) => {
+    if(!marca) return;
+    marca.textContent = t || '';
+    marca.title = tit || '';
+    marca.setAttribute('aria-label', tit || '');
+    marca.style.cssText = t ? 'color:var(--green,#2ea043);font-size:11px' : 'display:none';
+  };
   const viva = _agVigente();
   if(viva){
-    el.innerHTML = '🏢 <b>Agencia identificada</b> · '+escH(viva.agenciaNombre);
-    el.style.cssText = 'font-size:10.5px;line-height:1.5;margin-top:5px;color:#2ea043';
-  } else {
+    /* ⚠️ Y AQUÍ HABÍA DUPLICACIÓN PURA: la línea repetía «ANCASH / HUARAZ /
+       HUARAZ / HUARAZ CO», que ya está escrito en el campo Dirección justo
+       encima. Dos veces el mismo texto no informa el doble. */
+    ponMarca('🏢', 'Agencia identificada · '+viva.agenciaNombre);
+    el.innerHTML = ''; el.style.cssText = 'display:none';
+    if(typeof _pintarRegistroShalom==='function') _pintarRegistroShalom();
+    return;
+  }
+  ponMarca('', '');
+  {
     const c = window.Agencias ? Agencias.courierDe(($('fCourier')||{value:''}).value) : '';
     // Sin catálogo (DELIVERY, ENCOMIENDA…) no hay nada que identificar: el
     // aviso solo sale donde de verdad hace falta.
     if(!c){ el.innerHTML=''; el.style.cssText='display:none'; return; }
-    el.innerHTML = '⚠️ Agencia sin identificar — elígela de la lista para poder registrar el envío';
-    el.style.cssText = 'font-size:10.5px;line-height:1.5;margin-top:5px;color:#8b949e';
+    // Un problema sí conserva sus palabras — pero las justas.
+    el.innerHTML = '⚠️ Elígela de la lista';
+    el.style.cssText = 'font-size:10.5px;line-height:1.5;margin-top:5px;color:#d29922';
   }
 }
 

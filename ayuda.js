@@ -340,6 +340,37 @@
         'Si un pedido no actualiza su estado, primero revisa que el número de guía y el código sean los del ticket: la mayoría de las consultas fallidas son un dígito cambiado.',
         'El botón ⟳ de cada tarjeta consultará esa guía contra la API de Shalom. Hoy avisa "en reconstrucción": los estados que ya tenías guardados se siguen viendo.'
       ]
+    },
+
+    /* ★ ESTA SECCIÓN EXISTE PARA VACIAR LA PANTALLA.
+       El formulario del pedido llevaba cuatro explicaciones fijas —qué es la
+       clave, que el origen vale para todos, que se comprueba lo guardado,
+       que crear solo crea si no hay— y entre las cuatro ocupaban más que los
+       campos. Una explicación se lee UNA vez; un dato se mira cada día. Lo
+       que se lee una vez, aquí. */
+    registroShalom: {
+      titulo: 'Registrar el envío en Shalom',
+      icono: '🚚',
+      actualizado: '2026-10-03',
+      pasos: [
+        '<b>🔑 Clave de recojo</b>: los 4 dígitos que tu cliente necesita para retirar el paquete en la agencia. Se genera sola al abrir un pedido nuevo de Shalom y se le manda a Shalom al registrar el envío. <b>Díctasela al cliente</b> — sin ella no se lo entregan.',
+        '<b>📦 Medidas y peso</b>: deciden la caja, y por tanto lo que te cobra Shalom. El peso cuenta tanto como las medidas: 20×15×12 con 3 kg no entra en XS, se va a M.',
+        '<b>🔌 Cuenta de Shalom Pro</b>: la instancia que el panel usa para registrar. Se comprueba sola contra Shalom al abrir el pedido — y comprobarla no gasta cuota.',
+        '<b>🏢 Agencia de origen</b>: desde dónde despachas. <b>Es UNA sola para todo el negocio</b>, no por pedido: si la cambias aquí, cambian todos los envíos que registres después.',
+        '<b>🚚 Registrar</b>: solo aparece si no falta nada. Crea la guía en Shalom, trae el número y el código, y el pedido pasa a ALISTADO.'
+      ],
+      faq: [
+        {q:'¿Por qué dice que faltan datos si los acabo de escribir?', a:'Porque se comprueba <b>lo guardado</b>, que es lo que Shalom va a leer del servidor — no lo que ves en pantalla. Guarda el pedido y vuelve a abrirlo.'},
+        {q:'¿Qué es el simulacro?', a:'Un ensayo: decide todo igual, te enseña exactamente lo que mandaría, y NO llama a Shalom. No cuesta nada. Con el simulacro apagado, el botón se pone naranja y cada clic crea un envío real que se cobra.'},
+        {q:'Pulsé registrar y dice "no sabemos si se creó". ¿Vuelvo a pulsar?', a:'<b>No.</b> Shalom no anula envíos y no tiene clave de idempotencia: un segundo intento sería un segundo paquete y un segundo cobro. Usa el botón <b>Recuperar</b> que sale ahí mismo: solo lee los pendientes de Shalom y rellena la guía si el envío sí se creó.'},
+        {q:'¿Por qué el pedido sigue en ALISTADO si ya lo registré?', a:'Porque registrar crea la guía, no mueve el paquete. Pasa a ENVIADO cuando Shalom fecha el ingreso a la agencia de origen — es decir, cuando de verdad lo dejaste allí.'},
+        {q:'¿Puedo registrar dos veces el mismo pedido?', a:'No. En cuanto tiene guía, el botón desaparece: no está gris, no existe. Y la clave de recojo se congela, porque la que se le dio a Shalom es la que tu cliente va a usar.'},
+        {q:'Dice que mi cuenta "ya no existe en Shalom".', a:'La instancia guardada en el panel no está en tu cuenta de Shalom API. Pasa cuando se rehace o cuando cambia el plan. Ve a ⚙️ Config → Shalom y pulsa <b>Conectar / reconectar la cuenta</b>.'}
+      ],
+      tips: [
+        'El plazo es de <b>24 horas</b>: si no dejas el paquete en la agencia, Shalom borra la guía. La cuenta atrás sale junto al pedido en cuanto lo registras.',
+        'Con el desplegable cerrado, la cabecera te dice lo importante: la caja, la clave y si falta algo. Si se pone ámbar, hay algo que hacer ahora.'
+      ]
     }
 
   };
