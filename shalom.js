@@ -268,7 +268,8 @@
        existe. Vacío, manda el nombre; y si tampoco casa, se PREGUNTA — que
        es lo correcto cuando no se sabe. */
     INSTANCIA_PREFERIDA: {
-      id: '',
+      id: '70f5a14e-186a-40be-a0d9-43f82cb38a0e',
+      correo: 'Totaltools@gmail.com',
       nombre: 'Total Tools Panel'
     },
 
@@ -306,9 +307,11 @@
          nombre, o si el id declarado apunta a una y el nombre a OTRA, eso
          no es una elección: es una contradicción, y se pregunta. */
       var pid = '';
+      var pcorreo = '';
       var pnom = '';
       if (preferida && typeof preferida === 'object') {
         pid = String(preferida.id || '').trim();
+        pcorreo = String(preferida.correo || '').trim().toLowerCase();
         pnom = String(preferida.nombre || '').trim().toLowerCase();
       } else {
         pnom = String(preferida || '').trim().toLowerCase();
@@ -328,12 +331,45 @@
           return {estado: 'declarada', instancia: porId[0], instancias: L};
         }
       }
-      /* Plan B: el nombre, para cuando la instancia se rehízo y cambió de
-         id. Sigue exigiendo UNA sola: si dos se llaman igual y el id ya no
-         está, el nombre de verdad no identifica nada y se pregunta. */
+      /* ★ PLAN B: EL CORREO. Es el ancla más fuerte de las tres, y no es
+         una idea del código: es la regla que puso el dueño el 3/10/2026,
+         «una instancia por cada correo de inicio de sesión». Con esa regla
+         el correo es una CLAVE ÚNICA.
+
+         Por qué va antes que el nombre, con lo que pasó esta semana:
+           · el `id` es exacto pero MURIÓ al vaciarse el lote con el cambio
+             de plan (3/10) — sobrevive a un renombrado, no a rehacerla;
+           · el `nombre` COLISIONÓ (2/10) con una instancia que creó la otra
+             aplicación del dueño, y con 900 slots puede volver a pasar;
+           · el `correo` es el NEGOCIO. Sobrevive a que la instancia se
+             rehaga Y a que la renombres, y no puede colisionar sin romper
+             la regla de arriba.
+
+         Y si DOS casan el correo, se pregunta — porque eso significaría que
+         la regla se rompió, y ese es justo el momento de no adivinar. */
+      if (pcorreo) {
+        var porCorreo = L.filter(function (x) {
+          return String(x.usuario || '').trim().toLowerCase() === pcorreo;
+        });
+        if (porCorreo.length === 1) {
+          return {estado: 'declarada', instancia: porCorreo[0], instancias: L};
+        }
+      }
+      /* Plan C: el nombre, el más débil de los tres. Sigue exigiendo UNA
+         sola: si dos se llaman igual, el nombre no identifica nada. */
       if (pnom) {
         var porNombre = L.filter(function (x) {
-          return String(x.nombre || '').trim().toLowerCase() === pnom;
+          if (String(x.nombre || '').trim().toLowerCase() !== pnom) return false;
+          /* ⚠️ Y EL CORREO MANDA SOBRE EL NOMBRE, aunque el nombre case.
+             Si declaraste un correo y esta instancia tiene OTRO, no es la
+             tuya por mucho que se llame igual: es una contradicción, y este
+             archivo ya decidió una vez que ante una contradicción se
+             pregunta. Sin esto, una instancia ajena bautizada con nuestro
+             nombre se colaría el día que la nuestra desapareciera — que es
+             exactamente el día en que el plan C entra en juego.
+             Si no trae correo, no se sabe y no se descarta. */
+          var u = String(x.usuario || '').trim().toLowerCase();
+          return !(pcorreo && u && u !== pcorreo);
         });
         if (porNombre.length === 1) {
           return {estado: 'declarada', instancia: porNombre[0], instancias: L};

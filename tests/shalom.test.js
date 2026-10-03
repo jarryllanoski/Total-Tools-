@@ -758,6 +758,77 @@ module.exports = async (t) => {
        'mas explicito');
   }
 
+  bloque('El correo: el ancla que sobrevive a rehacer y a renombrar');
+
+  {
+    const win = {}; E.cargar('shalom.js', win);
+    const S = win.Shalom;
+    const D = S.INSTANCIA_PREFERIDA;
+    const MIA = 'totaltools@gmail.com';
+    const yo = (x) => Object.assign({usuario: MIA}, x);
+
+    /* ⚠️ LAS TRES ANCLAS, Y POR QUE HACEN FALTA LAS TRES. Esta semana
+       fallaron dos de ellas, cada una a su manera:
+         · el ID murio el 3/10 al vaciarse el lote con el cambio de plan;
+         · el NOMBRE colisiono el 2/10 con una instancia que creo la otra
+           aplicacion del dueño, y con 900 slots puede repetirse;
+         · el CORREO es el negocio, y con la regla que puso el dueño —«una
+           instancia por cada correo de inicio de sesion»— es clave unica. */
+    ok(D.id && D.correo && D.nombre,
+       'se declaran las tres: id, correo y nombre');
+
+    // EL ESCENARIO DE HOY: la instancia se rehizo y el id declarado ya no esta.
+    const rehecha = S.elegirInstancia([
+      yo({id: 'nuevo-uuid', nombre: 'Total Tools Panel'}),
+      {id: 'ajena', nombre: 'Total', usuario: 'otro@gmail.com'}
+    ], '', D);
+    ok(rehecha.estado === 'declarada' && rehecha.instancia.id === 'nuevo-uuid',
+       'con el id muerto, el correo la encuentra igual');
+
+    // EL ESCENARIO DEL 2/10: una ajena con nuestro nombre.
+    const colision = S.elegirInstancia([
+      yo({id: 'mia', nombre: 'Como se llame ahora'}),
+      {id: 'ajena', nombre: 'Total Tools Panel', usuario: 'otro@gmail.com'}
+    ], '', D);
+    ok(colision.estado === 'declarada' && colision.instancia.id === 'mia',
+       'y aunque la ajena lleve NUESTRO nombre, manda el correo');
+
+    /* EL HUECO QUE SE ME ESCAPO AL ESCRIBIR ESTO: si la nuestra desaparece
+       y queda una ajena con nuestro nombre, el plan C la casaria — y ese es
+       justo el dia en que el plan C entra en juego. */
+    const sinMia = S.elegirInstancia([
+      {id: 'ajena', nombre: 'Total Tools Panel', usuario: 'otro@gmail.com'},
+      {id: 'otra', nombre: 'Yapaitas', usuario: 'tercero@gmail.com'}
+    ], '', D);
+    ok(sinMia.estado === 'falta_elegir',
+       'sin la nuestra, una ajena con nuestro nombre NO se cuela: el correo ' +
+       'la contradice y se pregunta');
+
+    // El nombre sigue sirviendo cuando el correo no desempata.
+    const porNombre = S.elegirInstancia([
+      {id: 'a', nombre: 'Total Tools Panel'},
+      {id: 'b', nombre: 'Otra'}
+    ], '', {id: '', correo: MIA, nombre: 'Total Tools Panel'});
+    ok(porNombre.estado === 'declarada' && porNombre.instancia.id === 'a',
+       'si ninguna trae correo, el nombre sigue siendo el plan C');
+
+    // Dos con el mismo correo = la regla del dueño rota. No se adivina.
+    const dosIguales = S.elegirInstancia([
+      yo({id: 'a', nombre: 'Una'}), yo({id: 'b', nombre: 'Otra'})
+    ], '', D);
+    ok(dosIguales.estado === 'falta_elegir',
+       'dos instancias con el mismo correo significan que la regla se rompio, ' +
+       'y ese es el momento de preguntar, no de elegir');
+
+    // Y el id, cuando esta, sigue mandando sobre todo lo demas.
+    const porId = S.elegirInstancia([
+      {id: D.id, nombre: 'Renombrada', usuario: 'cambiado@gmail.com'},
+      yo({id: 'z', nombre: 'Total Tools Panel'})
+    ], '', D);
+    ok(porId.estado === 'declarada' && porId.instancia.id === D.id,
+       'el id declarado sigue siendo el primero: es el dato mas especifico');
+  }
+
   {
     const win = {}; E.cargar('shalom.js', win);
     const S = win.Shalom;

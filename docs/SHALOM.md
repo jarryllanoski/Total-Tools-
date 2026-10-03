@@ -833,8 +833,30 @@ La primera versión de esto montó un **selector** cuando lo que hacía falta er
 Este panel es el de Total Tools:
 
 ```js
-{ id: '', nombre: 'Total Tools Panel' }
+{
+  id:     '70f5a14e-186a-40be-a0d9-43f82cb38a0e',  // exacto, muere al rehacerse
+  correo: 'Totaltools@gmail.com',                  // el negocio. No colisiona.
+  nombre: 'Total Tools Panel'                      // último recurso
+}
 ```
+
+**Precedencia: id → correo → nombre → preguntar.** Y el correo **manda sobre
+el nombre**: una instancia cuyo correo contradice al declarado no es la
+nuestra por mucho que se llame igual.
+
+Las tres anclas existen porque **dos de ellas fallaron en la misma semana**:
+
+| ancla | qué le pasó | sobrevive a |
+|---|---|---|
+| `id` | **murió el 3/10** al vaciarse el lote con el cambio de plan | renombrar |
+| `nombre` | **colisionó el 2/10** con una instancia de la otra aplicación | rehacer |
+| `correo` | — | **rehacer y renombrar** |
+
+El correo es el ancla fuerte porque **es el negocio**, y porque el dueño puso
+la regla el 3/10/2026: **«una instancia por cada correo de inicio de
+sesión»**. Con esa regla es una clave única. Si **dos** casan el correo, se
+pregunta — eso significaría que la regla se rompió, y ese es justo el momento
+de no adivinar.
 
 > **⚠️ Esto decía `{ id: 'd14b120a-…', nombre: 'Total' }` hasta el 3/10/2026.**
 > Cambiaron las dos cosas, y por motivos distintos:
