@@ -1065,6 +1065,22 @@ async function registrarEnvioPanel(){
    es un segundo paquete y un segundo cobro. La duda tiene su propia salida, y
    es de SOLO LECTURA. */
 function _aplicarRegistroShalom(ped, r){
+  /* ★ EL RASTRO. Un registro cuesta dinero y pasa UNA vez: si la respuesta
+     no queda escrita en algún sitio, lo único que te queda cuando algo sale
+     raro es el recuerdo. Y `forma` —los NOMBRES de los campos que devolvió
+     Shalom, sin un solo valor— es lo que permite cerrar el traductor cuando
+     un campo no llega donde lo esperábamos; pasó con el monto.
+     Se deja fuera `cuerpo`: en simulacro lleva el nombre, el DNI y el
+     teléfono del cliente, y eso no tiene por qué quedar en una consola que
+     cualquiera puede estar mirando por encima del hombro. */
+  try{
+    console.log('[Registro Shalom]', JSON.stringify({
+      ok: r && r.ok, estado: r && r.estado, motivo: r && r.motivo,
+      detalle: r && r.detalle, simulacro: !!(r && r.simulacro),
+      recuperado: !!(r && r.recuperado), campos: r && r.campos,
+      forma: r && r.forma, faltan: r && r.faltan}));
+  }catch(e){}
+
   if(r && r.ok && r.simulacro){
     _regSalida('<span style="color:#388bfd">🧪 Simulacro correcto.</span> '+
       '<span style="color:var(--text2)">No se creó nada. Apaga el simulacro '+

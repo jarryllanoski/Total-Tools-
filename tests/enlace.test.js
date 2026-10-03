@@ -452,7 +452,7 @@ module.exports = async ({bloque, ok}) => {
        codigo. Si alguien vuelve a tocar estos archivos sin subirlo, esta
        prueba se lo recuerda. */
     const idx = E.leer('index.html');
-    [['config.js', 43], ['tracking.js', 22], ['notify.js', 5], ['shalom.js', 26],
+    [['config.js', 44], ['tracking.js', 22], ['notify.js', 5], ['shalom.js', 26],
       ['functions/enlaceSeguimiento.js', 1],
       ['functions/registroShalom.js', 3]].forEach((par) => {
       /* `src="` delante a proposito: sin eso, `config.js` casa dentro de

@@ -63,6 +63,7 @@ function montar(op) {
     save: (id) => visto.guardados.push(id),
     render: () => { visto.renders++; },
     confirmar: (o) => { visto.confirmado = o; },
+    console: {log: () => {}},
     _congelarSiRegistrado: () => {},
     _pintarOrigen: () => {},
     setTimeout: (fn, ms) => { visto.programados.push(ms); return 1; },
