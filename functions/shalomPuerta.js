@@ -94,8 +94,29 @@ const PERMITIDAS = {
 
      En soloMedir: con cuerpo vacio su API devuelve la forma del error, que
      es medio contrato gratis — el mismo truco que con `register`. */
+  /* ⚠️ `soloServidor`, NO `soloMedir`. Antes esto era un hueco medido con
+     `cuerpoCampos: []` para que el navegador no pudiera mandar la
+     contraseña. Ahora se usa de verdad, y la reja cambia de forma: el
+     cuerpo lleva los tres campos, pero `soloServidor` hace que la barrera
+     corte la operacion ANTES de mirar nada — el navegador no puede
+     llamarla, ni para medirla. Solo la llama la orquestacion
+     `conectarShalom`, que pone usuario y clave desde Secret Manager.
+
+     Si estuviera aqui como las demas, `{op:"instanceLogin", datos:{…}}`
+     desde la consola dejaria entrar con CUALQUIER credencial. */
   instanceLogin: {metodo: "POST", ruta: "/instances/login",
-    soloMedir: true, cuerpoCampos: []},
+    soloServidor: true,
+    cuerpoCampos: ["instanceId", "username", "password"]},
+  /* ⚠️ CREAR UNA INSTANCIA, y por que tambien es `soloServidor`.
+     Hasta el 3/10/2026 el plan permitia UNA, y crear otra daba 403: el
+     limite nos protegia. Ahora permite 900 y el 403 ya no llega.
+
+     El `name` va en `cuerpoCampos` pero lo pone el SERVIDOR, no tu: con
+     `soloServidor` el navegador no alcanza esta operacion, asi que nadie
+     puede crear una instancia con el nombre que le apetezca desde la
+     consola. Y la orquestacion solo crea si no habia ninguna. */
+  instanceCrear: {metodo: "POST", ruta: "/instances",
+    soloServidor: true, cuerpoCampos: ["name"]},
   /* ⚠️ `register` — SOLO EL SERVIDOR, Y NI SIQUIERA SE PUEDE MEDIR.
      `POST /account/register` CREA UN ENVIO DE VERDAD: se paga, Shalom no
      tiene endpoint para anularlo y no hay clave de idempotencia.
@@ -143,7 +164,8 @@ const PERMITIDAS = {
  * llamar, y escribir el resultado. El navegador manda SOLO el id del
  * pedido — no puede falsificar el cuerpo ni saltarse un candado.
  */
-const ORQUESTADAS = {registrarEnvio: true, recuperarEnvio: true};
+const ORQUESTADAS = {registrarEnvio: true, recuperarEnvio: true,
+  conectarShalom: true};
 
 /**
  * Quita de un texto cualquier cosa con forma de clave antes de devolverlo.

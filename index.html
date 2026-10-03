@@ -1118,6 +1118,24 @@
         font-size:13px;font-weight:700;background:rgba(56,139,253,.15);
         border:1px solid rgba(56,139,253,.35);color:#388bfd">&#128268; Verificar sesión de Shalom Pro</button>
       <div id="shalomInstEstado" style="display:none;margin-top:10px;font-size:12px;line-height:1.5"></div>
+
+      <!-- CONECTAR / RECONECTAR LA CUENTA DE SHALOM PRO
+           Una sola operación, idempotente: crea la instancia solo si no
+           existe, y ENTRA SIEMPRE. Entrar es lo que deja las credenciales
+           guardadas en la instancia, y eso es lo que hace que la sesión se
+           levante sola cuando expira — sin ellas llega el 401 que su propia
+           documentación llama «el fallo más repetido de esta API».
+           Las credenciales las pone el servidor desde Secret Manager: el
+           navegador manda el nombre de la operación y nada más. -->
+      <button id="shalomConectarBtn" type="button" onclick="conectarCuentaShalom()"
+        style="width:100%;margin-top:9px;padding:11px;border-radius:9px;cursor:pointer;
+        font-family:inherit;font-size:13px;font-weight:700;
+        background:rgba(63,185,80,.14);border:1px solid rgba(63,185,80,.35);
+        color:#3fb950">&#128279; Conectar / reconectar la cuenta</button>
+      <div style="font-size:10.5px;color:#8b949e;margin-top:6px;line-height:1.45">
+        Crea la instancia solo si no existe y renueva la sesión. Pulsarlo dos
+        veces no crea dos cuentas.</div>
+      <div id="shalomConectarSalida" style="display:none;margin-top:9px;font-size:11.5px;line-height:1.55"></div>
     </div>
 
     <!-- AGENCIA DE ORIGEN — de dónde despachas -->
@@ -4800,10 +4818,10 @@ render();
      lo usa. config.js, print.js y voz.js preguntan por los pedidos marcados,
      así que siguen yendo detrás. El orden de carga es un contrato
      (ver docs/ARQUITECTURA.md). -->
-<script src="config.js?v=45"></script>
+<script src="config.js?v=46"></script>
 <script src="print.js?v=16"></script>
 <script src="notify.js?v=5"></script>
-<script src="shalom.js?v=28"></script>
+<script src="shalom.js?v=29"></script>
 <script src="tracking.js?v=22"></script>
 <script src="floatpanel.js?v=4"></script>
 <script src="delivery.js?v=8"></script>

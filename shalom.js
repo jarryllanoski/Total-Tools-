@@ -279,13 +279,50 @@
       }) : [];
       var id = String(idGuardado || '').trim();
       var vacio = {estado: 'ninguna', instancia: null, instancias: L};
+      /* La identidad declarada se lee ARRIBA porque ahora hace falta antes
+         de decidir sobre la elección guardada, no solo después. */
+      var pid = '';
+      var pcorreo = '';
+      var pnom = '';
+      if (preferida && typeof preferida === 'object') {
+        pid = String(preferida.id || '').trim();
+        pcorreo = String(preferida.correo || '').trim().toLowerCase();
+        pnom = String(preferida.nombre || '').trim().toLowerCase();
+      } else {
+        pnom = String(preferida || '').trim().toLowerCase();
+      }
+      var unaPorCorreo = function () {
+        if (!pcorreo) return null;
+        var c = L.filter(function (x) {
+          return String(x.usuario || '').trim().toLowerCase() === pcorreo;
+        });
+        return c.length === 1 ? c[0] : null;
+      };
       if (id) {
         var hallada = null;
         for (var i = 0; i < L.length; i++) {
           if (L[i].id === id) { hallada = L[i]; break; }
         }
         if (hallada) return {estado: 'elegida', instancia: hallada, instancias: L};
-        // No está. Y NO se sustituye por otra, pase lo que pase.
+        /* ⚠️ TU ELECCIÓN MURIÓ. Antes esto devolvía `elegida_no_existe` y
+           te pedía elegir otra, siempre. Esa regla se escribió cuando lo
+           único que teníamos era el id: caerse a «otra» habría sido caerse
+           a la cuenta del otro negocio.
+
+           Ahora hay un CORREO declarado, y volver a él no es caerse a otra:
+           es volver a lo que configuraste. La frontera sigue intacta —el
+           código no elige entre varias cuando no sabe cuál— porque esto
+           solo actúa si el correo declarado casa EXACTAMENTE UNA.
+
+           Pasó de verdad el 3/10/2026: el cambio de plan vació el lote, el
+           id guardado dejó de existir, y el panel pedía elegir entre `Total`
+           y `Yapaitas` —dos negocios— cuando el correo ya decía cuál era. */
+        var rescate = unaPorCorreo();
+        if (rescate) {
+          return {estado: 'declarada', instancia: rescate, instancias: L,
+            rescatada: true};
+        }
+        // Ni por correo. Y NO se sustituye por otra, pase lo que pase.
         return {estado: 'elegida_no_existe', instancia: null, instancias: L};
       }
       if (!L.length) return vacio;
@@ -306,16 +343,6 @@
          Y SE EXIGE UNA SOLA CANDIDATA. Si hay dos cuentas con el mismo
          nombre, o si el id declarado apunta a una y el nombre a OTRA, eso
          no es una elección: es una contradicción, y se pregunta. */
-      var pid = '';
-      var pcorreo = '';
-      var pnom = '';
-      if (preferida && typeof preferida === 'object') {
-        pid = String(preferida.id || '').trim();
-        pcorreo = String(preferida.correo || '').trim().toLowerCase();
-        pnom = String(preferida.nombre || '').trim().toLowerCase();
-      } else {
-        pnom = String(preferida || '').trim().toLowerCase();
-      }
       /* ★ PRECEDENCIA: PRIMERO EL ID, Y EL NOMBRE SOLO SI EL ID NO ESTÁ.
          No son alternativas, y confundirlas me costó un fallo real
          (02/10/2026): la cuenta pasó a tener DOS instancias llamadas
@@ -417,6 +444,17 @@
       return _pedir({op: 'recuperarEnvio', datos: {pedidoId: pedidoId}});
     },
 
+    /* ✅ CONECTAR LA CUENTA — crear si hace falta, entrar siempre,
+       comprobar. Una sola operación idempotente: el navegador manda el
+       nombre y NADA MÁS. El servidor pone la identidad declarada y las
+       credenciales desde Secret Manager; su documentación desaconseja este
+       endpoint en un panel justo porque «obligaría a que tus credenciales
+       de Shalom Pro pasen por tu sistema», y así no pasan.
+       → {ok:true, id, creada, conectada, usuario, forma} */
+    conectarCuenta: function () {
+      return _pedir({op: 'conectarShalom', datos: {}});
+    },
+
     estadoSesion: function (instanceId) {
       return _pedir({op: 'instanceStatus', datos: {instanceId: instanceId}});
     },
@@ -488,6 +526,7 @@
         INSTANCIA_NO_EXISTE: 'La cuenta de Shalom Pro que elegiste ya no está. Elige otra en Config — no se cambia sola, porque sería cambiarte de negocio sin avisar.',
         SIN_DATO:      'Faltan datos para registrar. Abajo dice cuáles.',
         NO_ENCONTRADO_PEDIDO: 'Ese pedido ya no está en la base de datos.',
+        SIN_CREDENCIALES: 'Faltan las credenciales de Shalom Pro en el servidor. Se ponen desde tu terminal con `firebase functions:secrets:set SHALOM_PRO_USER` y `SHALOM_PRO_PASS`.',
         SIN_INSTANCIA_VALIDA: 'El id de instancia de Shalom Pro no sirve. La clave de la API puede estar bien: compruébala con «Verificar sesión».',
         LIMITE:        'Se agotó la cuota del plan de Shalom.',
         ERROR_SHALOM:  'Shalom respondió con un error. Reintenta en unos minutos.',

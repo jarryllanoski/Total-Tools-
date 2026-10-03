@@ -49,25 +49,53 @@ module.exports = async ({bloque, ok}) => {
        `ORDER_FIELDS`: lista blanca. Lo que no esta declarado no sale. Para
        `login` la lista esta VACIA a proposito: el navegador no puede mandar
        NADA. Las credenciales las pondra el servidor desde Secret Manager. */
-    ok(P.PERMITIDAS.instanceLogin && P.PERMITIDAS.instanceLogin.soloMedir === true,
-       '`instanceLogin` existe y entra en soloMedir, como todo endpoint nuevo');
-    ok(Array.isArray(P.PERMITIDAS.instanceLogin.cuerpoCampos) &&
-       P.PERMITIDAS.instanceLogin.cuerpoCampos.length === 0,
-       'y su lista de campos permitidos esta VACIA: el navegador no manda nada');
+    /* ⚠️ LA REJA CAMBIO DE SITIO, Y A UNO MEJOR (3/10/2026).
+       Antes era `soloMedir` + `cuerpoCampos: []`: el navegador SI alcanzaba
+       la operacion, y lo que la protegia era que el cuerpo se vaciaba. Ahora
+       que el login se usa de verdad, es `soloServidor`: la barrera lo corta
+       ANTES de mirar el cuerpo, asi que el navegador no la alcanza siquiera.
+
+       Mas estricto, no menos. Y lo que se prueba abajo ya no es el filtrado
+       del cuerpo —eso ni se ejecuta— sino LA PUERTA REAL, que es por donde
+       entra todo lo que viene de fuera. */
+    ok(P.PERMITIDAS.instanceLogin &&
+       P.PERMITIDAS.instanceLogin.soloServidor === true,
+       '`instanceLogin` es solo-servidor: el navegador no la alcanza');
+    ok(P.PERMITIDAS.instanceCrear &&
+       P.PERMITIDAS.instanceCrear.soloServidor === true,
+       'y crear instancias tambien: con 900 slots, un creador al alcance de ' +
+       'la consola llena la cuenta de instancias sueltas');
   }
 
   {
-    /* De comportamiento: aunque alguien mande credenciales, NO SALEN. */
-    const f = conFetch(resp(400, {error: 'x', message: 'y'}));
-    await P.llamar('instanceLogin', 'sk_clave', {
-      username: 'jarry@totaltools', password: 'laQueSea123', instanceId: 'abc'
+    /* ⚠️ DE COMPORTAMIENTO, Y POR LA PUERTA REAL. `barreras()` es el unico
+       sitio por el que entra lo que manda el navegador (functions/index.js).
+       Si alguien pega credenciales en la consola, tienen que morir AHI —
+       antes de que exista ninguna peticion a Shalom. */
+    const sesionOk = {uid: 'u1', correo: 'jarryllanoski@gmail.com'};
+    const intento = P.barreras({
+      sesion: sesionOk, admins: ['jarryllanoski@gmail.com'], encendida: true,
+      cuerpo: {op: 'instanceLogin', datos: {instanceId: 'abc',
+        username: 'jarry@totaltools', password: 'laQueSea123'}}
     });
-    const enviado = f.opciones.body;
-    f.restaurar();
-    ok(enviado === '{}',
-       'una contraseña mandada desde fuera NO llega a Shalom — se envio: ' + enviado);
-    ok(enviado.indexOf('laQueSea123') < 0 && enviado.indexOf('password') < 0,
-       'y no queda ni rastro de ella en el cuerpo');
+    ok(intento.ok !== true,
+       'mandar credenciales desde el navegador NO pasa la puerta');
+    ok(JSON.stringify(intento).indexOf('laQueSea123') < 0,
+       'y la contraseña no viaja ni dentro del rechazo');
+
+    // Ni disfrazado de diagnostico, que es como se colo `register` una vez.
+    const medir = P.barreras({
+      sesion: sesionOk, admins: ['jarryllanoski@gmail.com'], encendida: true,
+      cuerpo: {op: 'esquema', de: 'instanceLogin', datos: {password: 'x'}}
+    });
+    ok(medir.ok !== true, 'ni llamandolo "medir"');
+
+    const crear = P.barreras({
+      sesion: sesionOk, admins: ['jarryllanoski@gmail.com'], encendida: true,
+      cuerpo: {op: 'instanceCrear', datos: {name: 'La que me apetezca'}}
+    });
+    ok(crear.ok !== true,
+       'y nadie crea una instancia con el nombre que quiera desde la consola');
   }
 
   {
@@ -115,12 +143,21 @@ module.exports = async ({bloque, ok}) => {
   }
 
   {
-    /* ⚠️ `POST /instances` (CREAR) tampoco. El boton de la otra app se llama
-       "Obtener instancia" y eso suena a crear, pero Jarry YA TIENE una: el
-       `id` sale del `GET /instances` que ya esta traducido. Crear una
-       segunda devuelve 403 por limite, y deja un lio que desenredar. */
-    ok(!P.PERMITIDAS.instanceCrear && !P.PERMITIDAS.instanceNueva,
-       'crear instancias no esta en la puerta: ya hay una, y el limite da 403');
+    /* ⚠️ `POST /instances` (CREAR) ESTABA EXCLUIDO, y el motivo escrito era
+       «ya hay una, y crear otra devuelve 403 por limite». Ese motivo se
+       murio el 3/10/2026: el plan paso de 1 instancia a 900 y el 403 ya no
+       llega. El limite era lo que protegia, no una decision nuestra.
+
+       Ahora existe, pero `soloServidor`: el navegador no la alcanza, y la
+       orquestacion solo crea si no habia ninguna con el correo declarado.
+       «Una sola vez» por construccion, no por confianza. */
+    ok(P.PERMITIDAS.instanceCrear &&
+       P.PERMITIDAS.instanceCrear.soloServidor === true,
+       'crear instancias existe, pero fuera del alcance del navegador');
+    ok(!P.PERMITIDAS.instanceBorrar && !P.PERMITIDAS.instanceLogout,
+       'borrar y cerrar sesion siguen SIN estar: su doc dice que el logout ' +
+       'borra las credenciales guardadas y se acaba el auto-login, que es ' +
+       'justo lo contrario de lo que el dueño pidio');
   }
 
   {
@@ -422,10 +459,18 @@ module.exports = async ({bloque, ok}) => {
        que pida credenciales aunque no se llame "login". */
     claves.filter((k) => /login|password|credencial/i.test(
         k + ' ' + P.PERMITIDAS[k].ruta)).forEach((k) => {
-      const cc = P.PERMITIDAS[k].cuerpoCampos;
-      ok(Array.isArray(cc) && cc.length === 0,
-         k + ': una ruta de credenciales existe SOLO si el navegador no ' +
-         'puede mandarle nada (cuerpoCampos vacío)');
+      const d = P.PERMITIDAS[k];
+      const cc = d.cuerpoCampos;
+      /* ⚠️ DOS FORMAS DE CUMPLIRLO, Y LA CONDICION ES LA MISMA: el navegador
+         no puede poner nada ahí dentro.
+           · `cuerpoCampos: []`  → alcanza la operación, pero el cuerpo se
+             vacía. Es lo que valía mientras el login era solo un hueco.
+           · `soloServidor`      → ni siquiera la alcanza. Más estricto.
+         Lo que NO se admite es una ruta de credenciales que acepte campos
+         del navegador, se llame como se llame. */
+      ok(d.soloServidor === true || (Array.isArray(cc) && cc.length === 0),
+         k + ': una ruta de credenciales, o es solo-servidor, o tiene la ' +
+         'lista de campos vacía — el navegador nunca pone nada ahí');
     });
     ok(!P.PERMITIDAS['instances/logout'] && !P.PERMITIDAS['webhooks'] &&
        !P.PERMITIDAS['tracking/subscriptions'],
@@ -462,8 +507,8 @@ module.exports = async ({bloque, ok}) => {
 
   ok(Object.keys(P.PERMITIDAS).join(',') ===
      'validate,track,instances,agencies,dni,instanceStatus,instanceLogin,' +
-     'register,pendientes',
-  'hoy hay nueve, y en el orden en que se reconstruyen');
+     'instanceCrear,register,pendientes',
+  'hoy hay diez, y en el orden en que se reconstruyen');
   ok(!P.PERMITIDAS.track.soloMedir,
      'track ya no es solo medible: su forma se midió y se tradujo');
   ok(P.PERMITIDAS.instances.metodo === 'GET' &&

@@ -1056,6 +1056,64 @@ function regToggleSimulacro(){
   _pintarRegistroShalom();
 }
 
+/* ★ CONECTAR / RECONECTAR LA CUENTA DE SHALOM PRO.
+   Una sola operación idempotente: el servidor crea la instancia SOLO si no
+   existe, entra siempre, y comprueba. Pulsarla dos veces no crea dos.
+
+   Entrar aunque ya figure conectada no es un descuido: entrar por la API es
+   lo que deja las credenciales guardadas en la instancia, y eso es lo que
+   hace que la sesión se levante sola cuando expira. Sin ellas llega el 401
+   que su propia documentación llama «el fallo más repetido de esta API».
+
+   El navegador manda el nombre de la operación y NADA MÁS: la identidad
+   declarada y las credenciales las pone el servidor. */
+async function conectarCuentaShalom(){
+  const btn = $('shalomConectarBtn');
+  const caja = $('shalomConectarSalida');
+  const decir = (html) => { if(caja){ caja.style.display='block'; caja.innerHTML=html; } };
+  if(!window.Shalom || !window.Shalom.conectarCuenta){
+    decir('<span style="color:var(--red)">Shalom no está disponible.</span>'); return; }
+
+  // Sin apagarlo, dos clics seguidos son dos vueltas al mismo trabajo — y la
+  // primera podría estar creando la instancia mientras la segunda la busca.
+  if(btn){ btn.disabled = true; btn.style.opacity='.5'; btn.textContent='⏳ Conectando…'; }
+  decir('<span style="color:var(--text2)">Buscando la cuenta, entrando y comprobando…</span>');
+  let r = null;
+  try{ r = await window.Shalom.conectarCuenta(); }catch(e){ r = null; }
+  if(btn){ btn.disabled = false; btn.style.opacity=''; btn.textContent='🔗 Conectar / reconectar la cuenta'; }
+
+  if(r && r.ok){
+    if(r.id){
+      S.shalomInstancia = {id: String(r.id),
+        nombre: (S.shalomInstancia||{}).nombre || 'Total Tools Panel'};
+      save('config');
+    }
+    _regSesion = {estado: r.conectada ? 'ok' : 'sinSesion', usuario: r.usuario};
+    _regSesionDe = String(r.id || '');
+    if(typeof _pintarRegistroShalom === 'function') _pintarRegistroShalom();
+    decir('<div style="background:rgba(63,185,80,.1);border:1px solid rgba(63,185,80,.3);'+
+      'border-radius:9px;padding:10px 12px">'+
+      '<b style="color:#3fb950">'+(r.creada ? '✅ Cuenta creada y conectada' :
+        (r.conectada ? '✅ Sesión renovada' : '⚠️ Entró, pero Shalom aún no la da por conectada'))+
+      '</b><div style="color:var(--text2);margin-top:4px">'+
+      (r.usuario ? escH(r.usuario)+' · ' : '')+'<span style="font-family:monospace;font-size:10.5px">'+
+      escH(r.id||'')+'</span></div></div>');
+    toast(r.creada ? '✅ Cuenta de Shalom creada y conectada' : '✅ Sesión de Shalom renovada');
+    /* Los NOMBRES de lo que contestó el login, sin un solo valor. Es lo que
+       falta para cerrar el traductor y se puede pegar en un chat. */
+    if(r.forma) console.log('[Shalom login · forma]', JSON.stringify(r.forma));
+    return;
+  }
+
+  const mot = (r && r.motivo) || 'SIN_RED';
+  const txt = (window.Shalom.textoMotivo ? window.Shalom.textoMotivo(mot) : mot);
+  decir('<div style="background:rgba(248,81,73,.1);border:1px solid rgba(248,81,73,.3);'+
+    'border-radius:9px;padding:10px 12px"><b style="color:var(--red)">❌ '+escH(txt)+'</b>'+
+    ((r && r.detalle) ? '<div style="color:var(--text2);margin-top:4px">'+escH(r.detalle)+'</div>' : '')+
+    '</div>');
+  if(r && r.forma) console.log('[Shalom conectar · forma]', JSON.stringify(r.forma));
+}
+
 async function regComprobarSesion(){
   const id = (S.shalomInstancia||{}).id;
   if(!id){ toast('Elige tu cuenta de Shalom Pro en ⚙️ Config'); return; }

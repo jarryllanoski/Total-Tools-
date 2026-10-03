@@ -28,6 +28,7 @@ const agencias = require("./agencias");
 const pedidoPublico = require("./pedidoPublico");
 const enlace = require("./enlaceSeguimiento");
 const registroShalom = require("./registroShalom");
+const instanciaShalom = require("./instanciaShalom");
 
 setGlobalOptions({maxInstances: 10});
 initializeApp();
@@ -47,6 +48,22 @@ const SHALOM_API_KEY = defineSecret("SHALOM_API_KEY");
 // despues queda enmascarado. Se pone con:
 //   firebase functions:secrets:set SHALOM_WEBHOOK_SECRET
 const SHALOM_WEBHOOK_SECRET = defineSecret("SHALOM_WEBHOOK_SECRET");
+
+/* Las credenciales de Shalom Pro. Su documentacion desaconseja tener
+   `POST /instances/login` en un panel porque «obligaria a que tus
+   credenciales de Shalom Pro pasen por tu sistema». No pasan: viven aqui,
+   igual que la clave de la API, y el navegador no puede mandarlas (la
+   operacion es `soloServidor`, la barrera la corta antes del cuerpo).
+
+   Se ponen desde la terminal del dueño, NUNCA pegadas en un chat:
+     firebase functions:secrets:set SHALOM_PRO_USER
+     firebase functions:secrets:set SHALOM_PRO_PASS
+
+   ⚠️ TIENEN QUE EXISTIR ANTES DE DESPLEGAR. Una funcion que declara un
+   secreto inexistente no despliega — y el fallo sale en el deploy, no en
+   produccion, que es donde se quiere que salga. */
+const SHALOM_PRO_USER = defineSecret("SHALOM_PRO_USER");
+const SHALOM_PRO_PASS = defineSecret("SHALOM_PRO_PASS");
 
 // ⚠️ ESTA LISTA DEBE COINCIDIR CON firestore.rules (funcion esAdmin).
 // Son dos archivos distintos que expresan la misma regla: si se cambian por
@@ -1205,7 +1222,13 @@ exports.barridoAhora = onRequest({
 // `track` esta en la lista pero marcado `soloMedir`: se puede medir y todavia
 // no usar. Pedirlo como operacion normal responde SIN_TRADUCTOR.
 exports.shalomPuerta = onRequest(
-    {region: "us-central1", secrets: [SHALOM_API_KEY], timeoutSeconds: 60},
+    /* ⚠️ LOS TRES SECRETOS TIENEN QUE EXISTIR ANTES DE DESPLEGAR. Una
+       funcion que declara un secreto que no esta en Secret Manager NO
+       DESPLIEGA — y que falle en el deploy es exactamente donde se quiere
+       que falle, no en produccion con el dueño delante. */
+    {region: "us-central1",
+      secrets: [SHALOM_API_KEY, SHALOM_PRO_USER, SHALOM_PRO_PASS],
+      timeoutSeconds: 120},
     async (req, res) => {
       setCORS(req, res);
       if (req.method === "OPTIONS") {
@@ -1274,6 +1297,55 @@ exports.shalomPuerta = onRequest(
             motivo: "ERROR_SHALOM",
             detalle: "Algo se rompio a mitad y NO SABEMOS si el envio llego " +
               "a crearse. Verifica en pro.shalom.pe antes de reintentar."});
+        }
+        return;
+      }
+
+      /* ★ CONECTAR LA CUENTA DE SHALOM PRO — crear si hace falta, entrar
+         siempre, comprobar. Una sola operacion idempotente: pulsarla dos
+         veces no crea dos instancias.
+
+         Se entra SIEMPRE aunque ya figure conectada, y no es un descuido:
+         entrar por la API es lo que deja las credenciales guardadas en la
+         instancia, y eso es lo que hace que la sesion se levante sola
+         cuando expira. Sin credenciales guardadas llega el 401 que su
+         propia documentacion llama «el fallo mas repetido de esta API». */
+      if (paso.orquestar === "conectarShalom") {
+        try {
+          const cfgSnap2 = await db.doc(CFG_DOC).get();
+          const cfg2 = cfgSnap2.exists ? cfgSnap2.data() : {};
+          const decl = (cfg2.shalomInstanciaPreferida &&
+            typeof cfg2.shalomInstanciaPreferida === "object") ?
+            cfg2.shalomInstanciaPreferida : {};
+          const salida3 = await instanciaShalom.conectar({
+            listar: () => _porLaPuerta("instances", {}),
+            crear: (nombre) => _porLaPuerta("instanceCrear", {name: nombre}),
+            entrar: (id, usuario, clave) => _porLaPuerta("instanceLogin",
+                {instanceId: id, username: usuario, password: clave}),
+            estado: (id) => _porLaPuerta("instanceStatus", {instanceId: id}),
+          }, {
+            // Lo declarado en Config pisa lo del codigo, igual que el resto.
+            // Config puede pisarla sin desplegar; si no, la del modulo.
+            // NUNCA del navegador: ver el comentario de DECLARADA.
+            correo: decl.correo || instanciaShalom.DECLARADA.correo,
+            nombre: decl.nombre || instanciaShalom.DECLARADA.nombre,
+            usuario: SHALOM_PRO_USER.value(),
+            clave: SHALOM_PRO_PASS.value(),
+          });
+          /* Si acabo de conectar una instancia, se guarda cual — el
+             registro de envios la lee de Firestore, no del navegador. */
+          if (salida3 && salida3.ok && salida3.id) {
+            await db.doc(CFG_DOC).set({shalomInstancia: {
+              id: salida3.id,
+              nombre: decl.nombre || instanciaShalom.DECLARADA.nombre,
+            }}, {merge: true});
+          }
+          res.status(200).json(salida3);
+        } catch (e) {
+          console.error("conectarShalom:", e);
+          res.status(200).json({ok: false, motivo: "ERROR_SHALOM",
+            detalle: "Algo se rompio al conectar. Mira la cuenta en " +
+              "shalom-api.lat antes de volver a intentarlo."});
         }
         return;
       }

@@ -536,10 +536,49 @@ ejecutan desde el panel de Shalom API, a mano, sabiendo lo que se hace.
 
 | Endpoint | Qué rompe |
 |---|---|
-| `DELETE /instances` | Borra la instancia y su sesión persistida (tienes **una**) |
+| `DELETE /instances` | Borra la instancia y su sesión persistida |
 | `POST /instances/logout` | Borra la sesión **y las credenciales guardadas** → se acaba el auto-login |
-| `POST /instances/login` | Obligaría a que tus credenciales de Shalom Pro pasen por tu sistema |
 | `DELETE /webhooks` | Deja el panel ciego **sin que salte ningún error** |
 | `DELETE /tracking/subscriptions` | *(masivo)* dejaría de avisar de guías vivas |
 
-El panel solo **lee** el estado y avisa cuando algo hace falta.
+Esas cuatro siguen fuera. **`POST /instances/login` y `POST /instances`
+entraron el 3/10/2026**, y conviene saber por qué cada uno:
+
+### `POST /instances/login` — la objeción era la credencial, y se resolvió
+
+Su documentación lo desaconseja porque *«obligaría a que tus credenciales de
+Shalom Pro pasen por tu sistema»*. **No pasan:**
+
+```
+tu terminal ──▶ Secret Manager ──▶ Cloud Function ──▶ Shalom
+                                        │
+navegador ──▶ {op:'conectarShalom'} ────┘   (sin cuerpo)
+```
+
+La operación es **`soloServidor`**: la barrera la corta *antes* de mirar el
+cuerpo, así que el navegador **no la alcanza**, ni siquiera disfrazada de
+`esquema`. Es más estricto que el `cuerpoCampos: []` que tenía antes.
+
+**Y hacía falta.** El dueño pidió *«que no se caiga al refrescar»*, y según
+esta misma documentación lo único que impide que se caiga es entrar con las
+credenciales guardadas:
+
+> *«hace auto-login cuando expira, **si guardaste credenciales**»*
+> *«401 — la sesión expiró sin credenciales guardadas. ⚠️ Ese es el fallo
+> más repetido de esta API.»*
+
+No entrar nunca por la API **era** el fallo, no la protección.
+
+### `POST /instances` — su protección era el límite, y el límite se fue
+
+Estaba fuera porque *«ya hay una y crear otra devuelve 403»*. Con 900
+instancias ese 403 no llega. Ahora entra, también `soloServidor`, y con el
+nombre **fijado en el código**: nadie crea una instancia con el nombre que le
+apetezca desde la consola.
+
+**«Una sola vez» es por construcción:** la orquestación lista primero y
+**solo crea si no hay ninguna** con el correo declarado — o con el nombre
+declarado y sin correo, que es una creada en un intento anterior que no llegó
+a entrar. Pulsar el botón tres veces crea **una** instancia.
+
+El panel sigue sin **borrar** y sin **cerrar sesión**: esos dos sí rompen.
