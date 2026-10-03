@@ -417,6 +417,11 @@
         SIN_RED:       'Sin conexión. Reintenta en un momento.',
         SIN_DATO:      'Faltan datos para consultar.',
         NO_ENCONTRADO: 'Shalom no encontró ese dato.',
+        /* No es un fallo: es el estado normal entre registrar y llevar el
+           paquete. Shalom distingue `registrado` (la guía existe) de
+           `origen` (el paquete entró a la agencia); la puerta ya no las
+           aplasta, así que esta respuesta por fin se puede decir. */
+        SOLO_REGISTRADO: 'Registrado en Shalom, pero el paquete todavía no entró a la agencia. Déjalo allí: el plazo es de 24 horas.',
         BLOQUEADO:     'Shalom rechazó la clave de la API, o el plan venció.',
         /* Medido: con un instanceId malo, Shalom responde 403 "Invalid API
            Key or instance access". Antes se traducía como BLOQUEADO y

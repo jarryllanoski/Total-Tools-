@@ -29,7 +29,7 @@
 <script src="functions/etiquetas.js?v=1"></script>
 <script src="functions/agencias.js?v=1"></script>
 <script src="functions/enlaceSeguimiento.js?v=1"></script>
-<script src="functions/registroShalom.js?v=1"></script>
+<script src="functions/registroShalom.js?v=2"></script>
 <script src="appcheck.js?v=1"></script>
 <!-- FIREBASE via REST API — sin SDK, funciona en Brave/Chrome/Firefox/Safari -->
 <script>
@@ -2024,7 +2024,12 @@ window._mergeRemote = (remote) => {
         if(rs.docEmbalado && rs.docEmbalado.d === '[img]' && local.docEmbalado) rs.docEmbalado = local.docEmbalado;
         if(rs.docTicket && rs.docTicket.d === '[img]' && local.docTicket) rs.docTicket = local.docTicket;
         // Preservar campos de tracking/guía Shalom si Firebase trae versión sin ellos
+        // ⚠️ shalomEstado/shalomMonto/shalomRegistradoEn faltaban en esta lista
+        // desde que se lanzo el registro: una copia vieja de la nube podia
+        // borrarlos. Esta lista solo CONSERVA, nunca pisa, asi que anadirlos
+        // no puede romper nada — y sin shalomRegistradoEn no hay cuenta atras.
         ['trackingOrderNumber','trackingOrderCode','shalomGuia','shalomCodigo',
+         'shalomEstado','shalomMonto','shalomRegistradoEn',
          'trackingStatus','trackingMessage','trackingLastUpdate','trackingLastAutoCheck',
          'trackingHistory','trackingHistorialShalom','trackingOrigen','trackingDestino'].forEach(k=>{
           if(local[k]!==undefined && !rs[k]) rs[k]=local[k];
@@ -4784,11 +4789,11 @@ render();
      lo usa. config.js, print.js y voz.js preguntan por los pedidos marcados,
      así que siguen yendo detrás. El orden de carga es un contrato
      (ver docs/ARQUITECTURA.md). -->
-<script src="config.js?v=41"></script>
+<script src="config.js?v=42"></script>
 <script src="print.js?v=16"></script>
 <script src="notify.js?v=5"></script>
-<script src="shalom.js?v=25"></script>
-<script src="tracking.js?v=21"></script>
+<script src="shalom.js?v=26"></script>
+<script src="tracking.js?v=22"></script>
 <script src="floatpanel.js?v=4"></script>
 <script src="delivery.js?v=8"></script>
 <script src="qrtracking.js?v=3"></script>

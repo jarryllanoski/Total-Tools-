@@ -77,6 +77,13 @@ function _reabreEn(reabre){
 function _motivoTexto(motivo, detalle){
   switch (motivo) {
     case 'DESCONECTADO':  return '🔧 Rastreo Shalom en reconstrucción';
+    /* NO ES UN ERROR, y por eso no lleva ⚠️. Shalom reconoce la guía pero
+       todavía no ha entrado a ninguna agencia: el paquete sigue contigo.
+       Antes esto no existía como respuesta —la puerta traducía la guía recién
+       nacida como "En origen"— y la primera consulta movía la etiqueta a
+       ENVIADO con el paquete en la tienda. */
+    case 'SOLO_REGISTRADO':
+      return '📦 Registrado en Shalom — el paquete aún no entró a la agencia';
     case 'NO_ENCONTRADO': return '⚠️ Shalom no encontró esa guía — verifica número y código';
     // Estos dos son del PANEL, no de Shalom. Antes los dos caían en BLOQUEADO
     // y mandaban a revisar la cuenta de Shalom cuando lo único que pasaba era
@@ -515,6 +522,30 @@ function _injectOverlays() {
 /* ══════════════════════════════════════════════
    CHIP DE ESTADO
 ══════════════════════════════════════════════ */
+/* EL PLAZO DE 24 H DE SHALOM.
+   Shalom borra la guía que no se deja en la agencia dentro de 24 h —su propio
+   panel muestra la cuenta atrás— y una guía borrada es un envío que no existe.
+   Sin esto, lo único que veías era "Registrado" y nada que te apurara.
+
+   Devuelve null cuando el pedido no trae sello de hora: los envíos
+   recuperados con `recuperarEnvio` no lo tienen a propósito, porque su hora
+   de nacimiento no se puede afirmar. Mejor sin cuenta atrás que con una
+   inventada que te deje tranquilo mientras el plazo se vence. */
+function _plazoShalom(ship, ahora) {
+  var t = Date.parse(String((ship && ship.shalomRegistradoEn) || ''));
+  if (!isFinite(t)) return null;
+  var resta = (t + 86400000) - (ahora || Date.now());
+  var abs = Math.abs(resta);
+  var h = Math.floor(abs / 3600000);
+  var m = Math.floor((abs % 3600000) / 60000);
+  return {
+    queda: resta,
+    vencido: resta <= 0,
+    urgente: resta > 0 && resta < 10800000,   // menos de 3 h
+    texto: (resta <= 0 ? 'venció hace ' : 'quedan ') + h + ' h ' + m + ' min'
+  };
+}
+
 function _estadoChip(ship) {
   var st = ship.trackingStatus;
   if (!st || st === '—') {
@@ -527,9 +558,18 @@ function _estadoChip(ship) {
        En cuanto Shalom lo mueve, manda el rastreo: el estado del
        transporte es más fresco que "lo registré yo". */
     if (String(ship.shalomEstado || '').toUpperCase() === 'REGISTRADO') {
-      return '<div class="trk-chip trk-chip-pend" style="margin-top:4px">'+
+      var pz = _plazoShalom(ship);
+      var cls = 'trk-chip-pend', cola = ' — déjalo en la agencia';
+      if (pz && pz.vencido) {
+        cls = 'trk-chip-err';
+        cola = ' — ⏰ venció el plazo de 24 h (' + pz.texto + ')';
+      } else if (pz) {
+        if (pz.urgente) cls = 'trk-chip-err';
+        cola = ' — déjalo en la agencia · ' + pz.texto;
+      }
+      return '<div class="trk-chip '+cls+'" style="margin-top:4px">'+
         '📦 Registrado en Shalom'+
-        '<span style="opacity:.75;font-weight:400"> — déjalo en la agencia'+
+        '<span style="opacity:.75;font-weight:400">'+cola+
         '</span></div>';
     }
     return '<div style="font-size:11px;color:#8b949e;margin-top:4px;padding:4px 0">Sin consultas aún — presiona Consultar</div>';

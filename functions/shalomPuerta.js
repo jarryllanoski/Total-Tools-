@@ -424,8 +424,24 @@ async function llamar(op, clave, cuerpo) {
 // El orden de esta lista ES el avance del envío. Gana el ÚLTIMO que tenga
 // fecha, no el de número más alto: `destino` y `reparto` comparten pasos:2 y
 // aun así reparto va después.
+//
+// ⚠️ `registrado` NO ESTÁ AQUÍ, por la misma razón que `demora` no está: no es
+// un paso del paquete. Shalom tiene DOS ramas distintas, con dos fechas
+// distintas, y significan cosas distintas:
+//
+//     registrado → la guía fue creada          ← esto lo hacemos NOSOTROS
+//     origen     → el paquete entró a la agencia ← esto es "ya lo dejé"
+//
+// Las dos estaban traducidas al mismo texto y al mismo rango. Aplastarlas
+// costó un pedido real: se registró, nadie dejó el paquete, la primera
+// consulta contestó "En origen" y la etiqueta saltó a ENVIADO con el paquete
+// todavía en la tienda. Medimos bien el esquema y después tiramos la única
+// distinción que importaba.
+//
+// Con `registrado` fuera de esta lista, una guía recién nacida no alcanza
+// ningún paso → `ok:false` → nadie mueve nada. Y eso no es que el bug esté
+// arreglado: es que no se puede escribir.
 const PASOS = [
-  {clave: "registrado", texto: "En origen", pasos: 0},
   {clave: "origen", texto: "En origen", pasos: 0},
   {clave: "transito", texto: "En tránsito", pasos: 1},
   {clave: "destino", texto: "En destino", pasos: 2},
@@ -500,9 +516,24 @@ function traducirTrack(j) {
       alcanzado = p; // el último con fecha manda
     }
   });
-  // REGLA DE ORO: sin un paso real, no hay éxito. Un árbol entero en null es
-  // una guía que Shalom aún no registró — no un error, pero tampoco un dato.
-  if (!alcanzado) return {ok: false, motivo: "SIN_DATO"};
+  /* REGLA DE ORO: sin un paso real, no hay éxito.
+
+     Y aquí se separan dos "no hay dato" que no son lo mismo:
+
+       SOLO_REGISTRADO → la guía existe y Shalom la reconoce, pero el paquete
+                         no ha entrado a ninguna agencia. Hay un plazo de 24 h
+                         corriendo y el paquete sigue contigo.
+       SIN_DATO        → el árbol entero en null: Shalom aún no la registró.
+
+     Las dos devuelven ok:false, así que ninguna mueve etiquetas ni escribe
+     tracking. La diferencia es lo que se te dice en pantalla, y no es poca
+     cosa: una te manda a la agencia, la otra a revisar la guía. */
+  const reg = _fechaDe(d.registrado);
+  if (!alcanzado) {
+    return reg ?
+      {ok: false, motivo: "SOLO_REGISTRADO", registrado: {fecha: reg}} :
+      {ok: false, motivo: "SIN_DATO"};
+  }
 
   const ent = d.entregado;
   const cli = (ent && typeof ent === "object") ? ent.cliente : null;
@@ -522,6 +553,9 @@ function traducirTrack(j) {
     pasos: alcanzado.pasos,
     fecha: arbol[alcanzado.clave],
     demora: demora ? {fecha: demora} : null,
+    // Cuándo nació la guía. Viaja aparte —como la demora— porque es un hecho
+    // del papel, no del paquete.
+    registrado: reg ? {fecha: reg} : null,
     // Quién recibió: solo tiene sentido si de verdad se entregó.
     recibio: alcanzado.clave === "entregado" ? recibio : null,
     arbol: arbol,

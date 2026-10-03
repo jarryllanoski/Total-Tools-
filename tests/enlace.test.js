@@ -452,8 +452,9 @@ module.exports = async ({bloque, ok}) => {
        codigo. Si alguien vuelve a tocar estos archivos sin subirlo, esta
        prueba se lo recuerda. */
     const idx = E.leer('index.html');
-    [['config.js', 41], ['tracking.js', 21], ['notify.js', 5], ['shalom.js', 25],
-      ['functions/enlaceSeguimiento.js', 1]].forEach((par) => {
+    [['config.js', 42], ['tracking.js', 22], ['notify.js', 5], ['shalom.js', 26],
+      ['functions/enlaceSeguimiento.js', 1],
+      ['functions/registroShalom.js', 2]].forEach((par) => {
       /* `src="` delante a proposito: sin eso, `config.js` casa dentro de
          `firebase-config.js` y la prueba lee la version del archivo
          equivocado. Me acaba de pasar. */

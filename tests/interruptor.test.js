@@ -143,4 +143,30 @@ module.exports = async ({bloque, ok: afirmar}) => {
       'ni un fallo del dato');
   afirmar(I.tras(I.normalizar({fallos: 2}), ok(), T, false) !== null,
       'pero si había fallos contados, se limpian');
+
+  bloque('SOLO_REGISTRADO no puede cerrar la puerta');
+
+  {
+    /* ⚠️ EL RIESGO QUE TRAJO EL ARREGLO DEL 3 OCT.
+       Desde que la puerta distingue `registrado` de `origen`, un pedido
+       registrado y todavía no dejado en la agencia responde ok:false con
+       motivo SOLO_REGISTRADO. Eso es lo CORRECTO —no hay dato de seguimiento
+       todavía— pero si el interruptor lo contara como fallo del servicio, el
+       barrido nocturno con varios pedidos así cerraría la puerta a Shalom
+       para TODO el panel, de madrugada, sin nadie delante.
+
+       No pasa porque MOTIVOS_DE_SERVICIO es lista blanca y no está dentro.
+       Esto lo deja clavado: si alguien lo añade, esta prueba se enciende. */
+    afirmar(I.tras(I.normalizar(null), falla('SOLO_REGISTRADO'), T, false) ===
+        null,
+        'cinco pedidos esperando a que los dejes en la agencia no apagan ' +
+        'el seguimiento de todo el panel');
+    let e = I.normalizar(null);
+    for (let i = 0; i < 12; i++) {
+      const c = I.tras(e, falla('SOLO_REGISTRADO'), T, false);
+      if (c) e = I.normalizar(Object.assign({}, e, c));
+    }
+    afirmar(!e.cerradaHasta && !e.fallos,
+        'y doce seguidos tampoco: no se acumulan hacia el cierre');
+  }
 };

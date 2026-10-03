@@ -426,11 +426,24 @@
   }
 
   /**
+   * La hora de ahora en ISO, por un reloj que una prueba pueda sustituir.
+   * Una prueba que dependa de la hora real falla sola algún martes.
+   * @param {Object} deps las dependencias, que pueden traer `ahora`
+   * @return {string} fecha ISO, o "" si el reloj dio algo que no es fecha
+   */
+  function _ahora(deps) {
+    const f = deps && deps.ahora;
+    const d = new Date((typeof f === "function") ? f() : Date.now());
+    return isFinite(d.getTime()) ? d.toISOString() : "";
+  }
+
+  /**
    * Lo que se guarda en el pedido a partir de un envío ya creado.
    * @param {Object} env el envío, como lo devuelve Shalom
+   * @param {string} [nacimiento] cuándo se creó la guía, en ISO
    * @return {Object} los campos a escribir
    */
-  function _deEnvio(env) {
+  function _deEnvio(env, nacimiento) {
     const e = env || {};
     const guia = _txt(e.service_order_guia_empresarial || e.guia ||
       e.orderNumber);
@@ -444,6 +457,22 @@
       status: "ALISTADO",
     };
     if (isFinite(monto) && monto > 0) campos.shalomMonto = monto;
+    /* ⏱ DE DÓNDE SALE EL PLAZO DE 24 H.
+       Shalom borra la guía que no se deja en la agencia dentro de 24 h, y su
+       panel muestra la cuenta atrás. Nosotros no la teníamos: el registro no
+       guardaba NINGUNA hora, así que no había desde dónde contar.
+
+       Se sella solo cuando se puede afirmar. En un registro recién hecho, la
+       hora de ahora y la de Shalom se diferencian en segundos: sirve. En una
+       recuperación posterior —`recuperarEnvio`, que puedes correr horas
+       después— no se sabe cuándo nació la guía, y entonces NO se sella: sin
+       sello no hay cuenta atrás, y eso es mejor que una cuenta atrás
+       inventada que te deje tranquilo mientras el plazo se vence.
+
+       La fuente definitiva es la rama `registrado` de /track, que es el
+       reloj de Shalom y cubre también los recuperados. Viaja ya en la
+       respuesta de la puerta; falta medir su formato antes de parsearla. */
+    if (nacimiento) campos.shalomRegistradoEn = nacimiento;
     return campos;
   }
 
@@ -460,7 +489,8 @@
    * devuelve el cuerpo exacto que mandaría, y NO llama a nadie.
    *
    * @param {Object} datos {pedidoId}
-   * @param {Object} deps {leerPedido, leerConfig, llamar, pendientes, guardar}
+   * @param {Object} deps {leerPedido, leerConfig, llamar, pendientes,
+   *   guardar, ahora}
    * @param {Object} [opc] {simulacro}
    * @return {Promise<Object>} el resultado, siempre con motivo en palabras
    */
@@ -495,7 +525,7 @@
         service_order_guia_empresarial: g.guia,
         code_service_order_empresarial: g.codigo,
         quote: g.monto,
-      });
+      }, _ahora(deps));
       await deps.guardar(campos);
       // Los NOMBRES de los campos que trajo Shalom, sin un solo valor: es
       // lo que hace falta para cerrar el traductor, y se puede pegar en un
@@ -522,7 +552,8 @@
       encontrado = null;
     }
     if (encontrado) {
-      const campos = _deEnvio(encontrado);
+      // Recién creado hace segundos: su hora de nacimiento es ahora.
+      const campos = _deEnvio(encontrado, _ahora(deps));
       await deps.guardar(campos);
       return {ok: true, estado: "exito", recuperado: true, campos: campos};
     }
@@ -579,6 +610,8 @@
           "registró nada de nuevo. Míralo en pro.shalom.pe: si está, " +
           "copia la guía a mano; si no está, no llegó a crearse."};
     }
+    /* SIN SELLO DE HORA, A PROPÓSITO: esto puede correr horas después del
+       registro, y poner "ahora" regalaría 24 h de plazo que ya no existen. */
     const campos = _deEnvio(env);
     await deps.guardar(campos);
     return {ok: true, estado: "exito", recuperado: true, campos: campos};

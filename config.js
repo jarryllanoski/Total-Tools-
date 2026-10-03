@@ -1146,6 +1146,7 @@ function saveShipment(){
     ['trackingStatus','trackingMessage','trackingLastUpdate','trackingLastAutoCheck',
      'trackingHistory','trackingHistorialShalom','trackingOrigen','trackingDestino',
      'trackingOrderNumber','trackingOrderCode','shalomGuia','shalomCodigo',
+     'shalomEstado','shalomMonto','shalomRegistradoEn',
      'dniDestinatario'].forEach(k=>{
       if(prev[k]!==undefined&&!data[k]) data[k]=prev[k];
     });

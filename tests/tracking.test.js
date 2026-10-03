@@ -21,7 +21,8 @@ module.exports = (t) => {
   const puente = src.replace('global.Tracking = Tracking;',
       'global.Tracking = Tracking;\n' +
       'global.__t={_aplicarEstadoShalom:_aplicarEstadoShalom,_estadoChip:_estadoChip,' +
-      '_rangoDeTexto:_rangoDeTexto,_avisoConsulta:_avisoConsulta,_motivoTexto:_motivoTexto};');
+      '_rangoDeTexto:_rangoDeTexto,_avisoConsulta:_avisoConsulta,_motivoTexto:_motivoTexto,' +
+      '_plazoShalom:_plazoShalom};');
   if (puente === src) throw new Error('no se pudo inyectar el puente de pruebas en tracking.js');
 
   const dom = E.domFalso({});
@@ -64,6 +65,61 @@ module.exports = (t) => {
     const viejo = T._estadoChip({id: '1'});
     ok(/Sin consultas/i.test(viejo),
        'un pedido sin registrar sigue diciendo lo de siempre');
+  }
+
+  bloque('El plazo de 24 h — el reloj que no existia');
+  {
+    /* Shalom borra la guia que no se deja en la agencia dentro de 24 h. Su
+       panel muestra la cuenta atras; el nuestro no mostraba NADA, porque el
+       registro no guardaba ninguna hora de la que contar. */
+    const t0 = Date.parse('2026-10-02T21:28:00Z');
+    const sello = {shalomEstado: 'REGISTRADO', shalomRegistradoEn:
+      '2026-10-02T21:28:00.000Z'};
+
+    const recien = T._plazoShalom(sello, t0 + 3600000);          // +1 h
+    ok(recien.vencido === false && recien.urgente === false,
+       'una hora despues del registro quedan 23 h: nada que alarmar');
+    ok(/quedan 23 h 0 min/.test(recien.texto),
+       'y se dice cuanto queda, no "pronto" — ' + recien.texto);
+
+    const apurado = T._plazoShalom(sello, t0 + 22 * 3600000);    // +22 h
+    ok(apurado.urgente === true && apurado.vencido === false,
+       'con menos de 3 h se marca urgente: es cuando hay que correr');
+
+    const muerto = T._plazoShalom(sello, t0 + 25 * 3600000);     // +25 h
+    ok(muerto.vencido === true && /venci. hace 1 h/.test(muerto.texto),
+       'pasadas las 24 h se dice que vencio, y hace cuanto — ' + muerto.texto);
+
+    /* ⚠️ SIN SELLO NO SE INVENTA. `recuperarEnvio` no sella a proposito: no
+       puede saber cuando nacio la guia. Una cuenta atras falsa es peor que
+       ninguna, porque te deja tranquilo mientras el plazo se consume. */
+    ok(T._plazoShalom({shalomEstado: 'REGISTRADO'}, t0) === null,
+       'un pedido sin hora de registro no tiene cuenta atras');
+    ok(T._plazoShalom({shalomRegistradoEn: 'basura'}, t0) === null,
+       'ni una fecha que no se puede leer');
+    ok(T._plazoShalom(null, t0) === null, 'ni sin pedido');
+  }
+  {
+    const chip = T._estadoChip({id: '1', shalomEstado: 'REGISTRADO',
+      shalomGuia: '98173469', shalomRegistradoEn:
+        new Date(Date.now() - 3600000).toISOString()});
+    ok(/REGISTRAD/i.test(chip) && /quedan 2[23] h/.test(chip),
+       'el chip del pedido registrado lleva la cuenta atras pegada');
+    const vencido = T._estadoChip({id: '1', shalomEstado: 'REGISTRADO',
+      shalomGuia: '98173469', shalomRegistradoEn:
+        new Date(Date.now() - 30 * 3600000).toISOString()});
+    ok(/venci/i.test(vencido) && /trk-chip-err/.test(vencido),
+       'y cuando vence lo dice en rojo, no en gris');
+    const sinSello = T._estadoChip({id: '1', shalomEstado: 'REGISTRADO',
+      shalomGuia: '98173469'});
+    ok(/d.jalo en la agencia/i.test(sinSello) && !/quedan/.test(sinSello),
+       'sin sello, el chip dice lo de siempre y no inventa un plazo');
+  }
+  {
+    const aviso = T._motivoTexto('SOLO_REGISTRADO', '');
+    ok(/REGISTRAD/i.test(aviso) && !/⚠/.test(aviso),
+       'que el paquete no haya entrado a la agencia NO es un error: el aviso ' +
+       'no lleva señal de alarma, porque no hay nada que arreglar');
   }
 
   bloque('El chip muestra la fecha del cambio, siempre');

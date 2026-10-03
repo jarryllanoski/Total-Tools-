@@ -38,10 +38,53 @@ module.exports = async ({bloque, ok}) => {
   ok(E.escalon('RECLAMOS, DEVOLUCIONES, GARANT') === -1,
      'una etiqueta tuya no está en la escalera, y eso es un dato, no un fallo');
 
+  bloque('Registrado no es dejado — un pedido no sale de ALISTADO solo');
+
+  {
+    /* LA GARANTÍA QUE PIDIÓ EL NEGOCIO, PROBADA DONDE SE DECIDE.
+       Registras en Shalom, el pedido pasa a ALISTADO con su guía, y consultas
+       —a mano o por el barrido— antes de llevar el paquete a la agencia.
+       Shalom contesta que la guía existe y nada más. Eso NO puede mover la
+       etiqueta: el paquete sigue en la tienda.
+
+       Pasó de verdad, con un envío pagado: la consulta manual lo mandó a
+       ENVIADO mientras el panel de Shalom seguía mostrando "quedan 23 h para
+       dejarlo". Aquí se prueba por el mismo sitio por el que pasan el botón
+       manual Y el barrido del servidor. */
+    const registrado = {status: 'ALISTADO', shalomGuia: '98173469',
+      shalomEstado: 'REGISTRADO'};
+
+    ok(decidir(registrado, {ok: false, motivo: 'SOLO_REGISTRADO'}) === null,
+       'la guía existe pero el paquete no se ha dejado → la etiqueta no se mueve');
+    ok(decidir(registrado, {ok: false, motivo: 'SIN_DATO'}) === null,
+       'ni cuando Shalom no sabe nada de la guía');
+    ok(nueva(registrado, shalom(0, 'En origen')) === 'ENVIADO',
+       'y en cuanto Shalom fecha el ingreso a la agencia, SÍ: ya se dejó');
+  }
+  {
+    /* LA TRAMPA DEL OTRO LADO, que este archivo ya sufrió una vez: tres
+       pedidos entregados se quedaron atascados en ENVIADO para siempre.
+       Un pedido con shalomEstado REGISTRADO tiene que poder llegar al final
+       del recorrido: el freno es del rango 0 sin dato, no del pedido. */
+    const reg = (st) => ({status: st, shalomEstado: 'REGISTRADO', cost: '0'});
+    ok(nueva(reg('ALISTADO'), shalom(1, 'En tránsito')) === 'ENVIADO',
+       'un pedido registrado por nosotros avanza normal en tránsito');
+    ok(nueva(reg('ALISTADO'), shalom(2, 'En destino')) === 'LLEGÓ A DESTINO',
+       'y salta directo a destino sin quedarse atascado en ALISTADO');
+    ok(nueva(reg('LLEGÓ A DESTINO'), shalom(3, 'Entregado')) === 'FINALIZADO',
+       'y llega hasta el final: REGISTRADO no es una jaula');
+  }
+
   bloque('La fórmula');
 
+  /* ⚠️ EL TEXTO DE ESTA PRUEBA DECÍA «la guía existe en Shalom → ENVIADO», y
+     esa frase era el bug escrito con palabras. Que la guía exista no mueve
+     nada: la guía la creamos nosotros. El rango 0 llega SOLO cuando Shalom
+     pone fecha en su rama `origen`, que es el ingreso del paquete a la
+     agencia. La puerta ya no traduce `registrado` a rango 0 — ver
+     functions/shalomPuerta.js, PASOS. */
   ok(nueva({status: 'NUEVO PEDIDO'}, shalom(0, 'En origen')) === 'ENVIADO',
-     'la guía existe en Shalom → ENVIADO');
+     'el paquete entró a la agencia de origen → ENVIADO');
   ok(nueva({status: 'NUEVO PEDIDO'}, shalom(1, 'En tránsito')) === 'ENVIADO',
      'en tránsito → ENVIADO');
   ok(nueva({status: 'ENVIADO'}, shalom(2, 'En destino')) === 'LLEGÓ A DESTINO',

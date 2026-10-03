@@ -55,11 +55,58 @@ module.exports = async ({bloque, ok}) => {
             codigo: 'MCHN', quote: 12.5}};
         },
         pendientes: async () => { visto.pendientes++; return op.pendientes || []; },
-        guardar: async (campos) => { visto.guardado = campos; }
+        guardar: async (campos) => { visto.guardado = campos; },
+        // Reloj sustituible: una prueba que dependa de la hora real falla
+        // sola algún martes, y a nadie se le ocurre mirar el calendario.
+        ahora: op.ahora || (() => Date.parse('2026-10-02T21:28:00Z'))
       }
     };
   };
 
+
+  bloque('El sello de hora — de donde sale el plazo de 24 h');
+
+  {
+    const {visto, deps} = mundo();
+    await R.orquestar({pedidoId: 'p1'}, deps, {simulacro: false});
+    ok(visto.guardado.shalomRegistradoEn === '2026-10-02T21:28:00.000Z',
+       'un alta sella la hora: antes el registro no guardaba NINGUNA, asi ' +
+       'que no habia desde donde contar las 24 h');
+    ok(visto.guardado.status === 'ALISTADO' &&
+       visto.guardado.shalomEstado === 'REGISTRADO',
+       'y lo demas sigue igual: el sello no cambia lo que ya funcionaba');
+  }
+  {
+    /* Un alta que se corta a medio camino y se encuentra en pendientes nacio
+       hace segundos: su hora SI se puede afirmar. */
+    const {visto, deps} = mundo({
+      respuesta: {ok: false, motivo: 'SIN_RED'},
+      pendientes: [{code_val: '5773', destination_station: {ter_id: 499},
+        service_order_guia_empresarial: '98014733',
+        code_service_order_empresarial: 'MCHN'}]
+    });
+    const r = await R.orquestar({pedidoId: 'p1'}, deps, {simulacro: false});
+    ok(r.recuperado === true && visto.guardado.shalomGuia === '98014733',
+       'el envio se encontro entre los pendientes');
+    ok(visto.guardado.shalomRegistradoEn === '2026-10-02T21:28:00.000Z',
+       'y tambien se sella: se acaba de crear');
+  }
+  {
+    /* ⚠️ LA RECUPERACION NO SELLA, Y ESO ES LO CORRECTO.
+       `recuperarEnvio` lo corres cuando te da la gana —horas despues— y no
+       hay forma de saber cuando nacio la guia. Poner "ahora" regalaria 24 h
+       de plazo que ya se consumieron, y te dejaria tranquilo mientras el
+       envio se vence. Sin sello no hay cuenta atras: eso es honesto. */
+    const {visto, deps} = mundo({
+      pendientes: [{code_val: '5773', destination_station: {ter_id: 499},
+        service_order_guia_empresarial: '98014733',
+        code_service_order_empresarial: 'MCHN'}]
+    });
+    const r = await R.recuperarEnvio({pedidoId: 'p1'}, deps);
+    ok(r.ok === true && r.recuperado === true, 'la recuperacion encuentra el envio');
+    ok(visto.guardado.shalomRegistradoEn === undefined,
+       'y NO inventa una hora de nacimiento que no conoce');
+  }
 
   bloque('Que falta para poder registrar — y se dice CUAL, no "no se puede"');
 

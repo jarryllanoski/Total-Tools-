@@ -890,8 +890,12 @@ module.exports = async ({bloque, ok}) => {
        'ordenan mal los historiales');
     ok(r.recibio && r.recibio.nombre === 'Ana' && r.recibio.documento === '12345678',
        'y quién recibió el paquete, que es lo que le dices al cliente que reclama');
-    ok(Object.keys(r.arbol).length === 5,
+    ok(Object.keys(r.arbol).length === 4,
        'el árbol completo queda para el historial, sin las ramas que no pasaron');
+    ok(r.arbol.registrado === undefined,
+       'y `registrado` no está en el árbol de pasos: no es un paso del paquete');
+    ok(r.registrado && r.registrado.fecha === '2026-09-05 10:00',
+       'viaja aparte, como la demora — el dato no se pierde, deja de decidir');
   }
 
   {
@@ -925,11 +929,52 @@ module.exports = async ({bloque, ok}) => {
     const r = tt(arbolReal({entregado: null, reparto: null}));
     ok(r.estado === 'En destino', 'sin reparto se queda en destino');
   }
+  bloque('`registrado` no es `origen` — la distinción que costó un pedido');
+
   {
+    /* ⚠️ ESTA PRUEBA AFIRMABA LO CONTRARIO, y lo contrario costó un pedido.
+       Decía: «una guía recién registrada» → estado 'En origen', pasos 0. Con
+       eso, la PRIMERA consulta después de registrar movía la etiqueta a
+       ENVIADO — con el paquete todavía en la tienda y 24 h de plazo
+       corriendo. Shalom nunca dijo que el paquete estuviera en la agencia:
+       dijo que la guía existía. Lo demás lo inventó la traducción. */
     const r = tt({statuses: {success: true, data: {registrado: {fecha: 'x'},
       origen: null, transito: null, destino: null, reparto: null,
       entregado: null, demora: null}}});
-    ok(r.estado === 'En origen' && r.pasos === 0, 'una guía recién registrada');
+    ok(r.ok === false && r.motivo === 'SOLO_REGISTRADO',
+       'la guía existe pero el paquete no ha entrado a ninguna agencia: ' +
+       'eso NO es un paso del envío');
+    ok(r.registrado && r.registrado.fecha === 'x',
+       'y se dice cuándo nació la guía, que es de donde sale el plazo de 24 h');
+    ok(r.estado === undefined && r.pasos === undefined,
+       'sin paso no hay estado ni rango que nadie pueda usar para avanzar');
+  }
+  {
+    const r = tt({statuses: {success: true, data: {registrado: {fecha: 'x'},
+      origen: {fecha: '2026-10-02 09:00'}, transito: null, destino: null,
+      reparto: null, entregado: null, demora: null}}});
+    ok(r.ok === true && r.estado === 'En origen' && r.pasos === 0,
+       'con `origen` CON FECHA sí: el paquete entró a la agencia, y eso es ' +
+       'exactamente "ya lo dejé en Shalom"');
+    ok(r.fecha === '2026-10-02 09:00',
+       'y la fecha es la del ingreso a la agencia, no la del registro');
+  }
+  {
+    ok(P.PASOS.every((p) => p.clave !== 'registrado'),
+       '`registrado` NO está en la lista de pasos — igual que `demora`, no es ' +
+       'que el bug esté arreglado: es que no se puede escribir');
+  }
+  {
+    /* Dos "no hay dato" que no son el mismo problema: uno te manda a la
+       agencia, el otro a revisar el número de guía. Confundirlos ya costó
+       días una vez (ver NO_ENCONTRADO vs FORMATO_DESCONOCIDO). */
+    const vacio = tt({statuses: {success: true, data: {registrado: null,
+      origen: null, transito: null, destino: null, reparto: null,
+      entregado: null, demora: null}}});
+    ok(vacio.motivo === 'SIN_DATO',
+       'sin NI el registro, Shalom no sabe nada de esa guía: SIN_DATO');
+    ok(vacio.motivo !== 'SOLO_REGISTRADO',
+       'y no se confunde con la guía que sí existe pero no se ha dejado');
   }
 
   bloque('/track — jamás ok:true sin dato real');
