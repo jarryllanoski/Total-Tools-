@@ -717,18 +717,47 @@ module.exports = async ({bloque, ok}) => {
   }
 
   {
-    /* Y la funcion lee la cuenta y el origen de Firestore, no del navegador. */
-    const fidx = E.leer('functions/index.js');
-    const i = fidx.indexOf('paso.orquestar === "registrarEnvio"');
-    const orq = fidx.slice(i, i + 2200);
-    ok(i > 0, 'la orquestacion esta conectada en la funcion');
-    ok(/cfgDoc\.agenciaOrigen/.test(orq),
-       'la agencia de origen sale de Firestore');
-    ok(/cfgDoc\.shalomInstancia/.test(orq),
-       'y la cuenta de Shalom tambien');
-    ok(/shalomRegistroSimulacro !== false/.test(orq),
-       'y el simulacro esta encendido salvo que Config diga lo contrario');
-    ok(/estado: "duda"/.test(orq),
-       'y si algo revienta a mitad se dice DUDA, no fallo: el envio pudo crearse');
+    /* ⚠️ ESTE BLOQUE BUSCABA TEXTO EN `functions/index.js` —`/cfgDoc\.
+       agenciaOrigen/` y companhia— y por eso se puso rojo el dia que ese
+       literal se sustituyo por la funcion compartida, sin que el
+       comportamiento cambiara en nada. Una prueba que lee codigo fuente en
+       vez de ejecutarlo no protege el comportamiento: protege la forma de
+       escribirlo, que es justo lo que uno quiere poder cambiar.
+       Ahora se ejecuta. */
+    const orq = E.leer('functions/index.js')
+        .indexOf('paso.orquestar === "registrarEnvio"');
+    ok(orq > 0, 'la orquestacion esta conectada en la funcion');
+
+    const cfg = R.configDe({agenciaOrigen: {agenciaId: '576',
+      agenciaCourier: 'SHALOM'}, shalomInstancia: {id: 'abc', nombre: 'Total'}});
+    ok(cfg.agenciaOrigen.agenciaId === '576',
+       'la agencia de origen sale del documento de config');
+    ok(cfg.instanceId === 'abc', 'y la cuenta de Shalom tambien');
+    ok(Object.keys(cfg).length === 2,
+       'y nada mas: lo que el registro no necesita, no viaja');
+  }
+  {
+    /* LA DIVERGENCIA QUE ESTA FUNCION EXISTE PARA IMPEDIR.
+       El servidor la llama con el documento de Firestore y el panel con `S`,
+       para avisarte de lo que falta ANTES de gastar una llamada. Si cada
+       lado armara su propio objeto, el dia que uno cambiara el panel diria
+       "listo" y el servidor "falta algo" — y lo verias con el envio a medio
+       crear. Mismo dato, misma respuesta, por construccion. */
+    const crudo = {agenciaOrigen: {agenciaId: '576', agenciaCourier: 'SHALOM'},
+      shalomInstancia: {id: 'abc'}, otraCosa: 'que no importa'};
+    ok(JSON.stringify(R.faltantes(PEDIDO_OK, R.configDe(crudo))) ===
+       JSON.stringify(R.faltantes(PEDIDO_OK, CFG_OK)),
+       'el cfg armado por la funcion decide igual que el de las pruebas');
+    ok(R.faltantes(PEDIDO_OK, R.configDe({})).length > 0,
+       'y sin config, falta algo — no se da por bueno el vacio');
+  }
+  {
+    // Formas rotas: nunca revienta, siempre devuelve algo utilizable.
+    [null, undefined, 'texto', 42, [], {shalomInstancia: 'no-objeto'},
+      {shalomInstancia: null}].forEach((malo) => {
+      const c = R.configDe(malo);
+      ok(c && typeof c === 'object' && typeof c.instanceId === 'string',
+         'configDe aguanta ' + JSON.stringify(malo) + ' sin reventar');
+    });
   }
 };

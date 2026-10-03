@@ -29,7 +29,7 @@
 <script src="functions/etiquetas.js?v=1"></script>
 <script src="functions/agencias.js?v=1"></script>
 <script src="functions/enlaceSeguimiento.js?v=1"></script>
-<script src="functions/registroShalom.js?v=2"></script>
+<script src="functions/registroShalom.js?v=3"></script>
 <script src="appcheck.js?v=1"></script>
 <!-- FIREBASE via REST API — sin SDK, funciona en Brave/Chrome/Firefox/Safari -->
 <script>
@@ -1231,6 +1231,17 @@
           <div id="pkgTipoResultado" style="display:none;margin-top:10px;padding:9px 12px;border-radius:9px;font-size:12.5px;font-weight:700;text-align:center"></div>
         </div>
       </div>
+
+      <!-- ★ REGISTRAR EN SHALOM — la cara del registro automático.
+           VA AQUÍ Y NO DENTRO DEL ACORDEÓN DE MEDIDAS a propósito: ese
+           acordeón se pliega, y un botón que a veces no existe es un botón
+           que no se encuentra el día que hace falta. Dentro de
+           `shalomGuiaBlock` hereda gratis la regla de courier: si el pedido
+           no va por Shalom, no se ve.
+           Todo el contenido lo pinta `_pintarRegistroShalom()` en config.js:
+           qué falta, de dónde a dónde, y el botón. Un solo sitio que decide
+           es un solo sitio que puede equivocarse. -->
+      <div id="shalomRegBlock" style="margin-top:11px;border-top:1px solid rgba(56,139,253,.18);padding-top:11px"></div>
     </div>
     <!-- ★ DELIVERY: bloque motorizado (mismo patrón que Guía Shalom) -->
     <div id="dlvDriverBlock" style="display:none;background:rgba(163,113,247,.06);border:1px solid rgba(163,113,247,.18);border-radius:10px;padding:12px;margin-bottom:11px">
@@ -4789,7 +4800,7 @@ render();
      lo usa. config.js, print.js y voz.js preguntan por los pedidos marcados,
      así que siguen yendo detrás. El orden de carga es un contrato
      (ver docs/ARQUITECTURA.md). -->
-<script src="config.js?v=42"></script>
+<script src="config.js?v=43"></script>
 <script src="print.js?v=16"></script>
 <script src="notify.js?v=5"></script>
 <script src="shalom.js?v=26"></script>

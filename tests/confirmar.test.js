@@ -146,15 +146,20 @@ module.exports = async ({bloque, ok}) => {
        'la puerta está expuesta para que config.js la use');
   }
   {
-    /* Toda pantalla que borra algo pasa por la MISMA puerta. El número sube
-       cuando se añade una —hoy son 7, con el centro de recursos—, y tiene que
-       subir a mano: si alguien monta su propio diálogo de borrado con su
-       propio botón, esta cuenta no se mueve pero la de `delYes` de arriba sí,
-       y salta. Las dos juntas son la reja. */
+    /* Toda pantalla que hace algo IRREVERSIBLE pasa por la MISMA puerta. El
+       número sube cuando se añade una —hoy son 8— y tiene que subir a mano:
+       si alguien monta su propio diálogo con su propio botón, esta cuenta no
+       se mueve pero la de `delYes` de arriba sí, y salta. Las dos juntas son
+       la reja.
+
+       ⚠️ La octava NO BORRA: registra un envío en Shalom. Entró aquí a
+       propósito, porque el criterio nunca fue "borrar" sino "no se puede
+       deshacer" — y un envío creado en Shalom no se anula ni se devuelve el
+       dinero, así que merece la misma puerta que la papelera. */
     const todo = E.leer('index.html') + E.leer('config.js');
     const usos = (todo.match(/confirmar\(\{/g) || []).length;
-    ok(usos === 7,
-       'las siete pantallas que borran algo pasan por la misma puerta ' +
+    ok(usos === 8,
+       'las ocho pantallas irreversibles pasan por la misma puerta ' +
        '(vistas: ' + usos + ')');
   }
 };

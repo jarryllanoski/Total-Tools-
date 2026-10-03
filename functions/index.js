@@ -1246,11 +1246,9 @@ exports.shalomPuerta = onRequest(
               const s2 = await ref.get();
               return s2.exists ? s2.data() : null;
             },
-            leerConfig: async () => ({
-              agenciaOrigen: cfgDoc.agenciaOrigen || null,
-              instanceId: (cfgDoc.shalomInstancia &&
-                cfgDoc.shalomInstancia.id) || "",
-            }),
+            // La MISMA funcion que usa el panel para avisarte antes de
+            // gastar una llamada. Dos copias divergen; una no puede.
+            leerConfig: async () => registroShalom.configDe(cfgDoc),
             llamar: (c) => _porLaPuerta("register", c),
             pendientes: async () => {
               const pr = await _porLaPuerta("pendientes", {

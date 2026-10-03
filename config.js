@@ -481,6 +481,7 @@ function openForm(id){
     if(isShalom){ _claveAuto(); if(typeof _panelShalomLoad==='function') _panelShalomLoad(); }
     else { const d=$('shDrop'); if(d) d.style.display='none'; }
     if(typeof _updateShalomMic==='function') _updateShalomMic();
+    if(typeof _pintarRegistroShalom==='function') _pintarRegistroShalom();
   };
   $('fCourier').onchange = function(){ _showShalomBlock(); _agPintar(); };
   // Pedido nuevo: el mismo vigilante, con id vacío (no hay pedido que excluir).
@@ -766,6 +767,373 @@ function _congelarSiRegistrado(s){
   }
 }
 
+
+/* ── 🚚 REGISTRAR EN SHALOM, DESDE EL PEDIDO ──────────────────────────────
+   Hasta hoy el registro solo existía desde la consola. Esta es su cara.
+
+   TRES REGLAS QUE NO SE NEGOCIAN, porque Shalom no anula un envío, no tiene
+   clave de idempotencia y cada registro cuesta dinero:
+
+   1. Lo que falta se dice ANTES, en palabras. `window.RegistroShalom.faltantes()` es
+      el MISMO archivo que usa el servidor para decidir, así que lo que lees
+      aquí es exactamente lo que el servidor va a decidir — no una copia que
+      algún día diga otra cosa. Un botón gris sin explicación obliga a probar,
+      y probar aquí cuesta S/ 12.
+   2. El botón se apaga al pulsarlo y NO SE VUELVE A ENCENDER. Ni en éxito, ni
+      en fallo, ni en duda. Dos clics serían dos envíos y dos cobros.
+   3. En duda jamás sale "reintentar". Sale "Recuperar", que solo lee.
+
+   Y la trampa silenciosa: el servidor lee el pedido DE FIRESTORE, no de tu
+   pantalla. Si hay cambios sin subir, registraría con los datos viejos —caja
+   equivocada, o "faltan medidas" con las medidas delante—. Por eso se mira
+   `_dirtyShips` y se te pide guardar primero. Explícito, no magia. */
+
+let _regTimer = null;
+
+/** La config del registro, por la MISMA función que usa el servidor.
+ * @return {Object} {agenciaOrigen, instanceId} */
+function _regCfg(){
+  return window.RegistroShalom ? window.RegistroShalom.configDe(S)
+                               : {agenciaOrigen:null, instanceId:''};
+}
+
+/** Simulacro ENCENDIDO salvo un `false` explícito — la regla del servidor,
+ * repetida aquí porque la pantalla tiene que decir la verdad sobre si el
+ * próximo clic cuesta dinero.
+ * @return {boolean} true si no va a gastar */
+function _regEsSimulacro(){ return S.shalomRegistroSimulacro !== false; }
+
+/** ¿Este pedido tiene cambios que Firestore todavía no tiene?
+ * @param {string} id el id del pedido
+ * @return {boolean} true si falta subirlo */
+function _regSinSubir(id){
+  try{ return !!(id && typeof _dirtyShips!=='undefined' && _dirtyShips.has(id)); }
+  catch(e){ return false; }
+}
+
+function _regFila(ico, txt, accion){
+  return '<div style="display:flex;align-items:center;gap:7px;font-size:11.5px;'+
+    'color:var(--text2);margin-bottom:6px;line-height:1.45">'+
+    '<span>'+ico+'</span><span style="flex:1">'+txt+'</span>'+(accion||'')+'</div>';
+}
+function _regLink(txt, fn){
+  return '<span onclick="'+fn+'" style="font-size:11px;color:#388bfd;'+
+    'cursor:pointer;font-weight:700;white-space:nowrap">'+txt+'</span>';
+}
+
+/* ★ EL PINTOR. Único sitio que decide qué se ve en ese bloque. */
+function _pintarRegistroShalom(reintento){
+  const box = $('shalomRegBlock'); if(!box) return;
+  const R = window.RegistroShalom;
+  const tit = '<div style="font-size:10px;font-weight:700;color:#388bfd;'+
+    'letter-spacing:.8px;text-transform:uppercase;margin-bottom:9px">'+
+    '🚚 Registrar en Shalom</div>';
+  const aviso = (ico, txt, col) =>
+    '<div style="font-size:11.5px;color:'+(col||'var(--text2)')+';line-height:1.5">'+
+    ico+' '+txt+'</div>';
+
+  if(!R){ box.innerHTML = tit + aviso('⚠️',
+    'El módulo de registro no cargó. Recarga con Ctrl+Shift+R.', '#f59e0b');
+    return; }
+
+  const ped = _editId ? (S.shipments||[]).find(x=>x.id===_editId) : null;
+  if(!ped){ box.innerHTML = tit + aviso('💾',
+    'Guarda el pedido y vuelve a abrirlo para poder registrarlo.'); return; }
+
+  /* YA REGISTRADO: no hay botón. No es que esté deshabilitado — es que no
+     existe, que es la única forma de que un clic no pueda crear un segundo
+     envío con un segundo cobro. */
+  if(R.estaRegistrado(ped)){
+    const m = parseFloat(ped.shalomMonto);
+    box.innerHTML = tit +
+      '<div style="background:rgba(63,185,80,.09);border:1px solid rgba(63,185,80,.25);'+
+      'border-radius:9px;padding:10px 12px">'+
+      '<div style="font-size:12.5px;font-weight:700;color:#3fb950">✅ Registrado en Shalom</div>'+
+      '<div style="font-size:11.5px;color:var(--text2);margin-top:5px;line-height:1.6">'+
+      'Guía <b style="color:var(--text)">'+escH(ped.shalomGuia||'—')+'</b> · '+
+      'Código <b style="color:var(--text)">'+escH(ped.shalomCodigo||'—')+'</b>'+
+      (isFinite(m)&&m>0 ? ' · <b style="color:var(--text)">S/ '+m.toFixed(2)+'</b>' : '')+
+      '</div></div>';
+    return;
+  }
+
+  const cfg = _regCfg();
+  const org = cfg.agenciaOrigen || {};
+  const inst = S.shalomInstancia || {};
+  let html = tit;
+
+  /* ── TU CUENTA — se lee de lo guardado, GRATIS. Comprobar de verdad gasta
+     una llamada de las 900 del mes, así que eso solo pasa si lo pides. */
+  html += _regFila(inst.id ? '🔌' : '⚠️',
+    inst.id ? 'Cuenta <b style="color:var(--text)">'+escH(inst.nombre||inst.id)+'</b>'
+            : '<span style="color:#f59e0b">Sin cuenta de Shalom Pro</span>',
+    _regLink(inst.id ? 'comprobar' : 'elegir en Config', 'regComprobarSesion()'));
+
+  /* ── TU AGENCIA DE ORIGEN. Se puede cambiar desde aquí, pero el texto dice
+     lo que es: UNA sola para todo el negocio. Sin ese aviso, un día se cambia
+     "para este envío" y todos los siguientes salen del sitio equivocado. */
+  const orgOk = !!(org.agenciaId);
+  html += _regFila(orgOk ? '🏢' : '⚠️',
+    orgOk ? 'Despachas desde <b style="color:var(--text)">'+escH(org.agenciaNombre||org.agenciaId)+'</b>'+
+            '<span style="opacity:.7"> — vale para todos tus envíos</span>'
+          : '<span style="color:#f59e0b">Sin agencia de origen</span>',
+    _regLink('cambiar', 'regOrigenAbrir()'));
+  html += '<div id="regOrigenCaja" style="display:none;position:relative;margin:2px 0 8px">'+
+    '<input class="fi" id="regOrigenInput" autocomplete="off" placeholder="Busca por ciudad, distrito o nombre…" '+
+    'oninput="onOrigenInput(this.value,\'reg\')" onfocus="onOrigenInput(this.value,\'reg\')">'+
+    '<div id="regOrigenDrop" style="display:none;position:absolute;left:0;right:0;top:100%;z-index:60;'+
+    'background:var(--bg2);border:1px solid var(--bd);border-radius:9px;margin-top:4px;'+
+    'max-height:220px;overflow-y:auto;box-shadow:0 8px 24px rgba(0,0,0,.4)"></div></div>';
+
+  /* ── LO QUE FALTA, EN PALABRAS. Mismo archivo que el servidor. */
+  const faltan = R.faltantes(ped, cfg);
+  if(faltan.length){
+    html += '<div style="background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.25);'+
+      'border-radius:9px;padding:9px 11px;margin-top:4px">'+
+      '<div style="font-size:11.5px;font-weight:700;color:#f59e0b;margin-bottom:5px">'+
+      'Falta esto para poder registrar:</div><ul style="margin:0;padding-left:16px;'+
+      'font-size:11.5px;color:var(--text2);line-height:1.6">'+
+      faltan.map(f=>'<li>'+escH(f)+'</li>').join('')+'</ul>'+
+      '<div style="font-size:10.5px;color:var(--text2);margin-top:6px;font-style:italic">'+
+      'Se comprueba lo guardado, que es lo que Shalom va a leer. Si acabas de '+
+      'escribir algo, guarda el pedido primero.</div></div>';
+    box.innerHTML = html;
+    return;
+  }
+
+  /* ── TODO LISTO. Antes del botón, la trampa de los datos sin subir. */
+  const caja = R.clasificar(ped.pkgLargo, ped.pkgAncho, ped.pkgAlto,
+      ped.pkgPeso) || {};
+  const queEs = R.contenidoDe(ped) || caja.etiqueta || '—';
+  const sinSubir = _regSinSubir(ped.id);
+  const sim = _regEsSimulacro();
+
+  html += '<div style="background:rgba(56,139,253,.07);border:1px solid rgba(56,139,253,.2);'+
+    'border-radius:9px;padding:9px 11px;margin-top:4px;font-size:11.5px;'+
+    'color:var(--text2);line-height:1.6">Se registrará como <b style="color:var(--text)">'+
+    escH(queEs)+'</b>, de <b style="color:var(--text)">'+
+    escH(org.agenciaNombre||'origen')+'</b> a <b style="color:var(--text)">'+
+    escH(ped.agenciaNombre||'destino')+'</b>, clave <b style="color:var(--text)">'+
+    escH(ped.shalomClave||'—')+'</b>.</div>';
+
+  if(sinSubir){
+    /* ⚠️ "Guarda primero" sonaría a reproche cuando acabas de guardar: la
+       subida va con 800 ms de espera más la red, así que hay unos segundos
+       en los que ya pulsaste Guardar y la nube todavía no lo tiene. Se dice
+       lo que de verdad pasa, y el bloque se repinta solo al terminar — sin
+       eso te quedarías mirando un aviso vencido sin saber qué hacer. */
+    html += '<div style="margin-top:9px;background:rgba(245,158,11,.08);'+
+      'border:1px solid rgba(245,158,11,.3);border-radius:9px;padding:10px 12px;'+
+      'font-size:11.5px;color:#f59e0b;line-height:1.5;font-weight:700">'+
+      '💾 Subiendo cambios…'+
+      '<div style="font-weight:400;color:var(--text2);margin-top:4px">Shalom se registra '+
+      'con lo que hay en la nube, no con lo que ves en pantalla. El botón aparece '+
+      'en cuanto termine de subir.</div></div>';
+    /* ⚠️ ACOTADO. La primera versión se reprogramaba sola sin límite: si la
+       subida no terminaba nunca —sin red, sesión caída— el panel repintaba
+       cada 1,2 s para siempre. Un reintento sin final no es paciencia, es un
+       bucle. A los ~18 s se para y se te da un botón, que además te dice que
+       algo va mal con la subida en vez de fingir que sigue en camino. */
+    const n = (reintento || 0) + 1;
+    if(n <= 15){
+      clearTimeout(_regTimer);
+      _regTimer = setTimeout(() => {
+        if(document.getElementById('shalomRegBlock')) _pintarRegistroShalom(n);
+      }, 1200);
+    } else {
+      html = html.replace('El botón aparece en cuanto termine de subir.',
+        'Los cambios llevan rato sin subir — comprueba tu conexión. ' +
+        '<span onclick="_pintarRegistroShalom()" style="color:#388bfd;' +
+        'cursor:pointer;font-weight:700">Comprobar de nuevo</span>');
+    }
+  } else {
+    html += '<button type="button" id="btnRegistrarShalom" onclick="registrarEnvioPanel()" '+
+      'style="width:100%;margin-top:9px;padding:11px;border-radius:9px;cursor:pointer;'+
+      'font-family:inherit;font-size:13px;font-weight:700;'+
+      (sim ? 'background:rgba(56,139,253,.15);border:1px solid rgba(56,139,253,.35);color:#388bfd">'+
+             '🧪 Probar registro (simulacro — no cuesta)'
+           : 'background:rgba(245,158,11,.15);border:1px solid rgba(245,158,11,.45);color:#f59e0b">'+
+             '🚚 Registrar en Shalom — crea un envío real')+
+      '</button>';
+  }
+
+  /* ── EL INTERRUPTOR. Hasta hoy solo se podía cambiar subiendo un archivo de
+     configuración: lo único que decide si un clic cuesta S/ 12 era invisible. */
+  html += '<div style="margin-top:8px;text-align:right">'+
+    _regLink(sim ? 'Apagar simulacro (registrará de verdad)' : 'Encender simulacro',
+             'regToggleSimulacro()')+'</div>';
+  html += '<div id="regShalomSalida" style="display:none;margin-top:9px;'+
+    'font-size:11.5px;line-height:1.55"></div>';
+
+  box.innerHTML = html;
+}
+
+function _regSalida(html){
+  const d = $('regShalomSalida'); if(!d) return;
+  d.style.display='block'; d.innerHTML = html;
+}
+
+function regOrigenAbrir(){
+  const c = $('regOrigenCaja'); if(!c) return;
+  const abierto = c.style.display !== 'none';
+  c.style.display = abierto ? 'none' : 'block';
+  if(!abierto){ const i=$('regOrigenInput'); if(i) i.focus(); }
+}
+
+function regToggleSimulacro(){
+  const sim = _regEsSimulacro();
+  /* Se guarda `false` EXPLÍCITO para apagarlo y `true` para encenderlo: el
+     servidor solo apaga el simulacro con un false explícito, así que dejar
+     el campo ausente lo dejaría encendido y el botón mentiría. */
+  S.shalomRegistroSimulacro = sim ? false : true;
+  save('config');
+  toast(sim ? '⚠️ Simulacro APAGADO — los registros serán reales'
+            : '🧪 Simulacro encendido — los registros no cuestan');
+  _pintarRegistroShalom();
+}
+
+async function regComprobarSesion(){
+  const id = (S.shalomInstancia||{}).id;
+  if(!id){ toast('Elige tu cuenta de Shalom Pro en ⚙️ Config'); return; }
+  if(!window.Shalom || !window.Shalom.estadoSesion){ toast('⚠️ Shalom no disponible'); return; }
+  toast('🔌 Comprobando…');
+  let r = null;
+  try{ r = await window.Shalom.estadoSesion(id); }catch(e){ r = null; }
+  if(r && r.ok){ toast('✅ Sesión de Shalom conectada'); return; }
+  const m = (r && r.motivo) || 'SIN_RED';
+  toast('⚠️ ' + (window.Shalom.textoMotivo ? window.Shalom.textoMotivo(m) : m));
+}
+
+/* ★ EL CLIC QUE CUESTA DINERO.
+   Todo se vuelve a comprobar aquí, justo antes de llamar: entre que se pintó
+   el bloque y pulsaste pudo cambiar cualquier cosa (otra pestaña, el barrido,
+   tú mismo). Lo pintado es un aviso; lo que manda es esta comprobación. */
+async function registrarEnvioPanel(){
+  const R = window.RegistroShalom;
+  const ped = _editId ? (S.shipments||[]).find(x=>x.id===_editId) : null;
+  if(!R || !ped || !window.Shalom) return;
+
+  if(R.estaRegistrado(ped)){
+    toast('Este pedido ya tiene guía de Shalom'); _pintarRegistroShalom(); return; }
+  if(R.faltantes(ped, _regCfg()).length){
+    toast('⚠️ Falta algo — mira la lista'); _pintarRegistroShalom(); return; }
+  if(_regSinSubir(ped.id)){
+    toast('💾 Guarda los cambios antes de registrar'); _pintarRegistroShalom(); return; }
+
+  const sim = _regEsSimulacro();
+  const caja = R.clasificar(ped.pkgLargo, ped.pkgAncho, ped.pkgAlto,
+      ped.pkgPeso) || {};
+  const queEs = R.contenidoDe(ped) || caja.etiqueta || '—';
+  const org = (_regCfg().agenciaOrigen) || {};
+  const btn = $('btnRegistrarShalom');
+
+  confirmar({
+    html: '<div style="text-align:left;line-height:1.65;font-size:13px">'+
+      (sim ? '<b style="color:var(--blue)">🧪 Simulacro.</b> No se crea nada y no cuesta nada.'
+           : '<b style="color:#f59e0b">⚠️ Esto crea un envío real en Shalom y se cobra.</b>'+
+             '<br><span style="font-size:12px;color:var(--text2)">Shalom no anula envíos: '+
+             'una vez creado, no se deshace.</span>')+
+      '<div style="margin-top:9px;font-size:12.5px;color:var(--text2)">'+
+      '<b style="color:var(--text)">'+escH(ped.name||'')+'</b><br>'+
+      escH(queEs)+' · de '+escH(org.agenciaNombre||'origen')+
+      ' a '+escH(ped.agenciaNombre||'destino')+'<br>Clave de recojo: <b style="color:var(--text)">'+
+      escH(ped.shalomClave||'—')+'</b></div></div>',
+    textoSi: sim ? 'Probar' : 'Sí, registrar',
+    colorSi: sim ? 'var(--blue)' : '#f59e0b',
+    trabajando: 'Registrando…',
+    alConfirmar: async () => {
+      /* ⚠️ EL BOTÓN SE APAGA ANTES DE LLAMAR Y NO SE VUELVE A ENCENDER.
+         No es un detalle de estilo: dos clics son dos envíos y dos cobros que
+         nadie puede anular. Se le quita hasta el onclick. */
+      if(btn){
+        btn.disabled = true; btn.onclick = null; btn.style.opacity = '.45';
+        btn.style.cursor = 'default'; btn.textContent = '⏳ Registrando…';
+      }
+      let r = null;
+      try{ r = await window.Shalom.registrarEnvio(ped.id); }catch(e){ r = null; }
+      _aplicarRegistroShalom(ped, r);
+      /* NO SE RELANZA NUNCA. `confirmar` vuelve a habilitar SU botón cuando
+         `alConfirmar` lanza, y ofrecer ahí un reintento sería ofrecer un
+         segundo envío. Los tres finales se cuentan abajo, en su sitio. */
+    }
+  });
+}
+
+/* ★ LOS TRES FINALES. No dos: éxito, fallo y DUDA.
+   Shalom no anula y no tiene clave de idempotencia, así que llamar "fallo" a
+   una duda invita a reintentar — y un reintento sobre un envío que sí se creó
+   es un segundo paquete y un segundo cobro. La duda tiene su propia salida, y
+   es de SOLO LECTURA. */
+function _aplicarRegistroShalom(ped, r){
+  if(r && r.ok && r.simulacro){
+    _regSalida('<span style="color:#388bfd">🧪 Simulacro correcto.</span> '+
+      '<span style="color:var(--text2)">No se creó nada. Apaga el simulacro '+
+      'para registrar de verdad.</span>');
+    toast('🧪 Simulacro correcto — no se creó nada');
+    return;
+  }
+
+  if(r && r.ok && r.campos){
+    Object.assign(ped, r.campos);
+    save(ped.id);
+    if(typeof _congelarSiRegistrado==='function') _congelarSiRegistrado(ped);
+    if(typeof render==='function') render();
+    _pintarRegistroShalom();
+    toast('✅ Registrado — guía '+(r.campos.shalomGuia||''));
+    return;
+  }
+
+  const mot = (r && r.motivo) || 'SIN_RED';
+  const txt = (window.Shalom && window.Shalom.textoMotivo) ? window.Shalom.textoMotivo(mot) : mot;
+
+  /* DUDA: se cortó y NO sabemos si el envío llegó a crearse. */
+  if(r && r.estado === 'duda'){
+    _regSalida('<div style="background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.35);'+
+      'border-radius:9px;padding:10px 12px"><b style="color:#f59e0b">⚠️ No sabemos si se creó.</b>'+
+      '<div style="color:var(--text2);margin-top:4px">'+escH(r.detalle||txt)+'</div>'+
+      '<button type="button" onclick="recuperarEnvioPanel()" style="width:100%;margin-top:9px;'+
+      'padding:9px;border-radius:8px;cursor:pointer;font-family:inherit;font-size:12.5px;'+
+      'font-weight:700;background:rgba(56,139,253,.15);border:1px solid rgba(56,139,253,.35);'+
+      'color:#388bfd">🔍 Buscar en Shalom y rellenar la guía</button>'+
+      '<div style="font-size:10.5px;color:var(--text2);margin-top:6px">Solo lee. No registra '+
+      'nada y no puede cobrarte otra vez.</div></div>');
+    toast('⚠️ Registro en duda — no se reintenta');
+    return;
+  }
+
+  /* FALLO: Shalom dijo que no. Se dice UNA vez, con sus palabras, y sin
+     ningún botón que invite a volver a intentarlo a ciegas. */
+  _regSalida('<span style="color:var(--red)">❌ '+escH(txt)+'</span>'+
+    (r && r.detalle ? '<div style="color:var(--text2);margin-top:3px">'+escH(r.detalle)+'</div>' : '')+
+    (r && r.faltan && r.faltan.length ?
+      '<ul style="margin:5px 0 0;padding-left:16px;color:var(--text2)">'+
+      r.faltan.map(f=>'<li>'+escH(f)+'</li>').join('')+'</ul>' : ''));
+  toast('❌ No se registró');
+}
+
+/* SOLO LEE: busca el envío entre los pendientes de Shalom por clave y destino
+   y rellena la guía. No registra, así que no puede costar ni duplicar. */
+async function recuperarEnvioPanel(){
+  const ped = _editId ? (S.shipments||[]).find(x=>x.id===_editId) : null;
+  if(!ped || !window.Shalom) return;
+  _regSalida('🔍 Buscando en Shalom…');
+  let r = null;
+  try{ r = await window.Shalom.recuperarEnvio(ped.id); }catch(e){ r = null; }
+  if(r && r.ok && r.campos){
+    Object.assign(ped, r.campos);
+    save(ped.id);
+    if(typeof _congelarSiRegistrado==='function') _congelarSiRegistrado(ped);
+    if(typeof render==='function') render();
+    _pintarRegistroShalom();
+    toast('✅ Guía recuperada: '+(r.campos.shalomGuia||''));
+    return;
+  }
+  const mot = (r && r.motivo) || 'SIN_RED';
+  const txt = (window.Shalom.textoMotivo ? window.Shalom.textoMotivo(mot) : mot);
+  _regSalida('<span style="color:var(--red)">❌ '+escH(txt)+'</span>'+
+    (r && r.detalle ? '<div style="color:var(--text2);margin-top:3px">'+escH(r.detalle)+'</div>' : ''));
+}
+
 function _claveAuto(){
   const el = $('fShalomClave'); if(!el) return;
   if(el.value) return;                       // ya tiene una: no se pisa
@@ -807,8 +1175,13 @@ function _pintarOrigen(){
     'cursor:pointer;font-size:13px;padding:2px 5px;flex-shrink:0">✕</button></div>';
 }
 
-function onOrigenInput(val){
-  const drop = $('cfgOrigenDrop'); if(!drop) return;
+/* `pre` existe para que el MISMO buscador sirva en Config y en el pedido.
+   La alternativa era copiarlo, y una copia habría divergido: dos buscadores
+   escribiendo sobre la MISMA `S.agenciaOrigen` con reglas distintas es como
+   se despacha desde la agencia equivocada sin que nadie lo note. */
+function onOrigenInput(val, pre){
+  pre = pre || 'cfg';
+  const drop = $(pre+'OrigenDrop'); if(!drop) return;
   clearTimeout(_orTimer);
   const q = (val||'').trim();
   if(q.length < 2){ drop.style.display='none'; return; }
@@ -823,7 +1196,7 @@ function onOrigenInput(val){
     drop.innerHTML = res.map((ag,i)=>{
       const nombre = ag.lugar_over||ag.nombre||'—';
       const geo = [ag.zona||ag.distrito, ag.provincia, ag.departamento].filter(Boolean).join(' · ');
-      return '<div onclick="pickOrigen('+i+')" style="padding:9px 12px;border-bottom:1px solid var(--bd);cursor:pointer">'+
+      return '<div onclick="pickOrigen('+i+',\''+pre+'\')" style="padding:9px 12px;border-bottom:1px solid var(--bd);cursor:pointer">'+
         '<div style="font-weight:700;font-size:12px;color:var(--text)">'+escH(nombre)+'</div>'+
         (geo?'<div style="font-size:11px;color:var(--blue);margin-top:2px">'+escH(geo)+'</div>':'')+
         (ag.direccion?'<div style="font-size:11px;color:var(--text2);margin-top:2px;line-height:1.4">'+escH(ag.direccion)+'</div>':'')+
@@ -833,7 +1206,8 @@ function onOrigenInput(val){
   }, 300);
 }
 
-function pickOrigen(i){
+function pickOrigen(i, pre){
+  pre = pre || 'cfg';
   const ag = (window._origenCache||[])[i]; if(!ag) return;
   // SHALOM fijo, no el courier del formulario: esta es TU agencia de
   // despacho, y el registro que la va a usar es el de Shalom.
@@ -841,9 +1215,13 @@ function pickOrigen(i){
   if(!el){ toast('⚠️ Esa agencia no tiene un id utilizable'); return; }
   S.agenciaOrigen = el;
   save('config');
-  const inp = $('cfgOrigenInput'); if(inp) inp.value='';
-  const drop = $('cfgOrigenDrop'); if(drop) drop.style.display='none';
+  const inp = $(pre+'OrigenInput'); if(inp) inp.value='';
+  const drop = $(pre+'OrigenDrop'); if(drop) drop.style.display='none';
+  const caja = $('regOrigenCaja'); if(caja) caja.style.display='none';
   _pintarOrigen();
+  // El bloque del pedido depende de esto: sin repintar, seguiría diciendo
+  // "sin agencia de origen" con la agencia ya elegida.
+  if(typeof _pintarRegistroShalom==='function') _pintarRegistroShalom();
   toast('🏢 Origen: '+el.agenciaNombre);
 }
 

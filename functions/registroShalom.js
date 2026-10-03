@@ -426,6 +426,28 @@
   }
 
   /**
+   * La configuración que el registro necesita, a partir del documento de
+   * config — venga de Firestore (servidor) o de `S` (panel).
+   *
+   * ⚠️ VIVE AQUÍ PARA QUE NO PUEDA HABER DOS VERSIONES. El servidor arma
+   * este objeto para decidir, y el panel lo arma para avisarte ANTES de
+   * gastar una llamada. Si las dos formas se escriben por separado, el día
+   * que una cambie el panel dirá "listo" y el servidor dirá "falta algo" —
+   * y lo descubrirías con el envío a medio crear. Una función, dos lados.
+   * @param {Object} raw el documento de config, o `S`
+   * @return {Object} {agenciaOrigen, instanceId}
+   */
+  function configDe(raw) {
+    const c = (raw && typeof raw === "object") ? raw : {};
+    const inst = (c.shalomInstancia && typeof c.shalomInstancia === "object") ?
+      c.shalomInstancia : {};
+    return {
+      agenciaOrigen: c.agenciaOrigen || null,
+      instanceId: _txt(inst.id),
+    };
+  }
+
+  /**
    * La hora de ahora en ISO, por un reloj que una prueba pueda sustituir.
    * Una prueba que dependa de la hora real falla sola algún martes.
    * @param {Object} deps las dependencias, que pueden traer `ahora`
@@ -619,5 +641,5 @@
 
   return {ESTADO_PUERTA, CAJAS, CONTENIDOS, clasificar, contenidoDe,
     faltantes, cuerpo, resultado, buscarEnPendientes, orquestar,
-    reniecDe, guiaDe, camposDe, recuperarEnvio, estaRegistrado};
+    reniecDe, guiaDe, camposDe, recuperarEnvio, estaRegistrado, configDe};
 });
