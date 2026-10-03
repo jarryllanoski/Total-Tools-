@@ -192,14 +192,48 @@ timingSafeEqual(Buffer.from(v1.replace('v1=', '')),
 > sección. El SKILL.md es un resumen; estos detalles son los que deciden si el
 > código funciona o no.
 
-## Cuenta y plan (a 2026-09-13)
+## Cuenta y plan (a 2026-10-03)
 
 | | |
 |---|---|
-| Plan | **Pro** — S/59/mes, activo hasta 29/9/2026 |
+| Plan | **Pro**, renovado tras vencer el 29/9/2026 |
 | Consultas | **Ilimitadas** (`limit` y `remaining` llegan `null`) |
-| Instancias | **1 máxima** — ya usada |
+| Instancias | **900 máximas** — ⚠️ **0 en uso**: el cambio de plan vació el lote |
 | Incluye | Agencias en tiempo real · Tracking · Crear pedidos y detalles |
+
+### ⚠️ El límite de instancias nos estaba protegiendo
+
+| | hasta 29/9/2026 | desde 3/10/2026 |
+|---|---|---|
+| Instancias | **1 máxima** | **900** |
+
+No es solo un número más grande. El dueño tiene **dos aplicaciones** sobre
+**la misma clave de API**, y por tanto sobre **el mismo lote** — `GET
+/instances` lista *«las instancias del usuario»*, no las de una aplicación:
+la API no sabe quién pregunta.
+
+La otra aplicación tiene un botón «Obtener instancia» que llama a `POST
+/instances` **sin mandar nombre** (lo elige su servidor, y eligió `Total`).
+Con el tope en 1, ese botón recibía **403 «límite de instancias alcanzado»**
+y no podía hacer daño. Con 900 **funciona siempre**.
+
+Eso convirtió en peligroso el plan B de `Shalom.INSTANCIA_PREFERIDA` —casar
+por NOMBRE cuando el id no está—: una instancia ajena llamada `Total` habría
+casado, y los envíos de los clientes se habrían registrado **en la cuenta del
+otro negocio, cobrados a ellos**. Por eso el nombre declarado pasó a ser
+`Total Tools Panel`.
+
+**Y el lote se vació al renovar.** Misma clave, misma cuenta, cero
+instancias. El id que estaba declarado
+(`d14b120a-983d-4369-b519-c9d6bcf70d6a`) murió con el cambio.
+
+### Lo que esto enseña sobre el estado guardado
+
+El panel mostraba «🔌 Cuenta Total» leyendo lo que había en el navegador, y
+lo siguió mostrando con el lote vacío. Comprobarlo **es gratis** —*«`GET
+/instances` · `POST /instances/status` — Ninguno consume cuota»*—, así que
+ahora se comprueba solo. **Un dato propio no se pinta nunca como si fuera una
+respuesta de Shalom.**
 
 ⚠️ **`limit` y `remaining` pueden ser `null` con plan ilimitado.** El código
 debe tratar `null` como "sin límite", nunca como cero.

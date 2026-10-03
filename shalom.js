@@ -245,9 +245,31 @@
                        código la respeta sin volver a preguntar.
        La frontera no se mueve: si la declarada NO está, o si hay DOS con el
        mismo nombre, se vuelve a pedir que elija. Nunca se sustituye. */
+    /* ⚠️ EL LÍMITE DE 1 INSTANCIA NOS ESTABA PROTEGIENDO, Y YA NO ESTÁ.
+       Hasta el 3 oct 2026 el plan era «Pro — 1 instancia máxima». Con ese
+       tope, el botón «Obtener instancia» de la otra aplicación del dueño
+       —que no manda nombre, lo elige su servidor, y eligió `Total`— recibía
+       un 403 «límite de instancias alcanzado» y no podía crear nada.
+
+       Al renovar, el tope pasó a 900. Ahora ese botón funciona SIEMPRE, y
+       el plan B de aquí abajo (casar por NOMBRE cuando el id no está) casaría
+       una instancia ajena llamada `Total` y registraríamos los envíos de tus
+       clientes en la cuenta del otro negocio, cobrados a ellos.
+
+       Por eso el nombre declarado deja de ser `Total`: es `Total Tools
+       Panel`, que el servidor de la otra aplicación no genera ni por
+       accidente. El plan B sigue haciendo falta —es justo lo que pasó hoy:
+       el cambio de plan vació el lote y el id viejo murió— pero ahora apunta
+       a un nombre que solo puede ser el nuestro.
+
+       ⚠️ EL `id` VA VACÍO A PROPÓSITO. El de antes
+       (`d14b120a-983d-4369-b519-c9d6bcf70d6a`) desapareció con el cambio de
+       plan. Dejarlo escrito sería declarar como «la mía» una cuenta que no
+       existe. Vacío, manda el nombre; y si tampoco casa, se PREGUNTA — que
+       es lo correcto cuando no se sabe. */
     INSTANCIA_PREFERIDA: {
-      id: 'd14b120a-983d-4369-b519-c9d6bcf70d6a',
-      nombre: 'Total'
+      id: '',
+      nombre: 'Total Tools Panel'
     },
 
     elegirInstancia: function (lista, idGuardado, preferida) {

@@ -790,6 +790,45 @@ function _congelarSiRegistrado(s){
 
 let _regTimer = null;
 
+/* ── ⚠️ LO GUARDADO NO ES LO COMPROBADO ──────────────────────────────────
+   La primera versión de este bloque pintaba «🔌 Cuenta Total» leyendo
+   `S.shalomInstancia`, que es lo que hay en TU NAVEGADOR. El 3 de octubre el
+   lote de instancias de Shalom se quedó VACÍO al cambiar de plan y la
+   pantalla siguió diciendo «Cuenta Total» tan tranquila. Era el mismo error
+   que la otra aplicación, que mostraba «Instancia asignada» sin instancia
+   ninguna: enseñar un dato propio como si fuera una respuesta de Shalom.
+
+   Y no había excusa, porque comprobarlo es GRATIS. De su documentación:
+   «GET /instances · POST /instances/status — Ninguno consume cuota».
+
+   Se comprueba solo, una vez por cuenta. `_regSesionDe` guarda para QUÉ id
+   se comprobó: si cambias de cuenta, la respuesta vieja no vale. */
+let _regSesion = null;
+let _regSesionDe = '';
+
+/** Comprueba la instancia contra Shalom. Gratis, una vez, sin bloquear.
+ * @param {boolean} [forzar] true vuelve a preguntar aunque ya se supiera */
+function _regComprobarInstancia(forzar){
+  const id = (S.shalomInstancia || {}).id;
+  if(!id || !window.Shalom || !window.Shalom.estadoSesion) return;
+  if(!forzar && _regSesionDe === id && _regSesion) return;
+  _regSesionDe = id;
+  _regSesion = {estado: 'mirando'};
+  window.Shalom.estadoSesion(id).then((r) => {
+    // Si cambiaste de cuenta mientras llegaba, esta respuesta ya no es de
+    // nadie: tirarla es más barato que explicar por qué el panel miente.
+    if((S.shalomInstancia || {}).id !== id) return;
+    _regSesion = (r && r.ok && r.sesion) ?
+      {estado: r.sesion.conectada ? 'ok' : 'sinSesion', usuario: r.sesion.usuario} :
+      {estado: 'rota', motivo: (r && r.motivo) || 'SIN_RED'};
+    _pintarRegistroShalom();
+  }).catch(() => {
+    if((S.shalomInstancia || {}).id !== id) return;
+    _regSesion = {estado: 'rota', motivo: 'SIN_RED'};
+    _pintarRegistroShalom();
+  });
+}
+
 /** La config del registro, por la MISMA función que usa el servidor.
  * @return {Object} {agenciaOrigen, instanceId} */
 function _regCfg(){
@@ -862,12 +901,37 @@ function _pintarRegistroShalom(reintento){
   const inst = S.shalomInstancia || {};
   let html = tit;
 
-  /* ── TU CUENTA — se lee de lo guardado, GRATIS. Comprobar de verdad gasta
-     una llamada de las 900 del mes, así que eso solo pasa si lo pides. */
-  html += _regFila(inst.id ? '🔌' : '⚠️',
-    inst.id ? 'Cuenta <b style="color:var(--text)">'+escH(inst.nombre||inst.id)+'</b>'
-            : '<span style="color:#f59e0b">Sin cuenta de Shalom Pro</span>',
-    _regLink(inst.id ? 'comprobar' : 'elegir en Config', 'regComprobarSesion()'));
+  /* ── TU CUENTA. Comprobada contra Shalom, no leída de tu navegador.
+     NO se bloquea el botón cuando la comprobación falla: un registro sin
+     instancia válida devuelve 403 y NO crea ni cobra nada, mientras que
+     bloquear por una lectura que puede fallar por red te dejaría sin poder
+     registrar teniéndolo todo bien. Se dice la verdad y decides tú. */
+  if(inst.id) _regComprobarInstancia();
+  const ses = (_regSesionDe === inst.id) ? _regSesion : null;
+  let icoC = '🔌', txtC, accC = 'comprobar';
+  if(!inst.id){
+    icoC = '⚠️';
+    txtC = '<span style="color:#f59e0b">Sin cuenta de Shalom Pro</span>';
+    accC = 'elegir en Config';
+  } else {
+    const nom = '<b style="color:var(--text)">'+escH(inst.nombre||inst.id)+'</b>';
+    if(!ses || ses.estado === 'mirando'){
+      txtC = 'Cuenta '+nom+'<span style="opacity:.6"> — comprobando…</span>';
+    } else if(ses.estado === 'ok'){
+      txtC = 'Cuenta '+nom+'<span style="color:#3fb950"> — sesión activa</span>';
+    } else if(ses.estado === 'sinSesion'){
+      icoC = '⚠️';
+      txtC = 'Cuenta '+nom+'<span style="color:#f59e0b"> — sin sesión en '+
+        'Shalom Pro</span>';
+    } else {
+      icoC = '⛔';
+      txtC = 'Cuenta '+nom+'<span style="color:var(--red)"> — '+
+        escH(ses.motivo === 'SIN_INSTANCIA_VALIDA' ? 'ya no existe en Shalom' :
+          (ses.motivo === 'SIN_RED' ? 'no se pudo comprobar' : ses.motivo))+
+        '</span>';
+    }
+  }
+  html += _regFila(icoC, txtC, _regLink(accC, 'regComprobarSesion()'));
 
   /* ── TU AGENCIA DE ORIGEN. Se puede cambiar desde aquí, pero el texto dice
      lo que es: UNA sola para todo el negocio. Sin ese aviso, un día se cambia
@@ -995,6 +1059,7 @@ function regToggleSimulacro(){
 async function regComprobarSesion(){
   const id = (S.shalomInstancia||{}).id;
   if(!id){ toast('Elige tu cuenta de Shalom Pro en ⚙️ Config'); return; }
+  _regComprobarInstancia(true);   // y que la fila se entere, no solo el aviso
   if(!window.Shalom || !window.Shalom.estadoSesion){ toast('⚠️ Shalom no disponible'); return; }
   toast('🔌 Comprobando…');
   let r = null;

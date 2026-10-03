@@ -762,10 +762,24 @@ module.exports = async (t) => {
     const win = {}; E.cargar('shalom.js', win);
     const S = win.Shalom;
     const D = S.INSTANCIA_PREFERIDA;
-    ok(D && typeof D === 'object' && D.id && D.nombre,
-       'la cuenta declarada vive en UN sitio, con id Y nombre');
-    ok(/^[0-9a-f-]{36}$/.test(D.id),
-       'y su id es el UUID real que dio el dueño, no un hueco por rellenar');
+    ok(D && typeof D === 'object' && D.nombre,
+       'la cuenta declarada vive en UN sitio');
+    /* ⚠️ ESTA PRUEBA EXIGIA UN UUID, y la exigencia era correcta mientras
+       hubo uno. El 3 oct 2026 el cambio de plan vacio el lote y ese UUID
+       dejo de existir: declararlo seguiria siendo "no es un hueco por
+       rellenar", pero afirmaria que nuestra cuenta es una que YA NO ESTA.
+       Un dato muerto no es mejor que un hueco: es peor, porque parece vivo.
+
+       Lo que sigue siendo cierto es esto: un id, si se declara, tiene que
+       ser un UUID de verdad; y sin id, el nombre tiene que poder
+       identificar solo. */
+    ok(D.id === '' || /^[0-9a-f-]{36}$/.test(D.id),
+       'o hay un UUID de verdad, o no hay id — nunca un id a medias');
+    ok(/\s/.test(String(D.nombre).trim()),
+       'y sin id, el nombre no puede ser una palabra sola como "Total": con ' +
+       '900 instancias la otra aplicacion puede crear una asi y la casariamos');
+    ok(String(D.nombre).toLowerCase() !== 'total',
+       'ese nombre en concreto ya colisiono el 2 oct 2026');
     ok(S.elegirInstancia([{id: 'x', nombre: 'Otra'}], '', D).estado === 'una',
        'con una sola instancia da igual como se llame: se usa, como siempre');
     ok(S.elegirInstancia([], '', D).estado === 'ninguna',
@@ -812,11 +826,17 @@ module.exports = async (t) => {
     const doc = {getElementById: (id) =>
       (id === 'shalomInstBtn' ? btn : (id === 'shalomInstEstado' ? caja : null))};
 
+    /* ⚠️ `Total` A PROPOSITO, Y NO ES LA NUESTRA. Desde que el plan permite
+       900 instancias, la otra aplicacion del dueño puede crear las que
+       quiera y las llama `Total` (su servidor elige el nombre). Esta lista
+       reproduce ese escenario: la nuestra se llama `Total Tools Panel`, y
+       casar la otra significaria registrar los envios de sus clientes en el
+       negocio equivocado, cobrados a ellos. */
     const dos = [
-      {id: 'd14b120a-983d-4369-b519-c9d6bcf70d6a', nombre: 'Total',
+      {id: 'd14b120a-983d-4369-b519-c9d6bcf70d6a', nombre: 'Total Tools Panel',
         usuario: 'Totaltools@gmail.com', conectada: true},
-      {id: '29bf1b07-a3b0-4e29-a01f-5c7bc0000000', nombre: 'Yapaitas',
-        usuario: 'ramossuyin@gmail.com', conectada: false}
+      {id: '29bf1b07-a3b0-4e29-a01f-5c7bc0000000', nombre: 'Total',
+        usuario: 'otra-aplicacion@gmail.com', conectada: true}
     ];
     const winS = {};
     E.cargar('shalom.js', winS);
@@ -845,7 +865,7 @@ module.exports = async (t) => {
 
     ok(pintado.sesion !== null,
        'con la cuenta declarada, se PINTA LA SESION — no el aviso de varias');
-    ok(pintado.sesion && pintado.sesion.nombre === 'Total',
+    ok(pintado.sesion && pintado.sesion.nombre === 'Total Tools Panel',
        'y es Total, la declarada — salio: ' +
        (pintado.sesion && pintado.sesion.nombre));
     ok(pintado.elector === null,
@@ -997,9 +1017,10 @@ module.exports = async (t) => {
     };
 
     const declarada = await correr([
-      {id: 'd14b120a-983d-4369-b519-c9d6bcf70d6a', nombre: 'Total',
+      {id: 'd14b120a-983d-4369-b519-c9d6bcf70d6a', nombre: 'Total Tools Panel',
         conectada: true},
-      {id: 'otra', nombre: 'Yapaitas', conectada: true}
+      // La de la otra aplicacion, con el nombre que ya colisiono una vez.
+      {id: 'otra', nombre: 'Total', conectada: true}
     ]);
     ok(declarada.valor && declarada.valor.id ===
        'd14b120a-983d-4369-b519-c9d6bcf70d6a',

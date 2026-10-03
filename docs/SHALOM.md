@@ -833,8 +833,30 @@ La primera versión de esto montó un **selector** cuando lo que hacía falta er
 Este panel es el de Total Tools:
 
 ```js
-{ id: 'd14b120a-983d-4369-b519-c9d6bcf70d6a', nombre: 'Total' }
+{ id: '', nombre: 'Total Tools Panel' }
 ```
+
+> **⚠️ Esto decía `{ id: 'd14b120a-…', nombre: 'Total' }` hasta el 3/10/2026.**
+> Cambiaron las dos cosas, y por motivos distintos:
+>
+> **El id murió.** Al renovar el plan, el lote de instancias se vació: misma
+> clave, misma cuenta, cero instancias. Dejar el UUID escrito sería declarar
+> como «la mía» una cuenta que ya no existe — y un dato muerto es peor que un
+> hueco, porque parece vivo. Vacío, manda el nombre; y si tampoco casa, **se
+> pregunta**, que es lo correcto cuando no se sabe.
+>
+> **El nombre era peligroso.** El plan pasó de **1 instancia máxima a 900**.
+> Con el tope en 1, el botón «Obtener instancia» de la otra aplicación del
+> dueño —que llama a `POST /instances` sin mandar nombre, y su servidor elige
+> `Total`— recibía un 403 y no podía crear nada. **El límite nos estaba
+> protegiendo sin que lo supiéramos.** Con 900 funciona siempre, así que el
+> plan B por nombre habría casado una instancia ajena llamada `Total` y
+> habríamos registrado los envíos de tus clientes en el otro negocio,
+> cobrados a ellos. `Total Tools Panel` no lo genera su servidor ni por
+> accidente.
+>
+> El plan B **no se quita**: es justo lo que hacía falta hoy, cuando el id
+> murió sin avisar. Lo que se quita es que pueda casar algo que no es nuestro.
 
 **Los dos, pero NO como alternativas — con precedencia:**
 
