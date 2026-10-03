@@ -438,6 +438,24 @@ async function llamar(op, clave, cuerpo) {
 // todavía en la tienda. Medimos bien el esquema y después tiramos la única
 // distinción que importaba.
 //
+// MEDIDO el 3 oct 2026 sobre tres guías reales del flujo viejo (número de
+// guía puesto a mano, después de dejar el paquete en el mostrador):
+//
+//     86069409  registrado=2026-06-26 19:54:00  origen=2026-06-26 19:54:00
+//     86101685  registrado=2026-06-27 12:39:00  origen=2026-06-27 12:39:00
+//     92866322  registrado=2026-08-22 17:38:08  origen=2026-08-22 17:38:08
+//
+// IDÉNTICAS, al segundo: en el mostrador registrar y entregar son el mismo
+// acto. Por eso sacar `registrado` de los pasos no afecta a ningún pedido
+// antiguo — siguen llegando a ENVIADO por `origen`, igual que siempre. En
+// nuestro registro, en cambio, `origen` se queda en null hasta que el
+// paquete llega de verdad. Las dos poblaciones se separan solas.
+//
+// ⚠️ El formato es `YYYY-MM-DD HH:MM:SS` y NO LLEVA ZONA HORARIA. Parsearlo
+// en el servidor (que corre en UTC) lo correría 5 horas hacia adelante y la
+// cuenta atrás diría que te queda tiempo cuando ya venció. Por eso el plazo
+// sale de nuestro propio sello ISO y no de aquí, todavía.
+//
 // Con `registrado` fuera de esta lista, una guía recién nacida no alcanza
 // ningún paso → `ok:false` → nadie mueve nada. Y eso no es que el bug esté
 // arreglado: es que no se puede escribir.
