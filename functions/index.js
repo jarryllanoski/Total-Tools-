@@ -29,6 +29,7 @@ const pedidoPublico = require("./pedidoPublico");
 const enlace = require("./enlaceSeguimiento");
 const registroShalom = require("./registroShalom");
 const instanciaShalom = require("./instanciaShalom");
+const credenciales = require("./credenciales");
 
 setGlobalOptions({maxInstances: 10});
 initializeApp();
@@ -49,21 +50,79 @@ const SHALOM_API_KEY = defineSecret("SHALOM_API_KEY");
 //   firebase functions:secrets:set SHALOM_WEBHOOK_SECRET
 const SHALOM_WEBHOOK_SECRET = defineSecret("SHALOM_WEBHOOK_SECRET");
 
-/* Las credenciales de Shalom Pro. Su documentacion desaconseja tener
-   `POST /instances/login` en un panel porque «obligaria a que tus
-   credenciales de Shalom Pro pasen por tu sistema». No pasan: viven aqui,
-   igual que la clave de la API, y el navegador no puede mandarlas (la
-   operacion es `soloServidor`, la barrera la corta antes del cuerpo).
+/* ── LAS CREDENCIALES DE SHALOM PRO ───────────────────────────────────────
+   Viven en Secret Manager, la misma caja fuerte que la clave de la API. El
+   dueño las escribe UNA vez desde el panel; a partir de ahí el servidor
+   entra solo en Shalom — que es lo único que hace que la sesión no se caiga
+   de madrugada sin nadie delante.
 
-   Se ponen desde la terminal del dueño, NUNCA pegadas en un chat:
-     firebase functions:secrets:set SHALOM_PRO_USER
-     firebase functions:secrets:set SHALOM_PRO_PASS
+   ⚠️ NO CON `defineSecret()`, Y EL MOTIVO ES EL QUE LO HACE FUNCIONAR.
+   Ese fija la versión al DESPLEGAR: si el panel guarda una contraseña
+   nueva, la función seguiría usando la vieja hasta el próximo deploy —
+   justo lo contrario de lo que se quiere. Se lee la versión `latest` en el
+   momento de la petición, con la caché corta de `credenciales.js`.
 
-   ⚠️ TIENEN QUE EXISTIR ANTES DE DESPLEGAR. Una funcion que declara un
-   secreto inexistente no despliega — y el fallo sale en el deploy, no en
-   produccion, que es donde se quiere que salga. */
-const SHALOM_PRO_USER = defineSecret("SHALOM_PRO_USER");
-const SHALOM_PRO_PASS = defineSecret("SHALOM_PRO_PASS");
+   De regalo: como ya no van en `secrets: [...]`, un secreto que todavía no
+   existe deja de romper el despliegue. Al dueño le acaba de pasar. */
+let _smCliente = null;
+/**
+ * El cliente de Secret Manager, creado una sola vez.
+ * @return {Object} el cliente
+ */
+function _sm() {
+  if (!_smCliente) {
+    const {SecretManagerServiceClient} =
+      require("@google-cloud/secret-manager");
+    _smCliente = new SecretManagerServiceClient();
+  }
+  return _smCliente;
+}
+
+/**
+ * El id del proyecto, de donde lo ponga el entorno.
+ * @return {string} el id, o "" si no está
+ */
+function _proyecto() {
+  return process.env.GCLOUD_PROJECT || process.env.GCP_PROJECT ||
+    (JSON.parse(process.env.FIREBASE_CONFIG || "{}").projectId) || "";
+}
+
+/**
+ * Lee la versión MÁS NUEVA de un secreto.
+ * @param {string} nombre del secreto
+ * @return {Promise<string>} su valor
+ */
+async function _leerSecreto(nombre) {
+  const [v] = await _sm().accessSecretVersion({
+    name: `projects/${_proyecto()}/secrets/${nombre}/versions/latest`,
+  });
+  return v.payload.data.toString("utf8");
+}
+
+/**
+ * Escribe una versión nueva. Crea el secreto si es la primera vez.
+ *
+ * Las versiones viejas se quedan en el historial de Secret Manager: eso es
+ * lo que permite volver atrás si el dueño se equivoca de cuenta.
+ * @param {string} nombre del secreto
+ * @param {string} valor lo que se guarda
+ * @return {Promise<void>} nada
+ */
+async function _escribirSecreto(nombre, valor) {
+  const padre = `projects/${_proyecto()}`;
+  try {
+    await _sm().createSecret({parent: padre, secretId: nombre,
+      secret: {replication: {automatic: {}}}});
+  } catch (e) {
+    // Ya existía: eso no es un fallo, es el caso normal a partir del segundo.
+    if (!/already exists|ALREADY_EXISTS|6 ALREADY_EXISTS/i.test(
+        String((e && e.message) || e))) throw e;
+  }
+  await _sm().addSecretVersion({
+    parent: `${padre}/secrets/${nombre}`,
+    payload: {data: Buffer.from(String(valor), "utf8")},
+  });
+}
 
 // ⚠️ ESTA LISTA DEBE COINCIDIR CON firestore.rules (funcion esAdmin).
 // Son dos archivos distintos que expresan la misma regla: si se cambian por
@@ -1226,9 +1285,10 @@ exports.shalomPuerta = onRequest(
        funcion que declara un secreto que no esta en Secret Manager NO
        DESPLIEGA — y que falle en el deploy es exactamente donde se quiere
        que falle, no en produccion con el dueño delante. */
-    {region: "us-central1",
-      secrets: [SHALOM_API_KEY, SHALOM_PRO_USER, SHALOM_PRO_PASS],
-      timeoutSeconds: 120},
+    /* Solo la clave de la API va declarada. Las credenciales de Shalom Pro
+       se leen en el momento de la peticion (ver arriba), asi que un secreto
+       que aun no existe NO rompe el despliegue. */
+    {region: "us-central1", secrets: [SHALOM_API_KEY], timeoutSeconds: 120},
     async (req, res) => {
       setCORS(req, res);
       if (req.method === "OPTIONS") {
@@ -1312,6 +1372,7 @@ exports.shalomPuerta = onRequest(
          propia documentacion llama «el fallo mas repetido de esta API». */
       if (paso.orquestar === "conectarShalom") {
         try {
+          const cred = await credenciales.leer({leer: _leerSecreto});
           const cfgSnap2 = await db.doc(CFG_DOC).get();
           const cfg2 = cfgSnap2.exists ? cfgSnap2.data() : {};
           const decl = (cfg2.shalomInstanciaPreferida &&
@@ -1329,8 +1390,8 @@ exports.shalomPuerta = onRequest(
             // NUNCA del navegador: ver el comentario de DECLARADA.
             correo: decl.correo || instanciaShalom.DECLARADA.correo,
             nombre: decl.nombre || instanciaShalom.DECLARADA.nombre,
-            usuario: SHALOM_PRO_USER.value(),
-            clave: SHALOM_PRO_PASS.value(),
+            usuario: (cred && cred.usuario) || "",
+            clave: (cred && cred.clave) || "",
           });
           /* Si acabo de conectar una instancia, se guarda cual — el
              registro de envios la lee de Firestore, no del navegador. */
@@ -1346,6 +1407,40 @@ exports.shalomPuerta = onRequest(
           res.status(200).json({ok: false, motivo: "ERROR_SHALOM",
             detalle: "Algo se rompio al conectar. Mira la cuenta en " +
               "shalom-api.lat antes de volver a intentarlo."});
+        }
+        return;
+      }
+
+      /* ★ GUARDAR LAS CREDENCIALES DE SHALOM PRO — write-only.
+         Es la unica operacion que recibe un secreto del navegador, y el
+         trato es: entra una vez, va a Secret Manager, y no se puede volver
+         a sacar. No hay operacion de lectura; la respuesta no devuelve la
+         clave ni enmascarada; y lo que se audita es QUIEN y CUANDO.
+
+         Su documentacion desaconseja tener el login en un panel porque
+         «obligaria a que tus credenciales pasen por tu sistema». Pasan UNA
+         vez, en una peticion, y acaban en la misma caja fuerte que la clave
+         de la API. Una contraseña que se escribe una vez se expone una vez
+         — frente a escribirla cada vez que la sesion se cae. */
+      if (paso.orquestar === "guardarCredenciales") {
+        try {
+          const d = (paso.datos && typeof paso.datos === "object") ?
+            paso.datos : {};
+          const salida4 = await credenciales.guardar({
+            escribir: _escribirSecreto,
+            auditar: (a) => db.doc(CFG_DOC).set({shalomCredenciales: {
+              usuario: a.usuario, // el correo SI: no es un secreto
+              cuando: a.cuando,
+              porQuien: paso.correo || "",
+            }}, {merge: true}),
+          }, {usuario: d.usuario, clave: d.clave});
+          /* Sin `clave` en la respuesta, ni aqui ni en el error. El correo
+             si vuelve: es lo que el panel pinta para que sepas cual quedo. */
+          res.status(200).json(salida4);
+        } catch (e) {
+          console.error("guardarCredenciales:", e && e.message);
+          res.status(200).json({ok: false, motivo: "ERROR_SHALOM",
+            detalle: "No se pudieron guardar las credenciales."});
         }
         return;
       }

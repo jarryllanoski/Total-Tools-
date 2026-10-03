@@ -455,6 +455,18 @@
       return _pedir({op: 'conectarShalom', datos: {}});
     },
 
+    /* ★ GUARDAR LAS CREDENCIALES DE SHALOM PRO — write-only.
+       Van a Secret Manager, no a Firestore: Firestore se sincroniza al
+       navegador, Secret Manager no sale del servidor. NO existe la pareja
+       de lectura, ni aquí ni en la puerta: lo que entra no vuelve a salir.
+       La respuesta trae el correo —que no es un secreto— y nunca la clave,
+       ni enmascarada: devolver `****` ya confirmaría su longitud.
+       → {ok:true, usuario} · {ok:false, motivo, faltan[]} */
+    guardarCredenciales: function (usuario, clave) {
+      return _pedir({op: 'guardarCredenciales',
+        datos: {usuario: usuario, clave: clave}});
+    },
+
     estadoSesion: function (instanceId) {
       return _pedir({op: 'instanceStatus', datos: {instanceId: instanceId}});
     },
@@ -526,7 +538,8 @@
         INSTANCIA_NO_EXISTE: 'La cuenta de Shalom Pro que elegiste ya no está. Elige otra en Config — no se cambia sola, porque sería cambiarte de negocio sin avisar.',
         SIN_DATO:      'Faltan datos para registrar. Abajo dice cuáles.',
         NO_ENCONTRADO_PEDIDO: 'Ese pedido ya no está en la base de datos.',
-        SIN_CREDENCIALES: 'Faltan las credenciales de Shalom Pro en el servidor. Se ponen desde tu terminal con `firebase functions:secrets:set SHALOM_PRO_USER` y `SHALOM_PRO_PASS`.',
+        SIN_CREDENCIALES: 'Faltan las credenciales de Shalom Pro. Guárdalas en ⚙️ Config → Shalom, arriba del botón de conectar.',
+        SIN_PERMISO_SECRETOS: 'La función no tiene permiso para escribir en Secret Manager. Hay que darle el rol `roles/secretmanager.admin` a su cuenta de servicio, una sola vez.',
         SIN_INSTANCIA_VALIDA: 'El id de instancia de Shalom Pro no sirve. La clave de la API puede estar bien: compruébala con «Verificar sesión».',
         LIMITE:        'Se agotó la cuota del plan de Shalom.',
         ERROR_SHALOM:  'Shalom respondió con un error. Reintenta en unos minutos.',

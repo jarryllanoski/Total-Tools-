@@ -582,3 +582,32 @@ declarado y sin correo, que es una creada en un intento anterior que no llegó
 a entrar. Pulsar el botón tres veces crea **una** instancia.
 
 El panel sigue sin **borrar** y sin **cerrar sesión**: esos dos sí rompen.
+
+### Las credenciales: entran una vez y no vuelven a salir
+
+La objeción de su documentación era que el login *«obligaría a que tus
+credenciales de Shalom Pro pasen por tu sistema»*. Pasan **una vez**, desde
+el panel, y acaban en **Secret Manager** — la misma caja fuerte que la clave
+de la API. A partir de ahí el servidor entra solo.
+
+| | dónde descansa | veces que la escribes |
+|---|---|---|
+| la otra app del dueño | su base de datos, y **te la rellena** en el formulario | una |
+| usar y olvidar | en ningún sitio | **cada vez que la sesión cae** |
+| **esto** | **Secret Manager** | **una** |
+
+Una contraseña que se escribe una vez **se expone una vez**. Y con ella en la
+caja fuerte, el servidor puede volver a entrar **de madrugada, sin nadie
+delante** — que es lo único que hace que la sesión no se caiga de verdad.
+
+**Write-only, y es una propiedad del sistema, no una promesa:** no existe
+operación de lectura, ni en `PERMITIDAS` ni en `ORQUESTADAS`. Hay una prueba
+que recorre las dos listas y falla si aparece una. La respuesta nunca
+devuelve la clave, **ni enmascarada** —un `****` ya confirmaría su
+longitud—, y la auditoría registra quién y cuándo, nunca el valor.
+
+⚠️ **No se usa `defineSecret()`** para estas dos: ese fija la versión al
+desplegar, así que el panel guardaría una contraseña nueva y la función
+seguiría con la vieja hasta el próximo deploy. Se lee `latest` en el momento
+de la petición. **De regalo, un secreto que todavía no existe deja de romper
+el despliegue.**

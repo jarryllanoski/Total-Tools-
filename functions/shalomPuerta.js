@@ -164,8 +164,18 @@ const PERMITIDAS = {
  * llamar, y escribir el resultado. El navegador manda SOLO el id del
  * pedido — no puede falsificar el cuerpo ni saltarse un candado.
  */
+/* ⚠️ `guardarCredenciales` ES LA UNICA DE ESTA LISTA QUE RECIBE UN SECRETO
+   DEL NAVEGADOR, y por eso conviene leer esto antes de tocarla:
+
+     · Es WRITE-ONLY. No existe su pareja de lectura, ni aqui ni en
+       PERMITIDAS. Lo que entra no se puede volver a sacar por la puerta.
+     · Lo que guarda va a Secret Manager, NO a Firestore. Firestore se
+       sincroniza al navegador; Secret Manager no sale del servidor.
+     · La respuesta NUNCA devuelve la clave, ni enmascarada. Devolver
+       `****` ya seria confirmar su longitud.
+     · La auditoria registra quien y cuando. El valor no. */
 const ORQUESTADAS = {registrarEnvio: true, recuperarEnvio: true,
-  conectarShalom: true};
+  conectarShalom: true, guardarCredenciales: true};
 
 /**
  * Quita de un texto cualquier cosa con forma de clave antes de devolverlo.

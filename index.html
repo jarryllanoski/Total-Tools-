@@ -1119,6 +1119,41 @@
         border:1px solid rgba(56,139,253,.35);color:#388bfd">&#128268; Verificar sesión de Shalom Pro</button>
       <div id="shalomInstEstado" style="display:none;margin-top:10px;font-size:12px;line-height:1.5"></div>
 
+      <!-- ★ LAS CREDENCIALES DE SHALOM PRO — WRITE-ONLY.
+           Se escriben UNA vez y van a Secret Manager, la misma caja fuerte
+           que la clave de la API. A partir de ahí el servidor entra solo,
+           que es lo único que hace que la sesión no se caiga de madrugada
+           sin nadie delante.
+
+           ⚠️ LOS CAMPOS NACEN VACÍOS Y SE VACÍAN AL GUARDAR. No se
+           rellenan nunca con lo guardado — no existe forma de pedirlo de
+           vuelta, ni desde aquí ni desde la consola. La otra aplicación del
+           dueño sí te rellena la contraseña cada vez que entras: eso es
+           poder leerla, y es lo que no se hace aquí.
+           `autocomplete="new-password"` para que tampoco la rellene el
+           navegador por su cuenta. -->
+      <div style="border-top:1px solid var(--bd);margin-top:11px;padding-top:11px">
+        <div style="font-size:11px;color:#8b949e;line-height:1.5;margin-bottom:9px">
+          <b style="color:var(--text)">Tu cuenta de Shalom Pro.</b> La de
+          <code style="font-size:10.5px">pro.shalom.pe</code>. Se guarda cifrada en
+          Secret Manager y <b>no se puede volver a leer desde el panel</b>.
+          <span id="credEstado"></span></div>
+        <div class="frow">
+          <div class="fg"><label class="fl">Correo</label>
+            <input class="fi" id="credUser" type="email" autocomplete="off"
+              placeholder="correo@gmail.com"></div>
+          <div class="fg"><label class="fl">Contraseña</label>
+            <input class="fi" id="credPass" type="password" autocomplete="new-password"
+              placeholder="La de pro.shalom.pe"></div>
+        </div>
+        <button id="credBtn" type="button" onclick="guardarCredencialesShalom()"
+          style="width:100%;margin-top:9px;padding:11px;border-radius:9px;cursor:pointer;
+          font-family:inherit;font-size:13px;font-weight:700;
+          background:rgba(163,113,247,.15);border:1px solid rgba(163,113,247,.35);
+          color:#a78bfa">&#128273; Guardar credenciales</button>
+        <div id="credSalida" style="display:none;margin-top:9px;font-size:11.5px;line-height:1.55"></div>
+      </div>
+
       <!-- CONECTAR / RECONECTAR LA CUENTA DE SHALOM PRO
            Una sola operación, idempotente: crea la instancia solo si no
            existe, y ENTRA SIEMPRE. Entrar es lo que deja las credenciales
@@ -4820,10 +4855,10 @@ render();
      lo usa. config.js, print.js y voz.js preguntan por los pedidos marcados,
      así que siguen yendo detrás. El orden de carga es un contrato
      (ver docs/ARQUITECTURA.md). -->
-<script src="config.js?v=47"></script>
+<script src="config.js?v=48"></script>
 <script src="print.js?v=16"></script>
 <script src="notify.js?v=5"></script>
-<script src="shalom.js?v=29"></script>
+<script src="shalom.js?v=30"></script>
 <script src="tracking.js?v=22"></script>
 <script src="floatpanel.js?v=4"></script>
 <script src="delivery.js?v=8"></script>

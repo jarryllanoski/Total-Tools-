@@ -1104,6 +1104,59 @@ function regToggleSimulacro(){
   _pintarRegistroShalom();
 }
 
+/* ★ GUARDAR LAS CREDENCIALES DE SHALOM PRO.
+   Se escriben una vez y van a Secret Manager. Dos reglas que no se tocan:
+
+     1. LOS CAMPOS SE VACÍAN AL GUARDAR, y nunca se rellenan con lo que hay
+        guardado. No es que no se quiera: es que NO SE PUEDE — no existe
+        operación de lectura. La otra aplicación del dueño sí te rellena la
+        contraseña al entrar, y eso es exactamente lo que aquí no pasa.
+     2. LA RESPUESTA NO TRAE LA CLAVE, ni enmascarada. Un `****` ya
+        confirmaría su longitud. Vuelve el correo, que no es un secreto, y
+        es lo que se pinta para que sepas cuál quedó. */
+async function guardarCredencialesShalom(){
+  const u = $('credUser'), k = $('credPass'), btn = $('credBtn');
+  const caja = $('credSalida');
+  const decir = (html) => { if(caja){ caja.style.display='block'; caja.innerHTML=html; } };
+  if(!window.Shalom || !window.Shalom.guardarCredenciales){
+    decir('<span style="color:var(--red)">Shalom no está disponible.</span>'); return; }
+
+  const usuario = (u && u.value || '').trim();
+  const clave   = (k && k.value) || '';
+  if(btn){ btn.disabled = true; btn.style.opacity='.5'; btn.textContent='⏳ Guardando…'; }
+  let r = null;
+  try{ r = await window.Shalom.guardarCredenciales(usuario, clave); }catch(e){ r = null; }
+  if(btn){ btn.disabled = false; btn.style.opacity=''; btn.textContent='🔑 Guardar credenciales'; }
+
+  if(r && r.ok){
+    // Se vacían SIEMPRE, y la contraseña primero: lo que no está en el DOM
+    // no se puede leer desde la consola ni quedar en una captura.
+    if(k) k.value = '';
+    if(u) u.value = '';
+    const est = $('credEstado');
+    if(est) est.innerHTML = ' <b style="color:#3fb950">Guardada ✓</b> · '+
+      escH(r.usuario||'');
+    decir('<span style="color:#3fb950">✅ Guardada para <b>'+escH(r.usuario||'')+
+      '</b>.</span> <span style="color:var(--text2)">Ahora pulsa «Conectar» '+
+      'para entrar en Shalom con ella.</span>');
+    toast('🔑 Credenciales guardadas');
+    return;
+  }
+
+  const mot = (r && r.motivo) || 'SIN_RED';
+  const txt = (window.Shalom.textoMotivo ? window.Shalom.textoMotivo(mot) : mot);
+  decir('<div style="background:rgba(248,81,73,.1);border:1px solid rgba(248,81,73,.3);'+
+    'border-radius:9px;padding:10px 12px"><b style="color:var(--red)">❌ '+escH(txt)+'</b>'+
+    ((r && r.faltan && r.faltan.length) ?
+      '<ul style="margin:5px 0 0;padding-left:16px;color:var(--text2)">'+
+      r.faltan.map(f=>'<li>'+escH(f)+'</li>').join('')+'</ul>' : '')+
+    ((r && r.detalle) ? '<div style="color:var(--text2);margin-top:4px">'+
+      escH(r.detalle)+'</div>' : '')+'</div>');
+  // La contraseña se vacía TAMBIÉN al fallar: si fallo fue por permisos, el
+  // valor no tiene por qué seguir en pantalla mientras se arregla.
+  if(k) k.value = '';
+}
+
 /* ★ CONECTAR / RECONECTAR LA CUENTA DE SHALOM PRO.
    Una sola operación idempotente: el servidor crea la instancia SOLO si no
    existe, entra siempre, y comprueba. Pulsarla dos veces no crea dos.
