@@ -262,13 +262,27 @@
        el cambio de plan vació el lote y el id viejo murió— pero ahora apunta
        a un nombre que solo puede ser el nuestro.
 
-       ⚠️ EL `id` VA VACÍO A PROPÓSITO. El de antes
-       (`d14b120a-983d-4369-b519-c9d6bcf70d6a`) desapareció con el cambio de
-       plan. Dejarlo escrito sería declarar como «la mía» una cuenta que no
-       existe. Vacío, manda el nombre; y si tampoco casa, se PREGUNTA — que
-       es lo correcto cuando no se sabe. */
+       ⚠️ EL `id` VA VACÍO, Y ESTA VEZ EL COMENTARIO Y EL CÓDIGO DICEN LO
+       MISMO. Van DOS ids muertos:
+         · `d14b120a-983d-4369-b519-c9d6bcf70d6a` murió el 3/10/2026 cuando
+           el cambio de plan vació el lote;
+         · `70f5a14e-186a-40be-a0d9-43f82cb38a0e` lo sustituyó a mano ese
+           mismo día y murió igual: el 11/10/2026 el panel de shalom-api.lat
+           mostraba «0 de 900 utilizadas · Aún no tienes instancias».
+
+       Y entre medias este comentario ya decía «va vacío» mientras la línea
+       de abajo llevaba un UUID escrito. Un comentario que contradice a su
+       código es peor que no tener comentario: se lee, se cree, y nadie mira
+       la línea.
+
+       El id es el ancla MÁS específica y la MÁS perecedera — se muere cada
+       vez que la instancia se rehace, y es justo entonces cuando hace falta
+       un ancla. El correo no se muere: es la cuenta del negocio. Así que el
+       id no se declara a mano nunca más; lo guarda Firestore al conectar, y
+       quien manda aquí es el correo. Si tampoco casa, se PREGUNTA — que es
+       lo correcto cuando no se sabe. */
     INSTANCIA_PREFERIDA: {
-      id: '70f5a14e-186a-40be-a0d9-43f82cb38a0e',
+      id: '',
       correo: 'Totaltools@gmail.com',
       nombre: 'Total Tools Panel'
     },

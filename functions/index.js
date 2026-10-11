@@ -29,6 +29,7 @@ const pedidoPublico = require("./pedidoPublico");
 const enlace = require("./enlaceSeguimiento");
 const registroShalom = require("./registroShalom");
 const instanciaShalom = require("./instanciaShalom");
+const puertaInstancias = require("./puertaInstancias");
 const credenciales = require("./credenciales");
 
 setGlobalOptions({maxInstances: 10});
@@ -1414,13 +1415,18 @@ exports.shalomPuerta = onRequest(
           const decl = (cfg2.shalomInstanciaPreferida &&
             typeof cfg2.shalomInstanciaPreferida === "object") ?
             cfg2.shalomInstanciaPreferida : {};
-          const salida3 = await instanciaShalom.conectar({
-            listar: () => _porLaPuerta("instances", {}),
-            crear: (nombre) => _porLaPuerta("instanceCrear", {name: nombre}),
-            entrar: (id, usuario, clave) => _porLaPuerta("instanceLogin",
-                {instanceId: id, username: usuario, password: clave}),
-            estado: (id) => _porLaPuerta("instanceStatus", {instanceId: id}),
-          }, {
+          /* ⚠️ LAS CUATRO LLAMADAS VIVEN EN `puertaInstancias`, NO AQUI.
+             Estuvieron escritas aqui mismo, sueltas, y dos de las cuatro
+             devolvian la respuesta EN CRUDO donde `conectar` esperaba la
+             traducida: `lis.instancias` y `st.sesion` salian `undefined`
+             siempre, asi que no se veia ninguna instancia existente —se
+             creaba una nueva en cada pulsacion— y el login bueno se
+             reportaba como «no conectada». Ninguna prueba en rojo: los
+             dobles devolvian la forma traducida, mas amable que la realidad.
+             Ahora el empalme es un modulo y se prueba con el JSON medido. */
+          const cables = puertaInstancias.hacer(
+              _porLaPuerta, shalomPuerta.traducir);
+          const salida3 = await instanciaShalom.conectar(cables, {
             // Lo declarado en Config pisa lo del codigo, igual que el resto.
             // Config puede pisarla sin desplegar; si no, la del modulo.
             // NUNCA del navegador: ver el comentario de DECLARADA.

@@ -581,6 +581,49 @@ apetezca desde la consola.
 declarado y sin correo, que es una creada en un intento anterior que no llegó
 a entrar. Pulsar el botón tres veces crea **una** instancia.
 
+#### ⚠️ Y eso era verdad en la lógica y mentira en el cable (11 oct 2026)
+
+«Solo crea si no hay ninguna» estaba bien escrito y bien probado en
+`instanciaShalom.conectar`. Pero la orquestación de `index.js` le pasaba las
+cuatro llamadas **en crudo**, tal y como salen de la puerta:
+
+```js
+listar: () => _porLaPuerta("instances", {})   // → {ok, json:{instances:[…]}}
+```
+
+y `conectar` lee `lis.instancias` — el vocabulario del **traductor**. En crudo
+ese campo es `undefined` siempre, y `undefined` no se queja: `cual(undefined,
+…)` contesta *«ninguna»*, así que **se creaba una instancia nueva en cada
+pulsación**. Lo mismo con `estado`: `st.sesion` undefined → `conectada:false`
+aunque el login fuera bien.
+
+Las otras dos —`crear` y `entrar`— sí casaban, porque de ellas se lee `.json`,
+que es justo lo que la puerta devuelve. Dos cables bien y dos mal en la misma
+función.
+
+**Hasta el 3 oct el límite de 1 instancia tapaba el agujero**: la segunda
+creación recibía 403. Con 900 no lo tapa nada. Es la segunda vez que ese
+límite resulta haber sido una protección que no sabíamos que teníamos.
+
+**Por qué ninguna de las 1745 pruebas lo vio:** los dobles devolvían la forma
+**ya traducida** (`{ok:true, instancias:[]}`). Un doble más amable que la
+realidad no prueba el código, prueba el doble. El empalme vivía suelto dentro
+de una función de 120 líneas en `index.js`, donde no se puede llamar sin
+levantar Firebase entero.
+
+**El arreglo** es `functions/puertaInstancias.js`: los cuatro cables en un
+módulo, con el traductor de verdad dentro, probado con el **JSON crudo
+medido** (`tests/puerta-instancias.test.js`). Y un cinturón en `conectar`:
+después de crear, **vuelve a listar**; si hay dos con el mismo correo no se
+usa ninguna y se dice cuáles — listar no gasta cuota, así que el seguro es
+gratis.
+
+| ancla | estado |
+|---|---|
+| `id` | **no se declara a mano**: van dos muertos (3 y 11 oct). Lo guarda Firestore al conectar |
+| `correo` | el que manda: es la cuenta del negocio y no se muere |
+| `nombre` | plan C, y solo si esa instancia no tiene correo (una huérfana) |
+
 El panel sigue sin **borrar** y sin **cerrar sesión**: esos dos sí rompen.
 
 ### Las credenciales: entran una vez y no vuelven a salir

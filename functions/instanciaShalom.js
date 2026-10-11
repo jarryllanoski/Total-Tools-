@@ -244,6 +244,37 @@
         id: id, creada: creada};
     }
 
+    /* ── 3.5 · si la acabo de crear, mirar que no haya quedado DOBLE ──
+       ⚠️ EL SEGURO CONTRA EL FALLO QUE ACABAMOS DE ARREGLAR. Mientras el
+       empalme con la puerta estuvo mal, `listar` no veía nunca las
+       instancias existentes y esto creaba una nueva en cada pulsación. El
+       arreglo está en `puertaInstancias.js`; esto es el cinturón: después de
+       crear, se vuelve a mirar.
+
+       Se mira DESPUÉS de entrar y no antes porque entrar es lo que deja el
+       `username` puesto — sin él, la recién creada no casa por correo y el
+       recuento saldría mal. Y listar no gasta cuota, así que el seguro es
+       gratis.
+
+       Si salen dos, NO se sigue: con dos cuentas iguales, registrar un envío
+       es elegir a ciegas en cuál se cobra. Se dice cuántas hay y se para.
+       Si la comprobación misma falla —red, formato— no se anula lo
+       conseguido: entrar ya salió bien, y un seguro que rompe lo que vino a
+       proteger no es un seguro. */
+    if (creada) {
+      const otra = await deps.listar();
+      if (otra && otra.ok && Array.isArray(otra.instancias)) {
+        const ver = cual(otra.instancias, correo, nombre);
+        if (ver.estado === "varias") {
+          return {ok: false, motivo: "VARIAS_INSTANCIAS", id: id, creada: true,
+            detalle: "Se creó la instancia y ahora hay más de una con ese " +
+              "correo o ese nombre. No se va a usar ninguna a ciegas: entra " +
+              "en shalom-api.lat, deja una sola, y vuelve a pulsar Conectar.",
+            instancias: otra.instancias};
+        }
+      }
+    }
+
     // ── 4 · comprobar, que es lo único que demuestra algo ─────────────
     const st = await deps.estado(id);
     const conectada = !!(st && st.ok && st.sesion && st.sesion.conectada);

@@ -774,8 +774,18 @@ module.exports = async (t) => {
            aplicacion del dueño, y con 900 slots puede repetirse;
          · el CORREO es el negocio, y con la regla que puso el dueño —«una
            instancia por cada correo de inicio de sesion»— es clave unica. */
-    ok(D.id && D.correo && D.nombre,
-       'se declaran las tres: id, correo y nombre');
+    /* ⚠️ ESTA PRUEBA EXIGIA LAS TRES, Y EXIGIR EL `id` ERA EL ERROR.
+       Lo escribi el 3/10 despues de que muriera el primero, y puse el
+       segundo a mano para que pasara. El 11/10 murio tambien: la cuenta
+       mostraba «0 de 900 · Aun no tienes instancias». Un ancla que hay que
+       reescribir a mano cada vez que se rompe no es un ancla.
+       Lo que se declara a mano es lo que NO se muere; el id lo guarda
+       Firestore al conectar. */
+    ok(D.correo && D.nombre,
+       'se declaran las dos que no se mueren: correo y nombre');
+    ok(D.id === '',
+       'y el id NO se declara a mano: van dos muertos (3/10 y 11/10), y un ' +
+       'id muerto es peor que un hueco porque parece vivo');
 
     // EL ESCENARIO DE HOY: la instancia se rehizo y el id declarado ya no esta.
     const rehecha = S.elegirInstancia([
@@ -820,12 +830,17 @@ module.exports = async (t) => {
        'dos instancias con el mismo correo significan que la regla se rompio, ' +
        'y ese es el momento de preguntar, no de elegir');
 
-    // Y el id, cuando esta, sigue mandando sobre todo lo demas.
+    /* Y el id, CUANDO LO HAY, sigue mandando sobre todo lo demas. Ya no se
+       declara a mano —van dos muertos— pero Firestore guarda el de la
+       instancia conectada, y esa precedencia tiene que seguir viva: es la
+       que hace que una instancia renombrada o con otro correo se siga
+       reconociendo. Se declara aqui uno de mentira, a proposito. */
+    const conId = {id: 'uuid-vivo', correo: MIA, nombre: 'Total Tools Panel'};
     const porId = S.elegirInstancia([
-      {id: D.id, nombre: 'Renombrada', usuario: 'cambiado@gmail.com'},
+      {id: 'uuid-vivo', nombre: 'Renombrada', usuario: 'cambiado@gmail.com'},
       yo({id: 'z', nombre: 'Total Tools Panel'})
-    ], '', D);
-    ok(porId.estado === 'declarada' && porId.instancia.id === D.id,
+    ], '', conId);
+    ok(porId.estado === 'declarada' && porId.instancia.id === 'uuid-vivo',
        'el id declarado sigue siendo el primero: es el dato mas especifico');
   }
 

@@ -31,6 +31,10 @@ function mundo(op) {
   const deps = {
     listar: async () => {
       visto.listadas++;
+      /* `lista2` es lo que se ve en la SEGUNDA llamada — la de despues de
+         crear. Sin ella no se puede probar el seguro contra duplicados, que
+         justamente consiste en que el mundo cambio entre las dos miradas. */
+      if (visto.listadas > 1 && op.lista2 !== undefined) return op.lista2;
       return op.lista === undefined ?
         {ok: true, instancias: []} : op.lista;
     },
@@ -251,5 +255,75 @@ module.exports = async ({bloque, ok}) => {
        'el correo declarado es el mismo en los dos lados');
     ok(String(P.nombre).trim() === String(I.DECLARADA.nombre).trim(),
        'y el nombre tambien');
+  }
+
+  bloque('⚠️ El seguro: si crear dejo DOS, no se usa ninguna');
+
+  {
+    /* POR QUE EXISTE ESTE SEGURO. Hasta el 11/10/2026 el empalme con la
+       puerta estaba mal y `listar` no veia NUNCA las instancias que ya
+       habia: se creaba una nueva en cada pulsacion. El arreglo esta en
+       `functions/puertaInstancias.js`. Esto es el cinturon — despues de
+       crear, se vuelve a mirar — porque el fallo de crear de mas solo se
+       nota cuando ya hay cinco, y para entonces nadie sabe cual es cual.
+
+       Se mira DESPUES de entrar y no antes: entrar es lo que deja el
+       `username` puesto, y sin el la recien creada no casa por correo. */
+    const {deps, visto} = mundo({
+      lista: {ok: true, instancias: []},
+      lista2: {ok: true, instancias: [
+        {id: 'nueva-uuid', nombre: 'Total Tools Panel', usuario: MIA},
+        {id: 'vieja', nombre: 'Otra cosa', usuario: MIA}
+      ]}
+    });
+    const r = await I.conectar(deps, conOpc());
+    ok(visto.creadas === 1, 'se creo una, porque al mirar no habia ninguna');
+    ok(visto.entradas === 1, 'y se entro: el username se pone al entrar');
+    ok(visto.listadas === 2,
+       '⚠️ y se VOLVIO A MIRAR despues de crear — listar no gasta cuota, ' +
+       'asi que el seguro es gratis');
+    ok(r.ok === false && r.motivo === 'VARIAS_INSTANCIAS',
+       'con dos del mismo correo NO se sigue: registrar un envio seria ' +
+       'elegir a ciegas en cual se cobra');
+    ok(Array.isArray(r.instancias) && r.instancias.length === 2,
+       'y se dicen cuales, para poder ir a shalom-api.lat y dejar una');
+    ok(visto.estados === 0,
+       'ni se llega a comprobar el estado: no hay instancia que comprobar');
+  }
+  {
+    // El caso bueno: se creo una y despues de crear sigue habiendo una.
+    const {deps, visto} = mundo({
+      lista: {ok: true, instancias: []},
+      lista2: {ok: true, instancias: [
+        {id: 'nueva-uuid', nombre: 'Total Tools Panel', usuario: MIA}
+      ]}
+    });
+    const r = await I.conectar(deps, conOpc());
+    ok(r.ok === true && r.id === 'nueva-uuid' && r.creada === true,
+       'si al volver a mirar hay UNA, se sigue como siempre');
+    ok(visto.estados === 1, 'y se comprueba el estado');
+  }
+  {
+    /* Un seguro que rompe lo que vino a proteger no es un seguro. */
+    const {deps} = mundo({
+      lista: {ok: true, instancias: []},
+      lista2: {ok: false, motivo: 'SIN_RED'}
+    });
+    const r = await I.conectar(deps, conOpc());
+    ok(r.ok === true && r.id === 'nueva-uuid',
+       'y si la comprobacion misma falla, NO se anula lo conseguido: entrar ' +
+       'ya salio bien, y perder eso por no poder mirar seria peor');
+  }
+  {
+    // Si NO se creo nada, no se mira dos veces: no hay nada que comprobar.
+    const {deps, visto} = mundo({
+      lista: {ok: true, instancias: [
+        {id: 'ya-estaba', nombre: 'Total Tools Panel', usuario: MIA}
+      ]}
+    });
+    await I.conectar(deps, conOpc());
+    ok(visto.creadas === 0 && visto.listadas === 1,
+       'reutilizando la que ya habia no se lista dos veces: el seguro es ' +
+       'para lo que se acaba de crear');
   }
 };
