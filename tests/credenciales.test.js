@@ -42,7 +42,6 @@ function mundo(op) {
 }
 
 module.exports = async ({bloque, ok}) => {
-  C.olvidar();
 
   bloque('⚠️ Lo que entra NO se puede sacar');
 
@@ -134,55 +133,65 @@ module.exports = async ({bloque, ok}) => {
        'eso el dueño no sabe que pedir');
   }
 
-  bloque('Leer: la cache no se come un cambio de cuenta');
+  bloque('⚠️ Leer SIEMPRE de Secret Manager — la cache mentia');
 
   {
-    C.olvidar();
-    const g = {}; g[C.NOMBRE_USER] = 'a@b.com'; g[C.NOMBRE_PASS] = 'k1';
+    /* ⚠️ EL FALLO DEL 11/10/2026, Y POR QUE FUE DEL PEOR TIPO.
+       El dueño guardo sus credenciales, el panel dijo «Guardada ✓», y al
+       pulsar «Conectar» le contesto «faltan las credenciales». Dos
+       pantallas contradiciendose, ambas sinceras.
+
+       Habia una cache de 60 s que guardaba tambien el NEGATIVO, y `guardar`
+       solo la limpiaba en LA INSTANCIA que atendio el guardado. Cloud
+       Functions corre varias:
+
+         1. pulsa Conectar antes de guardar → la instancia A cachea «no hay»
+         2. guarda → lo atiende la instancia B, que si escribe
+         3. pulsa Conectar → cae en A otra vez → «no hay» viejo
+
+       Una cache cuya invalidacion no cruza de instancia no es una cache: es
+       un dato viejo con fecha de caducidad. Y el negativo es el peor de los
+       dos, porque la accion que lo vuelve falso —guardar— es justo la que
+       el dueño acaba de hacer.
+
+       Se quita entera. Estas pruebas la mantienen fuera. */
+    const g = {};
+    g[C.NOMBRE_USER] = 'a@b.com';
+    g[C.NOMBRE_PASS] = 'clave-buena';
     const {deps, visto} = mundo({guardado: g});
-    const r1 = await C.leer(deps);
-    const r2 = await C.leer(deps);
-    ok(r1 && r1.usuario === 'a@b.com', 'se lee');
-    ok(r2 && visto.leidos === 2,
-       'y la segunda sale de la cache: son dos lecturas de Secret Manager, ' +
-       'no cuatro');
+    await C.leer(deps);
+    await C.leer(deps);
+    await C.leer(deps);
+    ok(visto.leidos === 6,
+       'tres lecturas son SEIS llamadas (dos secretos cada una): no se ' +
+       'cachea nada. Es un boton que se aprieta a mano unas pocas veces al ' +
+       'dia — ahorrar ahi no vale poder mentir');
   }
   {
-    /* ⚠️ GUARDAR TIENE QUE INVALIDAR LA CACHE. Sin esto, cambias de cuenta
-       en el panel y el siguiente «Conectar» entraria con la ANTERIOR — en
-       el negocio equivocado, que es el fallo que mas cuesta de esta
-       integracion. */
-    C.olvidar();
-    const g = {}; g[C.NOMBRE_USER] = 'viejo@b.com';
-    g[C.NOMBRE_PASS] = 'clave-vieja';
-    const {deps} = mundo({guardado: g});
-    await C.leer(deps);
-    g[C.NOMBRE_USER] = 'nuevo@b.com';
-    /* ⚠️ Con una clave de dos letras esto no guardaba —la rechaza la propia
-       validacion— y la prueba fallaba por el fixture, no por el codigo. Se
-       deja anotado: una prueba que usa datos invalidos prueba otra cosa. */
-    const gu = await C.guardar(deps, {usuario: 'nuevo@b.com',
-      clave: 'clave-nueva'});
-    ok(gu.ok === true, 'el guardado de prueba usa datos validos de verdad');
-    const r = await C.leer(deps);
+    /* EL ESCENARIO EXACTO, reproducido: leer en vacio y guardar DESPUES.
+       Con la cache, esta segunda lectura devolvia null. */
+    const {deps} = mundo({guardado: {}});
+    ok(await C.leer(deps) === null, 'al principio no hay nada');
+    const g2 = {};
+    g2[C.NOMBRE_USER] = 'nuevo@b.com';
+    g2[C.NOMBRE_PASS] = 'clave-nueva';
+    const d2 = mundo({guardado: g2}).deps;
+    const r = await C.leer(d2);
     ok(r && r.usuario === 'nuevo@b.com',
-       'tras guardar, lo leido es lo NUEVO — no la cuenta anterior');
+       'y en cuanto hay, se ve — sin esperar a que caduque ningun minuto');
   }
   {
     // Primer dia: los secretos no existen todavia. Eso no es un error.
-    C.olvidar();
     const {deps} = mundo({fallaLeer: 'NOT_FOUND'});
-    const r = await C.leer(deps);
-    ok(r === null,
+    ok(await C.leer(deps) === null,
        'si todavia no hay credenciales se devuelve null, no se revienta: ' +
        'quien llame dira «guardalas en el panel»');
   }
   {
-    C.olvidar();
-    const g = {}; g[C.NOMBRE_USER] = 'a@b.com';   // sin la clave
+    const g = {};
+    g[C.NOMBRE_USER] = 'a@b.com';   // sin la clave
     const {deps} = mundo({guardado: g});
     ok(await C.leer(deps) === null,
        'con solo la mitad tampoco: media credencial no sirve para entrar');
   }
-  C.olvidar();
 };

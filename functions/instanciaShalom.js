@@ -175,10 +175,13 @@
        instancia muerta en la cuenta, y lo que el dueño pidió es justo lo
        contrario: que la sesión no se caiga. */
     if (!_txt(o.usuario) || !_txt(o.clave)) {
+      /* El texto decía «se ponen desde tu terminal con
+         firebase functions:secrets:set…», que dejó de ser verdad en cuanto
+         el panel pudo guardarlas. Un aviso que manda a hacer algo que ya
+         no hace falta es peor que no avisar. */
       return {ok: false, motivo: "SIN_CREDENCIALES",
-        detalle: "Faltan las credenciales de Shalom Pro en Secret Manager. " +
-          "Se ponen con `firebase functions:secrets:set SHALOM_PRO_USER` y " +
-          "`SHALOM_PRO_PASS`, desde tu terminal."};
+        detalle: "Escribe tu correo y tu contraseña de pro.shalom.pe aquí " +
+          "arriba y pulsa «Guardar credenciales»."};
     }
 
     // ── 1 · ¿ya existe? ───────────────────────────────────────────────

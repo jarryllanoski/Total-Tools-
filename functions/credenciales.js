@@ -49,10 +49,6 @@
     raiz.Credenciales = fabrica();
   }
 })(typeof globalThis !== "undefined" ? globalThis : window, () => {
-  /** Cuánto se guarda en memoria lo leído. Corto a propósito: si el dueño
-   *  cambia de cuenta, la siguiente conexión no debería usar la anterior. */
-  const CACHE_MS = 60000;
-
   const NOMBRE_USER = "SHALOM_PRO_USER";
   const NOMBRE_PASS = "SHALOM_PRO_PASS";
 
@@ -129,7 +125,6 @@
             "cuenta de servicio — una sola vez." :
           "No se pudo guardar. " + txt};
     }
-    _cache = null; // lo guardado manda desde ya, sin esperar a la caché
     /* La auditoría registra QUIÉN y CUÁNDO, nunca el valor. Un registro que
        guardara la contraseña sería una segunda copia fuera de la caja
        fuerte, que es exactamente lo que se quiere evitar. */
@@ -142,16 +137,36 @@
     return {ok: true, usuario: usuario};
   }
 
-  let _cache = null;
-
   /**
-   * Leer, con caché corta. Devuelve `{usuario, clave}` o `null` si no hay.
-   * @param {Object} deps {leer, ahora}
-   * @return {Promise<?Object>} las credenciales, o null
+   * Leer. SIEMPRE de Secret Manager, sin caché.
+   *
+   * ⚠️ AQUÍ HUBO UNA CACHÉ DE 60 s, Y FALLÓ EL 11/10/2026 DE LA PEOR
+   * MANERA: el dueño guardó sus credenciales, el panel dijo «Guardada ✓», y
+   * al pulsar «Conectar» le contestó «faltan las credenciales».
+   *
+   * La caché guardaba también el NEGATIVO —«aquí no hay nada»— durante un
+   * minuto, y `guardar` solo la limpiaba en LA INSTANCIA que atendió el
+   * guardado. Cloud Functions corre varias:
+   *
+   *   1. pulsa Conectar antes de guardar → la instancia A lee, no hay
+   *      nada, y cachea el «no hay»
+   *   2. guarda → lo atiende la instancia B, que sí escribe
+   *   3. pulsa Conectar → vuelve a caer en A → le sirve el «no hay» viejo
+   *
+   * Una caché cuya invalidación no cruza de instancia no es una caché: es
+   * un dato viejo con fecha de caducidad. Y el negativo es el peor de los
+   * dos para guardar, porque la acción que lo vuelve falso —guardar— es
+   * justo la que el dueño acaba de hacer.
+   *
+   * Se quita entera, no se arregla. Esto se lee solo al pulsar «Conectar»,
+   * un botón que se aprieta a mano unas pocas veces al día: dos lecturas de
+   * Secret Manager no se notan, y a cambio la respuesta es siempre la de
+   * ahora. Una caché que ahorra lo que no cuesta y puede mentir no vale lo
+   * que pesa.
+   * @param {Object} deps {leer}
+   * @return {Promise<?Object>} las credenciales, o null si no hay
    */
   async function leer(deps) {
-    const ahora = deps.ahora ? deps.ahora() : Date.now();
-    if (_cache && (ahora - _cache.t) < CACHE_MS) return _cache.v;
     let usuario = "";
     let clave = "";
     try {
@@ -163,16 +178,8 @@
       usuario = "";
       clave = "";
     }
-    const v = (usuario && clave) ? {usuario: usuario, clave: clave} : null;
-    _cache = {t: ahora, v: v};
-    return v;
+    return (usuario && clave) ? {usuario: usuario, clave: clave} : null;
   }
 
-  /** Olvidar lo cacheado. Para las pruebas y para después de guardar. */
-  function olvidar() {
-    _cache = null;
-  }
-
-  return {NOMBRE_USER, NOMBRE_PASS, CACHE_MS, faltantes, guardar, leer,
-    olvidar};
+  return {NOMBRE_USER, NOMBRE_PASS, faltantes, guardar, leer};
 });
