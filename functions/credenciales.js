@@ -173,10 +173,27 @@
       usuario = _txt(await deps.leer(NOMBRE_USER));
       clave = _txt(await deps.leer(NOMBRE_PASS));
     } catch (e) {
-      /* Que no existan todavía NO es un error: es el estado del primer día.
-         Se devuelve null y quien llame dirá «guárdalas en el panel». */
-      usuario = "";
-      clave = "";
+      /* ⚠️ AQUÍ SE TRAGABAN TODOS LOS ERRORES, Y ESO NOS DEJÓ CIEGOS DOS
+         DÍAS. El comentario decía «que no existan todavía no es un error» —
+         cierto— pero estaba implementado como «cualquier cosa que falle no
+         es un error». Permiso denegado, proyecto mal resuelto, la API de
+         Google caída: todo acababa saliendo por pantalla como «faltan las
+         credenciales», que manda a guardarlas otra vez y no arregla nada.
+
+         Un `catch` que convierte causas distintas en el mismo síntoma no
+         simplifica: borra la información que hacía falta para arreglarlo.
+
+         Ahora solo NO ENCONTRADO significa «todavía no hay». Lo demás sube
+         con su motivo, y quien llame lo enseña. */
+      const txt = String((e && e.message) || e);
+      const cod = (e && (e.code === 5 || e.code === "NOT_FOUND")) ||
+        /NOT_FOUND|not found|no existe/i.test(txt);
+      if (cod) return null;
+      const permiso = /permission|denied|forbidden|403|PERMISSION_DENIED/i
+          .test(txt);
+      const err = new Error(txt);
+      err.motivo = permiso ? "SIN_PERMISO_SECRETOS" : "ERROR_SECRETOS";
+      throw err;
     }
     return (usuario && clave) ? {usuario: usuario, clave: clave} : null;
   }

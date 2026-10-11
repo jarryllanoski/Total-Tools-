@@ -182,10 +182,37 @@ module.exports = async ({bloque, ok}) => {
   }
   {
     // Primer dia: los secretos no existen todavia. Eso no es un error.
-    const {deps} = mundo({fallaLeer: 'NOT_FOUND'});
+    const {deps} = mundo({fallaLeer: '5 NOT_FOUND: Secret not found'});
     ok(await C.leer(deps) === null,
        'si todavia no hay credenciales se devuelve null, no se revienta: ' +
        'quien llame dira «guardalas en el panel»');
+  }
+
+  bloque('⚠️ Un error de verdad ya no se disfraza de «no hay credenciales»');
+
+  {
+    /* ESTO NOS DEJO CIEGOS DOS DIAS. El `catch` decia «que no existan
+       todavia no es un error» —cierto— pero estaba escrito como «cualquier
+       cosa que falle no es un error». Permiso denegado, proyecto mal
+       resuelto, la API caida: todo salia por pantalla como «faltan las
+       credenciales», que manda a guardarlas otra vez y no arregla nada.
+
+       Un catch que convierte causas distintas en el mismo sintoma no
+       simplifica: borra justo la informacion que hacia falta. */
+    const {deps} = mundo({fallaLeer: '7 PERMISSION_DENIED: nope'});
+    let cazado = null;
+    try { await C.leer(deps); } catch (e) { cazado = e; }
+    ok(cazado, 'un permiso denegado SUBE, no se convierte en null');
+    ok(cazado.motivo === 'SIN_PERMISO_SECRETOS',
+       'y viene con su motivo, para que el panel diga que arreglar');
+  }
+  {
+    const {deps} = mundo({fallaLeer: 'la API se cayo'});
+    let cazado = null;
+    try { await C.leer(deps); } catch (e) { cazado = e; }
+    ok(cazado && cazado.motivo === 'ERROR_SECRETOS',
+       'y lo que no sabemos clasificar tampoco se calla: sube como error ' +
+       'generico con el texto de Google dentro');
   }
   {
     const g = {};

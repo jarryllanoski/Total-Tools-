@@ -79,10 +79,24 @@ function _sm() {
 }
 
 /**
- * El id del proyecto, de donde lo ponga el entorno.
- * @return {string} el id, o "" si no está
+ * El id del proyecto.
+ *
+ * ⚠️ SE LO PREGUNTAMOS A LA LIBRERIA, no lo deducimos. Antes esto leia
+ * `GCLOUD_PROJECT` / `GCP_PROJECT` / `FIREBASE_CONFIG` a mano, y en
+ * Cloud Functions de 2ª generacion —que por dentro es Cloud Run— ninguna
+ * de las tres esta garantizada. `getProjectId()` sale de las credenciales
+ * con las que la funcion ya esta autenticada: es la misma fuente que usa
+ * el cliente para hablar con Google, asi que no puede discrepar.
+ * Las variables quedan de respaldo por si la metadata tarda.
+ * @return {Promise<string>} el id del proyecto
  */
-function _proyecto() {
+async function _proyecto() {
+  try {
+    const p = await _sm().getProjectId();
+    if (p) return String(p);
+  } catch (e) {
+    // abajo el respaldo
+  }
   return process.env.GCLOUD_PROJECT || process.env.GCP_PROJECT ||
     (JSON.parse(process.env.FIREBASE_CONFIG || "{}").projectId) || "";
 }
@@ -94,7 +108,7 @@ function _proyecto() {
  */
 async function _leerSecreto(nombre) {
   const [v] = await _sm().accessSecretVersion({
-    name: `projects/${_proyecto()}/secrets/${nombre}/versions/latest`,
+    name: `projects/${await _proyecto()}/secrets/${nombre}/versions/latest`,
   });
   return v.payload.data.toString("utf8");
 }
@@ -109,7 +123,7 @@ async function _leerSecreto(nombre) {
  * @return {Promise<void>} nada
  */
 async function _escribirSecreto(nombre, valor) {
-  const padre = `projects/${_proyecto()}`;
+  const padre = `projects/${await _proyecto()}`;
   /* ⚠️ CREAR PUEDE FALLAR Y NO PASA NADA, A PROPÓSITO.
      Dos motivos, y los dos son normales:
        · el secreto YA EXISTE — el caso de todas las veces menos la primera;
@@ -1380,7 +1394,21 @@ exports.shalomPuerta = onRequest(
          propia documentacion llama «el fallo mas repetido de esta API». */
       if (paso.orquestar === "conectarShalom") {
         try {
-          const cred = await credenciales.leer({leer: _leerSecreto});
+          /* Si leer el secreto falla de verdad —permiso, API caída— se
+             dice QUÉ pasó. Antes todo acababa en «faltan las credenciales»,
+             que manda a guardarlas otra vez y no arregla nada. */
+          let cred = null;
+          try {
+            cred = await credenciales.leer({leer: _leerSecreto});
+          } catch (e) {
+            console.error("leerCredenciales:", e && e.message);
+            res.status(200).json({ok: false,
+              motivo: (e && e.motivo) || "ERROR_SECRETOS",
+              detalle: "No se pudieron LEER las credenciales de Secret " +
+                "Manager (guardarlas sí funcionó). Motivo de Google: " +
+                String((e && e.message) || e).slice(0, 300)});
+            return;
+          }
           const cfgSnap2 = await db.doc(CFG_DOC).get();
           const cfg2 = cfgSnap2.exists ? cfgSnap2.data() : {};
           const decl = (cfg2.shalomInstanciaPreferida &&
