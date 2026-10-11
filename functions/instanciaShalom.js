@@ -220,11 +220,24 @@
     // ── 3 · entrar SIEMPRE: es lo que guarda las credenciales ─────────
     const en = await deps.entrar(id, _txt(o.usuario), _txt(o.clave));
     if (!en || !en.ok) {
-      return {ok: false, motivo: (en && en.motivo) || "SIN_RED",
+      /* ⚠️ AQUÍ UN RECHAZO SIGNIFICA OTRA COSA QUE EN EL RESTO DE LA API.
+         `motivoDeHttp` traduce 401/403 a BLOQUEADO, y su texto dice «Shalom
+         rechazó la clave de la API, o el plan venció». Es correcto en los
+         demás endpoints — pero en ESTE acabamos de mandar el usuario y la
+         contraseña de Shalom Pro, así que lo que casi seguro está mal es
+         eso, no la clave de la API.
+
+         Dejarlo en BLOQUEADO mandaría al dueño a revisar Secret Manager y
+         el plan cuando lo único que pasó fue una letra mal tecleada. Ese
+         —mandar a mirar el sitio equivocado— es el fallo que esta
+         integración persigue desde el principio. */
+      const m = (en && en.motivo) || "SIN_RED";
+      return {ok: false,
+        motivo: m === "BLOQUEADO" ? "CREDENCIALES_MALAS" : m,
         detalle: creada ?
           "La instancia se creó pero no se pudo entrar. No se va a crear " +
             "otra: la próxima vez se reutiliza esta." :
-          "No se pudo entrar en Shalom Pro. Comprueba el usuario y la clave.",
+          "No se pudo entrar en Shalom Pro.",
         id: id, creada: creada};
     }
 

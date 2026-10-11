@@ -539,6 +539,7 @@
         SIN_DATO:      'Faltan datos para registrar. Abajo dice cuáles.',
         NO_ENCONTRADO_PEDIDO: 'Ese pedido ya no está en la base de datos.',
         SIN_CREDENCIALES: 'Faltan las credenciales de Shalom Pro. Guárdalas en ⚙️ Config → Shalom, arriba del botón de conectar.',
+        CREDENCIALES_MALAS: 'Shalom Pro rechazó ese correo o esa contraseña. No es la clave de la API: son los datos con los que entras en pro.shalom.pe. Vuelve a guardarlos en Config.',
         SIN_PERMISO_SECRETOS: 'La función no tiene permiso para escribir en Secret Manager. Hay que darle el rol `roles/secretmanager.admin` a su cuenta de servicio, una sola vez.',
         SIN_INSTANCIA_VALIDA: 'El id de instancia de Shalom Pro no sirve. La clave de la API puede estar bien: compruébala con «Verificar sesión».',
         LIMITE:        'Se agotó la cuota del plan de Shalom.',

@@ -170,7 +170,32 @@ module.exports = async ({bloque, ok}) => {
   {
     const {deps, visto} = mundo({entrar: {ok: false, motivo: 'BLOQUEADO'}});
     const r = await I.conectar(deps, conOpc());
-    ok(r.ok === false && r.motivo === 'BLOQUEADO', 'si el login falla, se dice');
+    /* ⚠️ EL AVISO QUE HABRIA COSTADO UNA TARDE. `motivoDeHttp` traduce el
+       401 de Shalom a BLOQUEADO, y su texto dice «Shalom rechazo la clave
+       de la API, o el plan vencio». Es correcto en los demas endpoints,
+       pero en ESTE acabamos de mandar el usuario y la contraseña de Shalom
+       Pro: lo que esta mal es eso, no la clave de la API.
+
+       Dejarlo en BLOQUEADO mandaria al dueño a revisar Secret Manager y el
+       plan por una letra mal tecleada — mandar a mirar el sitio equivocado
+       es justo el fallo que esta integracion persigue. */
+    ok(r.motivo === 'CREDENCIALES_MALAS',
+       'un login rechazado acusa a las credenciales de Shalom Pro, NO a la ' +
+       'clave de la API');
+    ok(!/clave de la API/i.test(String(r.detalle||'')),
+       'y el detalle tampoco manda a mirar donde no es');
+  }
+  {
+    // Lo que NO es un rechazo de credenciales se respeta tal cual.
+    const {deps} = mundo({entrar: {ok: false, motivo: 'SIN_RED'}});
+    const r = await I.conectar(deps, conOpc());
+    ok(r.motivo === 'SIN_RED',
+       'un corte de red sigue siendo un corte de red: solo se reinterpreta ' +
+       'el rechazo, no todo fallo');
+  }
+  {
+    const {deps, visto} = mundo({entrar: {ok: false, motivo: 'BLOQUEADO'}});
+    const r = await I.conectar(deps, conOpc());
     ok(r.id === 'nueva-uuid' && r.creada === true,
        'y se devuelve el id de la que SI se creo, para no perderla');
     ok(/no se va a crear otra/i.test(r.detalle),
