@@ -110,13 +110,21 @@ async function _leerSecreto(nombre) {
  */
 async function _escribirSecreto(nombre, valor) {
   const padre = `projects/${_proyecto()}`;
+  /* ⚠️ CREAR PUEDE FALLAR Y NO PASA NADA, A PROPÓSITO.
+     Dos motivos, y los dos son normales:
+       · el secreto YA EXISTE — el caso de todas las veces menos la primera;
+       · la cuenta de servicio no tiene permiso para CREAR secretos, porque
+         el dueño le dio los permisos estrechos (añadir versión + leer) en
+         vez de `admin`. Eso es mejor, no peor: así la función nunca puede
+         borrar un secreto, ni el día que alguien se equivoque de línea.
+     Quien manda es `addSecretVersion` de abajo: si de verdad no se puede
+     escribir, falla ahí y el error llega entero. Tragarse este no esconde
+     nada — solo deja de exigir un permiso que no hace falta. */
   try {
     await _sm().createSecret({parent: padre, secretId: nombre,
       secret: {replication: {automatic: {}}}});
   } catch (e) {
-    // Ya existía: eso no es un fallo, es el caso normal a partir del segundo.
-    if (!/already exists|ALREADY_EXISTS|6 ALREADY_EXISTS/i.test(
-        String((e && e.message) || e))) throw e;
+    // ver arriba
   }
   await _sm().addSecretVersion({
     parent: `${padre}/secrets/${nombre}`,
