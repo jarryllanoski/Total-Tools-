@@ -285,8 +285,37 @@ module.exports = async ({bloque, ok}) => {
        'y si esa agencia no da un id utilizable, no se guarda a medias');
     ok(/Agencias\.identificada\(o\)/.test(cfg),
        'el aviso de Config usa la misma comprobación, no una suya');
-    ok(/⚠️ Sin agencia de origen/.test(cfg),
-       'y sin origen lo dice, meses antes de que exista el botón de registrar');
+
+    /* ⚠️ ESTA COMPROBACION BUSCABA EL TEXTO «⚠️ Sin agencia de origen» EN EL
+       CODIGO FUENTE, y se puso roja el dia que ese aviso se redacto mas
+       corto — sin que el comportamiento cambiara en nada. Una prueba que lee
+       codigo protege la forma de escribirlo, que es justo lo que uno quiere
+       poder cambiar. Ahora EJECUTA el pintor. */
+    const pintar = (origen) => {
+      const nodo = {innerHTML: '', style: {}};
+      const ctx = {
+        $: (id) => (id === 'cfgOrigenBadge' ? nodo : null),
+        S: {agenciaOrigen: origen},
+        escH: (x) => String(x == null ? '' : x),
+        window: {Agencias: {identificada: (o) => !!(o && o.agenciaId)}},
+        Agencias: {identificada: (o) => !!(o && o.agenciaId)},
+        quitarOrigen: () => {},
+        salida: {}
+      };
+      const nombres = Object.keys(ctx);
+      // eslint-disable-next-line no-new-func
+      new Function(...nombres,
+          E.trozo('config.js', 'function _pintarOrigen(){',
+              '\n/* `pre` existe para que') +
+          '\nsalida.p = _pintarOrigen;')(...nombres.map((x) => ctx[x]));
+      ctx.salida.p();
+      return nodo.innerHTML;
+    };
+    ok(/f59e0b|sin elegir/i.test(pintar(null)),
+       'sin origen se avisa, y en ambar — hace falta para registrar envios');
+    ok(/PUENTE PIEDRA/.test(
+        pintar({agenciaId: '635', agenciaNombre: 'LIMA / PUENTE PIEDRA'})),
+       'y con origen se dice CUAL, que es lo unico que hay que mirar');
 
     /* Hermana de `config`, no dentro: ese objeto lo devuelve ENTERO la
        función pública. La regla se comprueba antes de guardar, no después. */

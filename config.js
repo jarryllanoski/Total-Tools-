@@ -1104,84 +1104,170 @@ function regToggleSimulacro(){
   _pintarRegistroShalom();
 }
 
-/* ★ GUARDAR LAS CREDENCIALES DE SHALOM PRO.
-   Se escriben una vez y van a Secret Manager. Dos reglas que no se tocan:
+/* ★ LA SECCIÓN DE SHALOM EN CONFIG — una línea, y un botón solo si hace falta.
+   Aquí había TRES botones, y de raíz sobraban dos:
 
-     1. LOS CAMPOS SE VACÍAN AL GUARDAR, y nunca se rellenan con lo que hay
-        guardado. No es que no se quiera: es que NO SE PUEDE — no existe
-        operación de lectura. La otra aplicación del dueño sí te rellena la
-        contraseña al entrar, y eso es exactamente lo que aquí no pasa.
-     2. LA RESPUESTA NO TRAE LA CLAVE, ni enmascarada. Un `****` ya
-        confirmaría su longitud. Vuelve el correo, que no es un secreto, y
-        es lo que se pinta para que sepas cuál quedó. */
-async function guardarCredencialesShalom(){
-  const u = $('credUser'), k = $('credPass'), btn = $('credBtn');
-  const caja = $('credSalida');
-  const decir = (html) => { if(caja){ caja.style.display='block'; caja.innerHTML=html; } };
-  if(!window.Shalom || !window.Shalom.guardarCredenciales){
-    decir('<span style="color:var(--red)">Shalom no está disponible.</span>'); return; }
+     · «Verificar sesión» era un trozo de «Conectar» —Conectar ya termina
+       comprobando— y el estado es GRATIS (su doc: `GET /instances` y
+       `POST /instances/status` no consumen cuota). Pedirlo con un botón era
+       cobrar un clic por algo que no cuesta nada.
+     · «Guardar credenciales» NUNCA era útil sola: guardas, y luego hay que
+       conectar igual. El estado intermedio —«guardé pero no conecté»— no
+       sirve para nada, y es justo donde el dueño se quedó atascado el
+       11/10/2026.
 
-  const usuario = (u && u.value || '').trim();
-  const clave   = (k && k.value) || '';
-  if(btn){ btn.disabled = true; btn.style.opacity='.5'; btn.textContent='⏳ Guardando…'; }
-  let r = null;
-  try{ r = await window.Shalom.guardarCredenciales(usuario, clave); }catch(e){ r = null; }
-  if(btn){ btn.disabled = false; btn.style.opacity=''; btn.textContent='🔑 Guardar credenciales'; }
+   Lo que queda es: el estado, siempre visible; y un botón que hace lo que
+   haga falta sin obligarte a saber la diferencia. */
+let _cfgSesion = null;
+let _cfgSesionDe = '';
+let _cfgFormAbierto = false;
 
-  if(r && r.ok){
-    // Se vacían SIEMPRE, y la contraseña primero: lo que no está en el DOM
-    // no se puede leer desde la consola ni quedar en una captura.
-    if(k) k.value = '';
-    if(u) u.value = '';
-    const est = $('credEstado');
-    if(est) est.innerHTML = ' <b style="color:#3fb950">Guardada ✓</b> · '+
-      escH(r.usuario||'');
-    decir('<span style="color:#3fb950">✅ Guardada para <b>'+escH(r.usuario||'')+
-      '</b>.</span> <span style="color:var(--text2)">Ahora pulsa «Conectar» '+
-      'para entrar en Shalom con ella.</span>');
-    toast('🔑 Credenciales guardadas');
-    return;
-  }
-
-  const mot = (r && r.motivo) || 'SIN_RED';
-  const txt = (window.Shalom.textoMotivo ? window.Shalom.textoMotivo(mot) : mot);
-  decir('<div style="background:rgba(248,81,73,.1);border:1px solid rgba(248,81,73,.3);'+
-    'border-radius:9px;padding:10px 12px"><b style="color:var(--red)">❌ '+escH(txt)+'</b>'+
-    ((r && r.faltan && r.faltan.length) ?
-      '<ul style="margin:5px 0 0;padding-left:16px;color:var(--text2)">'+
-      r.faltan.map(f=>'<li>'+escH(f)+'</li>').join('')+'</ul>' : '')+
-    ((r && r.detalle) ? '<div style="color:var(--text2);margin-top:4px">'+
-      escH(r.detalle)+'</div>' : '')+'</div>');
-  // La contraseña se vacía TAMBIÉN al fallar: si fallo fue por permisos, el
-  // valor no tiene por qué seguir en pantalla mientras se arregla.
-  if(k) k.value = '';
+/** Comprueba la sesión de la cuenta guardada. Gratis, una vez por cuenta.
+ * @param {boolean} [forzar] true vuelve a preguntar */
+function _cfgComprobar(forzar){
+  const id = (S.shalomInstancia || {}).id;
+  if(!id || !window.Shalom || !window.Shalom.estadoSesion) return;
+  if(!forzar && _cfgSesionDe === id && _cfgSesion) return;
+  _cfgSesionDe = id;
+  _cfgSesion = {estado: 'mirando'};
+  window.Shalom.estadoSesion(id).then((r) => {
+    if((S.shalomInstancia || {}).id !== id) return;
+    _cfgSesion = (r && r.ok && r.sesion) ?
+      {estado: r.sesion.conectada ? 'ok' : 'sinSesion', usuario: r.sesion.usuario} :
+      {estado: 'rota', motivo: (r && r.motivo) || 'SIN_RED'};
+    _pintarShalomConfig();
+  }).catch(() => {
+    if((S.shalomInstancia || {}).id !== id) return;
+    _cfgSesion = {estado: 'rota', motivo: 'SIN_RED'};
+    _pintarShalomConfig();
+  });
 }
 
-/* ★ CONECTAR / RECONECTAR LA CUENTA DE SHALOM PRO.
-   Una sola operación idempotente: el servidor crea la instancia SOLO si no
-   existe, entra siempre, y comprueba. Pulsarla dos veces no crea dos.
+/** Abre o cierra el formulario de credenciales. */
+function cfgCambiarCuenta(){
+  _cfgFormAbierto = !_cfgFormAbierto;
+  _pintarShalomConfig();
+  if(_cfgFormAbierto){ const u = $('credUser'); if(u) u.focus(); }
+}
 
-   Entrar aunque ya figure conectada no es un descuido: entrar por la API es
-   lo que deja las credenciales guardadas en la instancia, y eso es lo que
-   hace que la sesión se levante sola cuando expira. Sin ellas llega el 401
-   que su propia documentación llama «el fallo más repetido de esta API».
+/** El pintor. Único sitio que decide qué se ve en la sección de Shalom.
+ * @param {boolean} [yaComprobado] true si acaba de resolverse por otra vía */
+function _pintarShalomConfig(yaComprobado){
+  const box = $('shalomCfgBloque'); if(!box) return;
+  const inst = S.shalomInstancia || {};
+  if(inst.id && !yaComprobado) _cfgComprobar();
+  const ses = (_cfgSesionDe === inst.id) ? _cfgSesion : null;
 
-   El navegador manda el nombre de la operación y NADA MÁS: la identidad
-   declarada y las credenciales las pone el servidor. */
-async function conectarCuentaShalom(){
-  const btn = $('shalomConectarBtn');
-  const caja = $('shalomConectarSalida');
+  /* El estado, en una línea. Conectada es lo normal, así que es lo que
+     menos tiene que ocupar: un punto verde y el correo. */
+  let ico = '🔌', txt, conectada = false;
+  if(!inst.id){
+    ico = '⚠️'; txt = '<span style="color:#f59e0b">Sin cuenta conectada</span>';
+  } else if(!ses || ses.estado === 'mirando'){
+    txt = '<span style="opacity:.6">comprobando…</span>';
+  } else if(ses.estado === 'ok'){
+    conectada = true;
+    txt = '<span style="color:#3fb950">● Conectada</span>'+
+      (ses.usuario ? '<span style="color:var(--text2)"> · '+escH(ses.usuario)+'</span>' : '');
+  } else if(ses.estado === 'sinSesion'){
+    ico = '⚠️'; txt = '<span style="color:#f59e0b">Sin sesión</span>';
+  } else {
+    ico = '⛔'; txt = '<span style="color:var(--red)">'+
+      escH(ses.motivo === 'SIN_INSTANCIA_VALIDA' ? 'Esa cuenta ya no existe' :
+        'No se pudo comprobar')+'</span>';
+  }
+
+  const enlace = (t, fn) => '<span onclick="'+fn+'" style="font-size:11px;'+
+    'color:#388bfd;cursor:pointer;font-weight:700;white-space:nowrap">'+t+'</span>';
+
+  let html = '<div style="display:flex;align-items:center;gap:8px;font-size:12px;'+
+    'color:var(--text2);line-height:1.5">'+
+    '<span>'+ico+'</span>'+
+    '<span style="flex:1"><b style="color:var(--text)">Shalom Pro</b> '+txt+'</span>'+
+    (inst.id ? enlace('comprobar', 'verificarInstanciaShalom()')+
+      '<span style="opacity:.3">·</span>' : '')+
+    enlace(_cfgFormAbierto ? 'cerrar' : (conectada ? 'cambiar cuenta' : 'entrar'),
+        'cfgCambiarCuenta()')+
+    '<span onclick="if(window.Ayuda)Ayuda.abrir(\'registroShalom\')" title="Ayuda" '+
+    'style="font-size:12px;color:#8b949e;cursor:pointer">📖</span></div>';
+
+  /* El formulario solo cuando hace falta: si no hay sesión sale solo, y si
+     la hay se pide con «cambiar cuenta». Lo que no se puede hacer ahora
+     mismo no tiene por qué estar ocupando pantalla. */
+  if(!conectada || _cfgFormAbierto){
+    html += '<div style="margin-top:10px">'+
+      '<div class="frow">'+
+        '<div class="fg"><label class="fl">Correo</label>'+
+          '<input class="fi" id="credUser" type="email" autocomplete="off" '+
+          'placeholder="correo@gmail.com"></div>'+
+        '<div class="fg"><label class="fl">Contraseña</label>'+
+          '<input class="fi" id="credPass" type="password" autocomplete="new-password" '+
+          'placeholder="La de pro.shalom.pe"></div>'+
+      '</div>'+
+      '<button id="cfgConectarBtn" type="button" onclick="conectarShalomUno()" '+
+      'style="width:100%;margin-top:9px;padding:11px;border-radius:9px;cursor:pointer;'+
+      'font-family:inherit;font-size:13px;font-weight:700;'+
+      'background:rgba(63,185,80,.14);border:1px solid rgba(63,185,80,.35);'+
+      'color:#3fb950">&#128279; Conectar</button>'+
+      '<div style="font-size:10.5px;color:#8b949e;margin-top:6px;line-height:1.45">'+
+      'Déjalos vacíos para entrar con las credenciales que ya están guardadas.'+
+      '</div></div>';
+  }
+  box.innerHTML = html;
+}
+
+/* ★ UN SOLO BOTÓN, Y HACE LO QUE HAGA FALTA.
+   Antes eran dos pasos que el dueño tenía que encadenar a mano —guardar y
+   luego conectar— y el estado de en medio no servía para nada. Ahora:
+
+     escribiste algo  → se guarda Y se conecta
+     campos vacíos    → se conecta con lo ya guardado
+     vacíos y sin nada→ se dice que hace falta escribirlo
+
+   Las dos operaciones siguen SEPARADAS en el servidor, con sus rejas: lo
+   que se junta es la cara, no los candados. */
+async function conectarShalomUno(){
+  const u = $('credUser'), k = $('credPass'), btn = $('cfgConectarBtn');
+  const caja = $('shalomCfgSalida');
   const decir = (html) => { if(caja){ caja.style.display='block'; caja.innerHTML=html; } };
   if(!window.Shalom || !window.Shalom.conectarCuenta){
     decir('<span style="color:var(--red)">Shalom no está disponible.</span>'); return; }
 
-  // Sin apagarlo, dos clics seguidos son dos vueltas al mismo trabajo — y la
-  // primera podría estar creando la instancia mientras la segunda la busca.
-  if(btn){ btn.disabled = true; btn.style.opacity='.5'; btn.textContent='⏳ Conectando…'; }
+  const usuario = (u && u.value || '').trim();
+  const clave   = (k && k.value) || '';
+  const apagar = (t) => { if(btn){ btn.disabled=true; btn.style.opacity='.5'; btn.textContent=t; } };
+  const encender = () => { if(btn){ btn.disabled=false; btn.style.opacity=''; btn.textContent='🔗 Conectar'; } };
+
+  // 1 · si escribió algo, se guarda ANTES de conectar
+  if(usuario || clave){
+    apagar('⏳ Guardando…');
+    let g = null;
+    try{ g = await window.Shalom.guardarCredenciales(usuario, clave); }catch(e){ g = null; }
+    if(!g || !g.ok){
+      encender();
+      const m = (g && g.motivo) || 'SIN_RED';
+      decir('<div style="background:rgba(248,81,73,.1);border:1px solid rgba(248,81,73,.3);'+
+        'border-radius:9px;padding:10px 12px"><b style="color:var(--red)">❌ '+
+        escH(window.Shalom.textoMotivo ? window.Shalom.textoMotivo(m) : m)+'</b>'+
+        ((g && g.faltan && g.faltan.length) ?
+          '<ul style="margin:5px 0 0;padding-left:16px;color:var(--text2)">'+
+          g.faltan.map(f=>'<li>'+escH(f)+'</li>').join('')+'</ul>' : '')+
+        ((g && g.detalle) ? '<div style="color:var(--text2);margin-top:4px">'+
+          escH(g.detalle)+'</div>' : '')+'</div>');
+      if(k) k.value = '';     // la contraseña no se queda en pantalla
+      return;
+    }
+    // Vaciar en cuanto están a salvo: la clave primero.
+    if(k) k.value = '';
+    if(u) u.value = '';
+  }
+
+  // 2 · conectar
+  apagar('⏳ Conectando…');
   decir('<span style="color:var(--text2)">Buscando la cuenta, entrando y comprobando…</span>');
   let r = null;
   try{ r = await window.Shalom.conectarCuenta(); }catch(e){ r = null; }
-  if(btn){ btn.disabled = false; btn.style.opacity=''; btn.textContent='🔗 Conectar / reconectar la cuenta'; }
+  encender();
 
   if(r && r.ok){
     if(r.id){
@@ -1189,31 +1275,34 @@ async function conectarCuentaShalom(){
         nombre: (S.shalomInstancia||{}).nombre || 'Total Tools Panel'};
       save('config');
     }
-    _regSesion = {estado: r.conectada ? 'ok' : 'sinSesion', usuario: r.usuario};
-    _regSesionDe = String(r.id || '');
-    if(typeof _pintarRegistroShalom === 'function') _pintarRegistroShalom();
-    decir('<div style="background:rgba(63,185,80,.1);border:1px solid rgba(63,185,80,.3);'+
-      'border-radius:9px;padding:10px 12px">'+
-      '<b style="color:#3fb950">'+(r.creada ? '✅ Cuenta creada y conectada' :
-        (r.conectada ? '✅ Sesión renovada' : '⚠️ Entró, pero Shalom aún no la da por conectada'))+
-      '</b><div style="color:var(--text2);margin-top:4px">'+
-      (r.usuario ? escH(r.usuario)+' · ' : '')+'<span style="font-family:monospace;font-size:10.5px">'+
-      escH(r.id||'')+'</span></div></div>');
-    toast(r.creada ? '✅ Cuenta de Shalom creada y conectada' : '✅ Sesión de Shalom renovada');
-    /* Los NOMBRES de lo que contestó el login, sin un solo valor. Es lo que
-       falta para cerrar el traductor y se puede pegar en un chat. */
+    _cfgSesion = {estado: r.conectada ? 'ok' : 'sinSesion', usuario: r.usuario};
+    _cfgSesionDe = String(r.id || '');
+    _cfgFormAbierto = false;
+    _pintarShalomConfig(true);
+    if(typeof _pintarRegistroShalom === 'function'){
+      _regSesion = _cfgSesion; _regSesionDe = _cfgSesionDe;
+      _pintarRegistroShalom();
+    }
+    decir('<span style="color:#3fb950">'+(r.creada ? '✅ Cuenta creada y conectada' :
+      (r.conectada ? '✅ Sesión renovada' : '⚠️ Entró, pero Shalom aún no la da por conectada'))+
+      '</span>'+(r.usuario ? '<span style="color:var(--text2)"> · '+escH(r.usuario)+'</span>' : ''));
+    toast(r.creada ? '✅ Cuenta de Shalom conectada' : '✅ Sesión de Shalom renovada');
     if(r.forma) console.log('[Shalom login · forma]', JSON.stringify(r.forma));
     return;
   }
 
   const mot = (r && r.motivo) || 'SIN_RED';
-  const txt = (window.Shalom.textoMotivo ? window.Shalom.textoMotivo(mot) : mot);
   decir('<div style="background:rgba(248,81,73,.1);border:1px solid rgba(248,81,73,.3);'+
-    'border-radius:9px;padding:10px 12px"><b style="color:var(--red)">❌ '+escH(txt)+'</b>'+
-    ((r && r.detalle) ? '<div style="color:var(--text2);margin-top:4px">'+escH(r.detalle)+'</div>' : '')+
-    '</div>');
-  if(r && r.forma) console.log('[Shalom conectar · forma]', JSON.stringify(r.forma));
+    'border-radius:9px;padding:10px 12px"><b style="color:var(--red)">❌ '+
+    escH(window.Shalom.textoMotivo ? window.Shalom.textoMotivo(mot) : mot)+'</b>'+
+    ((r && r.detalle) ? '<div style="color:var(--text2);margin-top:4px">'+
+      escH(r.detalle)+'</div>' : '')+'</div>');
 }
+
+/* Los dos manejadores que había aquí —`guardarCredencialesShalom` y
+   `conectarCuentaShalom`— se fundieron en `conectarShalomUno()`, arriba.
+   Eran dos pasos que el dueño tenía que encadenar a mano, y el estado de en
+   medio no servía para nada. */
 
 async function regComprobarSesion(){
   const id = (S.shalomInstancia||{}).id;
@@ -1396,23 +1485,37 @@ function _claveAuto(){
    un secreto, la regla se comprueba antes de guardar, no después. */
 let _orTimer = null;
 
+/* El origen, en UNA línea. El buscador estaba siempre abierto ocupando un
+   campo para algo que se elige una vez al año; ahora sale con «cambiar». */
+function cfgOrigenAbrir(){
+  const c = $('cfgOrigenCaja'); if(!c) return;
+  const abierto = c.style.display !== 'none';
+  c.style.display = abierto ? 'none' : 'block';
+  if(!abierto){ const i = $('cfgOrigenInput'); if(i) i.focus(); }
+}
+
 function _pintarOrigen(){
   const b = $('cfgOrigenBadge'); if(!b) return;
   const o = S.agenciaOrigen;
   const ok = window.Agencias && Agencias.identificada(o);
+  const enlace = (t, fn) => '<span onclick="'+fn+'" style="font-size:11px;'+
+    'color:#388bfd;cursor:pointer;font-weight:700;white-space:nowrap">'+t+'</span>';
+  b.style.display='block';
   if(!ok){
-    b.style.display='block';
-    b.innerHTML = '<span style="font-size:11px;color:#f59e0b">⚠️ Sin agencia de origen — hará falta para registrar envíos</span>';
+    b.innerHTML = '<div style="display:flex;align-items:center;gap:8px;font-size:12px;'+
+      'color:var(--text2);line-height:1.5"><span>⚠️</span>'+
+      '<span style="flex:1"><b style="color:var(--text)">Origen</b> '+
+      '<span style="color:#f59e0b">sin elegir</span></span>'+
+      enlace('elegir', 'cfgOrigenAbrir()')+'</div>';
     return;
   }
-  b.style.display='block';
-  b.innerHTML = '<div style="display:flex;align-items:center;gap:8px;background:rgba(46,160,67,.1);'+
-    'border:1px solid rgba(46,160,67,.3);border-radius:9px;padding:8px 11px">'+
-    '<div style="flex:1;min-width:0"><div style="font-size:12px;font-weight:700;color:#2ea043;'+
-    'overflow:hidden;text-overflow:ellipsis;white-space:nowrap">🏢 '+escH(o.agenciaNombre)+'</div>'+
-    '<div style="font-size:10px;color:var(--text2)">'+escH(String(o.agenciaGeo||'').split("|").join(" · "))+'</div></div>'+
-    '<button type="button" onclick="quitarOrigen()" style="background:none;border:none;color:#f87171;'+
-    'cursor:pointer;font-size:13px;padding:2px 5px;flex-shrink:0">✕</button></div>';
+  b.innerHTML = '<div style="display:flex;align-items:center;gap:8px;font-size:12px;'+
+    'color:var(--text2);line-height:1.5"><span>🏢</span>'+
+    '<span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;'+
+    'white-space:nowrap">Despachas desde <b style="color:var(--text)">'+
+    escH(o.agenciaNombre)+'</b></span>'+
+    enlace('cambiar', 'cfgOrigenAbrir()')+'<span style="opacity:.3">·</span>'+
+    enlace('quitar', 'quitarOrigen()')+'</div>';
 }
 
 /* `pre` existe para que el MISMO buscador sirva en Config y en el pedido.
@@ -1458,6 +1561,7 @@ function pickOrigen(i, pre){
   const inp = $(pre+'OrigenInput'); if(inp) inp.value='';
   const drop = $(pre+'OrigenDrop'); if(drop) drop.style.display='none';
   const caja = $('regOrigenCaja'); if(caja) caja.style.display='none';
+  const caja2 = $('cfgOrigenCaja'); if(caja2) caja2.style.display='none';
   _pintarOrigen();
   // El bloque del pedido depende de esto: sin repintar, seguiría diciendo
   // "sin agencia de origen" con la agencia ya elegida.
@@ -2415,6 +2519,7 @@ function loadCfgUI(){
   }
   if(typeof _pintarUltimoBarrido==='function') _pintarUltimoBarrido();
   if(typeof _pintarOrigen==='function') _pintarOrigen();
+  if(typeof _pintarShalomConfig==='function') _pintarShalomConfig();
   // Configuración Shalom: solo queda "Mostrar en el link del cliente". El motor
   // de rastreo, el modo de etiquetas y los intervalos se retiraron con el
   // rastreo viejo. Los campos que quedan en S.config (trackingMotor,

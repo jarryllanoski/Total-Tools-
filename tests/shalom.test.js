@@ -895,7 +895,7 @@ module.exports = async (t) => {
       get innerHTML() { return pintado.html; }, style: {}};
     const btn = {style: {}, disabled: false, textContent: ''};
     const doc = {getElementById: (id) =>
-      (id === 'shalomInstBtn' ? btn : (id === 'shalomInstEstado' ? caja : null))};
+      (id === 'shalomInstBtn' ? btn : (id === 'shalomCfgSalida' ? caja : null))};
 
     /* ⚠️ `Total` A PROPOSITO, Y NO ES LA NUESTRA. Desde que el plan permite
        900 instancias, la otra aplicacion del dueño puede crear las que
@@ -955,7 +955,7 @@ module.exports = async (t) => {
       get innerHTML() { return pintado.html; }, style: {}};
     const btn = {style: {}, disabled: false, textContent: ''};
     const doc = {getElementById: (id) =>
-      (id === 'shalomInstBtn' ? btn : (id === 'shalomInstEstado' ? caja : null))};
+      (id === 'shalomInstBtn' ? btn : (id === 'shalomCfgSalida' ? caja : null))};
     const otras = [
       {id: 'aaa', nombre: 'Yapaitas', conectada: true},
       {id: 'bbb', nombre: 'Tercera', conectada: true}
@@ -1065,7 +1065,7 @@ module.exports = async (t) => {
         style: {}};
       const btn = {style: {}, disabled: false, textContent: ''};
       const doc = {getElementById: (id2) => (id2 === 'shalomInstBtn' ? btn :
-        (id2 === 'shalomInstEstado' ? caja : null))};
+        (id2 === 'shalomCfgSalida' ? caja : null))};
       const winS = {}; E.cargar('shalom.js', winS);
       const S2 = {};
       Object.defineProperty(S2, 'shalomInstancia', {
