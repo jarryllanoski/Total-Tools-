@@ -6,6 +6,17 @@
 
 (function(){
 
+/* ★ EL DNI DEL PEDIDO — UNA SOLA REGLA, Y NO VIVE AQUI.
+   El 13/10/2026 esta etiqueta imprimio el DNI de OTRA PERSONA: el dueño
+   corrigio el destinatario en el panel, el nombre cambio y el documento no.
+   Leia `s.dniRecoger || s.dni`, y el panel al editar solo actualiza `dni`.
+   Mientras tanto el registro en Shalom leia `dni`: la etiqueta pegada al
+   paquete y la guia llevaban documentos distintos, que en la agencia
+   significa que no se lo entregan a nadie.
+   La regla —y por que «vacio» no es lo mismo que «no existe»— esta en
+   functions/dniPedido.js, que leen los nueve sitios. */
+const _dniDe = (s) => (window.DniPedido ? DniPedido.de(s) : (s && s.dni) || '');
+
 /* ── MODAL HTML ─────────────────────────────────────────────────── */
 function _injectModal(){
   if(document.getElementById('printModal')) return;
@@ -413,7 +424,7 @@ function _htmlEtiqueta(list, bultos, bizName, bizPhone, bizCity, fecha, qrUrl){
             <span class="dest-label">PARA:${bLabel}</span>
             <div class="dest-name">${esc(s.name)}</div>
             <div class="dest-phone">${esc(s.phone)}</div>
-            ${(s.dniRecoger||s.dni)?`<div class="dest-dni"><b>DNI:</b> ${esc(s.dniRecoger||s.dni)}</div>`:''}
+            ${_dniDe(s)?`<div class="dest-dni"><b>DNI:</b> ${esc(_dniDe(s))}</div>`:''}
             <div style="font-size:clamp(7.5pt,1.4vw,9pt);font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#555;margin:2mm 0 1mm">DESTINO:</div>
             <div class="dest-addr">${esc(addr)}</div>
             ${agencia}
@@ -527,7 +538,7 @@ function _htmlLista(list, bultos, bizName, bizPhone, bizCity, fecha, qrUrl){
       <td>
         <div class="row-addr">${esc(addr)}</div>
         ${agencia}
-        ${s.dniRecoger?`<div class="row-sub">DNI: ${esc(s.dniRecoger)}</div>`:''}
+        ${_dniDe(s)?`<div class="row-sub">DNI: ${esc(_dniDe(s))}</div>`:''}
         ${s.referencia?`<div class="row-sub">Ref: ${esc(s.referencia)}</div>`:''}
       </td>
       <td>

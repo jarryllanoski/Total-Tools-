@@ -529,6 +529,16 @@ function openForm(id){
   window._formSnap = (typeof _formSnapshot==='function') ? _formSnapshot() : '';
 }
 
+/* ★ EL DNI DE UN PEDIDO — una sola regla, en functions/dniPedido.js.
+   El 13/10/2026 el dueño corrigió un destinatario y la etiqueta siguió
+   imprimiendo el documento del anterior: el mismo dato vivía en tres campos
+   (`dni`, `dniRecoger`, `dniDestinatario`), el panel al editar solo tocaba
+   el primero, y cada uno de los nueve lectores tenía su propio orden. */
+function _dniDe(p){
+  return window.DniPedido ? DniPedido.de(p)
+    : String((p&&(p.dni||p.dniRecoger||p.dniDestinatario))||'').trim();
+}
+
 /* ── RELLENAR CLIENTE RECURRENTE (por teléfono o DNI, solo en Nuevo Envío) ──
    Opción A: se deriva del historial de pedidos en memoria (S.shipments), sin
    colección nueva ni costo. Rellena solo campos de cliente vacíos; NO toca
@@ -543,12 +553,22 @@ function _clienteBuscar(){
   const keyDni = dni.length===8 ? dni : '';
   if(!keyPh && !keyDni) return null;
   const cands=(S.shipments||[]).filter(function(x){
-    const xph=_norm9(x.phone), xdni=(x.dni||'').replace(/\D/g,'');
+    const xph=_norm9(x.phone), xdni=_dniDe(x).replace(/\D/g,'');
     return (keyPh&&xph===keyPh) || (keyDni&&xdni===keyDni);
   });
   if(!cands.length) return null;
-  // Más reciente (mejor dato de dirección). No se copia la fecha al rellenar.
-  cands.sort(function(a,b){ return String(b.createdAt||b.date||'').localeCompare(String(a.createdAt||a.date||'')); });
+  /* ★ EL MÁS RECIENTEMENTE CORREGIDO, no el más reciente.
+     Ordenaba por `createdAt`, que es cuándo NACIÓ el pedido, no cuándo se
+     arreglaron sus datos. El 13/10/2026 el dueño corrigió el destinatario de
+     un pedido viejo; con el orden anterior, la próxima vez que escribiera
+     ese teléfono le habríamos vuelto a ofrecer los datos sin corregir — y
+     los habría dado por buenos, que es lo que hace una sugerencia.
+     `updatedAt` se escribe al guardar desde hoy; los pedidos de antes no lo
+     tienen y siguen ordenándose por `createdAt`, igual que siempre. */
+  cands.sort(function(a,b){
+    const k=function(x){ return String(x.updatedAt||x.createdAt||x.date||''); };
+    return k(b).localeCompare(k(a));
+  });
   return cands[0];
 }
 function _clienteHintUpdate(){
@@ -561,7 +581,13 @@ function _clienteHintUpdate(){
     const btn=document.createElement('button');
     btn.type='button';
     btn.style.cssText='width:100%;text-align:left;background:rgba(34,197,94,.10);border:1px solid rgba(34,197,94,.35);border-radius:9px;padding:9px 11px;color:#22c55e;font-weight:700;font-size:12.5px;cursor:pointer;font-family:inherit';
-    btn.textContent='🌟 Cliente conocido: '+(m.name||'—')+' — toca para rellenar sus datos';
+    /* ★ SE ENSEÑA QUÉ VA A RELLENAR, no solo el nombre.
+       Una sugerencia que no dice qué trae se acepta a ciegas, y el día que
+       trae un DNI viejo nadie lo mira. Con el documento y el teléfono a la
+       vista, equivocarse cuesta una lectura. */
+    const _cd=_dniDe(m).replace(/\D/g,''), _cp=_norm9(m.phone);
+    btn.textContent='🌟 Cliente conocido: '+(m.name||'—')+
+      (_cd?' · DNI '+_cd:'')+(_cp?' · '+_cp:'')+' — toca para rellenar';
     btn.onclick=_clienteRellenar;
     box.appendChild(btn);
     box.style.display='block';
@@ -572,7 +598,7 @@ function _clienteRellenar(){
   const setIfEmpty=function(id,val){ const e=$(id); if(e && !e.value.trim() && val) e.value=String(val); };
   setIfEmpty('fName', m.name);
   setIfEmpty('fPhone', _norm9(m.phone));
-  setIfEmpty('fDni', (m.dni||'').replace(/\D/g,''));
+  setIfEmpty('fDni', _dniDe(m).replace(/\D/g,''));
   const isEnc=(m.courier||'').toUpperCase().includes('ENCOMIENDA');
   setIfEmpty('fAddr', isEnc?(m.ciudadDestino||m.address||''):(m.address||''));
   setIfEmpty('fEncAgencia', m.encAgencia||'');
@@ -1837,6 +1863,25 @@ function saveShipment(){
       ((S.shipments||[]).find(x=>x.id===_editId)||{}).shalomClave : undefined;
     if(_clv || (_prevClv !== undefined && _prevClv !== '')) data.shalomClave = _clv;
   }
+  /* ★ LAS COPIAS VIEJAS DEL DNI, PUESTAS AL DÍA.
+     El 13/10/2026 el dueño corrigió un destinatario aquí mismo y la etiqueta
+     siguió imprimiendo el DNI del anterior: `dniRecoger` se quedaba con el
+     valor viejo y la etiqueta lo prefería. Ya no lo prefiere —todos los
+     lectores pasan por `DniPedido.de`— pero una copia desfasada en la nube
+     es una trampa esperando al siguiente que la lea, así que se pone al día.
+
+     SOLO las que el pedido YA TENÍA: abrir y guardar un pedido antiguo no le
+     estrena campos. Misma regla que `shalomClave`, dos bloques más arriba. */
+  if(_editId && window.DniPedido){
+    Object.assign(data, DniPedido.copiasAlDia(
+        (S.shipments||[]).find(x=>x.id===_editId), dni));
+  }
+  /* ★ CUÁNDO SE CORRIGIÓ, que no es cuándo nació.
+     Sin esto, «rellenar con los últimos datos del cliente» ordenaba por
+     `createdAt` y te ofrecía el pedido más NUEVO, no el último que
+     corregiste. Los pedidos de antes de hoy no lo tienen y se siguen
+     ordenando por `createdAt`, igual que siempre. */
+  data.updatedAt = new Date().toISOString();
   if(_sGuia)  { data.trackingOrderNumber=_sGuia;   data.shalomGuia=_sGuia; }
   if(_sCodigo){ data.trackingOrderCode  =_sCodigo; data.shalomCodigo=_sCodigo; }
   // ★ MEDIDAS DEL PAQUETE: se guardan tal cual (vacío → '', nunca undefined,
@@ -1965,7 +2010,7 @@ function exportExcel(){
     'N° Orden':          s.id||'',
     'Nombre':            s.name||'',
     'Teléfono':          s.phone||'',
-    'DNI':               s.dni||s.dniDestinatario||s.dniRecoger||'',
+    'DNI':               _dniDe(s),
     'Dirección':         s.address||'',
     'Ciudad destino':    s.ciudadDestino||'',
     'Referencia':        s.referencia||'',
@@ -2014,6 +2059,14 @@ function importExcel(input){
         S.shipments.push({
           id: importedId || 'xl_'+Date.now()+'_'+Math.random().toString(36).slice(2,6),
           name, phone, address,
+          /* ★ EL DNI VA EN `dni`, QUE ES SU CAMPO.
+             Esto escribía SOLO `dniDestinatario`, y el exportador lee `dni`:
+             exportar e importar perdía el documento. El pedido volvía sin
+             DNI, la etiqueta salía sin DNI, y registrarlo en Shalom —que
+             mira `dni`— contestaba «el DNI debe tener 8 dígitos» con el
+             número delante, en la pantalla. `dniDestinatario` se mantiene
+             por si algún Excel viejo se vuelve a importar. */
+          dni:             (row['DNI']||'').toString().trim(),
           dniDestinatario: (row['DNI']||'').toString().trim(),
           ciudadDestino:   (row['Ciudad destino']||'').toString().trim(),
           referencia:      (row['Referencia']||'').toString().trim(),
@@ -2362,7 +2415,7 @@ function _renderTokList(){
         ? S.shipments.find(function(x){return x.id===tok.orderId;}) : null;
       var nmRaw = (ord && ord.name) ? ord.name : (tok.name||'—');
       var nm = String(nmRaw).replace(/</g,'&lt;').replace(/>/g,'&gt;');
-      var dni = ord ? String(ord.dni||ord.dniRecoger||ord.dniDestinatario||'').trim() : '';
+      var dni = ord ? _dniDe(ord) : '';
       var cour = ord ? String(ord.courier||'').trim() : '';
       var dniEsc = dni.replace(/</g,'&lt;').replace(/>/g,'&gt;');
       var courEsc = cour.replace(/</g,'&lt;').replace(/>/g,'&gt;');

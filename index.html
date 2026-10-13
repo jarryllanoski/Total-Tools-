@@ -30,6 +30,7 @@
 <script src="functions/agencias.js?v=1"></script>
 <script src="functions/enlaceSeguimiento.js?v=1"></script>
 <script src="functions/registroShalom.js?v=3"></script>
+<script src="functions/dniPedido.js?v=1"></script>
 <script src="appcheck.js?v=1"></script>
 <!-- FIREBASE via REST API — sin SDK, funciona en Brave/Chrome/Firefox/Safari -->
 <script>
@@ -2539,7 +2540,7 @@ function visibleShipments(){
   let data=S.shipments;
   if(_filt) data=data.filter(x=>x.status===_filt);
   else if(_soloActivos()) data=data.filter(x=>x.status!=='FINALIZADO');
-  if(srch) data=data.filter(x=>x.name.toLowerCase().includes(srch)||x.phone.includes(srch)||(x.dni&&x.dni.includes(srch))||x.address.toLowerCase().includes(srch)||x.courier.toLowerCase().includes(srch));
+  if(srch) data=data.filter(x=>x.name.toLowerCase().includes(srch)||x.phone.includes(srch)||(_dniDe(x)&&_dniDe(x).includes(srch))||x.address.toLowerCase().includes(srch)||x.courier.toLowerCase().includes(srch));
   if(_advActive){
     if(_adv.dateFrom) data=data.filter(x=>x.date&&x.date>=_adv.dateFrom);
     if(_adv.dateTo)   data=data.filter(x=>x.date&&x.date<=_adv.dateTo);
@@ -4808,8 +4809,8 @@ render();
      lo usa. config.js, print.js y voz.js preguntan por los pedidos marcados,
      así que siguen yendo detrás. El orden de carga es un contrato
      (ver docs/ARQUITECTURA.md). -->
-<script src="config.js?v=49"></script>
-<script src="print.js?v=16"></script>
+<script src="config.js?v=50"></script>
+<script src="print.js?v=17"></script>
 <script src="notify.js?v=5"></script>
 <script src="shalom.js?v=32"></script>
 <script src="tracking.js?v=22"></script>

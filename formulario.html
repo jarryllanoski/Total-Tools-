@@ -197,6 +197,7 @@ textarea.fi{resize:vertical;line-height:1.5}
 .addr-pin-chip button{margin-left:auto;background:none;border:none;color:var(--text2);font-size:15px;cursor:pointer;font-family:inherit;line-height:1;padding:0 2px}
 </style>
 <script src="functions/agencias.js?v=1"></script>
+<script src="functions/dniPedido.js?v=1"></script>
 </head>
 <body>
 <script src="narrador/loader.js?v=1"></script>
@@ -1885,7 +1886,12 @@ function _shalomTrackingBlock(ship){
   var codigo = ship.trackingOrderCode   || ship.shalomCodigo || '';
   var estado = (ship.trackingStatus || '').trim();
   var ultima = ship.trackingLastUpdate || '';
-  var dni    = ship.dniRecoger || ship.dniDestinatario || '';
+  /* ★ UNA SOLA REGLA, en functions/dniPedido.js. Esto leía las copias y se
+     saltaba `dni`, que es el que corrige el panel: a un cliente cuyo pedido
+     se hubiera corregido se le decía que fuera a la agencia con el
+     documento VIEJO. */
+  var dni    = (window.DniPedido ? DniPedido.de(ship)
+                : (ship.dni || ship.dniRecoger || ship.dniDestinatario || ''));
   if(!guia && !codigo && !estado) return '';
 
   // "actualizado hace X" en el header
@@ -1961,6 +1967,16 @@ function _shalomTrackingBlock(ship){
 }
 
 function renderTrackResult(ship, code){
+  /* ★ UNA SOLA FILA DE DNI, y su rotulo deducido del TIPO DE ENVIO.
+     Habia tres filas distintas —una por cada copia del mismo dato— y cada
+     una se pintaba segun que campo estuviera lleno. Un pedido a agencia
+     creado desde el panel nunca tiene `dniRecoger`, asi que al cliente se le
+     decia «DNI» a secas en vez de «DNI para recoger»; y uno corregido en el
+     panel le mostraba el documento VIEJO, que es con el que se habria
+     presentado en la agencia. La regla vive en functions/dniPedido.js. */
+  const _dniTk    = window.DniPedido ? DniPedido.de(ship)
+    : String(ship.dni||ship.dniRecoger||ship.dniDestinatario||'').trim();
+  const _dniTkLbl = window.DniPedido ? DniPedido.etiqueta(ship) : 'DNI';
   const meta   = STATUS_META[ship.status]||{color:'#6b7280',emoji:'🏷️',step:0};
   const tc     = codigoSeg(ship.id, ship.createdAt);
 
@@ -2006,10 +2022,8 @@ function renderTrackResult(ship, code){
         ${ship.address?`<div class="tk-row"><span class="tk-row-lbl">Dirección</span><span class="tk-row-val">${esc(ship.address)}</span></div>`:''}
         ${ship.referencia?`<div class="tk-row"><span class="tk-row-lbl">Referencia</span><span class="tk-row-val">${esc(ship.referencia)}</span></div>`:''}
         ${ship.ciudadDestino?`<div class="tk-row"><span class="tk-row-lbl">Ciudad destino</span><span class="tk-row-val">${esc(ship.ciudadDestino)}</span></div>`:''}
-        ${ship.dniDestinatario?`<div class="tk-row"><span class="tk-row-lbl">DNI destinatario</span><span class="tk-row-val">${esc(ship.dniDestinatario)}</span></div>`:''}
         ${ship.encAgencia?`<div class="tk-row"><span class="tk-row-lbl">Agencia</span><span class="tk-row-val">${esc(ship.encAgencia)}</span></div>`:''}
-        ${ship.dniRecoger?`<div class="tk-row"><span class="tk-row-lbl">DNI para recoger</span><span class="tk-row-val">${esc(ship.dniRecoger)}</span></div>`:''}
-        ${(!ship.dniRecoger&&!ship.dniDestinatario&&ship.dni)?`<div class="tk-row"><span class="tk-row-lbl">DNI</span><span class="tk-row-val">${esc(ship.dni)}</span></div>`:''}
+        ${_dniTk?`<div class="tk-row"><span class="tk-row-lbl">${_dniTkLbl}</span><span class="tk-row-val">${esc(_dniTk)}</span></div>`:''}
         ${ship.notes?`<div class="tk-row"><span class="tk-row-lbl">Notas</span><span class="tk-row-val">${esc(ship.notes)}</span></div>`:''}
         ${extraRows}
       </div>

@@ -381,3 +381,36 @@ otra** → el reconocimiento del cliente falla en silencio.
 
 **Decidido:** se deja como está por ahora. Tocarlo cambiaría las claves de
 pedidos antiguos.
+
+### 🔵 T-6 · El formulario público sigue escribiendo tres copias del DNI
+
+Desde el 13/10/2026 **todos los lectores** pasan por `functions/dniPedido.js`,
+así que las copias ya no pueden contradecir al original: `dni` manda siempre, y
+`dniRecoger`/`dniDestinatario` solo se miran cuando el campo `dni` **no existe**
+(pedidos anteriores a que lo hubiera).
+
+Pero `formulario.html:1619-1672` **las sigue creando** en cada pedido nuevo, y
+el panel las pone al día al guardar (`DniPedido.copiasAlDia`). Son dos campos
+que no aportan nada y que el día que alguien lea por su cuenta vuelven a morder.
+
+**Lo que falta:** que el formulario escriba solo `dni`, y quitar los dos campos
+de `ORDER_FIELDS` y `FIELD_MAX` en `functions/index.js`.
+
+**Por qué no se hizo el 13/10:** toca el camino por el que entran los pedidos de
+los clientes, de noche y antes de un despliegue, para arreglar algo que ya no
+puede fallar. Hay una prueba estructural en `tests/dni-pedido.test.js` que
+impide que nadie vuelva a leerlas sueltas mientras tanto.
+
+### 🔵 T-7 · `registroShalom.js` lee `p.dni` directo, no `DniPedido.de`
+
+`faltan()` y `armar()` exigen 8 dígitos en **`p.dni`**. Para los pedidos de hoy
+en adelante eso siempre es correcto —el panel y el importador escriben `dni`—
+pero un pedido **anterior** a ese campo, con el documento solo en `dniRecoger`,
+contesta *«el DNI del destinatario debe tener 8 dígitos»* con el número a la
+vista en la pantalla.
+
+**Por qué se deja:** los módulos UMD de `functions/` son todos autocontenidos —
+ninguno depende de otro— y hacer que este dependa de `dniPedido` estrenaría
+acoplamiento entre scripts cuyo orden de carga en el navegador nadie controla.
+Y registrar en Shalom exige `POR ALISTAR` + medidas + clave, que son del flujo
+nuevo: un pedido así ya tiene `dni`.

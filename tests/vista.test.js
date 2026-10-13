@@ -28,13 +28,19 @@ module.exports = (t) => {
   }
 
   let busqueda = '';
-  const api = new Function('S', '$', '_adv',
+  /* `_dniDe` lo define config.js, que en el navegador siempre esta cargado
+     antes de que nadie busque. Aqui se inyecta la MISMA regla —la del modulo
+     compartido— en vez de un doble amable: una sustituta mas simple que la
+     real es como se cuela un fallo por la rendija entre las dos. */
+  const DP = require('../functions/dniPedido.js');
+  const api = new Function('S', '$', '_adv', '_dniDe',
       'let _filt="", _advActive=false;' + src +
       ';return {vis:visibleShipments, set:(f,a)=>{_filt=f;_advActive=a;}};'
   )(S, (id) => (id === 'fSearch' ? {value: busqueda} : null),
       // Los filtros avanzados vacíos: la búsqueda avanzada se activa por el
       // flag, no por tener filtros puestos — que es justo el caso a probar.
-      {dateFrom: '', dateTo: '', couriers: [], costMin: '', costMax: '', doc: 'any'});
+      {dateFrom: '', dateTo: '', couriers: [], costMin: '', costMax: '', doc: 'any'},
+      DP.de);
   const ver = (filtro, texto, avanzada) => {
     busqueda = texto || ''; api.set(filtro || '', !!avanzada); return api.vis();
   };
