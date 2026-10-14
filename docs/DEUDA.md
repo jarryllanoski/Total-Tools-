@@ -414,3 +414,23 @@ ninguno depende de otro— y hacer que este dependa de `dniPedido` estrenaría
 acoplamiento entre scripts cuyo orden de carga en el navegador nadie controla.
 Y registrar en Shalom exige `POR ALISTAR` + medidas + clave, que son del flujo
 nuevo: un pedido así ya tiene `dni`.
+
+
+### ✅ T-8 · `SIN_DATO` estaba dos veces en la tabla de motivos — CERRADO 14/10/2026
+
+`shalom.js` declaraba la clave dos veces en el mismo objeto literal. En
+JavaScript la segunda **pisa a la primera en silencio**: no avisa el
+navegador, no avisa ESLint, y ninguna prueba se pone roja porque las dos
+líneas están a la vista y las dos parecen correctas. Consultar una guía sin
+número contestaba *«Faltan datos para registrar»*.
+
+No se eligió una de las dos. El mismo código sale de dos sitios que no
+comparten contexto —consultar y registrar— y una tabla que traduce códigos no
+sabe de cuál viene, así que el texto dice lo único cierto en ambos
+(**«Faltan datos.»**) y la lista de lo que falta, que el registro sí pinta
+debajo, se explica sola.
+
+Un barrido por los 40 archivos `.js`/`.html` del proyecto dice que **era la
+única**. Hay una prueba en `tests/shalom.test.js` que lee las claves **del
+fuente** —en el objeto ya construido la repetida se perdió, que es justo el
+problema— y mantiene la tabla sin repeticiones según crece.

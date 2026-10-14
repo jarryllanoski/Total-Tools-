@@ -601,6 +601,50 @@ module.exports = async (t) => {
     });
   }
 
+  bloque('⚠️ Ni una clave repetida en la tabla de motivos');
+
+  {
+    /* ⚠️ `SIN_DATO` ESTUVO DOS VECES EN ESTA TABLA, y en JavaScript la
+       segunda pisa a la primera EN SILENCIO: no avisa el navegador, no
+       avisa ESLint, y ninguna prueba se pone roja porque las dos lineas
+       estan ahi, a la vista, y las dos parecen correctas. El resultado era
+       que consultar una guia sin numero contestaba «Faltan datos para
+       registrar».
+
+       Es una tabla que solo crece —cada motivo nuevo del servidor añade una
+       linea— y las claves son parecidas entre si. Esta prueba es lo unico
+       que hay entre eso y el proximo texto que desaparece sin dejar rastro.
+
+       Se leen del FUENTE y no del objeto ya construido: en el objeto la
+       repetida ya se perdio, que es justo el problema. */
+    const src = E.leer('shalom.js');
+    const ini = src.indexOf('textoMotivo: function');
+    const cuerpo = src.slice(ini, src.indexOf('return T[k]', ini))
+        .replace(/\/\*[\s\S]*?\*\//g, '');
+    const vistas = {};
+    const repes = [];
+    (cuerpo.match(/^\s{8}([A-Z_]+):/gm) || []).forEach((l) => {
+      const k = l.trim().replace(':', '');
+      if (vistas[k]) repes.push(k); else vistas[k] = 1;
+    });
+    ok(Object.keys(vistas).length > 15,
+       'la tabla se esta leyendo de verdad — ' + Object.keys(vistas).length +
+       ' motivos');
+    ok(repes.length === 0,
+       '⚠️ ninguna clave repetida: la segunda pisaria a la primera sin que ' +
+       'nadie se entere. Repetidas: ' + repes.join(', '));
+  }
+  {
+    const win = {}; E.cargar('shalom.js', win);
+    const t = win.Shalom.textoMotivo('SIN_DATO');
+    ok(t === 'Faltan datos.',
+       'y el texto que quedo es el unico cierto en los DOS sitios de donde ' +
+       'sale ese codigo —consultar y registrar—: una tabla que traduce ' +
+       'codigos no sabe de cual viene. Salio: ' + t);
+    ok(!/registrar|consultar/i.test(t),
+       'sin elegir uno de los dos contextos, que es lo que lo rompia');
+  }
+
   bloque('La cuenta declarada: se usa sola, SIN pulsar nada');
 
   {

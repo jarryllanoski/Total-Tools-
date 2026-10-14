@@ -537,7 +537,21 @@
         SIN_SESION:    'Tu sesión venció — ingresa de nuevo.',
         SIN_PERMISO:   'Tu cuenta no está autorizada para esto.',
         SIN_RED:       'Sin conexión. Reintenta en un momento.',
-        SIN_DATO:      'Faltan datos para consultar.',
+        /* ⚠️ ESTA CLAVE ESTABA DOS VECES EN ESTA MISMA TABLA, y en JavaScript
+           la segunda PISA a la primera sin decir nada: ni un aviso del
+           navegador, ni uno de ESLint, ni una prueba en rojo. La de abajo
+           decía «Faltan datos para registrar. Abajo dice cuáles.», así que
+           consultar una guía sin número contestaba hablando de registrar.
+
+           No se eligió una de las dos: el mismo código sale de dos sitios
+           que no comparten contexto —consultar y registrar—, y una tabla
+           que traduce códigos no sabe de cuál viene. Así que el texto dice
+           lo único cierto en ambos, y la lista de lo que falta —que el
+           registro sí pinta debajo— se explica sola.
+
+           Un barrido por todo el proyecto (14/10/2026) dice que era la
+           única. Hay una prueba que la mantiene única. */
+        SIN_DATO:      'Faltan datos.',
         NO_ENCONTRADO: 'Shalom no encontró ese dato.',
         /* No es un fallo: es el estado normal entre registrar y llevar el
            paquete. Shalom distingue `registrado` (la guía existe) de
@@ -550,7 +564,6 @@
            mandaba a revisar la clave, que estaba perfecta. */
         VARIAS_INSTANCIAS: 'Tienes más de una cuenta de Shalom Pro. Elige en Config cuál usa el panel: registrar en la equivocada cobra al otro negocio.',
         INSTANCIA_NO_EXISTE: 'La cuenta de Shalom Pro que elegiste ya no está. Elige otra en Config — no se cambia sola, porque sería cambiarte de negocio sin avisar.',
-        SIN_DATO:      'Faltan datos para registrar. Abajo dice cuáles.',
         NO_ENCONTRADO_PEDIDO: 'Ese pedido ya no está en la base de datos.',
         SIN_CREDENCIALES: 'Faltan las credenciales de Shalom Pro. Guárdalas en ⚙️ Config → Shalom, arriba del botón de conectar.',
         CREDENCIALES_MALAS: 'Shalom Pro rechazó ese correo o esa contraseña. No es la clave de la API: son los datos con los que entras en pro.shalom.pe. Vuelve a guardarlos en Config.',
