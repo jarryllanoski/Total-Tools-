@@ -168,9 +168,14 @@ module.exports = async ({bloque, ok}) => {
        '⚠️ y se sella CUANDO se corrigio: sin eso, «rellenar con los ultimos ' +
        'datos» ordenaba por `createdAt` y te ofrecia el pedido mas NUEVO, no ' +
        'el ultimo que corregiste');
-    const ord = cfg.slice(cfg.indexOf('cands.sort'),
-        cfg.indexOf('cands.sort') + 240);
-    ok(/updatedAt/.test(ord) && ord.indexOf('updatedAt') < ord.indexOf('createdAt'),
+    /* El ordenador vive en `_cliMasReciente` desde el 14/10, cuando el
+       buscador de clientes dejo de elegir solo entre dos personas con el
+       mismo telefono. Lo que se comprueba es lo mismo: que `updatedAt`
+       manda. */
+    const i = cfg.indexOf('function _cliMasReciente');
+    const ord = cfg.slice(i, i + 260);
+    ok(i > 0 && /updatedAt/.test(ord) &&
+       ord.indexOf('updatedAt') < ord.indexOf('createdAt'),
        'y el orden lo usa PRIMERO, con `createdAt` detras para los pedidos ' +
        'de antes de hoy, que no lo tienen');
   }

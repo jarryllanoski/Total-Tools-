@@ -486,8 +486,6 @@ function openForm(id){
     if(typeof _pintarRegistroShalom==='function') _pintarRegistroShalom();
   };
   $('fCourier').onchange = function(){ _showShalomBlock(); _agPintar(); };
-  // Pedido nuevo: el mismo vigilante, con id vacío (no hay pedido que excluir).
-  if(window.Guias && !id) Guias.vigilar('fShalomGuia', '');
   if(id){
     const s=S.shipments.find(x=>x.id===id);
     if(s){
@@ -518,6 +516,18 @@ function openForm(id){
     if($('fPkgAlto'))  $('fPkgAlto').value  = '';
     if($('fPkgPeso'))  $('fPkgPeso').value  = '';
     if(typeof _pkgClasificar==='function') _pkgClasificar(); // limpia el badge
+    /* ⚠️ EL VIGILANTE, DESPUÉS DE LIMPIAR. Estaba veinte líneas MÁS ARRIBA,
+       y `Guias.vigilar` pinta en el acto: leía el campo cuando todavía tenía
+       la guía del pedido anterior y dejaba «⚠️ Esta guía ya está en otro
+       pedido» colgado sobre un campo que se vaciaba justo después.
+
+       Vaciar un campo por código NO dispara `input`, así que nadie volvía a
+       pintar y el aviso se quedaba ahí, hablando de un pedido que no tenía
+       nada que ver con el que estabas creando.
+
+       Un vigilante que mira antes de que el mundo esté listo no vigila:
+       informa de lo de antes. */
+    if(window.Guias) Guias.vigilar('fShalomGuia', '');
   }
   _showShalomBlock();
   if($('fPaste')) $('fPaste').value='';
@@ -540,74 +550,193 @@ function _dniDe(p){
 }
 
 /* ── RELLENAR CLIENTE RECURRENTE (por teléfono o DNI, solo en Nuevo Envío) ──
-   Opción A: se deriva del historial de pedidos en memoria (S.shipments), sin
-   colección nueva ni costo. Rellena solo campos de cliente vacíos; NO toca
-   fecha, estado, monto ni notas. */
-var _clienteMatch=null, _cliTimer=null;
+   Se deriva del historial que ya está en memoria (`S.shipments`): sin
+   colección nueva, sin una sola lectura de Firestore, sin reglas nuevas.
+
+   ⚠️ Y NO HACE FALTA UNA FICHA DE CLIENTE. Sería una SEGUNDA CASA del mismo
+   dato —el nombre y el DNI vivirían en el pedido y en la ficha— y el día que
+   no coincidan hay que decidir cuál manda. Esa es, palabra por palabra, la
+   historia del DNI en tres campos que costó dos días. El historial de
+   pedidos YA ES el historial del cliente. */
+var _clienteOpciones=[], _cliTimer=null;
 function _norm9(s){ let v=(s||'').replace(/\D/g,''); if(v.startsWith('51')&&v.length>9) v=v.slice(2); return v.slice(-9); }
+
+/* ★ LO QUE SE COPIA DE UN CLIENTE. LISTA CERRADA, NO UN COMENTARIO.
+   Antes esto eran seis `setIfEmpty` sueltos y un comentario que prometía
+   «NO se toca: fecha, estado, monto, notas, guía/código». Un comentario no
+   impide nada — es la misma clase de promesa que el «fuente única =
+   order.dni» que el código incumplía mientras hacía tres copias.
+
+   LO DE SHALOM NO ES DEL CLIENTE, ES DE ESE ENVÍO: la guía, el código, la
+   clave de recojo, el «registrado» y las medidas del paquete nacen y mueren
+   con un paquete concreto. Copiarlos daría por registrado un pedido que no
+   existe, y le daría al cliente una clave que no abre nada.
+
+   LA AGENCIA SÍ: es del cliente. Dónde recoge no cambia cada semana, y sin
+   el `agenciaId` el pedido es irregistrable y hay que volver a buscarla a
+   mano en cada envío repetido.
+
+   Hay una prueba que fija esta lista. */
+var CLIENTE_COPIA = ['name', 'phone', 'dni', 'address', 'encAgencia',
+  'courier', 'agenciaId', 'agenciaNombre', 'agenciaGeo', 'agenciaCourier'];
+
+/** El más recientemente CORREGIDO, no el más reciente. */
+function _cliMasReciente(L){
+  return L.slice().sort(function(a,b){
+    const k=function(x){ return String(x.updatedAt||x.createdAt||x.date||''); };
+    return k(b).localeCompare(k(a));
+  })[0];
+}
+
+/* ★ CUÁL DE LOS CLIENTES — Y POR QUÉ AQUÍ NO SE ADIVINA.
+   El teléfono 940703156 del dueño pertenece a DOS personas distintas: DUBER
+   GARCÍA PEÑA (DNI 76307875) y JOSE LINO CORDOVA MORETO (44049239). Antes se
+   cogía «el más reciente» EN SILENCIO, así que escribir ese número rellenaba
+   el nombre y el documento de una de las dos sin decir que había otra — y la
+   etiqueta salía con el DNI de otra persona, por el mismo camino que ya
+   arreglamos una vez.
+
+   Es la regla que el proyecto ya aplica a las instancias y a las agencias:
+     · Adivinar  = elegir entre varias cuando no se sabe cuál. Prohibido.
+     · Preguntar = enseñarlas y que elija el dueño. Eso sí.
+
+   EL DNI ES LA PERSONA; el teléfono es un punto de contacto y se comparte.
+   Por eso el DNI, cuando se escribe, manda y no hay ambigüedad posible.
+
+   Solo se considera que hay varias cuando se puede AFIRMAR que son personas
+   distintas: dos DNI diferentes, o —si ninguno tiene DNI— dos nombres
+   diferentes. Un pedido sin DNI nunca parte en dos a alguien que sí lo
+   tiene: sería preguntar por un dato que falta, no por una contradicción.
+   @param {Array} lista los pedidos
+   @param {string} keyPh teléfono de 9 dígitos, o ''
+   @param {string} keyDni DNI de 8 dígitos, o ''
+   @return {Object} {estado:'uno'|'varios'|'ninguno', uno, varios} */
+function _clienteElegir(lista, keyPh, keyDni){
+  const L = Array.isArray(lista) ? lista.filter(function(x){
+    return x && typeof x === 'object'; }) : [];
+  const dniDe = function(x){ return _dniDe(x).replace(/\D/g,''); };
+
+  if(keyDni){
+    const porDni = L.filter(function(x){ return dniDe(x) === keyDni; });
+    if(porDni.length) return {estado:'uno', uno:_cliMasReciente(porDni)};
+  }
+  if(!keyPh) return {estado:'ninguno'};
+
+  const porPh = L.filter(function(x){ return _norm9(x.phone) === keyPh; });
+  if(!porPh.length) return {estado:'ninguno'};
+
+  const dnis = [];
+  porPh.forEach(function(x){
+    const d = dniDe(x);
+    if(d && dnis.indexOf(d) < 0) dnis.push(d);
+  });
+  if(dnis.length > 1){
+    return {estado:'varios', varios: dnis.slice(0,4).map(function(d){
+      return _cliMasReciente(porPh.filter(function(x){ return dniDe(x)===d; }));
+    })};
+  }
+  if(!dnis.length){
+    // Sin ningún DNI, lo único que distingue a dos personas es el nombre.
+    const noms = [];
+    porPh.forEach(function(x){
+      const n = String(x.name||'').trim().toUpperCase();
+      if(n && noms.indexOf(n) < 0) noms.push(n);
+    });
+    if(noms.length > 1){
+      return {estado:'varios', varios: noms.slice(0,4).map(function(n){
+        return _cliMasReciente(porPh.filter(function(x){
+          return String(x.name||'').trim().toUpperCase()===n; }));
+      })};
+    }
+  }
+  return {estado:'uno', uno:_cliMasReciente(porPh)};
+}
+
 function _clienteBuscar(){
-  if(_editId) return null;                 // solo en Nuevo Envío
+  if(_editId) return {estado:'ninguno'};   // solo en Nuevo Envío
   const ph=_norm9(($('fPhone')||{value:''}).value);
   const dni=(($('fDni')||{value:''}).value||'').replace(/\D/g,'');
   const keyPh  = ph.length===9  ? ph  : '';
   const keyDni = dni.length===8 ? dni : '';
-  if(!keyPh && !keyDni) return null;
-  const cands=(S.shipments||[]).filter(function(x){
-    const xph=_norm9(x.phone), xdni=_dniDe(x).replace(/\D/g,'');
-    return (keyPh&&xph===keyPh) || (keyDni&&xdni===keyDni);
-  });
-  if(!cands.length) return null;
-  /* ★ EL MÁS RECIENTEMENTE CORREGIDO, no el más reciente.
-     Ordenaba por `createdAt`, que es cuándo NACIÓ el pedido, no cuándo se
-     arreglaron sus datos. El 13/10/2026 el dueño corrigió el destinatario de
-     un pedido viejo; con el orden anterior, la próxima vez que escribiera
-     ese teléfono le habríamos vuelto a ofrecer los datos sin corregir — y
-     los habría dado por buenos, que es lo que hace una sugerencia.
-     `updatedAt` se escribe al guardar desde hoy; los pedidos de antes no lo
-     tienen y siguen ordenándose por `createdAt`, igual que siempre. */
-  cands.sort(function(a,b){
-    const k=function(x){ return String(x.updatedAt||x.createdAt||x.date||''); };
-    return k(b).localeCompare(k(a));
-  });
-  return cands[0];
+  if(!keyPh && !keyDni) return {estado:'ninguno'};
+  return _clienteElegir(S.shipments||[], keyPh, keyDni);
 }
+
 function _clienteHintUpdate(){
   clearTimeout(_cliTimer);
   _cliTimer=setTimeout(function(){
     const box=$('clienteHint'); if(!box) return;
-    const m=_clienteBuscar(); _clienteMatch=m;
-    if(!m){ box.style.display='none'; box.innerHTML=''; return; }
+    const r=_clienteBuscar()||{estado:'ninguno'};
+    _clienteOpciones = r.estado==='uno' ? [r.uno]
+      : (r.estado==='varios' ? r.varios : []);
+    if(!_clienteOpciones.length){
+      box.style.display='none'; box.innerHTML=''; return; }
     box.innerHTML='';
-    const btn=document.createElement('button');
-    btn.type='button';
-    btn.style.cssText='width:100%;text-align:left;background:rgba(34,197,94,.10);border:1px solid rgba(34,197,94,.35);border-radius:9px;padding:9px 11px;color:#22c55e;font-weight:700;font-size:12.5px;cursor:pointer;font-family:inherit';
-    /* ★ SE ENSEÑA QUÉ VA A RELLENAR, no solo el nombre.
-       Una sugerencia que no dice qué trae se acepta a ciegas, y el día que
-       trae un DNI viejo nadie lo mira. Con el documento y el teléfono a la
-       vista, equivocarse cuesta una lectura. */
-    const _cd=_dniDe(m).replace(/\D/g,''), _cp=_norm9(m.phone);
-    btn.textContent='🌟 Cliente conocido: '+(m.name||'—')+
-      (_cd?' · DNI '+_cd:'')+(_cp?' · '+_cp:'')+' — toca para rellenar';
-    btn.onclick=_clienteRellenar;
-    box.appendChild(btn);
+    if(r.estado==='varios'){
+      /* ⚠️ NO SE ELIGE SOLO. Dos personas en el mismo teléfono es un caso
+         real de este negocio, y rellenar «la más reciente» pone el DNI de
+         una en el paquete de la otra. */
+      const t=document.createElement('div');
+      t.style.cssText='font-size:11.5px;color:#d29922;font-weight:700;margin-bottom:6px;line-height:1.45';
+      t.textContent='⚠️ Ese teléfono tiene '+_clienteOpciones.length+
+        ' clientes distintos — elige cuál:';
+      box.appendChild(t);
+    }
+    _clienteOpciones.forEach(function(m,i){
+      const btn=document.createElement('button');
+      btn.type='button';
+      btn.style.cssText='width:100%;text-align:left;background:rgba(34,197,94,.10);border:1px solid rgba(34,197,94,.35);border-radius:9px;padding:9px 11px;color:#22c55e;font-weight:700;font-size:12.5px;cursor:pointer;font-family:inherit;margin-bottom:5px';
+      /* ★ SE ENSEÑA QUÉ VA A RELLENAR, no solo el nombre. Una sugerencia que
+         no dice qué trae se acepta a ciegas, y el día que trae el DNI de
+         otro nadie lo mira. */
+      const _cd=_dniDe(m).replace(/\D/g,''), _cp=_norm9(m.phone);
+      btn.textContent=(_clienteOpciones.length>1?'👤 ':'🌟 Cliente conocido: ')+
+        (m.name||'—')+(_cd?' · DNI '+_cd:'')+
+        (_clienteOpciones.length>1?'':(_cp?' · '+_cp:''))+
+        (_clienteOpciones.length>1?'':' — toca para rellenar');
+      btn.onclick=function(){ _clienteRellenar(i); };
+      box.appendChild(btn);
+    });
     box.style.display='block';
   }, 250);
 }
-function _clienteRellenar(){
-  const m=_clienteMatch; if(!m) return;
+
+function _clienteRellenar(i){
+  const m=_clienteOpciones[i||0]; if(!m) return;
   const setIfEmpty=function(id,val){ const e=$(id); if(e && !e.value.trim() && val) e.value=String(val); };
   setIfEmpty('fName', m.name);
   setIfEmpty('fPhone', _norm9(m.phone));
   setIfEmpty('fDni', _dniDe(m).replace(/\D/g,''));
   const isEnc=(m.courier||'').toUpperCase().includes('ENCOMIENDA');
-  setIfEmpty('fAddr', isEnc?(m.ciudadDestino||m.address||''):(m.address||''));
+  const dirDe=isEnc?(m.ciudadDestino||m.address||''):(m.address||'');
+  setIfEmpty('fAddr', dirDe);
   setIfEmpty('fEncAgencia', m.encAgencia||'');
   // Courier habitual (dispara el cambio de bloque agencia/encomienda).
   if(m.courier && $('fCourier')){
     const opt=Array.from($('fCourier').options).find(o=>(o.value||'').toUpperCase()===String(m.courier).toUpperCase());
     if(opt){ $('fCourier').value=opt.value; $('fCourier').dispatchEvent(new Event('change')); }
   }
-  // NO se toca: fecha, estado, monto/adelanto/deuda, notas, guía/código.
+  /* ★ LA AGENCIA IDENTIFICADA VIAJA — y con la misma regla que todo el
+     proyecto: el id sobrevive SOLO si el texto de la dirección es
+     literalmente el de esa agencia.
+
+     Sin esto, el pedido repetido salía con la dirección de la agencia
+     escrita y «sin identificar» por dentro: irregistrable en Shalom hasta
+     volver a buscarla a mano, cada vez.
+
+     Y si el campo de dirección ya tenía algo escrito, `setIfEmpty` no lo
+     pisa — entonces el texto NO es el de esta agencia y el id tampoco se
+     pone. Un id pegado a una dirección que no es la suya es cómo se manda
+     un paquete pagado a otra ciudad. */
+  if(window.Agencias && Agencias.identificada(m) &&
+     ($('fAddr')||{value:''}).value === dirDe && dirDe){
+    _agElegida = {agenciaId:m.agenciaId, agenciaNombre:m.agenciaNombre||'',
+      agenciaGeo:m.agenciaGeo||'', agenciaCourier:m.agenciaCourier};
+    _agTexto = dirDe;
+    if(typeof _agPintar==='function') _agPintar();
+  }
+  /* NO se copia NADA de Shalom ni del paquete: guía, código, clave,
+     registrado, medidas. Ver CLIENTE_COPIA, que es la lista de verdad. */
   if(typeof toast==='function') toast('✅ Datos de '+(m.name||'cliente')+' rellenados');
   const box=$('clienteHint'); if(box){ box.style.display='none'; }
 }
@@ -941,8 +1070,22 @@ function _pintarRegistroShalom(reintento){
     return; }
 
   const ped = _editId ? (S.shipments||[]).find(x=>x.id===_editId) : null;
-  if(!ped){ box.innerHTML = tit + aviso('💾',
-    'Guarda el pedido y vuelve a abrirlo para poder registrarlo.'); return; }
+  if(!ped){
+    /* ⚠️ Y LA CABECERA TAMBIÉN SE LIMPIA. Esta puerta de atrás salía sin
+       repintarla, así que al abrir un pedido NUEVO después de editar uno
+       registrado, el desplegable seguía diciendo «PAQUETE L · CLAVE 6277 ·
+       REGISTRADO» del anterior — con el cuerpo justo debajo diciendo
+       «guarda el pedido y vuelve a abrirlo».
+
+       Una pantalla que se contradice consigo misma a dos centímetros de
+       distancia da más miedo que un error: el dueño creyó que el pedido
+       nuevo había nacido registrado. No lo estaba —los campos de verdad sí
+       se limpian— pero eso no se podía saber mirando. */
+    _pintarResumenPaquete(null, null, false);
+    box.innerHTML = tit + aviso('💾',
+      'Guarda el pedido y vuelve a abrirlo para poder registrarlo.');
+    return;
+  }
 
   /* YA REGISTRADO: no hay botón. No es que esté deshabilitado — es que no
      existe, que es la única forma de que un clic no pueda crear un segundo
