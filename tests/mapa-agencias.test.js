@@ -129,6 +129,69 @@ module.exports = async ({bloque, ok}) => {
        'y una coordenada vacia o rota se descarta, no se dibuja en el 0,0');
   }
 
+  bloque('«cerca de mi»: lo que GANA el cliente, y para los DOS couriers');
+
+  {
+    /* El boton decia «Buscando tu ubicacion…». Al cliente no le interesa
+       que le localicemos —eso es el medio— sino lo que consigue con ello.
+       Un boton que habla de lo que hace el programa en vez de lo que gana
+       quien lo pulsa se lee como una pega, y esa pega es pedir permiso de
+       ubicacion justo en el paso donde la gente abandona.
+
+       Se EJECUTA la funcion contra un DOM de mentira: lo que se comprueba
+       es el texto que acaba en el boton, no el que esta en el fuente. */
+    const src = form.slice(form.indexOf('function _cercaBtnBuscando'),
+        form.indexOf('async function agCerca'));
+    const txt = {textContent: ''};
+    const btn = {style: {}, disabled: false,
+      querySelector: () => txt};
+    const M = new Function('document', '$',
+        src + ';return _cercaBtnBuscando;')(
+        {getElementById: () => btn}, () => null);
+    M(true);
+    ok(/sedes cerca de ti/i.test(txt.textContent),
+       '⚠️ buscando → «Buscando sedes cerca de ti…», no «tu ubicacion»: se ' +
+       'dice lo que gana quien pulsa, no lo que hace el programa — salio: ' +
+       txt.textContent);
+    ok(!/ubicaci/i.test(txt.textContent),
+       'y la palabra «ubicacion» ya no sale en el boton');
+    M(false);
+    ok(txt.textContent === 'cerca de mí', 'y al acabar vuelve a su sitio');
+  }
+  {
+    /* ⚠️ UNO SOLO PARA LOS DOS COURIERS. Si hubiera dos botones o dos
+       textos, el dia que se cambie uno el otro se queda atras — y nadie
+       mira Olva hasta que un cliente se queja. */
+    /* Sin comentarios: dos de ellos CITAN el texto para explicarlo, y
+       contar una cita como una copia es confundir hablar con hacer. Me
+       paso ya con print.js esta misma semana. */
+    const codigo = form.replace(/<!--[\s\S]*?-->/g, '')
+        .replace(/\/\*[\s\S]*?\*\//g, '');
+    const n = (codigo.match(/Buscando sedes cerca de ti/g) || []).length;
+    ok(n === 1,
+       'el texto esta escrito UNA vez: Shalom y Olva comparten plantilla, ' +
+       'boton y funcion — salio ' + n + ' veces');
+    const plant = (form.match(/id="shalomCercaBtn"/g) || []).length;
+    ok(plant === 1,
+       'y el boton tambien es uno — el id dice «shalom» por historia, pero ' +
+       'lo pinta la rama compartida de AGENCY_SOURCES');
+    ok(/SHALOM:\s*\{[\s\S]{0,400}OLVA:\s*\{/.test(form),
+       'y ahi estan los dos couriers con catalogo');
+  }
+  {
+    /* El mapa tambien sirve a los dos: el catalogo de Olva trae las mismas
+       columnas de coordenadas. */
+    const j = JSON.parse(fs.readFileSync(
+        path.join(__dirname, '..', 'data', 'agencias-olva.json'), 'utf8'));
+    const L = j.agencias || j.data || j;
+    const con = L.filter((a) => isFinite(parseFloat(a.latitud)) &&
+        isFinite(parseFloat(a.longitud)));
+    ok(con.length > L.length * 0.9,
+       'Olva trae coordenadas en ' + con.length + ' de ' + L.length +
+       ' sedes: el mapa no es «el mapa de Shalom», es el de quien tenga ' +
+       'catalogo');
+  }
+
   bloque('Que el mapa no atrape al cliente dentro');
 
   {

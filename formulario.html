@@ -1330,8 +1330,11 @@ function renderAgencyBox(courierName){
     agBox.innerHTML = `<div class="agc-box">
       <!-- "cerca de mí" va en la MISMA fila que el título. El título se recorta
            solo con "…" si hace falta (flex-shrink), asi que cuando el boton pasa
-           a decir "Buscando tu ubicacion…" —mas largo— no se desborda ni en
-           pantallas de 360 px, sin medir nada a mano y sin saltos. -->
+           a decir "Buscando sedes cerca de ti…" —mas largo— no se desborda
+           ni en pantallas de 360 px, sin medir nada a mano y sin saltos.
+           ⚠️ El id dice "shalom" pero esta plantilla la comparten Shalom y
+           Olva (ver AGENCY_SOURCES): renombrarla seria tocar seis sitios
+           para no ganar nada. Lo que importa es que hay UNA. -->
       <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:6px">
         <span class="agc-lbl" style="margin-bottom:0;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Elige tu sede ${esc(cfg.label)} *</span>
         <button type="button" id="shalomCercaBtn" onclick="agCerca('${agKey}')"
@@ -2387,7 +2390,15 @@ function _cercaBtnBuscando(on){
   btn.disabled=on;
   btn.style.opacity=on?'.75':'';
   btn.style.cursor=on?'progress':'pointer';
-  txt.textContent=on?'Buscando tu ubicación…':'cerca de mí';
+  /* ★ «Buscando sedes cerca de ti» y no «Buscando tu ubicación».
+     Lo pidió el dueño, y dice lo correcto: al cliente no le interesa que
+     le localicemos —eso es el medio— sino lo que va a conseguir con ello.
+     Un botón que habla de lo que hace el programa en vez de lo que gana
+     quien lo pulsa se lee como una pega, y esa pega es pedir permiso de
+     ubicación justo en el paso en el que la gente abandona.
+     Y vale para Shalom y para Olva: este botón, esta función y este texto
+     son UNO solo — los dos couriers se pintan con la misma plantilla. */
+  txt.textContent=on?'Buscando sedes cerca de ti…':'cerca de mí';
 }
 async function agCerca(key){
   if(_cercaEnCurso) return;                 // doble-toque: ya hay uno en curso
