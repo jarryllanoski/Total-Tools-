@@ -91,13 +91,20 @@ module.exports = async ({bloque, ok}) => {
   bloque('El DNI va primero — y es orden, no logica');
 
   {
+    /* ⚠️ SE BUSCA EL PASO QUE CONTIENE LOS CAMPOS, NO EL NUMERO 1.
+       Esta prueba decia «paso 1» a pelo y se puso roja el 15/10/2026, el
+       dia que el courier paso a ser el primero y los datos el segundo —
+       aunque el orden de los campos, que es lo que comprueba, no habia
+       cambiado nada. Una prueba que se rompe cuando algo que no mira se
+       mueve es ruido: la proxima vez se arregla sin leerla. */
     const form = E.leer('formulario.html');
-    const paso1 = form.slice(form.indexOf('data-step="1"'),
-        form.indexOf('data-step="2"'));
-    const pd = paso1.indexOf('id="f_dni"');
-    const pn = paso1.indexOf('id="f_name"');
-    const pp = paso1.indexOf('id="f_phone"');
-    ok(pd > 0 && pn > 0 && pp > 0, 'los tres campos siguen en el paso 1');
+    const trozos = form.split(/<div class="wz-step" data-step="/);
+    const paso = trozos.find((t) => t.indexOf('id="f_dni"') > 0) || '';
+    ok(!!paso, 'los tres campos viven en algun paso del asistente');
+    const pd = paso.indexOf('id="f_dni"');
+    const pn = paso.indexOf('id="f_name"');
+    const pp = paso.indexOf('id="f_phone"');
+    ok(pd > 0 && pn > 0 && pp > 0, 'y los tres en el MISMO paso');
     ok(pd < pn && pn < pp,
        '⚠️ DNI, nombre, telefono — en ese orden. El DNI es el unico dato ' +
        'que puede RELLENAR a los otros: pedirlo al final es pedir que el ' +
@@ -117,12 +124,15 @@ module.exports = async ({bloque, ok}) => {
         form.indexOf('id="f_dni"') + 200)), 'el DNI sigue topado a 8');
   }
   {
+    // Igual aqui: el bloque que valida el DNI, sea el numero que sea.
     const form = E.leer('formulario.html');
-    const v = form.slice(form.indexOf('function wzValidate'),
-        form.indexOf('} else if(step===2)'));
-    const vd = v.indexOf("'err_dni'");
-    const vn = v.indexOf("'err_name'");
-    const vp = v.indexOf("'err_phone'");
+    const todo = form.slice(form.indexOf('function wzValidate'),
+        form.indexOf('} else if(step===3)'));
+    const bloques = todo.split(/if\(step===\d\)\{/);
+    const b = bloques.find((x) => x.indexOf("'err_dni'") > 0) || '';
+    const vd = b.indexOf("'err_dni'");
+    const vn = b.indexOf("'err_name'");
+    const vp = b.indexOf("'err_phone'");
     ok(vd > 0 && vd < vn && vn < vp,
        'y se valida en el MISMO orden en que se ve: leer la validacion en ' +
        'otro orden que el formulario es como se olvida un campo el dia que ' +
@@ -154,5 +164,101 @@ module.exports = async ({bloque, ok}) => {
     ok(pr.indexOf('--tt-s') < 0 && pr.indexOf('tt-lbl') < 0,
        'print.js no comparte nada con la vista previa: la etiqueta que se ' +
        'IMPRIME no cambia de tamaño');
+  }
+
+  bloque('⚠️ Elegir como recibir es lo PRIMERO que se ve');
+
+  {
+    /* Al entrar, el cliente veia una etiqueta EN BLANCO ocupando el primer
+       tercio del movil y tres campos debajo. Elegir como quiere recibir el
+       pedido es la decision de la que cuelga todo lo demas: que se pregunta
+       en el paso 3, y si hay paso 3 siquiera. */
+    const form = E.leer('formulario.html');
+    const trozos = form.split(/<div class="wz-step" data-step="/);
+    const nDe = (marca) => {
+      const t = trozos.find((x) => x.indexOf(marca) > 0) || '';
+      return t ? Number(t.slice(0, 1)) : 0;
+    };
+    const pasoCourier = nDe('id="courierCards"');
+    const pasoDatos = nDe('id="f_dni"');
+    ok(pasoCourier === 1,
+       '⚠️ el courier es el paso 1 — salio: ' + pasoCourier);
+    ok(pasoDatos === 2,
+       'y los datos el 2 — salio: ' + pasoDatos);
+  }
+  {
+    /* ⚠️ LA VALIDACION SE MOVIO CON LA PANTALLA. Si no, el asistente
+       validaria el paso equivocado y dejaria pasar un formulario vacio sin
+       decir nada — el peor fallo posible aqui, porque no se ve. */
+    const form = E.leer('formulario.html');
+    const todo = form.slice(form.indexOf('function wzValidate'),
+        form.indexOf('} else if(step===3)'));
+    const num = (marca) => {
+      const re = /if\(step===(\d)\)\{([\s\S]*?)(?=\}\s*else if\(step===|$)/g;
+      let m;
+      while ((m = re.exec(todo))) {
+        if (m[2].indexOf(marca) > 0) return Number(m[1]);
+      }
+      return 0;
+    };
+    ok(num("'err_courier'") === 1,
+       '⚠️ el paso 1 valida el COURIER, que es lo que ahora se ve ahi');
+    ok(num("'err_dni'") === 2,
+       'y el paso 2 valida los datos');
+  }
+  {
+    const form = E.leer('formulario.html');
+    const i = form.indexOf('cs.addEventListener');
+    const fn = form.slice(i, i + 300);
+    ok(/_wzStep!==1/.test(fn),
+       '⚠️ y el auto-avance al tocar una tarjeta mira el paso 1. Con el 2 ' +
+       'viejo, elegir courier no avanzaria y el cliente se quedaria mirando ' +
+       'una pantalla que ya respondio');
+  }
+  {
+    const form = E.leer('formulario.html');
+    const trozos = form.split(/<div class="wz-step" data-step="/);
+    const p1 = trozos.find((x) => x.indexOf('id="courierCards"') > 0) || '';
+    ok(p1.indexOf('wzBack()') < 0,
+       'la primera pantalla NO tiene «Atras»: un boton que no lleva a ningun ' +
+       'sitio es un boton que se toca una vez y ya no se cree');
+    const p2 = trozos.find((x) => x.indexOf('id="f_dni"') > 0) || '';
+    ok(p2.indexOf('wzBack()') > 0,
+       'y la segunda SI, para poder cambiar de courier');
+    ok(/Datos de la persona que recibe/.test(p2),
+       'con su encabezado: en un envio a agencia quien recoge puede NO ser ' +
+       'quien pide, y «tus datos» invita a poner el DNI del que paga');
+    ok(/id="f_dni"[^>]*data-wz-focus/.test(p2),
+       'y el DNI se enfoca al llegar: ahora se llega TOCANDO una tarjeta, ' +
+       'asi que el teclado puede abrirse dentro de ese gesto');
+  }
+  {
+    /* Ninguna tarjeta nace elegida: con 1 courier o con 7, el cliente toca
+       y avanza. Era la unica duda real del cambio de orden. */
+    const form = E.leer('formulario.html');
+    ok(/role="radio" aria-checked="false"/.test(form),
+       'ninguna tarjeta viene preseleccionada — no hay salto automatico ni ' +
+       'pantalla trabada cuando solo hay un courier');
+  }
+
+  bloque('⚠️ La etiqueta no se ve hasta que tiene algo TUYO dentro');
+
+  {
+    /* La regla mira el CONTENIDO, no el paso. Lo facil habria sido
+       «ocultala en el paso 1», y habria quedado mal el mismo dia que los
+       pasos se movieron. */
+    const et = E.leer('narrador/etiqueta.js');
+    const i = et.indexOf('function update()');
+    const fn = et.slice(i, et.indexOf('function place()', i));
+    ok(/box\.style\.display = \(name\|\|phone\|\|dni\|\|dest\|\|courier\)/
+        .test(fn),
+       '⚠️ se ve cuando hay nombre, telefono, DNI, destino o courier — y no ' +
+       'cuando el asistente esta en tal paso: asi la regla sigue siendo ' +
+       'cierta el dia que los pasos se muevan otra vez');
+    ok(!/remName|paintRemitente\(\)[^;]*display/.test(
+        fn.slice(fn.indexOf('box.style.display'))),
+       'y el REMITENTE no cuenta: esta desde el segundo cero porque es del ' +
+       'negocio, y contarlo haria que la etiqueta se viera SIEMPRE — justo ' +
+       'lo que se vino a quitar');
   }
 };

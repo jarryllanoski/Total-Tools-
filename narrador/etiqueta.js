@@ -272,6 +272,25 @@
     el.revisa.textContent=(name&&dest)
       ? 'Revisa que tus datos estén correctos'
       : 'Así se verá tu etiqueta';
+
+    /* ★ LA ETIQUETA NO SE VE HASTA QUE TIENE ALGO TUYO DENTRO.
+       Al entrar, el cliente veía una tarjeta EN BLANCO ocupando el primer
+       tercio del móvil, antes de poder hacer nada. Una etiqueta vacía no
+       enseña nada: es el sitio donde va a estar lo que todavía no existe.
+
+       ⚠️ LA REGLA MIRA EL CONTENIDO, NO EL PASO. Lo fácil habría sido
+       «ocúltala en el paso 1», y habría quedado mal el día que los pasos se
+       muevan —que es hoy mismo: el courier acaba de pasar a ser el primero—.
+       Así la regla sigue siendo cierta sola, sin saber nada del asistente.
+
+       Y el REMITENTE no cuenta. Es el único dato que está desde el segundo
+       cero, porque es del negocio y no del cliente: contarlo haría que la
+       etiqueta se viera siempre, que es justo lo que se vino a quitar.
+
+       Se decide con los mismos valores que se acaban de pintar, como el pie
+       de aquí arriba: una sola verdad, recalculada, sin poder
+       desincronizarse de lo que se ve. */
+    box.style.display = (name||phone||dni||dest||courier) ? '' : 'none';
   }
 
   // ── Montaje en el formulario (después de la cabecera) ───────────────

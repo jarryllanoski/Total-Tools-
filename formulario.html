@@ -864,7 +864,49 @@ function renderForm(){
     ${headerHtml()}
     <div class="wz-wrap">
       <div id="wzProgress" class="wz-progress"></div>
+      <!-- ★ ELEGIR CÓMO RECIBIR ES LO PRIMERO — 15/10/2026.
+           Lo pidió el dueño mirando su pantalla: al entrar se veía una
+           etiqueta EN BLANCO ocupando el primer tercio del móvil, y debajo
+           tres campos. La etiqueta en blanco no dice nada; elegir cómo
+           quieres recibir el pedido sí, y además es la decisión de la que
+           cuelga todo lo demás —qué se pregunta en el paso 3, y si hay
+           paso 3 siquiera—.
+
+           ⚠️ SE INTERCAMBIÓ EL CONTENIDO, NO LA NUMERACIÓN. Los pasos se
+           mueven por data-step, y wzSeq() devuelve [1,2,3,4] o [1,2,4]
+           según el courier. Renumerar habría tocado la secuencia, la barra,
+
+           (Y sin comillas invertidas aquí dentro: este comentario vive
+           DENTRO de un template literal de JavaScript, así que una sola
+           comilla invertida cierra la cadena y revienta el archivo entero.
+           Me acaba de pasar al escribirlo.)
+           el botón Atrás y el salto del paso 3; mover el contenido no toca
+           nada de eso. Tres ediciones en vez de un barrido.
+
+           De regalo arregla la barra: hasta hoy decía «Paso 1 de 4» y
+           cambiaba a «de 3» a mitad de camino, porque el total depende del
+           courier y todavía no se había elegido. -->
       <div class="wz-step" data-step="1">
+      <div class="section-ttl" style="margin-top:4px">¿Cómo quieres recibir tu pedido? *</div>
+      <div class="fg">
+        <div id="courierCards" role="radiogroup" aria-label="¿Cómo quieres recibir tu pedido?">${courierCards}</div>
+        <select class="fi sel" id="f_courier" onchange="onCourierChange(this.value)" style="display:none" tabindex="-1" aria-hidden="true">
+          ${courierOpts}
+        </select>
+        <div class="ferr" id="err_courier">Selecciona cómo recibir tu pedido</div>
+      </div>
+      <!-- Sin «Atrás»: es la primera pantalla, y un botón que no lleva a
+           ningún sitio es un botón que se toca una vez y ya no se cree. -->
+      <button class="btn-main" onclick="wzNext()" style="margin-top:8px">Continuar →</button>
+      </div>
+
+      <div class="wz-step" data-step="2" hidden>
+      <!-- ★ «DATOS DE LA PERSONA QUE RECIBE», y no «tus datos».
+           En un envío a agencia quien recoge puede NO ser quien pide: lo
+           manda a su madre, a su socio, al vecino. El DNI que va en esta
+           pantalla es el que Shalom va a exigir en el mostrador, así que
+           llamarlo «tus datos» invita a poner el del que paga. -->
+      <div class="section-ttl" style="margin-top:4px">Datos de la persona que recibe</div>
       <!-- ★ EL DNI VA PRIMERO, Y ES UN CAMBIO DE ORDEN, NO DE LÓGICA.
            Lo pidió el dueño y tiene su razón: el DNI es el único dato que
            puede RELLENAR a los otros. Pedirlo al final es pedir que el
@@ -875,7 +917,7 @@ function renderForm(){
            EXACTAMENTE los de antes: solo cambia en qué orden se ven. -->
       <div class="fg">
         <input class="fi" id="f_dni" type="text" inputmode="numeric" pattern="[0-9]*"
-          placeholder="🪪 DNI *" maxlength="8" autocomplete="off"
+          placeholder="🪪 DNI *" maxlength="8" autocomplete="off" data-wz-focus
           oninput="onDniInput(this.value)">
         <div class="ferr" id="err_dni">Ingresa el DNI (8 dígitos)</div>
         <div id="dniBadge" style="display:none;margin-top:8px"></div>
@@ -899,18 +941,6 @@ function renderForm(){
         <div id="knownBadge" style="display:none;margin-top:8px"></div>
       </div>
       ${extraHtml}
-      <button class="btn-main" onclick="wzNext()" style="margin-top:8px">Continuar →</button>
-      </div>
-
-      <div class="wz-step" data-step="2" hidden>
-      <div class="section-ttl" style="margin-top:4px">¿Cómo quieres recibir tu pedido? *</div>
-      <div class="fg">
-        <div id="courierCards" role="radiogroup" aria-label="¿Cómo quieres recibir tu pedido?">${courierCards}</div>
-        <select class="fi sel" id="f_courier" onchange="onCourierChange(this.value)" style="display:none" tabindex="-1" aria-hidden="true">
-          ${courierOpts}
-        </select>
-        <div class="ferr" id="err_courier">Selecciona cómo recibir tu pedido</div>
-      </div>
       <div class="wz-nav">
         <button class="wz-back" onclick="wzBack()">← Atrás</button>
         <button class="btn-main" onclick="wzNext()">Continuar →</button>
@@ -2769,7 +2799,17 @@ function _wzErr(fid,eid,bad){
 // Valida SOLO los campos del paso, con las mismas reglas que submitOrder.
 function wzValidate(step){
   var ok=true;
+  /* ⚠️ EL ORDEN DE ESTOS BLOQUES SIGUE AL DE LA PANTALLA, SIEMPRE.
+     El 15/10/2026 el courier paso a ser el paso 1 y los datos el 2, y estos
+     dos cuerpos se intercambiaron con ellos. Las reglas no cambiaron ni una
+     coma: lo unico que se movio es a que numero responden.
+     Si un dia vuelven a moverse los pasos y esto no se mueve, el asistente
+     validaria la pantalla equivocada y dejaria pasar un formulario vacio
+     sin decir nada. Hay una prueba que compara los dos ordenes. */
   if(step===1){
+    if(!selCourierName){ $('err_courier')&&$('err_courier').classList.add('show'); ok=false; }
+    else { $('err_courier')&&$('err_courier').classList.remove('show'); }
+  } else if(step===2){
     /* Se valida en el MISMO orden en que se ve. No cambia el resultado
        —`_wzErr` marca todos los campos malos a la vez, no se para en el
        primero— pero leer la validación en otro orden que el formulario es
@@ -2789,9 +2829,6 @@ function wzValidate(step){
       if(el&&!el.value.trim()){ el.classList.add('err'); er&&er.classList.add('show'); ok=false; }
       else if(el){ el.classList.remove('err'); er&&er.classList.remove('show'); }
     });
-  } else if(step===2){
-    if(!selCourierName){ $('err_courier')&&$('err_courier').classList.add('show'); ok=false; }
-    else { $('err_courier')&&$('err_courier').classList.remove('show'); }
   } else if(step===3){
     if(selCourierType==='agencia'){
       var man=$('agcManualInput');
@@ -2876,7 +2913,8 @@ function wzInit(){
     // correcto (agencia/otras/delivery), así que wzFocusFirst enfoca el campo justo.
     var cs=$('f_courier');
     if(cs) cs.addEventListener('change',function(){
-      if(_wzStep!==2||!this.value) return;
+      // El courier es el paso 1 desde el 15/10/2026 (antes el 2).
+      if(_wzStep!==1||!this.value) return;
       if(selCourierName) wzNext();
     });
     wzShow(1);
