@@ -226,13 +226,121 @@ module.exports = async ({bloque, ok}) => {
        'en el paso 3 de 4 esconde el boton de continuar');
   }
   {
+    /* ⚠️ ESTA PRUEBA AFIRMABA LO CONTRARIO, Y ERA MIA.
+       El 14/10 escribi que al elegir el mapa debia esconderse: «un mapa de
+       sedes debajo de la sede ya elegida invita a tocar algo ya decidido».
+       El dueño propuso que se quedara con la elegida marcada, y tiene
+       razon — cambia lo que el mapa SIGNIFICA: deja de ser una lista de
+       opciones y pasa a ser la confirmacion de adonde va el paquete.
+       Y el riesgo que yo temia no lo era: un toque de mas vuelve a pasar
+       por `agSel` y simplemente cambia de sede.
+       Se invierte a conciencia, no se borra: lo que estaba escrito era una
+       decision, y dejarla sin contar seria perder por que cambio. */
     const i = form.indexOf('function agSel(key, i)');
-    const fn = form.slice(i, i + 1800);
-    ok(/_mw\.style\.display='none'/.test(fn),
-       'al elegir, el mapa se va con la lista: un mapa de sedes debajo de ' +
-       'la sede ya elegida invita a tocar algo ya decidido');
+    const fn = form.slice(i, form.indexOf('function agManual', i));
+    ok(!/shalomMapaWrap/.test(fn),
+       '⚠️ al elegir, el mapa SE QUEDA — con la elegida señalada es una ' +
+       'confirmacion, no una invitacion');
     const r = form.indexOf('function agReset');
-    ok(/_mw\.style\.display='none'/.test(form.slice(r, r + 700)),
-       'y al borrar la eleccion tambien');
+    ok(/_mw\.style\.display='none'/.test(form.slice(r, r + 900)),
+       'pero al borrar la eleccion si se esconde: ahi no hay nada que ' +
+       'confirmar');
+  }
+
+  bloque('⚠️ Al llegar NO se abre el teclado');
+
+  {
+    /* El buscador llevaba `data-wz-focus`, asi que el asistente lo enfocaba
+       al llegar y Android abria el teclado encima del mapa y de la lista.
+       Y la lista dice, dos dedos mas abajo, «👇 Toca tu sede — no hace
+       falta escribir»: la pantalla se contradecia a si misma. */
+    const caja = form.slice(
+        form.indexOf('agBox.innerHTML = `<div class="agc-box">'),
+        form.indexOf('agPrecargar(agKey);'));
+    ok(caja.indexOf('id="shalomAgInput"') > 0, 'el buscador sigue ahi');
+    ok(!/id="shalomAgInput"[^>]*data-wz-focus/.test(caja),
+       '⚠️ y YA NO se enfoca solo: aqui hay un mapa y una lista que se ' +
+       'tocan, y abrir el teclado los tapa justo cuando se dice «no hace ' +
+       'falta escribir»');
+  }
+  {
+    /* Pero SOLO aqui. Donde escribir es lo unico que se puede hacer, el
+       teclado ayuda y el foco se queda. */
+    const quedan = ['agcManualInput', 'f_ciudad', 'addrManualInput', 'f_dni'];
+    quedan.forEach((id) => {
+      const i = form.indexOf('id="' + id + '"');
+      ok(i > 0 && /data-wz-focus/.test(form.slice(i - 220, i + 260)),
+         id + ' SI se sigue enfocando: ahi escribir es lo unico que hay');
+    });
+  }
+
+  bloque('Donde estoy: un PUNTO, no un pin');
+
+  {
+    const i = form.indexOf('async function agMapaPintar');
+    const fn = form.slice(i, form.indexOf('function agMapaMarcar', i));
+    ok(/_miUbic/.test(fn) && /circleMarker/.test(fn),
+       'la posicion del cliente se pinta como circulo, no como marcador');
+    ok(/interactive:false/.test(fn),
+       '⚠️ y NO se puede tocar: los pines de aqui son sedes que se eligen, ' +
+       'y tu posicion no se elige. Un pin ahi invita a elegirse');
+    ok(/if\(_miUbic\)\{/.test(fn),
+       'solo se pinta si hay ubicacion — NO se pide permiso para dibujar ' +
+       'un punto');
+  }
+  {
+    const i = form.indexOf('async function agCerca');
+    const fn = form.slice(i, i + 2200);
+    ok(/_miUbic=\{la:la, lo:lo\}/.test(fn),
+       'la ubicacion se guarda donde YA se tenia: se usaba para ordenar por ' +
+       'distancia y se tiraba al salir de la funcion');
+    ok(fn.indexOf('fetch(') < 0 && fn.indexOf('_api(') < 0,
+       '⚠️ y no sale del navegador: esta funcion no la manda a ningun sitio');
+  }
+
+  bloque('⚠️ La sede elegida se SEÑALA — el mapa pasa a ser confirmacion');
+
+  {
+    /* Ayer hice que el mapa se escondiera al elegir. El dueño propuso lo
+       contrario y tiene razon: con la elegida marcada, el mapa deja de ser
+       una invitacion y pasa a ser la confirmacion de adonde va el paquete.
+       Y un toque de mas no es un problema — vuelve a pasar por `agSel`. */
+    const i = form.indexOf('function agSel(key, i)');
+    const fn = form.slice(i, form.indexOf('function agManual', i));
+    ok(/agMapaMarcar\(i\)/.test(fn),
+       'al elegir se señala en el mapa, con el MISMO indice');
+    ok(!/shalomMapaWrap[\s\S]{0,60}display='none'/.test(fn),
+       '⚠️ y el mapa YA NO se esconde al elegir: es donde se ve adonde va ' +
+       'tu paquete');
+  }
+  {
+    const i = form.indexOf('function agMapaMarcar');
+    const fn = form.slice(i, form.indexOf('function agMapaDesmarcar'));
+    ok(/setOpacity\(yo\?1:\.35\)/.test(fn), 'las demas se atenuan');
+    ok(/setZIndexOffset\(yo\?1000:0\)/.test(fn), 'la elegida se pone delante');
+    ok(/openPopup\(\)/.test(fn) && /setView\(/.test(fn),
+       'abre su nombre y el mapa se mueve hasta ella — el movimiento es la ' +
+       'señal que de verdad se nota');
+    ok(/catch\(e\)\{/.test(fn),
+       '⚠️ y todo va en try/catch: el mapa NUNCA puede romper la eleccion, ' +
+       'que es lo que de verdad importa de esta pantalla');
+  }
+  {
+    const i = form.indexOf('function agReset');
+    const fn = form.slice(i, i + 900);
+    ok(/agMapaDesmarcar\(\)/.test(fn),
+       'la ✕ del recuadro desatenua los pines: si no, quedarian apagados ' +
+       'sin que nada este elegido');
+  }
+  {
+    /* Tocar una FILA de la lista tambien marca el mapa, porque las dos
+       pasan por `agSel` con el mismo indice. Una sola puerta, otra vez. */
+    const i = form.indexOf('function agSel(key, i)');
+    const fn = form.slice(i, form.indexOf('function agManual', i));
+    const marca = fn.indexOf('agMapaMarcar');
+    const guarda = fn.indexOf('window._agIdent');
+    ok(marca > 0 && guarda > 0 && guarda < marca,
+       'primero se guarda la eleccion y DESPUES se pinta: si el mapa ' +
+       'reventara, la sede ya estaria elegida');
   }
 };

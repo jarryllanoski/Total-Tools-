@@ -1387,7 +1387,17 @@ function renderAgencyBox(courierName){
       </div>
       <div style="position:relative;margin-bottom:10px">
         <span style="position:absolute;left:14px;top:50%;transform:translateY(-50%);font-size:15px;opacity:.65;pointer-events:none">🔍</span>
-        <input class="fi" id="shalomAgInput" autocomplete="off" data-wz-focus
+        <!-- ⚠️ SIN data-wz-focus, Y ESO ES EL ARREGLO. (Sin comillas
+             invertidas: esto vive dentro de un template literal. Van dos
+             veces hoy que lo rompo por lo mismo.)
+             Lo tenia, asi que al llegar al paso el asistente enfocaba este
+             campo y Android abria el teclado encima del mapa y de la lista.
+             Y la propia lista dice, dos dedos mas abajo, «👇 Toca tu sede —
+             no hace falta escribir»: la pantalla se contradecia a si misma.
+             En los demas pasos el foco se queda —el DNI, la ciudad, la
+             direccion— porque ahi escribir es lo UNICO que se puede hacer.
+             Aqui hay un mapa y una lista que se tocan. -->
+        <input class="fi" id="shalomAgInput" autocomplete="off"
           style="padding-left:42px"
           placeholder="Escribe tu ciudad o distrito…"
           oninput="agOnInput('${agKey}', this.value)">
@@ -2449,6 +2459,11 @@ async function agCerca(key){
     _cercaEnCurso=false; _cercaBtnBuscando(false);
     if(myToken!==_cercaToken) return;        // carrera: el cliente ya escribió → ignorar
     var la=pos.coords.latitude, lo=pos.coords.longitude;
+    /* ★ DONDE ESTA EL CLIENTE, para pintarlo en el mapa. Ya teniamos el
+       dato —se usa aqui mismo para ordenar por distancia— y se tiraba al
+       salir de esta funcion. No sale del navegador: hoy tampoco salia, y
+       esto no lo manda a ningun sitio. */
+    _miUbic={la:la, lo:lo};
     var lista=(window._agData[key]||[]).map(function(ag){
       var alat=parseFloat(ag.latitud), alon=parseFloat(ag.longitud);
       if(!isFinite(alat)||!isFinite(alon)||(alat===0&&alon===0)) return null;
@@ -2608,7 +2623,7 @@ function agMostrar(key, agencias, aviso){
 
    No cuesta ni una llamada: `latitud` y `longitud` ya venían en
    `data/agencias-shalom.json`, que además está cacheado 24 h. */
-var _mapa=null, _mapaMarcas=[], _mapaCarga=null;
+var _mapa=null, _mapaMarcas=[], _mapaCarga=null, _miUbic=null, _miPunto=null;
 
 /** Carga Leaflet UNA vez y solo cuando hace falta.
     Perezoso a propósito: quien pide a domicilio no llega a este paso, y no
@@ -2663,7 +2678,7 @@ async function agMapaPintar(key, agencias){
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
         {maxZoom:18, attribution:'© OpenStreetMap'}).addTo(_mapa);
     }
-    _mapaMarcas.forEach(function(m){ try{ _mapa.removeLayer(m); }catch(e){} });
+    _mapaMarcas.forEach(function(x){ try{ _mapa.removeLayer(x.m); }catch(e){} });
     _mapaMarcas=[];
     conGeo.forEach(function(g){
       var nombre=g.ag.lugar_over||g.ag.nombre||'Sede';
@@ -2671,15 +2686,74 @@ async function agMapaPintar(key, agencias){
       m.bindPopup('<b>'+esc(nombre)+'</b><br>'+esc(g.ag.direccion||''));
       // LA MISMA PUERTA que la lista: mismo índice, misma función.
       m.on('click', function(){ agSel(key, g.i); });
-      _mapaMarcas.push(m);
+      // El indice viaja con la marca: es lo que permite señalar DESPUES la
+      // que se eligio, venga el toque del mapa o de la lista.
+      _mapaMarcas.push({m:m, i:g.i});
     });
-    _mapa.fitBounds(conGeo.map(function(g){ return g.c; }), {padding:[24,24], maxZoom:15});
+    /* ★ DONDE ESTAS TU — un PUNTO, no un pin.
+       Los pines de aqui son sedes que se pueden elegir; tu posicion no se
+       elige. El circulo azul con borde blanco es la convencion que todo el
+       mundo ya entiende, y de paso no se puede tocar por error.
+       Solo si pulsaste «cerca de mi» y diste permiso: NO se pide ubicacion
+       para dibujar un punto. */
+    if(_miPunto){ try{ _mapa.removeLayer(_miPunto); }catch(e){} _miPunto=null; }
+    var puntos=conGeo.map(function(g){ return g.c; });
+    if(_miUbic){
+      _miPunto=L.circleMarker([_miUbic.la,_miUbic.lo],{
+        radius:7, color:'#fff', weight:2.5, fillColor:'#2d7ff9', fillOpacity:1,
+        interactive:false
+      }).addTo(_mapa);
+      puntos.push([_miUbic.la,_miUbic.lo]);
+    }
+    _mapa.fitBounds(puntos, {padding:[24,24], maxZoom:15});
     // El contenedor nace oculto y Leaflet mide mal lo que no se ve.
     setTimeout(function(){ try{ _mapa.invalidateSize(); }catch(e){} }, 60);
   }catch(e){
     // Un mapa que revienta no puede llevarse por delante el formulario.
     wrap.style.display='none';
   }
+}
+
+/* ★ SEÑALAR EN EL MAPA LA QUE SE ELIGIO.
+   ⚠️ AYER HICE QUE EL MAPA SE ESCONDIERA AL ELEGIR, con este argumento:
+   «un mapa de sedes debajo de la sede ya elegida invita a tocar algo ya
+   decidido». El dueño propuso lo contrario y tiene razon, porque cambia lo
+   que el mapa SIGNIFICA: con la elegida marcada deja de ser una invitacion
+   y pasa a ser una confirmacion — ves en el mapa adonde va tu paquete.
+   Y un toque de mas no es un problema: vuelve a pasar por `agSel` y
+   simplemente cambias de sede.
+
+   Tres señales, de la mas sutil a la mas clara: las demas se atenuan, la
+   elegida se pone delante y abre su nombre, y el mapa se mueve hasta ella.
+   El movimiento es la que de verdad se nota.
+
+   Sin iconos nuevos ni nada que descargar: tres llamadas de Leaflet. */
+function agMapaMarcar(i){
+  if(!_mapa || !_mapaMarcas.length) return;
+  try{
+    var elegida=null;
+    _mapaMarcas.forEach(function(x){
+      var yo=(x.i===i);
+      x.m.setOpacity(yo?1:.35);
+      x.m.setZIndexOffset(yo?1000:0);
+      if(yo) elegida=x.m;
+    });
+    if(elegida){
+      elegida.openPopup();
+      _mapa.setView(elegida.getLatLng(), Math.max(_mapa.getZoom(), 14),
+        {animate:true});
+    }
+  }catch(e){/* el mapa nunca puede romper la eleccion */}
+}
+
+function agMapaDesmarcar(){
+  if(!_mapaMarcas.length) return;
+  try{
+    _mapaMarcas.forEach(function(x){
+      x.m.setOpacity(1); x.m.setZIndexOffset(0);
+    });
+    if(_mapa) _mapa.closePopup();
+  }catch(e){}
 }
 
 function agSel(key, i){
@@ -2708,11 +2782,9 @@ function agSel(key, i){
   window._agIdentTxt = agState.addr;
   const drop = $('shalomDrop');
   if(drop) drop.style.display='none';
-  /* El mapa se va con la lista. Son la misma cosa vista de dos maneras, y
-     dejar uno sin el otro —un mapa de sedes debajo de la sede ya elegida—
-     invita a tocar otra vez algo que ya está decidido. */
-  const _mw = $('shalomMapaWrap');
-  if(_mw) _mw.style.display='none';
+  /* El mapa SE QUEDA, con la elegida señalada: ahí deja de ser una lista
+     de opciones y pasa a ser la confirmación de adónde va tu paquete. */
+  agMapaMarcar(i);
   const inp = $('shalomAgInput');
   if(inp) inp.value = nombre;
   const badge = $('shalomSelBadge');
@@ -2736,6 +2808,7 @@ function agReset(key){
   window._agSel[key] = null;
   window._agIdent = null; window._agIdentTxt = '';
   var _mw=$('shalomMapaWrap'); if(_mw) _mw.style.display='none';
+  agMapaDesmarcar();
   const inp = $('shalomAgInput');
   if(inp) inp.value = '';
   const drop = $('shalomDrop');
