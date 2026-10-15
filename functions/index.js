@@ -259,7 +259,23 @@ function setCORS(req, res) {
     res.set("Vary", "Origin");
   }
   res.set("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-  res.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
+  /* ⚠️ CADA CABECERA QUE EL NAVEGADOR MANDE TIENE QUE ESTAR AQUÍ, Y ESTO
+     CASI ROMPE EL FORMULARIO ENTERO EL 15/10/2026.
+
+     Añadir `X-Firebase-AppCheck` a las llamadas de la página del cliente
+     convierte un GET simple en uno con preflight: el navegador pregunta
+     primero con OPTIONS y, si la cabecera no está permitida AQUÍ, BLOQUEA
+     la petición de verdad. No la rechaza el servidor — no llega a salir.
+
+     Es decir: desplegar la página sin desplegar antes esta línea deja a
+     TODOS los clientes sin poder pedir. Una medida de seguridad que tumba
+     el negocio no es una medida de seguridad.
+
+     Hay una prueba que compara las cabeceras que el navegador manda con
+     esta lista. Si alguien añade una cabecera y se olvida de ponerla aquí,
+     se pone roja antes de salir de casa. */
+  res.set("Access-Control-Allow-Headers",
+      "Content-Type, Authorization, X-Firebase-AppCheck");
 }
 
 // ── formApi ────────────────────────────────────────────────────────────────

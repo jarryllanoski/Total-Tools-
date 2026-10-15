@@ -196,6 +196,23 @@ textarea.fi{resize:vertical;line-height:1.5}
 .addr-pin-chip a{color:var(--blue);text-decoration:none;font-weight:700}
 .addr-pin-chip button{margin-left:auto;background:none;border:none;color:var(--text2);font-size:15px;cursor:pointer;font-family:inherit;line-height:1;padding:0 2px}
 </style>
+<!-- ★ APP CHECK EN LA PÁGINA DEL CLIENTE — 15/10/2026.
+     Hasta hoy solo lo cargaba el panel. Esta página llama a `formApi`, que
+     crea pedidos y consulta datos, y cualquiera podía llamarla con `curl`:
+     el token decía QUIÉN eres (aquí nadie, es pública) pero nada decía DESDE
+     DÓNDE. App Check lo dice: la petición viene de esta página de verdad.
+
+     ⚠️ EN OBSERVACIÓN, NO EN BLOQUEO. El servidor todavía NO rechaza a quien
+     no lo manda. Ponerlo a bloquear de golpe dejaría fuera a un cliente con
+     un navegador raro o con reCAPTCHA caído, y perder un pedido de verdad es
+     peor que el ataque del que protege. Se mide primero.
+     Lo NUEVO sí nacerá bloqueado: una puerta que todavía no existe no tiene
+     clientes a los que dejar fuera. Ver `action=reniec`.
+
+     `appcheck.js` falla en silencio por diseño: sin red o sin reCAPTCHA
+     devuelve '' y el formulario sigue funcionando igual que sin este archivo. -->
+<script src="firebase-config.js?v=4"></script>
+<script src="appcheck.js?v=1"></script>
 <script src="functions/agencias.js?v=1"></script>
 <script src="functions/dniPedido.js?v=1"></script>
 </head>
@@ -218,7 +235,21 @@ const FORM_API = 'https://us-central1-total-tools-24ce8.cloudfunctions.net/formA
 async function _api(action, params, opts){
   let url = FORM_API + '?action=' + encodeURIComponent(action);
   if(params){ for(const k in params){ url += '&' + k + '=' + encodeURIComponent(params[k]); } }
-  const r = await fetch(url, opts || {});
+  const o = Object.assign({}, opts || {});
+  /* ★ LA PRUEBA DE QUE ESTO VIENE DE ESTA PÁGINA.
+     Se adjunta a TODAS las llamadas, no solo a las nuevas: así el panel de
+     Firebase puede medir qué porcentaje del tráfico real llega verificado
+     antes de que nadie piense en bloquear. Si no hay token —sin red,
+     reCAPTCHA caído, navegador viejo— se manda la petición IGUAL y sin la
+     cabecera: hoy el servidor no la exige, y el cliente no se queda sin
+     pedir por una capa que es de medición. */
+  try{
+    if(typeof window._appCheckToken === 'function'){
+      const t = await window._appCheckToken();
+      if(t){ o.headers = Object.assign({}, o.headers, {'X-Firebase-AppCheck': t}); }
+    }
+  }catch(e){}
+  const r = await fetch(url, o);
   /* El 429 NO es un error tecnico: es el freno por IP haciendo su trabajo, y
      trae en el cuerpo el motivo en palabras. Reventar aqui lo convertiria en
      un "Error al buscar: API 429" que no le dice nada a nadie. */
@@ -834,6 +865,20 @@ function renderForm(){
     <div class="wz-wrap">
       <div id="wzProgress" class="wz-progress"></div>
       <div class="wz-step" data-step="1">
+      <!-- ★ EL DNI VA PRIMERO, Y ES UN CAMBIO DE ORDEN, NO DE LÓGICA.
+           Lo pidió el dueño y tiene su razón: el DNI es el único dato que
+           puede RELLENAR a los otros. Pedirlo al final es pedir que el
+           cliente escriba un nombre que ya íbamos a saber — y escrito a mano
+           llega con faltas, sin tildes o con el apellido delante, que es
+           justo lo que Shalom rechaza al registrar.
+           La validación, los ids de los campos y los mensajes de error son
+           EXACTAMENTE los de antes: solo cambia en qué orden se ven. -->
+      <div class="fg">
+        <input class="fi" id="f_dni" type="text" inputmode="numeric" pattern="[0-9]*"
+          placeholder="🪪 DNI *" maxlength="8" autocomplete="off">
+        <div class="ferr" id="err_dni">Ingresa el DNI (8 dígitos)</div>
+        <div id="dniBadge" style="display:none;margin-top:8px"></div>
+      </div>
       <div class="fg">
         <input class="fi" id="f_name" type="text" placeholder="Nombre completo *" autocomplete="name">
         <div class="ferr" id="err_name">Ingresa tu nombre completo</div>
@@ -844,11 +889,6 @@ function renderForm(){
           oninput="onPhoneInput(this.value)">
         <div class="ferr" id="err_phone">Ingresa un número de 9 dígitos</div>
         <div id="knownBadge" style="display:none;margin-top:8px"></div>
-      </div>
-      <div class="fg">
-        <input class="fi" id="f_dni" type="text" inputmode="numeric" pattern="[0-9]*"
-          placeholder="🪪 DNI *" maxlength="8" autocomplete="off">
-        <div class="ferr" id="err_dni">Ingresa el DNI (8 dígitos)</div>
       </div>
       ${extraHtml}
       <button class="btn-main" onclick="wzNext()" style="margin-top:8px">Continuar →</button>
@@ -2473,13 +2513,17 @@ function _wzErr(fid,eid,bad){
 function wzValidate(step){
   var ok=true;
   if(step===1){
+    /* Se valida en el MISMO orden en que se ve. No cambia el resultado
+       —`_wzErr` marca todos los campos malos a la vez, no se para en el
+       primero— pero leer la validación en otro orden que el formulario es
+       cómo se olvida un campo el día que se añade uno. */
+    // DNI OBLIGATORIO (8 dígitos) para todos — coincide con el "*" del campo.
+    var dni1=($('f_dni')||{value:''}).value.trim();
+    if(_wzErr('f_dni','err_dni', !/^\d{8}$/.test(dni1))) ok=false;
     var name=($('f_name')||{value:''}).value.trim();
     var phone=($('f_phone')||{value:''}).value.trim();
     if(_wzErr('f_name','err_name',!name)) ok=false;
     if(_wzErr('f_phone','err_phone',!/^\d{9}$/.test(phone))) ok=false;
-    // DNI OBLIGATORIO (8 dígitos) para todos — coincide con el "*" del campo.
-    var dni1=($('f_dni')||{value:''}).value.trim();
-    if(_wzErr('f_dni','err_dni', !/^\d{8}$/.test(dni1))) ok=false;
     var extraF=((CFG&&CFG.extraFields)||[]).filter(function(f){return f&&f.visible!==false;});
     extraF.forEach(function(f){
       var fname=typeof f==='string'?f:(f.name||''); var isReq=typeof f==='object'&&!!f.required;

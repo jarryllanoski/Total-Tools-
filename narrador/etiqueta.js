@@ -29,33 +29,42 @@
   // ── Estilos (etiqueta de envío: papel blanco, bordes negros) ────────
   var st=document.createElement('style');
   st.textContent=''
-   +'#tt-lbl{margin:2px 0 14px;filter:drop-shadow(0 10px 18px rgba(0,0,0,.45))}'
-   +'#tt-lbl .card{background:#fff;color:#111;border:1.6px solid #111;border-radius:7px;padding:14px 15px;font-family:Arial,Helvetica,sans-serif;line-height:1.35}'
+   /* ★ LA ESCALA DE LA ETIQUETA, EN UN SOLO SITIO.
+      El dueño la quiso más pequeña: ocupaba media pantalla de móvil antes
+      del primer campo. No se tocó ni una medida a mano —eso habría sido
+      reescribir la tabla de tamaños y perder las proporciones— sino que
+      cada `font-size` pasó a ser `calc(Npx * var(--tt-s))`. Cambiar este
+      número cambia la etiqueta entera sin que nada se descuadre.
+      Las medidas ORIGINALES siguen escritas: se lee lo que era y lo que es.
+      ⚠️ Esto es la VISTA PREVIA del formulario, no el rótulo que se imprime.
+      El que se pega al paquete lo hace print.js y no pasa por aquí. */
+   +'#tt-lbl{--tt-s:.78;margin:2px 0 10px;filter:drop-shadow(0 8px 14px rgba(0,0,0,.45))}'
+   +'#tt-lbl .card{background:#fff;color:#111;border:1.6px solid #111;border-radius:7px;padding:calc(14px * var(--tt-s)) calc(15px * var(--tt-s));font-family:Arial,Helvetica,sans-serif;line-height:1.35}'
    // PARA (cliente) + QR
    +'#tt-lbl .para{min-width:0}'
    +'#tt-lbl .rem-info{flex:1;min-width:0}'
-   +'#tt-lbl .seclbl{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1.2px;color:#666;margin-bottom:3px}'
-   +'#tt-lbl .cli{font-size:20px;font-weight:800;text-transform:uppercase;line-height:1.1;word-break:break-word;color:#111}'
+   +'#tt-lbl .seclbl{font-size:calc(10px * var(--tt-s));font-weight:700;text-transform:uppercase;letter-spacing:1.2px;color:#666;margin-bottom:3px}'
+   +'#tt-lbl .cli{font-size:calc(20px * var(--tt-s));font-weight:800;text-transform:uppercase;line-height:1.1;word-break:break-word;color:#111}'
    +'#tt-lbl .cli.ghost{color:#bbb;font-weight:600}'
-   +'#tt-lbl .phone{font-size:15px;font-weight:700;margin-top:4px;color:#111}'
-   +'#tt-lbl .dni{font-size:14px;font-weight:800;letter-spacing:.5px;margin-top:3px;color:#111}'
-   +'#tt-lbl .qr{flex-shrink:0;text-align:center;width:74px}'
-   +'#tt-lbl .qr img{display:block;width:74px;height:74px}'
-   +'#tt-lbl .qr .qrnum{font-size:9.5px;color:#555;margin-top:2px;white-space:nowrap}'
+   +'#tt-lbl .phone{font-size:calc(15px * var(--tt-s));font-weight:700;margin-top:4px;color:#111}'
+   +'#tt-lbl .dni{font-size:calc(14px * var(--tt-s));font-weight:800;letter-spacing:.5px;margin-top:3px;color:#111}'
+   +'#tt-lbl .qr{flex-shrink:0;text-align:center;width:calc(74px * var(--tt-s))}'
+   +'#tt-lbl .qr img{display:block;width:calc(74px * var(--tt-s));height:calc(74px * var(--tt-s))}'
+   +'#tt-lbl .qr .qrnum{font-size:calc(9.5px * var(--tt-s));color:#555;margin-top:2px;white-space:nowrap}'
    // DESTINO
    +'#tt-lbl .dest{margin-top:11px;padding-top:10px;border-top:1px solid #111}'
-   +'#tt-lbl .dest-addr{font-size:13px;color:#111;word-break:break-word;white-space:pre-wrap}'
+   +'#tt-lbl .dest-addr{font-size:calc(13px * var(--tt-s));color:#111;word-break:break-word;white-space:pre-wrap}'
    +'#tt-lbl .dest-addr.ghost{color:#bbb}'
    // Envío (courier · fecha)
    +'#tt-lbl .envio{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:10px;padding-top:9px;border-top:1.6px solid #111}'
-   +'#tt-lbl .courier{font-size:13px;font-weight:800;text-transform:uppercase;letter-spacing:.8px;color:#111}'
-   +'#tt-lbl .fecha{font-size:12.5px;font-weight:700;color:#333}'
+   +'#tt-lbl .courier{font-size:calc(13px * var(--tt-s));font-weight:800;text-transform:uppercase;letter-spacing:.8px;color:#111}'
+   +'#tt-lbl .fecha{font-size:calc(12.5px * var(--tt-s));font-weight:700;color:#333}'
    // REMITENTE (al pie)
    +'#tt-lbl .rem{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:10px;padding-bottom:9px;border-bottom:1px dashed #999}'
-   +'#tt-lbl .rem-name{font-size:13px;font-weight:700;color:#111}'
-   +'#tt-lbl .rem-sub{font-size:11.5px;color:#444;margin-top:1px}'
+   +'#tt-lbl .rem-name{font-size:calc(13px * var(--tt-s));font-weight:700;color:#111}'
+   +'#tt-lbl .rem-sub{font-size:calc(11.5px * var(--tt-s));color:#444;margin-top:1px}'
    // Nota de revisión (sutil, fuera de la tarjeta)
-   +'#tt-lbl .revisa{text-align:center;font-size:10px;letter-spacing:1px;color:#8a8a8a;text-transform:uppercase;margin-top:7px}'
+   +'#tt-lbl .revisa{text-align:center;font-size:calc(10px * var(--tt-s));letter-spacing:1px;color:#8a8a8a;text-transform:uppercase;margin-top:7px}'
    // La tarjeta es un ATAJO al formulario: tocarla lleva al campo que falta.
    +'#tt-lbl .card{cursor:pointer}'
    // Resalte de "mira aquí" para el grupo de elección al tocar la etiqueta.
