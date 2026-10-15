@@ -1358,6 +1358,18 @@ function renderAgencyBox(courierName){
   if(agKey){
     const cfg = AGENCY_SOURCES[agKey];
     agBox.innerHTML = `<div class="agc-box">
+      <!-- ★ EL MAPA, ARRIBA DEL TODO. Lo pidió el dueño viéndolo en su
+           móvil, y tiene razón: el mapa es CONTEXTO —dónde estoy, qué hay
+           cerca— y el contexto va antes de los controles, no entre el
+           buscador y sus propios resultados, que era donde los separaba.
+           Nace oculto. Solo aparece si Leaflet carga Y hay sedes con
+           coordenadas que enseñar; la lista de abajo es la que manda. -->
+      <div id="shalomMapaWrap" style="display:none;margin-bottom:10px">
+        <div id="shalomMapa" style="height:190px;border-radius:12px;overflow:hidden;
+          border:1.5px solid var(--bd);background:#0d1117"></div>
+        <div style="font-size:10.5px;color:var(--text2);margin-top:4px;text-align:center">
+          Toca un punto del mapa, o elige de la lista</div>
+      </div>
       <!-- "cerca de mí" va en la MISMA fila que el título. El título se recorta
            solo con "…" si hace falta (flex-shrink), asi que cuando el boton pasa
            a decir "Buscando sedes cerca de ti…" —mas largo— no se desborda
@@ -1382,17 +1394,6 @@ function renderAgencyBox(courierName){
         <div id="shalomSpin" style="display:none;position:absolute;right:14px;top:50%;
           transform:translateY(-50%);width:16px;height:16px;border:2px solid #1e1e30;
           border-top-color:var(--blue);border-radius:50%;animation:spin .7s linear infinite"></div>
-      </div>
-      <!-- ★ EL MAPA. Va ENTRE el buscador y la lista a propósito: se ve al
-           mirar, no estorba al escribir, y la lista —que es la que manda—
-           queda igual de cerca del dedo que antes.
-           Nace oculto. Solo aparece si Leaflet carga Y hay sedes con
-           coordenadas que enseñar. -->
-      <div id="shalomMapaWrap" style="display:none;margin-bottom:8px">
-        <div id="shalomMapa" style="height:190px;border-radius:12px;overflow:hidden;
-          border:1.5px solid var(--bd);background:#0d1117"></div>
-        <div style="font-size:10.5px;color:var(--text2);margin-top:4px;text-align:center">
-          Toca un punto del mapa, o elige de la lista</div>
       </div>
       <div id="shalomDrop" style="display:none;background:var(--card);border:1.5px solid var(--bd);
         border-radius:12px;overflow:hidden;max-height:260px;overflow-y:auto;margin-bottom:8px"></div>

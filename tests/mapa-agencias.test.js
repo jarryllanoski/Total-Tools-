@@ -45,6 +45,23 @@ module.exports = async ({bloque, ok}) => {
        'agencias: si enseñaran cosas distintas, el indice de un marcador ' +
        'apuntaria a otra sede');
   }
+  {
+    /* ★ EL MAPA VA ARRIBA DEL TODO. Estaba entre el buscador y la lista, y
+       ahi SEPARABA el buscador de sus propios resultados. El mapa es
+       contexto —donde estoy, que hay cerca— y el contexto va antes de los
+       controles. */
+    const caja = form.slice(form.indexOf('agBox.innerHTML = `<div class="agc-box">'),
+        form.indexOf('agPrecargar(agKey);'));
+    const pm = caja.indexOf('id="shalomMapaWrap"');
+    const pt = caja.indexOf('Elige tu sede');
+    const pb = caja.indexOf('id="shalomAgInput"');
+    const pl = caja.indexOf('id="shalomDrop"');
+    ok(pm > 0 && pt > 0 && pb > 0 && pl > 0,
+       'estan los cuatro: mapa, titulo, buscador y lista');
+    ok(pm < pt && pt < pb && pb < pl,
+       '⚠️ en ese orden: mapa, «Elige tu sede», buscador, lista. El mapa ' +
+       'entre el buscador y la lista separaba una pregunta de su respuesta');
+  }
 
   bloque('⚠️ La lista manda: sin mapa se puede pedir igual');
 
