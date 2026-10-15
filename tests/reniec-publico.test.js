@@ -187,16 +187,99 @@ module.exports = async ({bloque, ok}) => {
        'dinero de verdad y la otra solo una lectura — salio: ' + max);
   }
 
+  bloque('⚠️ La marca se RECALCULA; no se recuerda');
+
+  {
+    /* Antes esto era un recuadro verde con el nombre dentro, justo encima
+       del campo que ya tenia ese mismo nombre: el dato dos veces a dos
+       dedos de distancia. Y peor — se pintaba UNA vez, al consultar, asi
+       que si el cliente corregia su nombre despues, el recuadro seguia en
+       pantalla afirmando algo que ya no era cierto.
+
+       Es la misma clase de mentira en pantalla que costo la etiqueta con
+       el DNI de otra persona: algo pintado en un momento y nunca revisado.
+
+       Se ejecuta de verdad, con un DOM de mentira: lo que se comprueba es
+       lo que PINTA, no lo que dice el fuente. */
+    const form = E.leer('formulario.html');
+    const src = form.slice(form.indexOf('function _nrmNom'),
+        form.indexOf('function onDniInput'));
+    const campos = {};
+    const el = (v) => ({value: v, style: {}, innerHTML: '',
+      classList: {remove: () => {}, add: () => {}}});
+    campos['f_name'] = el('');
+    campos['dniMarca'] = el('');
+    campos['err_name'] = el('');
+    const M = new Function('$', 'esc', '_dniOficial', '_dniPuesto',
+        src + ';return {marca:_dniMarca, usar:usarNombreDni, ' +
+        'oficial:()=>_dniOficial, nom:_nrmNom};');
+    const monta = (oficial, escrito) => {
+      campos['f_name'] = el(escrito);
+      campos['dniMarca'] = el('');
+      const api = M((id) => campos[id] || null, (x) => String(x),
+          oficial, '');
+      api.marca();
+      return campos['dniMarca'];
+    };
+
+    const igual = monta('JARLYN LLANOS ARTEAGA', 'JARLYN LLANOS ARTEAGA');
+    ok(/Verificado con tu DNI/.test(igual.innerHTML),
+       'coincide → una MARCA, no un recuadro');
+    ok(igual.innerHTML.indexOf('JARLYN') < 0,
+       '⚠️ y la marca NO repite el nombre: esta dos dedos mas arriba, en su ' +
+       'campo. Decirlo dos veces es lo que pidio quitar el dueño');
+
+    const tildes = monta('JOSÉ  LINO', 'jose lino');
+    ok(/Verificado/.test(tildes.innerHTML),
+       'las tildes, las mayusculas y los dobles espacios no son una ' +
+       'discrepancia: un aviso que salta donde no hay problema es el que ' +
+       'nadie lee cuando si lo hay');
+
+    const distinto = monta('JARLYN LLANOS ARTEAGA', 'Jarlyn');
+    ok(/Tu DNI dice/.test(distinto.innerHTML) &&
+       distinto.innerHTML.indexOf('JARLYN LLANOS ARTEAGA') > 0,
+       '⚠️ y si NO coincide, ahi si se dice el nombre entero: es el dato ' +
+       'que falta en pantalla, y el cliente puede tener razon');
+    ok(/usarNombreDni\(\)/.test(distinto.innerHTML),
+       'con un toque para usar el del documento — se le enseña y se le ' +
+       'ofrece, no se le pisa');
+
+    const vacio = monta('JARLYN LLANOS ARTEAGA', '');
+    ok(vacio.style.display === 'none',
+       'con el nombre vacio no se marca nada');
+    const sinConsulta = monta('', 'LO QUE SEA');
+    ok(sinConsulta.style.display === 'none',
+       'y sin consulta tampoco: no se afirma lo que no se sabe');
+  }
+  {
+    const form = E.leer('formulario.html');
+    ok(/id="f_name"[\s\S]{0,120}oninput="_dniMarca\(\)"/.test(form),
+       '⚠️ la marca se repinta al ESCRIBIR en el nombre. Sin esto, corregir ' +
+       'el nombre deja un ✅ en pantalla afirmando algo que ya no es cierto');
+    const i = form.indexOf('function onDniInput');
+    const fn = form.slice(i, i + 3000);
+    ok(/_dniOficial=''/.test(fn),
+       'y al cambiar el DNI se olvida lo oficial del anterior');
+    ok(/_callar\(\);\s*\n\s*_dniMarca\(\);/.test(fn),
+       'cuando sale bien, el aviso bajo el DNI se CALLA y habla la marca: ' +
+       'el recuadro verde con el nombre dentro ya no existe');
+  }
+
   bloque('En la pagina: nunca se pisa lo que escribio el cliente');
 
   {
     const form = E.leer('formulario.html');
     const i = form.indexOf('function onDniInput');
     const fn = form.slice(i, i + 2600);
-    ok(/!nm\.value\.trim\(\) \|\| nm\.value\.trim\(\)===_dniPuesto/.test(fn),
-       '⚠️ solo se rellena si el campo esta VACIO o si lo que hay lo puso ' +
-       'una consulta anterior. Un formulario que deshace lo que acabas de ' +
-       'escribir es un formulario del que te vas');
+    /* La regla se SIMPLIFICO al poner la marca: antes decia «vacio O lo que
+       puso una consulta anterior», porque una consulta nueva tenia que
+       poder pisar a la vieja. Ya no hace falta — al cambiar el DNI, el
+       nombre automatico se borra arriba del todo, asi que si al llegar
+       aqui el campo tiene algo, lo escribio el cliente. Y lo del cliente no
+       se pisa: se le enseña la discrepancia y se le ofrece cambiarla. */
+    ok(/if\(nm && !nm\.value\.trim\(\)\)\{/.test(fn),
+       '⚠️ solo se rellena si el campo esta VACIO. Un formulario que deshace ' +
+       'lo que acabas de escribir es un formulario del que te vas');
     ok(/_dniPuesto\s*=\s*''/.test(fn) || /nm\.value=''/.test(fn),
        'y al cambiar el DNI se borra el nombre automatico: un nombre pegado ' +
        'a otro documento es el nombre de otra persona');

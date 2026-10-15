@@ -881,8 +881,15 @@ function renderForm(){
         <div id="dniBadge" style="display:none;margin-top:8px"></div>
       </div>
       <div class="fg">
-        <input class="fi" id="f_name" type="text" placeholder="Nombre completo *" autocomplete="name">
+        <input class="fi" id="f_name" type="text" placeholder="Nombre completo *"
+          autocomplete="name" oninput="_dniMarca()">
         <div class="ferr" id="err_name">Ingresa tu nombre completo</div>
+        <!-- ★ LA MARCA, no el recibo. Cuando RENIEC contesta y el nombre ya
+             está en el campo de arriba, repetirlo aquí es decir dos veces lo
+             mismo a dos dedos de distancia. Una confirmación se encoge a una
+             marca; un problema conserva sus palabras — y las palabras, si
+             hacen falta, salen bajo el DNI, que es donde está la causa. -->
+        <div id="dniMarca" style="display:none;font-size:11.5px;margin-top:5px"></div>
       </div>
       <div class="fg">
         <input class="fi phone-norm" id="f_phone" type="tel" inputmode="numeric" pattern="[0-9]*"
@@ -1072,7 +1079,77 @@ function onPhoneInput(val){
    otro documento es el nombre de otra persona, y de ahi sale una etiqueta
    con el DNI de uno y el nombre de otro — que ya paso una vez en el panel,
    por otro camino. */
-var _dniTimer=null, _dniPuesto='';
+var _dniTimer=null, _dniPuesto='', _dniOficial='';
+
+/* Comparar nombres como los escribe la gente: sin tildes, sin dobles
+   espacios y sin importar mayusculas. «Jose  Lino» y «JOSÉ LINO» son la
+   misma persona, y marcarlas como distintas seria dar un aviso de
+   discrepancia donde no hay ninguna — el aviso que se da de mas es el que
+   nadie lee cuando de verdad importa. */
+function _nrmNom(x){
+  return String(x||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+    .replace(/\s+/g,' ').trim().toUpperCase();
+}
+
+/* ★ LA MARCA DEL NOMBRE — se recalcula, nunca se recuerda.
+   Antes esto era un recuadro verde con el nombre dentro, justo encima del
+   campo que ya tenia ese mismo nombre: el dato dos veces a dos dedos de
+   distancia. Y peor — se pintaba UNA vez, al consultar, asi que si el
+   cliente corregia su nombre despues, el recuadro seguia en pantalla
+   afirmando algo que ya no era cierto. Esa es la misma clase de mentira en
+   pantalla que costo la etiqueta con el DNI de otra persona.
+   Ahora se recalcula tambien al escribir en el nombre, y dice SOLO lo que
+   es verdad en ese momento. */
+function _dniMarca(){
+  var el=$('dniMarca'); if(!el) return;
+  var nom=($('f_name')||{value:''}).value;
+  if(!_dniOficial || !nom.trim()){
+    el.style.display='none'; el.innerHTML=''; return;
+  }
+  el.style.display='block';
+  if(_nrmNom(nom)===_nrmNom(_dniOficial)){
+    // Coincide: una marca, sin repetir el nombre que esta justo arriba.
+    el.innerHTML='<span style="color:var(--green)">✅ Verificado con tu DNI</span>';
+    return;
+  }
+  /* NO coincide: aqui SI se dice el nombre, porque es el dato que falta en
+     pantalla. El cliente puede tener razon —se llama distinto a lo que dice
+     su documento— asi que no se le pisa: se le enseña y se le ofrece. */
+  el.innerHTML='<span style="color:#d29922">⚠️ Tu DNI dice: <b>'+esc(_dniOficial)+
+    '</b></span> <button type="button" onclick="usarNombreDni()" '+
+    'style="background:none;border:none;color:var(--blue);font-weight:700;'+
+    'font-size:11.5px;cursor:pointer;font-family:inherit;padding:2px 4px;'+
+    'min-height:32px">usar este</button>';
+}
+
+function usarNombreDni(){
+  if(!_dniOficial) return;
+  var nm=$('f_name'); if(!nm) return;
+  nm.value=_dniOficial; _dniPuesto=_dniOficial;
+  var e=$('err_name'); if(e) e.classList.remove('show');
+  nm.classList.remove('err');
+  _dniMarca();
+}
+
+/* ★ EL DNI RELLENA EL NOMBRE — 15/10/2026.
+   Lo pidio el dueño, y para el negocio es claro: un nombre escrito a mano
+   llega con faltas, sin tildes o con el apellido delante, y eso es justo lo
+   que Shalom rechaza al registrar el envio.
+
+   Automatico y no con un boton: el dueño lo pidio asi («al poner dni
+   consulte reniec»), y un boton mas es una cosa mas que explicar en una
+   pantalla que ya tiene cuatro pasos.
+
+   ⚠️ LO QUE ESCRIBIO EL CLIENTE NO SE PISA. Se rellena si el campo esta
+   vacio, o si lo que hay lo puso una consulta anterior. Si el cliente
+   corrigio su nombre a mano —se llama distinto a lo que dice su documento,
+   o usa su nombre de siempre— eso es SUYO y manda. Un formulario que
+   deshace lo que acabas de escribir es un formulario del que te vas.
+
+   ⚠️ Y SI EL DNI CAMBIA, EL NOMBRE AUTOMATICO SE BORRA. Un nombre pegado a
+   otro documento es el nombre de otra persona, y de ahi sale una etiqueta
+   con el DNI de uno y el nombre de otro — que ya paso una vez en el panel,
+   por otro camino. */
 function onDniInput(val){
   clearTimeout(_dniTimer);
   const dni=String(val||'').replace(/\D/g,'');
@@ -1080,12 +1157,14 @@ function onDniInput(val){
   const nm=$('f_name');
   // Cambio de documento: lo que puso la consulta anterior deja de valer.
   if(_dniPuesto && nm && nm.value.trim()===_dniPuesto){ nm.value=''; }
-  _dniPuesto='';
+  _dniPuesto=''; _dniOficial='';
   if(badge){ badge.style.display='none'; badge.innerHTML=''; }
+  _dniMarca();
   if(dni.length!==8) return;
   _dniTimer=setTimeout(async ()=>{
-    const _mostrar=(html)=>{ if(badge){ badge.style.display='block'; badge.innerHTML=html; } };
-    _mostrar('<div style="font-size:12.5px;color:var(--text2)">Buscando tu nombre…</div>');
+    const _decir=(html)=>{ if(badge){ badge.style.display='block'; badge.innerHTML=html; } };
+    const _callar=()=>{ if(badge){ badge.style.display='none'; badge.innerHTML=''; } };
+    _decir('<div style="font-size:12.5px;color:var(--text2)">Buscando tu nombre…</div>');
     let r=null;
     try{ r = await _api('reniec', {dni: dni}); }catch(e){ r=null; }
     // El campo pudo cambiar mientras se consultaba: lo que vuelve es de otro
@@ -1094,16 +1173,21 @@ function onDniInput(val){
     if(!r || !r.ok || !r.persona || !r.persona.completo){
       /* Nunca se bloquea el pedido: se dice y el cliente escribe. Es lo que
          hacia ayer, asi que lo peor que pasa es que nada mejore. */
-      _mostrar('<div style="font-size:12.5px;color:var(--text2)">Escribe tu nombre completo.</div>');
+      _decir('<div style="font-size:12.5px;color:var(--text2)">Escribe tu nombre completo.</div>');
       return;
     }
     const comp=r.persona.completo;
-    if(nm && (!nm.value.trim() || nm.value.trim()===_dniPuesto)){
+    _dniOficial=comp;
+    if(nm && !nm.value.trim()){
       nm.value=comp; _dniPuesto=comp;
       const e=$('err_name'); if(e) e.classList.remove('show');
       nm.classList.remove('err');
     }
-    _mostrar('<div style="display:inline-flex;align-items:center;gap:8px;background:rgba(34,197,94,.12);border:1px solid rgba(34,197,94,.35);border-radius:10px;padding:8px 12px;font-size:13px;color:var(--green)">✅ '+esc(comp)+'</div>');
+    /* Salio bien: el aviso bajo el DNI se calla y habla la marca, que vive
+       junto al nombre. El recuadro verde con el nombre dentro desaparecio
+       aqui — repetia el dato que esta dos dedos mas abajo. */
+    _callar();
+    _dniMarca();
   },600);
 }
 
@@ -2790,6 +2874,8 @@ function wzInit(){
 
 /* ─── EXPOSE GLOBALS ────────────────────────────────────────────── */
 window.onDniInput           = onDniInput;
+window._dniMarca            = _dniMarca;
+window.usarNombreDni        = usarNombreDni;
 window.loadCfg              = loadCfg;
 window.renderForm           = renderForm;
 window.wzNext               = wzNext;
