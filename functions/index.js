@@ -7,6 +7,7 @@ const {defineSecret} = require("firebase-functions/params");
 const {initializeApp} = require("firebase-admin/app");
 const {getFirestore, FieldValue} = require("firebase-admin/firestore");
 const {getAuth} = require("firebase-admin/auth");
+const {getAppCheck} = require("firebase-admin/app-check");
 
 // Modulo aislado de extraccion de comprobantes.
 const comprobante = require("./comprobante");
@@ -30,6 +31,7 @@ const enlace = require("./enlaceSeguimiento");
 const registroShalom = require("./registroShalom");
 const instanciaShalom = require("./instanciaShalom");
 const puertaInstancias = require("./puertaInstancias");
+const reniecPublico = require("./reniecPublico");
 const credenciales = require("./credenciales");
 
 setGlobalOptions({maxInstances: 10});
@@ -279,29 +281,38 @@ function setCORS(req, res) {
 }
 
 // ── formApi ────────────────────────────────────────────────────────────────
-exports.formApi = onRequest(async (req, res) => {
-  setCORS(req, res);
-  if (req.method === "OPTIONS") {
-    res.status(204).send(""); return;
-  }
+/* ⚠️ `secrets` AQUI DESDE EL 15/10/2026. `action=reniec` consulta el espejo
+   de RENIEC de Shalom, y para eso hace falta la clave de la API. El resto de
+   acciones no la tocan: declararla no las cambia en nada. */
+exports.formApi = onRequest(
+    {secrets: [SHALOM_API_KEY]},
+    async (req, res) => {
+      setCORS(req, res);
+      if (req.method === "OPTIONS") {
+        res.status(204).send(""); return;
+      }
 
-  const action = (req.query.action || "").trim();
-  try {
-    if (action === "create") await handleCreate(req, res);
-    else if (action === "token") await handleToken(req, res);
-    else if (action === "config") await handleConfig(req, res);
-    else if (action === "track") await handleTrack(req, res);
-    else if (action === "formcfg") await handleFormCfg(req, res);
-    else if (action === "client") await handleClient(req, res);
-    else res.status(400).json({status: "error", error: "Acción desconocida"});
-  } catch (e) {
-    console.error("formApi error:", action, e);
-    res.status(500).json({
-      status: "error",
-      error: "Ocurrió un error temporal. Intenta nuevamente.",
+      const action = (req.query.action || "").trim();
+      try {
+        if (action === "create") await handleCreate(req, res);
+        else if (action === "token") await handleToken(req, res);
+        else if (action === "config") await handleConfig(req, res);
+        else if (action === "track") await handleTrack(req, res);
+        else if (action === "formcfg") await handleFormCfg(req, res);
+        else if (action === "client") await handleClient(req, res);
+        else if (action === "reniec") await handleReniec(req, res);
+        else {
+          res.status(400).json(
+              {status: "error", error: "Acción desconocida"});
+        }
+      } catch (e) {
+        console.error("formApi error:", action, e);
+        res.status(500).json({
+          status: "error",
+          error: "Ocurrió un error temporal. Intenta nuevamente.",
+        });
+      }
     });
-  }
-});
 
 // ── Whitelist de campos permitidos en order (formulario público) ───────────
 // Refleja exactamente los campos que construye formulario.html.
@@ -428,6 +439,42 @@ async function handleCreate(req, res) {
        sin poder mandarlo cuando se le cae internet. */
     trackToken,
   });
+
+  /* ★ EL NOMBRE OFICIAL, PUESTO POR EL SERVIDOR Y NUNCA POR EL NAVEGADOR.
+     `POST /account/register` de Shalom pide el nombre en TRES campos
+     (`name`, `firstname`, `lastname`), y partir «JOSE LUIS DE LA CRUZ» a ojo
+     se equivoca. Si el pedido nace con el nombre ya partido, el dueño puede
+     registrarlo sin volver a consultar el DNI.
+
+     ⚠️ SALE DE LA CACHÉ DEL SERVIDOR, NO DE LO QUE MANDE EL FORMULARIO. Si
+     el navegador pudiera mandar `reniec: {...}`, cualquiera podría poner el
+     nombre que quisiera EN UNA ETIQUETA DE ENVÍO REAL. El navegador
+     pregunta; el servidor consultó, guardó, y ahora se acuerda. `reniec`
+     tampoco está en ORDER_FIELDS, así que lo que venga de fuera con ese
+     nombre se tira antes de llegar aquí.
+
+     Y solo si CORRESPONDE AL DNI DEL PEDIDO: el cliente puede consultar un
+     documento y escribir otro. Pegar el nombre del primero sería darle a
+     Shalom el nombre de otra persona — peor que no tener ninguno. */
+  try {
+    const _d = reniecPublico.normalizar(orderToSave.dni);
+    if (_d) {
+      const _c = await db.doc("panel/reniec/items/" + _d).get();
+      const _p = _c.exists ? _c.data() : null;
+      if (_p && String(_p.nombres || "").trim()) {
+        orderToSave.reniec = {
+          dni: _d,
+          nombres: _p.nombres,
+          apePaterno: _p.apePaterno || "",
+          apeMaterno: _p.apeMaterno || "",
+        };
+      }
+    }
+  } catch (e) {
+    // Un pedido NUNCA se pierde por esto: el nombre partido es una mejora,
+    // no un requisito. Sin él, el panel lo consulta al abrir el pedido.
+    console.warn("create: no se pudo adjuntar reniec:", e && e.message);
+  }
 
   // Monto/adelanto vienen del TOKEN (los puso el operador), NO del cliente →
   // el cliente no los ve ni los puede alterar. Deuda = max(0, monto-adelanto)
@@ -584,6 +631,156 @@ async function handleClient(req, res) {
   }
 }
 
+// ── action=reniec ──────────────────────────────────────────────────────────
+/**
+ * ¿Trae esta petición una prueba válida de App Check?
+ *
+ * ⚠️ SE EXIGE AQUÍ Y NO EN LAS DEMÁS ACCIONES, A PROPÓSITO. `create`,
+ * `track` y `client` ya tienen clientes de verdad usándolas: exigirles de
+ * golpe una capa nueva dejaría fuera a quien tenga reCAPTCHA caído o un
+ * navegador viejo, y perder un pedido real es peor que el ataque del que
+ * protege. Esas se MIDEN primero (ver appcheck.js en formulario.html).
+ *
+ * `reniec` nace hoy. Una puerta que todavía no existe no tiene a nadie a
+ * quien dejar fuera, así que nace cerrada — que es la única vez que sale
+ * gratis cerrarla.
+ * @param {Object} req request de Express
+ * @return {Promise<boolean>} true si la prueba es válida
+ */
+async function appCheckOk(req) {
+  const t = req.get("X-Firebase-AppCheck") || "";
+  if (!t) return false;
+  try {
+    await getAppCheck().verifyToken(t);
+    return true;
+  } catch (e) {
+    /* No se dice por qué: a quien no pasa no se le explica cómo pasar. En
+       los registros sí queda, que es donde el dueño lo necesita. */
+    console.warn("appCheck rechazado:", (e && e.message) || e);
+    return false;
+  }
+}
+
+/**
+ * El espejo de RENIEC, para la página del cliente.
+ *
+ * Las cuatro capas y el porqué de cada una están en
+ * `functions/reniecPublico.js`. Aquí solo está el ir y venir: leer la
+ * caché, contar el día, llamar a Shalom y guardar.
+ *
+ * ⚠️ ESTO NO TOCA EL INTERRUPTOR DE LA PUERTA. `_porLaPuerta` apunta los
+ * fallos y cierra el paso tras cinco seguidos — correcto para el panel, y
+ * peligroso aquí: una racha de fallos desde la página pública dejaría al
+ * dueño sin poder REGISTRAR ENVÍOS, que es lo que da de comer. La página
+ * del cliente no puede apagarle el panel. Lo que acota el gasto aquí es el
+ * tope diario, no el interruptor.
+ * @param {Object} req request
+ * @param {Object} res response
+ * @return {Promise<void>}
+ */
+async function handleReniec(req, res) {
+  res.set("Cache-Control", "no-store");
+  const no = (motivo, detalle) =>
+    res.json({ok: false, motivo: motivo, detalle: detalle || ""});
+
+  if (!(await checkRateLimit("formApi_reniec", req))) {
+    return no("MUCHAS_CONSULTAS", "Espera un momento e intenta de nuevo.");
+  }
+
+  const dni = reniecPublico.normalizar(req.query.dni);
+  const ahora = Date.now();
+  const dia = reniecPublico.diaDe(ahora);
+  const refCache = db.doc("panel/reniec/items/" + (dni || "x"));
+  const refDia = db.doc("panel/reniec/dias/" + dia);
+
+  let cache = null;
+  let hoy = 0;
+  try {
+    const [c, d] = await Promise.all([
+      dni ? refCache.get() : Promise.resolve(null),
+      refDia.get(),
+    ]);
+    cache = (c && c.exists) ? c.data() : null;
+    hoy = (d.exists && Number(d.data().consultas)) || 0;
+  } catch (e) {
+    /* Si no se puede leer, se sigue como si no hubiera nada: el tope de
+       abajo y el freno por IP siguen puestos. Un formulario que se cae
+       porque Firestore tosió es peor que una consulta de más. */
+    console.warn("reniec: no se pudo leer caché/contador:", e && e.message);
+  }
+
+  const plan = reniecPublico.decidir({
+    dni: dni,
+    appCheck: await appCheckOk(req),
+    cache: cache,
+    consultasHoy: hoy,
+    ahora: ahora,
+  });
+
+  if (plan.accion === "rechazar") return no(plan.motivo, plan.detalle);
+  if (plan.accion === "cache") {
+    return res.json({ok: true, persona: _reniecFuera(plan.persona),
+      deCache: true});
+  }
+
+  /* ⚠️ SE CUENTA ANTES DE LLAMAR, Y NO DESPUÉS DE ACERTAR. Contar solo los
+     aciertos deja el gasto sin tope el día que Shalom conteste mal a todo:
+     cada fallo sería gratis para el contador y caro para la factura. Con el
+     día caído, el cliente escribe su nombre — que es lo que hacía ayer. */
+  try {
+    await refDia.set({consultas: FieldValue.increment(1), dia: dia},
+        {merge: true});
+  } catch (e) {
+    console.warn("reniec: no se pudo contar:", e && e.message);
+  }
+
+  let r = null;
+  try {
+    r = await shalomPuerta.llamar("dni", SHALOM_API_KEY.value(), {dni: dni});
+  } catch (e) {
+    console.error("reniec: llamada falló:", e && e.message);
+    return no("SIN_RED", "No se pudo consultar. Escribe tu nombre.");
+  }
+  if (!r || !r.ok) {
+    return no((r && r.motivo) || "SIN_RED",
+        "No se pudo consultar. Escribe tu nombre.");
+  }
+  const t = shalomPuerta.traducir("dni", r.json);
+  if (!t || !t.ok) {
+    return no("NO_ENCONTRADO", "No encontramos ese DNI. Escribe tu nombre.");
+  }
+  const guardar = reniecPublico.guardable(t.persona, ahora);
+  if (!guardar) {
+    return no("NO_ENCONTRADO", "No encontramos ese DNI. Escribe tu nombre.");
+  }
+  try {
+    await refCache.set(guardar, {merge: true});
+  } catch (e) {
+    console.warn("reniec: no se pudo guardar en caché:", e && e.message);
+  }
+  return res.json({ok: true, persona: _reniecFuera(guardar)});
+}
+
+/**
+ * Lo que sale al navegador. SOLO el nombre, y campo por campo.
+ *
+ * Devolver el objeto guardado entero enseñaría `cuando` —cuándo se consultó
+ * ese DNI por primera vez— que no le hace falta a nadie en la pantalla y le
+ * diría a cualquiera si ese documento ya pasó por aquí. Lo que no se copia a
+ * mano no se escapa por accidente.
+ * @param {Object} p lo guardado
+ * @return {Object} lo que ve el navegador
+ */
+function _reniecFuera(p) {
+  const o = p || {};
+  return {
+    nombres: o.nombres || "",
+    apePaterno: o.apePaterno || "",
+    apeMaterno: o.apeMaterno || "",
+    completo: o.completo || "",
+  };
+}
+
 // ── action=track ───────────────────────────────────────────────────────────
 /**
  * @param {Object} req request
@@ -707,6 +904,13 @@ const RATE_LIMITS = {
      del uso real, y aun asi recorrer un solo dia de milisegundos le tomaria
      a un raspador medio año. */
   formApi_track: {windowMs: 60000, max: 120},
+  /* La consulta de DNI. 10/min: un cliente escribe UNO, como mucho lo
+     corrige dos veces. Mas bajo que `client` (20) porque esta cuesta dinero
+     de verdad y la otra solo una lectura. Y aun asi el freno por IP aqui es
+     la capa DEBIL —en Peru media ciudad comparte IP publica, y un bot con
+     datos moviles cambia de IP cuando quiere—: quien de verdad acota el
+     daño es el tope diario de reniecPublico.js. */
+  formApi_reniec: {windowMs: 60000, max: 10},
 };
 
 /**
