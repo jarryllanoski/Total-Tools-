@@ -1266,6 +1266,17 @@ function renderAgencyBox(courierName){
           transform:translateY(-50%);width:16px;height:16px;border:2px solid #1e1e30;
           border-top-color:var(--blue);border-radius:50%;animation:spin .7s linear infinite"></div>
       </div>
+      <!-- ★ EL MAPA. Va ENTRE el buscador y la lista a propósito: se ve al
+           mirar, no estorba al escribir, y la lista —que es la que manda—
+           queda igual de cerca del dedo que antes.
+           Nace oculto. Solo aparece si Leaflet carga Y hay sedes con
+           coordenadas que enseñar. -->
+      <div id="shalomMapaWrap" style="display:none;margin-bottom:8px">
+        <div id="shalomMapa" style="height:190px;border-radius:12px;overflow:hidden;
+          border:1.5px solid var(--bd);background:#0d1117"></div>
+        <div style="font-size:10.5px;color:var(--text2);margin-top:4px;text-align:center">
+          Toca un punto del mapa, o elige de la lista</div>
+      </div>
       <div id="shalomDrop" style="display:none;background:var(--card);border:1.5px solid var(--bd);
         border-radius:12px;overflow:hidden;max-height:260px;overflow-y:auto;margin-bottom:8px"></div>
       <div id="shalomSelBadge" style="display:none">
@@ -2453,6 +2464,96 @@ function agMostrar(key, agencias, aviso){
     </div>`;
   }).join('');
   drop.style.display='block';
+  agMapaPintar(key, agencias);
+}
+
+/* ─── EL MAPA DE SEDES ──────────────────────────────────────────────────
+   ⚠️ EL MAPA NO ES OTRA FORMA DE ELEGIR: es otra forma de MIRAR. Tocar un
+   punto llama a `agSel(key, i)` —la misma función, con el mismo índice
+   sobre la misma lista— que tocar una fila. Dos caminos para elegir una
+   agencia serían dos caminos para perder el `ter_id`, y sin ese id el
+   pedido no se puede registrar en Shalom. Una puerta.
+
+   ⚠️ Y LA LISTA MANDA. El mapa nace oculto y solo aparece si Leaflet carga
+   y hay coordenadas. De las 552 sedes del catálogo, 19 no tienen: esas
+   salen en la lista y no en el mapa, y se eligen igual. Si el CDN está
+   caído o el cliente va con una conexión mala, el formulario funciona
+   exactamente como ayer.
+
+   No cuesta ni una llamada: `latitud` y `longitud` ya venían en
+   `data/agencias-shalom.json`, que además está cacheado 24 h. */
+var _mapa=null, _mapaMarcas=[], _mapaCarga=null;
+
+/** Carga Leaflet UNA vez y solo cuando hace falta.
+    Perezoso a propósito: quien pide a domicilio no llega a este paso, y no
+    tiene por qué pagar la descarga ni los mosaicos. */
+function agMapaCargar(){
+  if(_mapaCarga) return _mapaCarga;
+  _mapaCarga = new Promise(function(res){
+    if(window.L) return res(true);
+    try{
+      var css=document.createElement('link');
+      css.rel='stylesheet';
+      css.href='https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css';
+      document.head.appendChild(css);
+      var js=document.createElement('script');
+      js.src='https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js';
+      js.onload=function(){ res(!!window.L); };
+      js.onerror=function(){ res(false); };   // sin mapa, con lista
+      document.head.appendChild(js);
+    }catch(e){ res(false); }
+  });
+  return _mapaCarga;
+}
+
+function _agCoords(ag){
+  var la=parseFloat(ag&&ag.latitud), lo=parseFloat(ag&&ag.longitud);
+  if(!isFinite(la)||!isFinite(lo)) return null;
+  // Fuera de Perú es un dato malo, no una sede lejana: un cero o un signo
+  // cambiado mandaría el mapa al Atlántico y escondería todo lo demás.
+  if(la<-19||la>0||lo<-82||lo>-68) return null;
+  return [la,lo];
+}
+
+async function agMapaPintar(key, agencias){
+  var wrap=$('shalomMapaWrap');
+  if(!wrap) return;
+  var conGeo=[];
+  (agencias||[]).forEach(function(ag,i){
+    var c=_agCoords(ag);
+    if(c) conGeo.push({i:i, c:c, ag:ag});
+  });
+  if(!conGeo.length){ wrap.style.display='none'; return; }
+  var ok=await agMapaCargar();
+  if(!ok || !window.L){ wrap.style.display='none'; return; }
+  wrap.style.display='block';
+  try{
+    if(!_mapa){
+      _mapa=L.map('shalomMapa',{
+        // Sin rueda: dentro de una página que se desplaza, el zoom con
+        // rueda se come el scroll y el cliente queda atrapado en el mapa.
+        scrollWheelZoom:false, attributionControl:true
+      });
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+        {maxZoom:18, attribution:'© OpenStreetMap'}).addTo(_mapa);
+    }
+    _mapaMarcas.forEach(function(m){ try{ _mapa.removeLayer(m); }catch(e){} });
+    _mapaMarcas=[];
+    conGeo.forEach(function(g){
+      var nombre=g.ag.lugar_over||g.ag.nombre||'Sede';
+      var m=L.marker(g.c).addTo(_mapa);
+      m.bindPopup('<b>'+esc(nombre)+'</b><br>'+esc(g.ag.direccion||''));
+      // LA MISMA PUERTA que la lista: mismo índice, misma función.
+      m.on('click', function(){ agSel(key, g.i); });
+      _mapaMarcas.push(m);
+    });
+    _mapa.fitBounds(conGeo.map(function(g){ return g.c; }), {padding:[24,24], maxZoom:15});
+    // El contenedor nace oculto y Leaflet mide mal lo que no se ve.
+    setTimeout(function(){ try{ _mapa.invalidateSize(); }catch(e){} }, 60);
+  }catch(e){
+    // Un mapa que revienta no puede llevarse por delante el formulario.
+    wrap.style.display='none';
+  }
 }
 
 function agSel(key, i){
@@ -2481,6 +2582,11 @@ function agSel(key, i){
   window._agIdentTxt = agState.addr;
   const drop = $('shalomDrop');
   if(drop) drop.style.display='none';
+  /* El mapa se va con la lista. Son la misma cosa vista de dos maneras, y
+     dejar uno sin el otro —un mapa de sedes debajo de la sede ya elegida—
+     invita a tocar otra vez algo que ya está decidido. */
+  const _mw = $('shalomMapaWrap');
+  if(_mw) _mw.style.display='none';
   const inp = $('shalomAgInput');
   if(inp) inp.value = nombre;
   const badge = $('shalomSelBadge');
@@ -2503,6 +2609,7 @@ function agReset(key){
   agState.addr = '';
   window._agSel[key] = null;
   window._agIdent = null; window._agIdentTxt = '';
+  var _mw=$('shalomMapaWrap'); if(_mw) _mw.style.display='none';
   const inp = $('shalomAgInput');
   if(inp) inp.value = '';
   const drop = $('shalomDrop');
