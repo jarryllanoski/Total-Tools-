@@ -2576,6 +2576,18 @@ function visibleShipments(){
    Hoy no lo usa nadie: se revisaron las 87 llamadas y ninguna lee el DOM
    inmediatamente después. */
 let _renderPedido = false;
+
+/* ★ EL ESTADO DE «QUÉ PEDIDO ESTÁ MARCADO», fuera del DOM.
+   Vive aquí y no en una clase pegada a un elemento porque esta lista se
+   reconstruye entera en cada repintado: lo que se pega, se borra.
+
+   Y se declara AQUÍ, antes de `_renderAhora` y de `cardHTML`, que son
+   quienes lo leen. Con `let` hay zona muerta temporal: declararlo más abajo
+   —junto a `irAlPedido`, que es donde se escribe— funcionaría de milagro,
+   solo porque nadie pinta durante la carga. Un milagro no es una garantía. */
+let _pedidoMarcado = '';
+let _scrollPendiente = '';
+let _marcaTimer = null;
 function render(){
   if(_renderPedido) return;
   _renderPedido = true;
@@ -2654,6 +2666,23 @@ function _renderAhora(){
       <div class="cgroup-hdr"><div class="cgroup-bar"></div><span>${_courierIcon(courier)}</span><div class="cgroup-name">${escH(courier)}</div><div class="cgroup-spacer"></div><button class="cgroup-btn" title="Imprimir ${escH(courier)}" onclick="printGroup('${escJs(courier)}')">🖨️</button><div class="cgroup-spacer"></div><div class="cgroup-actions"><button class="cgroup-btn" title="Tarjeta anterior" onclick="scrollCard(-1)">▲</button><button class="cgroup-btn" title="Tarjeta siguiente" onclick="scrollCard(1)">▼</button></div><div class="cgroup-cnt">${items.length}</div></div>
       ${items.map(s=>cardHTML(s)).join('')}
     </div>`).join('') + _pieOcultos;
+
+  /* ★ Y EL SCROLL, DESPUÉS DE PINTAR. Antes se hacía antes, desde
+     `irAlPedido`, sobre la lista vieja: se desplazaba dentro de TODOS y
+     justo después la lista se reemplazaba por la de otra etiqueta, así que
+     la posición acababa apuntando a cualquier otra tarjeta.
+     Aquí la tarjeta existe con certeza —se acaba de escribir en la línea de
+     arriba— y la lista es la definitiva. No hay nada que esperar ni que
+     reintentar. */
+  if(_scrollPendiente){
+    const _c = area.querySelector('.card[data-id="' +
+      String(_scrollPendiente).replace(/["\\]/g, '\\$&') + '"]');
+    _scrollPendiente = '';
+    if(_c){
+      try{ _c.scrollIntoView({behavior:'smooth', block:'center'}); }
+      catch(e){ try{ _c.scrollIntoView(); }catch(_){} }
+    }
+  }
 }
 
 /* Sanitización XSS: datos de pedidos vienen del formulario público */
@@ -2714,7 +2743,24 @@ function cardHTML(s){
   const msgs=S.msgTemplates[s.status]||['',''];
   const m1=msgs[0]&&msgs[0].trim(), m2=msgs[1]&&msgs[1].trim();
   const pvtNote=s.privateNote||'';
-  return `<div class="card" data-id="${s.id}">
+  /* ★ LA MARCA SE DIBUJA CON LA TARJETA, no se pega encima.
+     Antes `irAlPedido` hacía `c.classList.add(...)` sobre el elemento que
+     encontraba. Pero esta lista se reconstruye ENTERA en cada repintado
+     —`area.innerHTML = …`— así que cualquier cosa que repintara borraba la
+     marca: una sincronización de la nube, un pedido nuevo, o el propio
+     cambio de filtro que `irAlPedido` acababa de pedir.
+
+     Ese último caso es el que veía el dueño: estando en TODOS, la tarjeta
+     YA estaba en pantalla, se marcaba al instante, y medio segundo después
+     el repintado la destruía. Desde otra etiqueta funcionaba porque la
+     tarjeta NO estaba y había que esperar al repintado — encontrarla
+     demasiado pronto era peor que no encontrarla.
+
+     Ahora la marca es ESTADO, y el repintado la vuelve a pintar. Sobrevive
+     a cuantos repintados hagan falta, que es lo que no podía hacer una
+     clase puesta a mano. */
+  const _marcada = (_pedidoMarcado === s.id) ? ' notify-card-highlight' : '';
+  return `<div class="card${_marcada}" data-id="${s.id}">
     <div class="card-top">
       <div class="chk ${Seleccion.tiene(s.id)?'on':''}" onclick="toggleSel('${s.id}')">${Seleccion.tiene(s.id)?'✓':''}</div>
       <div class="cname" 
@@ -3589,46 +3635,43 @@ function irAlPedido(id, opciones){
      texto en el buscador es el mismo fallo con otra cara. */
   const srch = document.getElementById('fSearch');
   if(srch && srch.value){ srch.value=''; }
-  if(typeof clearAdvSearch === 'function') clearAdvSearch(); // ← repinta SIEMPRE
+  if(typeof clearAdvSearch === 'function') clearAdvSearch();
   else if(typeof render === 'function') render();
 
-  /* 2 · Llevar a la etiqueta donde vive el pedido (o TODOS si no está). */
-  if(typeof setFilt === 'function') setFilt(ped ? ped.status : '');
+  /* 2 · Si el pedido ya no está, se dice y no se marca nada. Marcar un id
+     que no existe dejaría el estado encendido para siempre, esperando a una
+     tarjeta que no va a pintarse nunca. */
+  if(!ped){
+    console.warn('[irAlPedido] el pedido ' + id +
+      ' no está en S.shipments — no es cosa de la vista');
+    if(typeof toast === 'function') toast('⚠️ Ese pedido ya no está en la lista');
+    return;
+  }
 
-  /* 3 · Buscarla y resaltarla. Con reintentos por frame en vez de un
-     `setTimeout(250)` mágico: con 1200 pedidos el repintado puede tardar
-     más que cualquier número que uno elija a ojo, y un número a ojo falla
-     justo en el equipo más lento, que es donde menos se prueba. */
-  var intentos = 0;
-  (function buscar(){
-    const c = document.querySelector('.card[data-id="' +
-      String(id).replace(/["\\]/g,'\\$&') + '"]');
-    if(c){
-      try{ c.scrollIntoView({behavior:'smooth', block:'center'}); }
-      catch(e){ try{ c.scrollIntoView(); }catch(_){} }
-      c.classList.add('notify-card-highlight');
-      setTimeout(function(){ c.classList.remove('notify-card-highlight'); },
-        o.ms || 3000);
-      return;
-    }
-    if(++intentos <= 3){ requestAnimationFrame(buscar); return; }
+  /* 3 · Pedir la marca y el desplazamiento ANTES de cambiar de etiqueta.
+     No se hace ninguna de las dos cosas aquí: se APUNTAN, y las hace el
+     repintado cuando la lista definitiva ya está escrita. Esa inversión es
+     todo el arreglo — antes esto buscaba la tarjeta a mano y la encontraba
+     en la lista VIEJA, que el repintado estaba a punto de destruir. */
+  clearTimeout(_marcaTimer);
+  _pedidoMarcado = id;
+  _scrollPendiente = id;
 
-    /* ⚠️ Y SI NO APARECE, SE DICE. El fallo original era invisible: un
-       `if(!c) return;` y a otra cosa. Se distinguen los dos casos porque
-       tienen arreglos distintos: que el pedido no exista es un problema de
-       guardado; que exista y no se vea es de filtro o de repintado. */
-    if(ped){
-      console.warn('[irAlPedido] no encontré la tarjeta de ' + id +
-        ' — el pedido SÍ existe, así que lo esconde un filtro o el ' +
-        'repintado no llegó');
-      if(typeof toast === 'function'){
-        toast('⚠️ El pedido se guardó, pero no pude mostrarlo en la lista');
-      }
-    } else {
-      console.warn('[irAlPedido] el pedido ' + id +
-        ' no está en S.shipments — no es cosa de la vista');
-    }
-  })();
+  /* 4 · Llevar a la etiqueta donde vive el pedido. El repintado que esto
+     dispara es el que pinta la marca y hace el scroll, ya dentro de la
+     lista corta: desplazarse entre 29 tarjetas cae donde debe; entre 1408,
+     nunca caía bien. */
+  if(typeof setFilt === 'function') setFilt(ped.status);
+  /* `setFilt` no repinta si la etiqueta YA era esa. Entonces repinta esto,
+     o la marca se quedaría apuntada y sin pintar. */
+  if(typeof render === 'function') render();
+
+  /* 5 · Y se apaga sola. El apagado también es un repintado: la marca entra
+     y sale por el mismo sitio por el que se dibuja. */
+  _marcaTimer = setTimeout(function(){
+    _pedidoMarcado = '';
+    if(typeof render === 'function') render();
+  }, o.ms || 3000);
 }
 /* fin irAlPedido */
 
