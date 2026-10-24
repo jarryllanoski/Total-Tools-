@@ -434,3 +434,24 @@ Un barrido por los 40 archivos `.js`/`.html` del proyecto dice que **era la
 única**. Hay una prueba en `tests/shalom.test.js` que lee las claves **del
 fuente** —en el objeto ya construido la repetida se perdió, que es justo el
 problema— y mantiene la tabla sin repeticiones según crece.
+
+### 🔵 T-9 · El documento de configuración se reescribe ENTERO en cada guardado
+
+Descubierto el 24/10/2026. `_fbSave` (index.html) mete el documento `config`
+como primer elemento de **todas** las escrituras, sin condición: editar un
+pedido, imprimir o el seguimiento automático reescriben también `labels`,
+`recursos`, `couriers`, `shalomInstancia`, `agenciaOrigen`… con lo que haya en
+memoria en ese momento.
+
+Es la raíz de que un pedido pueda pisar la configuración. Desde el 24/10 ya no
+puede hacer daño —tres capas lo impiden: no se sube antes de que la nube
+conteste, Config y Recursos están vetados hasta sincronizar, y nunca se
+escriben los valores por defecto sobre un negocio real— pero la escritura
+sobrante sigue ahí.
+
+**Por qué no se quitó:** ese documento lleva el `ts` que los otros
+dispositivos usan para enterarse de que hubo cambios. Dejar de escribirlo
+haría que el móvil no viera los pedidos editados en la PC. Arreglarlo bien
+exige escribir solo campos sueltos (`updateMask` de Firestore) y separar el
+reloj compartido de la configuración. Es un cambio de arquitectura, no un
+parche.

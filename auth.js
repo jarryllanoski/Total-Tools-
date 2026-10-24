@@ -192,6 +192,11 @@
         _saveSession(d.refreshToken||d.idToken, expiry, d.email||'');
         _saveIdToken(d.idToken);
         _hideOverlay();
+        /* Ya hay sesión: traer la nube AHORA. La carga del arranque pudo
+           rendirse mientras se escribía la contraseña. */
+        if(typeof window._trasEntrar === 'function'){
+          try{ window._trasEntrar(); }catch(e){}
+        }
         return;
       }
       // Autenticó con Google pero Firebase lo rechazó. Se muestra el correo:
@@ -402,6 +407,11 @@
       var res = await _refreshToken();
       if(res === 'ok'){
         _hideOverlay();
+        // La sesión revivió renovando el token: la carga del arranque pudo
+        // haber fallado antes de que eso terminara.
+        if(typeof window._trasEntrar === 'function'){
+          try{ window._trasEntrar(); }catch(e){}
+        }
         return;
       }
       // El servidor rechazó el token: la sesión murió de verdad, así que no
@@ -445,6 +455,10 @@
           _saveSession(d.refreshToken||d.idToken, expiry, email);
           _saveIdToken(d.idToken);
           _hideOverlay();
+          // Igual que al entrar con Google: traer la nube ya.
+          if(typeof window._trasEntrar === 'function'){
+            try{ window._trasEntrar(); }catch(e){}
+          }
         } else {
           // Error de Firebase
           var msg = 'Correo o contraseña incorrectos';

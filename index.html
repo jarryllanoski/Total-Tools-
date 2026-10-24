@@ -452,6 +452,27 @@
 
   // ── SAVE ─────────────────────────────────────────────────────────────
   window._fbSave = async (data) => {
+    /* ★ CAPA 3 · LA ÚLTIMA RED: NUNCA ESCRIBIR LOS VALORES POR DEFECTO.
+       Las capas 1 y 2 deberían bastar. Esta existe por el camino que todavía
+       no vimos — como el que se descubrió el 24/10/2026: que guardar un
+       PEDIDO también reescribe la configuración entera.
+
+       La huella es inconfundible: «Mi Negocio» / 999000000 es lo que pone el
+       código cuando no hay nada. Si la memoria tiene eso y la nube tiene un
+       negocio real, esta escritura borraría etiquetas, recursos y la cuenta
+       de Shalom. Se niega.
+
+       Se eligió esta huella y no «no escribir si hay menos recursos que
+       antes» porque esa otra regla impediría borrar el último recurso a
+       propósito. Nadie llama «Mi Negocio» a su negocio: no da falsos
+       positivos. Va ANTES de `_isSaving`, para no dejar esa marca puesta. */
+    const _cfgM = (data && data.config) || {};
+    const _real = window._nubeNombre && window._nubeNombre !== 'Mi Negocio';
+    if(_real && _cfgM.name === 'Mi Negocio' && _cfgM.phone === '999000000'){
+      const _e = new Error('escritura de valores por defecto bloqueada');
+      _e.bloqueadoPorDefecto = true;
+      throw _e;
+    }
     window._isSaving = true; // ★ Mejora 2: cerrar la ventana de carrera con _mergeRemote
     // ★ Guardado incremental: decidir qué shipments subir
     // Modo solo-config: si solo cambió config y no hay pedidos sucios pendientes,
@@ -720,7 +741,14 @@
           // formTs: escrito solo por Cloud Function o formulario — el panel nunca lo toca
           const hasFormNew  = formTs > (window._lastFormTs||0);
           const hasPanelNew = remoteTs > (window._S_TS||0)+500;
-          if(hasFormNew || hasPanelNew){
+          /* ★ SI NUNCA SE CARGÓ, SE CARGA. El latido solo traía datos cuando
+             la nube tenía algo MÁS NUEVO que lo de aquí. Pero si la carga
+             inicial falló —sin sesión, sin red— `_S_TS` es la hora de
+             arranque, la nube es más vieja que eso, y el latido NUNCA la
+             traía: el panel se quedaba con lo del localStorage, o con los
+             valores por defecto en un navegador nuevo. Para siempre. */
+          const nuncaCargo = !window._nubeLista;
+          if(hasFormNew || hasPanelNew || nuncaCargo){
             if(hasFormNew) window._lastFormTs = formTs;
             const remote = await window._fbLoad();
             if(remote && window._mergeRemote) {
@@ -1741,7 +1769,7 @@
 
 <div class="toast" id="toastEl"></div>
 
-<script src="auth.js?v=9"></script>
+<script src="auth.js?v=10"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
 <script>
@@ -1959,6 +1987,22 @@ window.save = save;
 // Guardar con hasta 3 reintentos ante fallos de red
 async function _fbSaveWithRetry(data, attempt){
   if(!window._fbSave) return;
+  /* ★ CAPA 1 · NADA SUBE ANTES DE QUE LA NUBE CONTESTE.
+     `_fbSave` reescribe el documento de configuración ENTERO en CADA
+     guardado —editar un pedido, imprimir, el seguimiento automático—, no
+     solo al tocar Config. En un navegador sin datos locales la memoria
+     arranca con los valores por defecto, y cualquier guardado en el segundo
+     que tarda la nube en contestar borraba etiquetas, recursos, la cuenta de
+     Shalom y la agencia de origen. El 21/10/2026 faltó un pelo.
+
+     No se pierde nada por esperar: lo marcado como sucio sigue marcado,
+     `_mergeRemote` rescata los pedidos sucios al llegar la nube, y esta
+     bandera de pendiente hace que `_initFirebase` lo suba justo después.
+     Se APLAZA, no se tira. */
+  if(!window._nubeLista){
+    lsSet('dpanel_pending', '1');
+    return;
+  }
   try {
     await window._fbSave(data);
     lsSet('dpanel_pending', '0'); // sync exitoso
@@ -1966,6 +2010,18 @@ async function _fbSaveWithRetry(data, attempt){
     // había pintado 'ok' ANTES de que esta línea limpiara la bandera.
     window._fbStatus && window._fbStatus('ok');
   } catch(e) {
+    /* La capa 3 negó la escritura. Reintentar no sirve —la memoria sigue
+       teniendo los valores por defecto— y decir «guardado» sería mentir. */
+    if(e && e.bloqueadoPorDefecto){
+      lsSet('dpanel_pending', '1');
+      window._fbStatus && window._fbStatus('err');
+      if(typeof toast === 'function'){
+        toast('⛔ No se guardó: el panel tiene los datos vacíos. Recarga la página.');
+      }
+      console.error('[guarda] escritura bloqueada: la memoria tiene los ' +
+        'valores por defecto y la nube un negocio real');
+      return;
+    }
     // Un 403 al guardar es la misma sesión vencida: se marca pendiente (lo que
     // no subió sobrevive) y se pide entrar de nuevo, en vez de gastar cuatro
     // intentos que van a fallar igual.
@@ -2022,6 +2078,17 @@ window._fbStatus = (status) => {
 
 // Merge remote state preserving local images
 window._mergeRemote = (remote) => {
+  /* ★ LA NUBE CONTESTÓ CON DATOS. Se marca aquí y no en `_initFirebase`
+     porque este es el ÚNICO sitio por el que entran datos de la nube: la
+     carga inicial, el latido de 5 s y la recarga tras registrar. Si la
+     primera carga falla y el latido la recupera minutos después, también
+     cuenta — y así nada se queda bloqueado para siempre.
+     Y se apunta el nombre del negocio que trae la nube: es la referencia de
+     la capa 3. */
+  window._nubeLista = true;
+  if(remote && remote.config && remote.config.name){
+    window._nubeNombre = String(remote.config.name);
+  }
   // No mergear si hay un guardado en curso - evita race condition
   if(window._isSaving) return;
   // Preserve base64 images from local state
@@ -2121,6 +2188,7 @@ window._mergeRemote = (remote) => {
   if(window.pintarEncabezado) pintarEncabezado();
   render();
   renderChips();
+  if(typeof _liberarPantallasNube === 'function') _liberarPantallasNube();
   toast('☁️ Datos sincronizados');
 };
 
@@ -2145,6 +2213,10 @@ const _initFirebase = async (intento) => {
     } else {
       // remote === null SOLO cuando Firebase confirmó (respuestas OK) que está vacío.
       // Solo en ese caso es seguro subir lo local (primer arranque real).
+      /* La nube CONFIRMÓ que está vacía: eso también es una respuesta, y la
+         única en la que subir lo local es correcto. */
+      window._nubeLista = true;
+      if(typeof _liberarPantallasNube === 'function') _liberarPantallasNube();
       const tieneLocal = S.shipments.length > 0 || S.suppliers.length > 0 ||
                          (S.config && S.config.name && S.config.name !== 'Mi Negocio');
       // Primer arranque real: la nube está vacía y todo lo local es nuevo para
@@ -2192,6 +2264,15 @@ const _initFirebase = async (intento) => {
   if(window._fbListen) window._fbListen();
 };
 
+/* ★ AL ENTRAR, CARGAR. La carga inicial corre en paralelo con la pantalla
+   de login: sin sesión falla, reintenta cuatro veces (unos 37 s) y se rinde.
+   Quien tardaba más que eso en entrar se quedaba sin datos de la nube hasta
+   recargar la página — y con la guarda de la configuración, con Config
+   bloqueado. auth.js llama a esto al entrar con éxito. */
+window._trasEntrar = function(){
+  if(!window._nubeLista) _initFirebase(0);
+};
+
 if(window._fbReady) {
   _initFirebase();
 } else {
@@ -2202,6 +2283,58 @@ if(window._fbReady) {
 
 /* TOAST */
 function toast(m){const e=$('toastEl');e.textContent=m;e.classList.add('show');clearTimeout(e._t);e._t=setTimeout(()=>e.classList.remove('show'),2600)}
+
+/* ★ CAPA 2 · CONFIG Y RECURSOS NO SE TOCAN HASTA QUE LLEGUE LA NUBE.
+   Lo que se edita en un pedido antes de sincronizar se puede rescatar
+   —queda marcado como sucio y `_mergeRemote` lo conserva—. Lo que se edita
+   en la CONFIGURACIÓN no: al llegar la nube, `_mergeRemote` la reemplaza
+   entera. Aplazar esos cambios sería perderlos en silencio.
+
+   Así que en vez de dejarte editar algo que se va a perder, estas dos
+   pantallas dicen «sincronizando» y no se pueden tocar. Un solo punto de
+   entrada —esta función—, no una guarda en cada una de las cuarenta que
+   escriben en la configuración: una que se olvide es un agujero. */
+const _PANTALLAS_NUBE = ['configurar', 'recursos'];
+
+function _pintarEsperaNube(){
+  _PANTALLAS_NUBE.forEach(function(id){
+    const pg = document.getElementById('page-' + id);
+    if(!pg) return;
+    let velo = document.getElementById('nubeEspera_' + id);
+    if(window._nubeLista){
+      if(velo) velo.remove();
+      return;
+    }
+    if(velo) return;
+    if(getComputedStyle(pg).position === 'static') pg.style.position = 'relative';
+    velo = document.createElement('div');
+    velo.id = 'nubeEspera_' + id;
+    velo.setAttribute('role', 'status');
+    velo.style.cssText = 'position:absolute;inset:0;z-index:50;' +
+      'background:rgba(13,17,23,.82);backdrop-filter:blur(2px);' +
+      'display:flex;align-items:flex-start;justify-content:center;' +
+      'padding-top:80px;text-align:center';
+    velo.innerHTML = '<div style="max-width:300px;padding:0 20px">' +
+      '<div style="font-size:30px">⏳</div>' +
+      '<div style="font-weight:700;margin-top:10px">Sincronizando con la nube…</div>' +
+      '<div style="font-size:12.5px;color:var(--text2);margin-top:8px;line-height:1.5">' +
+      'Esta pantalla se abre en cuanto lleguen tus datos. Editarla antes ' +
+      'escribiría encima de tu configuración guardada.</div></div>';
+    pg.appendChild(velo);
+  });
+}
+
+/* Al llegar la nube: quitar el velo y REPINTAR. Sin repintar, Config seguía
+   mostrando lo dibujado antes de sincronizar —las 8 etiquetas fijas— y las
+   tuyas solo aparecían si añadías una para forzarlo. El 21/10/2026 pasó
+   exactamente eso. */
+function _liberarPantallasNube(){
+  _pintarEsperaNube();
+  const activa = document.querySelector('.page.active');
+  const id = activa ? activa.id.replace('page-', '') : '';
+  if(id === 'configurar' && typeof loadCfgUI === 'function') loadCfgUI();
+  if(id === 'recursos' && typeof recRender === 'function') recRender();
+}
 
 /* TABS */
 function goPage(id){
@@ -2216,6 +2349,7 @@ function goPage(id){
      cabecera y se sale tocando cualquier pestaña — el bucle de arriba no
      enciende ninguna, que es lo correcto: no estás en ninguna de las tres. */
   if(id==='recursos') recRender();
+  _pintarEsperaNube();
 }
 
 /* OVERLAYS */

@@ -153,7 +153,11 @@ function montarPersistencia(op) {
 function montarReintento(op) {
   const almacen = op.almacen || {};
   const pendientes = [];
-  const win = { _estados: [], _expulsado: null };
+  /* `_nubeLista` en true salvo que la prueba diga otra cosa: estas pruebas
+     miden los REINTENTOS, que solo existen una vez que la nube contestó.
+     Antes de eso la capa 1 no deja ni intentarlo — y eso se prueba aparte,
+     con `op.sinNube`. */
+  const win = { _estados: [], _expulsado: null, _nubeLista: !op.sinNube };
   win._fbStatus = function (s) { win._estados.push(s); };
   win._authExpulsar = function (m) { win._expulsado = m || 'sí'; };
   win._authHaySesion = function () { return !!op.haySesion; };
