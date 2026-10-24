@@ -23,7 +23,11 @@
   var Respaldo = {};
   window.Respaldo = Respaldo;
 
-  var FORMATO_VERSION = 1; // versión del formato de respaldo (para futuras migraciones)
+  /* Formato 2 desde el 24/10/2026: añade `recursos`, `agenciaOrigen` y
+     `shalomInstancia`. Los respaldos de formato 1 —los que ya hay
+     descargados— se siguen aceptando: les faltan esos campos y la
+     restauración los deja como están, no los vacía. */
+  var FORMATO_VERSION = 2;
   var LS_LAST_BACKUP  = 'tt_last_backup'; // fecha del último respaldo descargado
 
   /* ── Utilidades ──────────────────────────────────────────────────── */
@@ -69,7 +73,18 @@
       dispatch:      S.dispatch      || {},
       config:        S.config        || {},
       statusPin:     S.statusPin     || '1234',
-      trash:         S.trash         || []
+      trash:         S.trash         || [],
+      /* ★ LO QUE FALTABA, y faltaba sin que nadie lo supiera. El documento de
+         configuración tiene 13 campos y el respaldo guardaba 9: los recursos
+         —tus enlaces a Drive— y la agencia de origen no estaban. El día que
+         hiciera falta, el respaldo no los habría devuelto. */
+      recursos:      Array.isArray(S.recursos) ? S.recursos : [],
+      agenciaOrigen: S.agenciaOrigen || null,
+      /* Se GUARDA para que quede constancia de qué cuenta se usaba, pero la
+         restauración NO la aplica: ver `_aplicarRestauracion`.
+         `shalomRegistroSimulacro` no se guarda en absoluto: es un interruptor
+         de seguridad, no un dato del negocio. */
+      shalomInstancia: S.shalomInstancia || null
     };
     // Clon profundo para desligar del estado vivo
     return JSON.parse(JSON.stringify(snapshot));
@@ -123,6 +138,19 @@
   Respaldo.restaurarDesdeArchivo = function(input){
     var file = input && input.files && input.files[0];
     if(!file){ return; }
+    /* ⚠️ NO SE RESTAURA ANTES DE QUE LA NUBE CONTESTE.
+       Antes de sincronizar, `save()` queda en espera —eso está bien, es la
+       guarda de la configuración—; pero cuando la nube llega, `_mergeRemote`
+       reemplaza TODO con lo de la nube, y lo restaurado desaparece. Ni los
+       pedidos se salvan: restaurar marca «subir todo», y el rescate del merge
+       solo conserva los pedidos marcados uno a uno.
+       Lo peor no era perderlo: era que el aviso ya había dicho «✅ Respaldo
+       restaurado». Así que se espera, y se dice por qué. */
+    if(!window._nubeLista){
+      _toast('⏳ Espera a que sincronice con la nube y vuelve a intentarlo');
+      input.value = '';
+      return;
+    }
     var reader = new FileReader();
     reader.onload = function(ev){
       var data;
@@ -171,6 +199,30 @@
       S.statusPin     = data.statusPin || '1234';
       S.trash         = Array.isArray(data.trash)         ? data.trash         : [];
 
+      /* ★ LOS CAMPOS NUEVOS, SOLO SI EL RESPALDO LOS TRAE.
+         Un respaldo de formato 1 no tiene `recursos`. Si aquí se hiciera
+         `S.recursos = data.recursos || []`, restaurar uno de esos —de los que
+         ya hay descargados— BORRARÍA los recursos actuales. «No existe» no es
+         lo mismo que «está vacío»: lo que el respaldo no trae se deja como
+         está; lo que trae vacío, se vacía. Es la misma bisagra que el DNI. */
+      if(Object.prototype.hasOwnProperty.call(data, 'recursos')){
+        S.recursos = Array.isArray(data.recursos) ? data.recursos : [];
+      }
+      if(Object.prototype.hasOwnProperty.call(data, 'agenciaOrigen')){
+        S.agenciaOrigen = (data.agenciaOrigen && typeof data.agenciaOrigen === 'object')
+          ? data.agenciaOrigen : null;
+      }
+      /* ⚠️ Y NUNCA LA CUENTA DE SHALOM NI EL SIMULACRO.
+         · La cuenta ya se murió dos veces (3/10 y 11/10). Restaurar un
+           respaldo de hace un mes pondría un id que ya no existe encima del
+           que funciona, y el registro fallaría sin explicación. Se recupera
+           sola pulsando «Conectar».
+         · El simulacro es un interruptor de seguridad. Con él apagado,
+           registrar un envío COBRA. Un respaldo viejo no puede tener poder
+           para apagarlo. */
+      var _cuentaDistinta = !!(data.shalomInstancia && data.shalomInstancia.id &&
+        (!S.shalomInstancia || S.shalomInstancia.id !== data.shalomInstancia.id));
+
       window.S = S;
 
       // Persistir (sube a Firebase como cambio completo) y refrescar UI
@@ -180,7 +232,8 @@
 
       // Cerrar overlay si está abierto
       _cerrarOverlay();
-      _toast('✅ Respaldo restaurado ('+S.shipments.length+' pedidos)');
+      _toast('✅ Respaldo restaurado ('+S.shipments.length+' pedidos)' +
+        (_cuentaDistinta ? ' · la cuenta de Shalom no se cambió: si hace falta, pulsa Conectar en Config' : ''));
     } catch(e){
       console.error('[Respaldo] Error al restaurar:', e);
       _toast('⚠️ Error al restaurar el respaldo');
