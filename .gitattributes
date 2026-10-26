@@ -1,0 +1,29 @@
+# ★ SALTOS DE LÍNEA: SIEMPRE LF, EN CUALQUIER MÁQUINA.
+#
+# El 26/10/2026 el primer despliegue desde una PC con Windows recién
+# instalada falló con 5978 errores, todos iguales:
+#
+#     Expected linebreaks to be 'LF' but found 'CRLF'   linebreak-style
+#
+# Git para Windows, instalado con las opciones por defecto, convierte los
+# saltos de línea a CRLF al descargar los archivos. El revisor de código
+# (eslint-config-google, que corre antes de cada `firebase deploy`) exige
+# LF, y se quejaba de cada línea. En el repositorio todo estaba bien: el
+# cambio ocurría solo en la copia de esa PC.
+#
+# Esta línea manda sobre la configuración de cada máquina: da igual cómo se
+# instaló Git, los archivos de texto se descargan con LF. Así no depende de
+# que alguien se acuerde de configurar nada en una PC nueva.
+* text=auto eol=lf
+
+# Binarios: no se tocan nunca. `text=auto` ya los detecta solo, pero
+# declararlos evita que un .svg o un .json grande se trate mal por error.
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.webp binary
+*.gif  binary
+*.ico  binary
+*.pdf  binary
+*.woff binary
+*.woff2 binary
