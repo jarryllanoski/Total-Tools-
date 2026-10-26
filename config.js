@@ -2642,6 +2642,88 @@ function genToken(action, btn){
   return _genGuard(btn, ()=>_genTokenDo(action));
 }
 
+/* ★ LINKS GENERADOS POR PARTES (26/10/2026). Al entrar se cargan solo los
+   por usar y los usados desde el inicio de AYER (hora de Lima); el resto,
+   a pedido. Antes cada refresco bajaba la colección entera.
+     _tokRecientes  lo que traen las dos consultas pequeñas (se rehace en
+                    cada refresco: un link borrado en otra PC desaparece);
+     _tokAnteriores lo que se pidió con «Cargar anteriores» (se conserva:
+                    son links usados, no cambian, no se vuelven a pagar);
+     _tokTodo       el dueño pidió «Cargar todo»: la descarga completa de
+                    antes, que incluye los muy antiguos sin `usedAt`. */
+let _tokRecientes = [];
+let _tokAnteriores = [];
+let _tokCursor = null;        // {usedAt, name} del último anterior cargado
+let _tokFin = false;          // ya no quedan anteriores con fecha de uso
+let _tokTodo = false;
+let _tokCargandoAnt = false;
+const _TOK_PAGINA = 50;
+
+/** Inicio de AYER en Lima, en ISO universal (como `usedAt`). */
+function _tokCorteISO(){
+  const F = window.FechaPedido;
+  if(F && F.hoyLima) return F.inicioDiaLimaISO(F.sumarDias(F.hoyLima(), -1));
+  return new Date(Date.now() - 2*864e5).toISOString();   // sin el módulo: 48 h
+}
+/** Une recientes y anteriores (sin repetir; manda la copia reciente) y ordena. */
+function _tokUnir(recientes, anteriores){
+  const vistos = {};
+  return (recientes||[]).concat(anteriores||[])
+    .map(function(d){ return Object.assign({},d,{id:d.id||d._id||''}); })
+    .filter(function(d){ if(!d.id || vistos[d.id]) return false; vistos[d.id]=true; return true; })
+    .sort(function(a,b){ return (b.createdAt||'')>(a.createdAt||'')?1:-1; });
+}
+/** Lo que el panel debe pedir en un refresco. Lista completa solo si el
+    dueño pidió «Cargar todo», o si las consultas no existen o fallan. */
+async function _tokTraer(){
+  if(!_tokTodo && window._fbListToksRecientes){
+    try{ return {recientes: await window._fbListToksRecientes(_tokCorteISO()), todo:false}; }
+    catch(e){ console.warn('[links] la consulta parcial falló; se baja la lista completa:', e); }
+  }
+  return {recientes: await window._fbListToks(), todo:true};
+}
+async function tokCargarAnteriores(btn){
+  if(_tokCargandoAnt || _tokFin || _tokTodo || !window._fbListToksAnteriores) return;
+  _tokCargandoAnt = true;
+  if(btn){ btn.disabled = true; btn.textContent = '⏳ Cargando…'; }
+  try{
+    const pag = await window._fbListToksAnteriores(_tokCorteISO(), _tokCursor, _TOK_PAGINA);
+    if(pag.length){
+      const ult = pag[pag.length-1];
+      _tokCursor = {usedAt: ult.usedAt, name: ult._name};
+      _tokAnteriores = _tokAnteriores.concat(pag);
+    }
+    if(pag.length < _TOK_PAGINA) _tokFin = true;
+    _tokCache = _tokUnir(_tokRecientes, _tokAnteriores);
+  }catch(e){
+    if(typeof toast==='function') toast('⚠️ No se pudieron cargar: '+e.message);
+  }finally{
+    _tokCargandoAnt = false;
+    _renderTokList();
+  }
+}
+async function tokCargarTodo(btn){
+  if(_tokTodo) return;
+  _tokTodo = true;
+  if(btn){ btn.disabled = true; btn.textContent = '⏳ Cargando todo…'; }
+  _tokLastFetch = 0;
+  await _revalidateTokens(false);
+  _renderTokList();
+}
+/* El pie de la lista: «Cargar anteriores», y al final «Cargar todo». */
+function _tokPie(){
+  if(_tokTodo) return '';
+  const n = _tokAnteriores.length;
+  if(!_tokFin){
+    return '<div style="text-align:center;margin-top:10px">' +
+      '<button class="tok-act-btn" data-act="anteriores">⬇ Cargar anteriores' +
+      (n ? ' · '+n+' cargados' : '') + '</button></div>';
+  }
+  return '<div style="text-align:center;margin-top:10px;font-size:11px;color:var(--text2)">' +
+    'No hay más links' + (n ? ' · '+n+' anteriores cargados' : '') + '<br>' +
+    '<button class="tok-act-btn" data-act="todo" style="margin-top:6px">Cargar todo (incluye los muy antiguos)</button></div>';
+}
+
 let _tokLastFetch = 0;        // ts del último fetch exitoso
 let _tokRevalidating = false; // evita revalidaciones solapadas
 const _TOK_COOLDOWN = 30000;  // 30s: no re-consultar si se hizo hace poco
@@ -2672,11 +2754,11 @@ async function _revalidateTokens(isFirst){
       if(isFirst && list) list.innerHTML='<div class="tok-empty">⚠️ Sin conexión. Toca 🔄</div>';
       return;
     }
-    const raw = await window._fbListToks();
+    const r = await _tokTraer();
     _tokLastFetch = Date.now();
-    const next = (raw||[])
-      .map(function(d){ return Object.assign({},d,{id:d.id||d._id||''}); })
-      .sort(function(a,b){ return (b.createdAt||'')>(a.createdAt||'')?1:-1; });
+    if(r.todo){ _tokTodo = true; _tokAnteriores = []; }
+    _tokRecientes = r.recientes || [];
+    const next = _tokUnir(_tokRecientes, _tokAnteriores);
     // diff barato: repintar solo si cambió el conjunto (id/usado/vencimiento)
     const sig = function(arr){ return (arr||[]).map(function(t){return t.id+'|'+(t.used?1:0)+'|'+(t.expiresAt||'');}).join(','); };
     const changed = sig(next)!==sig(_tokCache);
@@ -2696,8 +2778,9 @@ function _renderTokList(){
   if(!list) return;
   try{
     if(!_tokCache || !_tokCache.length){
-      list.innerHTML='<div class="tok-empty">📭 No hay links generados aún.</div>';
+      list.innerHTML='<div class="tok-empty">📭 '+(_tokTodo?'No hay links generados aún.':'Ningún link por usar ni usado hoy o ayer.')+'</div>'+_tokPie();
       _updateTokBar();
+      _tokEnganchar(list);
       return;
     }
     
@@ -2807,23 +2890,28 @@ function _renderTokList(){
       });
     }
     if(!html) html = '<div class="tok-empty">📭 No hay links generados aún.</div>';
-    list.innerHTML = html;
+    list.innerHTML = html + _tokPie();
     _updateTokBar();
-
-    // Event delegation — usa el id real del documento, nunca la posición en el array
-    list.onclick = function(e){
-      var btn = e.target.closest('[data-act]');
-      if(!btn) return;
-      var id  = btn.dataset.id;
-      var act = btn.dataset.act;
-      if(act==='toksel'){  tokToggleSel(id);  return; }
-      if(act==='selall'){  tokSelAllToday();  return; }
-      if(act==='printsel'){ tokPrintSel();    return; }
-      _tokAction(id, act);
-    };
+    _tokEnganchar(list);
   }catch(e){
     console.error('renderTokList error:', e);
   }
+}
+
+// Event delegation — usa el id real del documento, nunca la posición en el array
+function _tokEnganchar(list){
+  list.onclick = function(e){
+    var btn = e.target.closest('[data-act]');
+    if(!btn) return;
+    var id  = btn.dataset.id;
+    var act = btn.dataset.act;
+    if(act==='toksel'){  tokToggleSel(id);  return; }
+    if(act==='selall'){  tokSelAllToday();  return; }
+    if(act==='printsel'){ tokPrintSel();    return; }
+    if(act==='anteriores'){ tokCargarAnteriores(btn); return; }
+    if(act==='todo'){     tokCargarTodo(btn);       return; }
+    _tokAction(id, act);
+  };
 }
 
 function _tokAction(id, action){
@@ -2870,6 +2958,9 @@ function _confirmDelToken(tok){
       if(!window._fbDelTok) throw new Error('sin _fbDelTok');
       await window._fbDelTok(id);
       delete _tokSel[id];
+      // Si era de los «anteriores» cargados a pedido, también sale de ahí:
+      // el refresco solo rehace los recientes.
+      _tokAnteriores = _tokAnteriores.filter(function(t){ return (t.id||t._id)!==id; });
       toast('🗑️ Link eliminado');
       loadTokenList(true);
     }

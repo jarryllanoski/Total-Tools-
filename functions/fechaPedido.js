@@ -104,5 +104,31 @@
     return true;
   }
 
-  return {ZONA, diaLima, envio, registro, hoyLima, segun, enRango};
+  /**
+   * El día «AAAA-MM-DD» corrido `n` días (negativo = atrás).
+   * @param {string} dia «AAAA-MM-DD»
+   * @param {number} n días
+   * @return {string} «AAAA-MM-DD», o "" si `dia` no vale
+   */
+  function sumarDias(dia, n) {
+    if (!DIA.test(String(dia || ""))) return "";
+    const [a, m, d] = dia.split("-").map(Number);
+    const t = new Date(Date.UTC(a, m - 1, d + (Number(n) || 0)));
+    return t.toISOString().slice(0, 10);
+  }
+
+  /**
+   * El instante en que EMPIEZA un día de Lima, en ISO universal — para
+   * compararlo con fechas guardadas en UTC (`usedAt`, `createdAt`).
+   * Perú no cambia de hora desde 1994: medianoche de Lima = 05:00 UTC.
+   * @param {string} dia «AAAA-MM-DD»
+   * @return {string} «AAAA-MM-DDT05:00:00.000Z», o "" si `dia` no vale
+   */
+  function inicioDiaLimaISO(dia) {
+    if (!DIA.test(String(dia || ""))) return "";
+    return new Date(dia + "T00:00:00-05:00").toISOString();
+  }
+
+  return {ZONA, diaLima, envio, registro, hoyLima, segun, enRango,
+    sumarDias, inicioDiaLimaISO};
 });

@@ -403,6 +403,32 @@
     return all;
   }
   window._fsList = fsList; // ★ exponer globalmente para tokens
+
+  /* ★ CONSULTA, NO LISTADO. `fsList` baja la colección ENTERA; Firestore
+     cobra cada documento devuelto. `runQuery` cobra solo los que cumplen el
+     filtro. `padre` es la ruta del documento que contiene la colección
+     (p. ej. 'panel/tokens'), `coleccion` su id ('items').
+     Devuelve los documentos como fsList, más `_name` (la ruta completa,
+     que hace falta como cursor para paginar sin saltarse ninguno). */
+  async function fsQuery(padre, coleccion, consulta){
+    const h=await _authHeaders();
+    h['Content-Type']='application/json';
+    const cuerpo={structuredQuery:Object.assign({from:[{collectionId:coleccion}]}, consulta||{})};
+    const r=await fetch(`${BASE}/${padre}:runQuery?key=${KEY}`,
+      {method:'POST', headers:h, body:JSON.stringify(cuerpo)});
+    if(!r.ok) throw _errorFs(r, 'fsQuery '+(await r.text().catch(()=>'')));
+    const filas=await r.json();
+    const out=[];
+    (filas||[]).forEach(f=>{
+      const doc=f&&f.document; if(!doc) return;   // filas sin doc: solo readTime
+      const o={};
+      Object.keys(doc.fields||{}).forEach(k=>{o[k]=fromFs(doc.fields[k])});
+      o._id=doc.name.split('/').pop();
+      o._name=doc.name;
+      out.push(o);
+    });
+    return out;
+  }
   // Latido de salud a demanda: UNA lectura del doc de config, sin arrastrar la
   // recarga completa de pedidos. El poll normal solo recarga cuando cambia `ts`
   // (que el backend NO toca al escribir el latido) — y hacer que lo tocara
@@ -696,6 +722,44 @@
     const docs = await fsList(tokCol());
     // Asignar el id desde _id si no está
     return docs.map(d => ({ ...d, id: d.id || d._id }));
+  };
+
+  /* ★ LINKS GENERADOS SIN BAJAR LA COLECCIÓN ENTERA (26/10/2026).
+     Antes cada apertura de Compartir, cada 🔄 y cada vez que un cliente
+     usaba un link se leían TODOS los tokens desde el primero. Ahora:
+       · recientes  = por usar (used == false) + usados desde `desdeISO`;
+       · anteriores = usados antes de `antesISO`, de `limite` en limite,
+                      del más reciente al más viejo, a pedido.
+     Filtros de un solo campo: Firestore ya tiene esos índices, no hay que
+     crear nada. La lista completa (`_fbListToks`) sigue existiendo para
+     «Cargar todo» y como respaldo si una consulta falla. */
+  const _tokConId = d => ({ ...d, id: d.id || d._id });
+  window._fbListToksRecientes = async (desdeISO) => {
+    const [porUsar, usados] = await Promise.all([
+      fsQuery(`${RAIZ}/tokens`, 'items', {where:{fieldFilter:{
+        field:{fieldPath:'used'}, op:'EQUAL', value:{booleanValue:false}}}}),
+      fsQuery(`${RAIZ}/tokens`, 'items', {where:{fieldFilter:{
+        field:{fieldPath:'usedAt'}, op:'GREATER_THAN_OR_EQUAL', value:{stringValue:desdeISO}}}}),
+    ]);
+    // Un link usado ENTRE las dos consultas puede salir en las dos: uno solo.
+    const vistos = {};
+    return porUsar.concat(usados).map(_tokConId).filter(d => {
+      if(vistos[d.id]) return false; vistos[d.id] = true; return true;
+    });
+  };
+  window._fbListToksAnteriores = async (antesISO, cursor, limite) => {
+    const consulta = {
+      where:{fieldFilter:{field:{fieldPath:'usedAt'}, op:'LESS_THAN', value:{stringValue:antesISO}}},
+      orderBy:[{field:{fieldPath:'usedAt'}, direction:'DESCENDING'},
+               {field:{fieldPath:'__name__'}, direction:'DESCENDING'}],
+      limit: limite,
+    };
+    // Cursor = (usedAt, ruta) del último ya cargado: dos links usados en el
+    // mismo milisegundo no se saltan ni se repiten.
+    if(cursor && cursor.usedAt && cursor.name){
+      consulta.startAt = {values:[{stringValue:cursor.usedAt}, {referenceValue:cursor.name}], before:false};
+    }
+    return (await fsQuery(`${RAIZ}/tokens`, 'items', consulta)).map(_tokConId);
   };
 
   window._fbDelTok = async (id) => {
@@ -5112,7 +5176,7 @@ render();
      lo usa. config.js, print.js y voz.js preguntan por los pedidos marcados,
      así que siguen yendo detrás. El orden de carga es un contrato
      (ver docs/ARQUITECTURA.md). -->
-<script src="config.js?v=56"></script>
+<script src="config.js?v=57"></script>
 <script src="print.js?v=19"></script>
 <script src="notify.js?v=7"></script>
 <script src="shalom.js?v=33"></script>
