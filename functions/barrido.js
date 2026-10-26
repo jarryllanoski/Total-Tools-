@@ -29,8 +29,16 @@ const ZONA = "America/Lima";
     veces la misma ranura (reintentos) y se consulte todo por duplicado. */
 const GRACIA_MIN = 50;
 
-/** Una guía de Shalom son 8 dígitos. Medido: 484 de 487. */
-const GUIA_OK = /^[0-9]{8}$/;
+/** Una guía de Shalom: 8 dígitos, o 9 que empiecen por 1.
+    Medido el 13/10: 484 de 487 tenían 8. Pero Shalom numera en orden y en
+    octubre de 2026 pasó el 99.999.999: sus guías nuevas son 100761787,
+    101038480… Con la regla de 8 cada envío nuevo caía en «mal escrita» y el
+    seguimiento automático dejó de mirarlos sin avisar a nadie.
+    9 dígitos que NO empiezan por 1 siguen siendo un error de tipeo —el caso
+    real fue 939726661, un dígito de más—, porque la serie nueva empieza en
+    100.000.000. La MISMA regla está en guias.js (los avisos del panel); una
+    prueba comprueba que las dos dicen lo mismo. */
+const GUIA_OK = /^(?:[0-9]{8}|1[0-9]{8})$/;
 
 // La formula de las etiquetas. La MISMA que usa el panel.
 const etiquetas = require("./etiquetas");

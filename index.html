@@ -19,7 +19,7 @@
 <!-- guias.js: avisos del número de guía. Lógica pura + un pintor; no
      depende de nada al cargar. Lo usan config.js (formulario) y tracking.js
      (modal de seguimiento). -->
-<script src="guias.js?v=1"></script>
+<script src="guias.js?v=2"></script>
 <!-- ⚠️ SÍ, ESTE ARCHIVO ESTÁ EN functions/ Y NO ES UN ERROR.
      Es la fórmula de qué etiqueta le toca a un pedido, y la usan LOS DOS: este
      panel y el barrido programado del servidor. Una copia en cada lado
@@ -799,7 +799,7 @@
   window._fbReady=true;
 })();
 </script>
-<link rel="stylesheet" href="panel.css?v=6">
+<link rel="stylesheet" href="panel.css?v=7">
 </head>
 <body>
 
@@ -1088,6 +1088,11 @@
        Se conserva lo único que sigue siendo una decisión tuya: qué ve el cliente. -->
   <div class="cfg-sec">
     <div class="cfg-ttl">🚚 Configuración Shalom <span onclick="if(window.Ayuda)Ayuda.abrir('shalomConfig')" style="font-size:11px;color:#8b949e;cursor:pointer;font-weight:400;margin-left:8px" title="Ayuda">📖 Ayuda</span></div>
+    <!-- 🔒 = pide la «Clave para cambiar estado» (la de arriba). Apagar la
+         puerta o el seguimiento por un toque sin querer deja de rastrear todo
+         sin que nadie lo note. La clave NO se escribe en el código: esta
+         página es pública. Ver _pinShalom. -->
+    <div class="tgl-s" style="margin:-4px 0 6px">🔒 Encender, apagar o cambiar estos ajustes pide la clave para cambiar estado.</div>
     <!-- EL INTERRUPTOR MAESTRO. Va primero porque manda sobre todo lo demás:
          apagado, ni el botón ⟳ consulta. Debajo del nombre va el ESTADO REAL,
          que no siempre coincide con el interruptor: la puerta puede estar
@@ -1095,7 +1100,7 @@
          encendida. Decir solo "encendido/apagado" escondería justo eso. -->
     <div class="tgl-row">
       <div style="max-width:74%">
-        <div class="tgl-n">🚪 Puerta a Shalom</div>
+        <div class="tgl-n">🚪 Puerta a Shalom <span class="cfg-lock" title="Pide la clave">🔒</span></div>
         <div class="tgl-s" id="shalomPuertaEstado">Consultando…</div>
       </div>
       <div class="tgl" id="tglShalomPuerta" onclick="toggleShalomPuerta()"></div>
@@ -1105,14 +1110,14 @@
          panel cerrado — que es justo cuando hace falta. -->
     <div class="tgl-row">
       <div style="max-width:74%">
-        <div class="tgl-n">🕐 Seguimiento automático</div>
+        <div class="tgl-n">🕐 Seguimiento automático <span class="cfg-lock" title="Pide la clave">🔒</span></div>
         <div class="tgl-s">Consulta tus guías vivas en los horarios de abajo, desde el servidor. Funciona aunque no tengas el panel abierto.</div>
       </div>
       <div class="tgl" id="tglBarridoActivo" onclick="toggleBarrido('activo')"></div>
     </div>
     <div class="frow">
-      <div class="fg"><label class="fl">Horarios (en punto o y media)</label><input class="fi" id="cfgBarridoHoras" placeholder="08:00, 11:30, 16:30, 19:00" onchange="guardarBarrido()"></div>
-      <div class="fg"><label class="fl">Mover etiquetas</label>
+      <div class="fg"><label class="fl">Horarios (en punto o y media) 🔒</label><input class="fi" id="cfgBarridoHoras" placeholder="08:00, 11:30, 16:30, 19:00" onchange="guardarBarrido()"></div>
+      <div class="fg"><label class="fl">Mover etiquetas 🔒</label>
         <select class="fs" id="cfgBarridoModo" onchange="guardarBarrido()">
           <option value="apagado">Apagado — solo registra</option>
           <option value="semi">Semiautomática — todo menos FINALIZADO</option>
@@ -1120,19 +1125,12 @@
         </select>
       </div>
     </div>
-    <!-- EL SIMULACRO. Encendido de fábrica: mover decenas de etiquetas a
-         ciegas y corregirlas a mano después no es una opción. -->
-    <div class="tgl-row">
-      <div style="max-width:74%">
-        <div class="tgl-n">🧪 Modo simulacro</div>
-        <div class="tgl-s">Decide todo igual pero <b>no escribe nada</b>: deja el informe de qué habría cambiado. Apágalo cuando el informe cuadre.</div>
-      </div>
-      <div class="tgl" id="tglBarridoSimulacro" onclick="toggleBarrido('simulacro')"></div>
-    </div>
+    <!-- El «Modo simulacro» se retiró el 26/10/2026: el informe ya cuadraba y
+         el seguimiento escribe siempre. Ver _correrBarrido en functions/index.js. -->
     <div class="tgl-s" id="barridoUltima" style="padding:6px 0 2px;line-height:1.5">Última corrida: —</div>
     <button id="btnBarridoAhora" onclick="correrBarridoAhora()" class="btn-sec" style="width:100%;margin-top:8px">▶️ Correr ahora</button>
     <div class="tgl-row" style="border:none">
-      <div style="max-width:74%"><div class="tgl-n">📱 Mostrar en el link del cliente</div><div class="tgl-s">El cliente ve el estado de Shalom en su link de seguimiento. Apagado = solo tú lo ves en el panel.</div></div>
+      <div style="max-width:74%"><div class="tgl-n">📱 Mostrar en el link del cliente <span class="cfg-lock" title="Pide la clave">🔒</span></div><div class="tgl-s">El cliente ve el estado de Shalom en su link de seguimiento. Apagado = solo tú lo ves en el panel.</div></div>
       <div class="tgl" id="tglTrackingWebCliente" onclick="toggleTrackingWebCliente()"></div>
     </div>
     <!-- ★ SHALOM PRO — UNA LÍNEA, Y UN BOTÓN SOLO SI HACE FALTA.
@@ -1189,9 +1187,11 @@
       <div class="fg"><label class="fl">Nombre *</label><input class="fi" id="fName" placeholder="Nombre completo"></div>
       <div class="fg"><label class="fl">Teléfono *</label><input class="fi phone-norm" id="fPhone" placeholder="9XXXXXXXX o @usuario" inputmode="text" oninput="if(typeof _clienteHintUpdate==='function')_clienteHintUpdate()"></div>
     </div>
-    <div class="frow">
+    <!-- frow-par: las dos etiquetas con la MISMA altura. El ✓ del DNI es más
+         grande que el texto y empujaba su casilla hacia abajo. -->
+    <div class="frow frow-par">
       <div class="fg"><label class="fl">DNI <span id="fDniMarca"></span></label><input class="fi" id="fDni" placeholder="12345678" maxlength="8" inputmode="numeric" oninput="if(typeof _clienteHintUpdate==='function')_clienteHintUpdate();if(typeof _dniReniec==='function')_dniReniec(this.value)"><div id="fDniReniec" style="display:none"></div></div>
-      <div class="fg"><label class="fl">🧾 N° Factura / Boleta</label><input class="fi" id="fComprobante" placeholder="F001-00123" maxlength="24" autocomplete="off" autocapitalize="characters" spellcheck="false" title="Opcional. Si lo pones, reemplaza el código de 6 dígitos en la etiqueta, el QR y el buscador."></div>
+      <div class="fg"><label class="fl">N° Factura / Boleta</label><input class="fi" id="fComprobante" placeholder="F001-00123" maxlength="24" autocomplete="off" autocapitalize="characters" spellcheck="false" title="Opcional. Si lo pones, reemplaza el código de 6 dígitos en la etiqueta, el QR y el buscador."></div>
     </div>
     <div class="fg" id="fEncAgenciaGroup" style="display:none"><label class="fl">Agencia</label><input class="fi" id="fEncAgencia" placeholder="Nombre de la agencia"></div>
     <div id="clienteHint" style="display:none;margin-bottom:11px"></div>
@@ -3024,34 +3024,48 @@ function togDoc(id,slot){const s=S.shipments.find(x=>x.id===id);if(!s)return;if(
 /* SHALOM: el barrido programado (Config) */
 function _cfgBarrido(){
   S.config = S.config || {};
-  // Valores de fábrica: encendido, en simulacro y en semiautomática. Es la
-  // única combinación que no puede hacer daño el día que se despliega.
+  // Valores de fábrica: encendido y en semiautomática. (`simulacro` se
+  // retiró: si quedó guardado en la nube, el servidor ya no lo lee.)
   S.config.barrido = Object.assign(
-    {activo:true, simulacro:true, modo:'semi', horas:'08:00, 11:30, 16:30, 19:00'},
+    {activo:true, modo:'semi', horas:'08:00, 11:30, 16:30, 19:00'},
     S.config.barrido || {});
   return S.config.barrido;
 }
+/* ★ LA CLAVE DE LOS AJUSTES DE SHALOM. Es la «Clave para cambiar estado»,
+   con su mismo teclado: una sola clave que el dueño cambia en un solo
+   sitio. No se escribe en el código — esta página es pública en GitHub. */
+function _pinShalom(hecho){
+  openPin(hecho, 'Clave para cambiar la configuración de Shalom');
+}
+/* Horarios y modo: el campo vuelve AL INSTANTE a lo guardado, y el valor
+   nuevo solo entra con la clave. Si se cancela, en pantalla queda lo que de
+   verdad está guardado — nunca un valor que parece puesto y no lo está. */
 function guardarBarrido(){
   const b = _cfgBarrido();
   const h = $('cfgBarridoHoras'), m = $('cfgBarridoModo');
-  if(h) b.horas = h.value.trim();
-  if(m) b.modo  = m.value;
-  save('config');
+  const nuevo = {horas: h ? h.value.trim() : (b.horas||''), modo: m ? m.value : (b.modo||'semi')};
+  if(h) h.value = b.horas || '';
+  if(m) m.value = b.modo || 'semi';
+  if(nuevo.horas === (b.horas||'') && nuevo.modo === (b.modo||'semi')) return;
+  _pinShalom(()=>{
+    b.horas = nuevo.horas; b.modo = nuevo.modo;
+    if(h) h.value = b.horas;
+    if(m) m.value = b.modo;
+    save('config');
+    toast('✅ Seguimiento automático actualizado');
+  });
 }
 function toggleBarrido(cual){
-  const b = _cfgBarrido();
-  const el = $(cual === 'activo' ? 'tglBarridoActivo' : 'tglBarridoSimulacro');
-  if(!el) return;
-  el.classList.toggle('on');
-  b[cual] = el.classList.contains('on');
-  save('config');
-  if(cual === 'simulacro'){
-    toast(b.simulacro ? '🧪 Simulacro encendido — no va a escribir nada'
-                      : '✅ Simulacro apagado — el barrido ya escribe de verdad');
-  } else {
+  if(cual !== 'activo') return;
+  _pinShalom(()=>{
+    const b = _cfgBarrido();
+    const el = $('tglBarridoActivo'); if(!el) return;
+    el.classList.toggle('on');
+    b.activo = el.classList.contains('on');
+    save('config');
     toast(b.activo ? '🕐 Seguimiento automático encendido'
                    : '⏸️ Seguimiento automático apagado');
-  }
+  });
 }
 /* Por qué fallaron, no solo cuántas. Un número suelto no se puede accionar:
    "6 fallaron" no distingue un corte de red de una cuota agotada ni de una
@@ -3082,14 +3096,13 @@ async function _pintarUltimoBarrido(){
   const ahorro = (s2.yaEntregados||0) + (s2.finalizados||0);
   el.innerHTML =
     '<b>Última corrida:</b> ' + cuando + ' (' + (u.hora||'') + ')' +
-    (u.simulacro ? ' · <b style="color:#d29922">SIMULACRO, no escribió</b>' : '') +
     '<br>Consultó ' + (u.consultadas||0) + ' · cambió ' + (u.conCambio||0) +
     ' · movió ' + (u.movidas||0) + ' etiqueta' + (u.movidas===1?'':'s') +
     (u.fallidas ? ' · <b style="color:#d29922">' + u.fallidas + ' fallaron</b>' +
       _motivosBarrido(u.motivos) : '') +
     '<br>No preguntó a ' + ahorro + ' (ya entregados o finalizados)' +
     ((u.guiasMalas||[]).length ? ' · ' + u.guiasMalas.length +
-      ' guía(s) mal escrita(s): ' + u.guiasMalas.map(g=>g.guia).join(', ') : '') +
+      ' guía(s) con formato raro: ' + u.guiasMalas.map(g=>g.guia).join(', ') : '') +
     (u.cortado ? '<br><b style="color:#d29922">Se cortó: ' + u.cortado + '</b>' : '');
 }
 
@@ -3115,10 +3128,9 @@ async function correrBarridoAhora(){
       return;
     }
     const i = j.informe || {};
-    toast((i.simulacro ? '🧪 Simulacro: ' : '✅ ') + 'consultó ' + (i.consultadas||0) +
-          ' · ' + (i.movidas||0) + ' etiqueta(s) ' + (i.simulacro ? 'se moverían' : 'movidas'));
+    toast('✅ consultó ' + (i.consultadas||0) + ' · ' + (i.movidas||0) + ' etiqueta(s) movidas');
     // Los pedidos cambiaron en la nube: que el panel los traiga.
-    if(!i.simulacro && window._fbLoad && window._mergeRemote){
+    if(window._fbLoad && window._mergeRemote){
       try{ const remoto = await window._fbLoad(); if(remoto) window._mergeRemote(remoto); }catch(e){}
     }
   }catch(e){
@@ -3445,7 +3457,8 @@ async function _pintarPuertaShalom(){
   fila.textContent = v.icono + ' ' + v.texto;
   fila.style.color = v.color;
 }
-async function toggleShalomPuerta(){
+function toggleShalomPuerta(){ _pinShalom(_toggleShalomPuertaHecho); }
+async function _toggleShalomPuertaHecho(){
   const tgl = $('tglShalomPuerta'); if(!tgl) return;
   const on = !tgl.classList.contains('on');
   tgl.classList.toggle('on', on);   // respuesta inmediata; se confirma abajo
@@ -3487,7 +3500,8 @@ function toggleShalomAuto(){
 
    Se conserva `toggleTrackingWebCliente`: qué ve el cliente sigue siendo una
    decisión tuya, y el filtro que la respeta vive en la Cloud Function. */
-function toggleTrackingWebCliente(){
+function toggleTrackingWebCliente(){ _pinShalom(_toggleTrackingWebClienteHecho); }
+function _toggleTrackingWebClienteHecho(){
   const el=document.getElementById('tglTrackingWebCliente'); if(!el) return;
   el.classList.toggle('on');
   const on=el.classList.contains('on');
@@ -5033,7 +5047,7 @@ render();
      lo usa. config.js, print.js y voz.js preguntan por los pedidos marcados,
      así que siguen yendo detrás. El orden de carga es un contrato
      (ver docs/ARQUITECTURA.md). -->
-<script src="config.js?v=54"></script>
+<script src="config.js?v=55"></script>
 <script src="print.js?v=18"></script>
 <script src="notify.js?v=6"></script>
 <script src="shalom.js?v=33"></script>

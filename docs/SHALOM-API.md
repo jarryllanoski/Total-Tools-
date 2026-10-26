@@ -168,7 +168,7 @@ timingSafeEqual(Buffer.from(v1.replace('v1=', '')),
 ## Reglas Anti-Alucinación
 
 - Usa **solo** endpoints documentados en https://shalom-api.lat/docs
-- `orderNumber`: exactamente 8 dígitos
+- `orderNumber`: exactamente 8 dígitos — ⚠️ desde octubre de 2026 también 9 dígitos que empiezan por 1 (la numeración pasó el 99.999.999; ej. `100761787`)
 - `orderCode`: exactamente 4 caracteres
 - `near`: formato `lat,lng` con signo (ej. -12.046,-77.043)
 - Batch máximo: 50 guías por solicitud

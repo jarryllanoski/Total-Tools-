@@ -25,6 +25,10 @@
   'use strict';
 
   var LARGO = 8;   // lo que mide una guía de Shalom (medido: 484 de 487)
+  /* Desde octubre de 2026 Shalom pasó el 99.999.999 y sus guías nuevas
+     tienen 9 dígitos, empezando por 1 (100761787…). Misma regla que el
+     seguimiento automático: functions/barrido.js GUIA_OK. */
+  var FORMATO = /^(?:[0-9]{8}|1[0-9]{8})$/;
   var MAX_LISTA = 3;
 
   function _guiaDe(s) {
@@ -47,11 +51,13 @@
 
     if (!/^[0-9]+$/.test(n)) {
       avisos.push({tipo: 'FORMATO', texto: 'La guía solo lleva números.'});
-    } else if (n.length !== LARGO) {
+    } else if (!FORMATO.test(n)) {
       avisos.push({
         tipo: 'FORMATO',
-        texto: 'Una guía de Shalom tiene ' + LARGO + ' dígitos; esta tiene ' +
-               n.length + '. Revisa que no falte o sobre uno.'
+        texto: 'Una guía de Shalom tiene ' + LARGO + ' dígitos, o 9 si ' +
+          'empieza por 1; esta tiene ' + n.length +
+          (n.length === LARGO + 1 ? ' y empieza por ' + n.charAt(0) : '') +
+          '. Revisa que no falte o sobre uno.'
       });
     }
 
@@ -138,6 +144,7 @@
 
   global.Guias = {
     LARGO: LARGO,
+    FORMATO: FORMATO,
     revisar: revisar,
     vigilar: vigilar
   };

@@ -281,7 +281,7 @@ Dos avisos, los dos salidos de mirar los 971 pedidos reales:
 
 | Aviso | Por qué existe |
 |---|---|
-| **El formato** | 484 de 487 guías tienen 8 dígitos. Tres están mal escritas y una, `939726661`, estaba EN TRÁNSITO: su seguimiento llevaba semanas muerto y nadie lo sabía. Un número mal escrito no da error, da silencio. |
+| **El formato** | 484 de 487 guías tienen 8 dígitos. Tres están mal escritas y una, `939726661`, estaba EN TRÁNSITO: su seguimiento llevaba semanas muerto y nadie lo sabía. Un número mal escrito no da error, da silencio. **26/10/2026:** Shalom pasó el 99.999.999 y sus guías nuevas tienen 9 dígitos empezando por 1 (`100761787`); la regla es ahora «8, o 9 si empieza por 1» (`barrido.js` `GUIA_OK` = `guias.js` `FORMATO`). |
 | **La guía repetida** | Tres números están en dos pedidos. Dos son el mismo cliente en un solo paquete; el tercero son dos clientes distintos, o sea un tipeo. |
 
 > **Avisan, no impiden.** Repetir una guía es algo que el negocio hace a

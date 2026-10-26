@@ -175,14 +175,17 @@ module.exports = async ({bloque, ok}) => {
        'sin token (link general) tampoco hay número');
   }
 
-  bloque('El seguimiento público no lo enseña');
+  bloque('El seguimiento del cliente lo enseña como su código (desde el 26/10)');
 
   {
+    /* Decisión del dueño: con factura/boleta, el cliente ve ESE número en
+       su WhatsApp, y el link de seguimiento tiene que decir lo mismo. */
     const PP = require('../functions/pedidoPublico.js');
     const vista = PP.proyectar({id: 'id_1', name: 'ANA', status: 'NUEVO PEDIDO',
-      nroComprobante: 'F001-1'}, {code: '1234', frozen: false});
-    ok(!('nroComprobante' in vista),
-       'la lista cerrada de campos públicos lo deja fuera');
+      nroComprobante: 'F001-1', shalomClave: '1234'}, {code: '1234', frozen: false});
+    ok(vista.nroComprobante === 'F001-1',
+       'el número entra en la lista cerrada de campos públicos');
+    ok(!('shalomClave' in vista), 'y los secretos siguen fuera');
   }
 
   bloque('La etiqueta: el número reemplaza al código; sin número, igual que hoy');

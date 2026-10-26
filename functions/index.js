@@ -1318,9 +1318,9 @@ if (WEBHOOK_ACTIVO) exports.shalomWebhook = _shalomWebhook;
 // funcion decide si le toca: asi los horarios viven en Config y se cambian sin
 // volver a desplegar. Los disparos que no tocan no consultan nada a Shalom.
 //
-// ⚠️ ARRANCA EN SIMULACRO. Decide todo igual y NO ESCRIBE: deja el informe de
-// que habria cambiado. Mover 71 etiquetas a ciegas y corregirlas a mano
-// despues no es una opcion. Se apaga desde Config cuando el informe cuadre.
+// Nacio en simulacro (decidia y no escribia) hasta que el informe cuadro.
+// El 26/10/2026 el dueño lo retiro: desde entonces SIEMPRE escribe. Un
+// `config.barrido.simulacro` que quede guardado en la nube se ignora.
 const BARRIDO_DOC = "panel/barrido";
 const PAUSA_MS = 300; // entre consulta y consulta
 const TOPE_MS = 450000; // margen bajo el timeout de 540 s
@@ -1353,7 +1353,6 @@ async function _correrBarrido(forzado) {
   if (!forzado && !barrido.tocaAhora(horas, ahoraLocal)) return null;
 
   const modo = String(b.modo || etiquetas.MODOS.SEMI);
-  const simulacro = b.simulacro !== false; // de fabrica, simulacro
 
   // 2 · a quien se consulta
   const docs = [];
@@ -1416,9 +1415,9 @@ async function _correrBarrido(forzado) {
     await new Promise((res) => setTimeout(res, PAUSA_MS));
   }
 
-  // 4 · escribir (o no, si es simulacro)
+  // 4 · escribir
   let escritas = 0;
-  if (!simulacro && escrituras.length) {
+  if (escrituras.length) {
     for (let i = 0; i < escrituras.length; i += 400) {
       const lote = db.batch();
       escrituras.slice(i, i + 400).forEach((w) => {
@@ -1441,7 +1440,7 @@ async function _correrBarrido(forzado) {
   //     a cuantos no se les pregunto y por que, no solo lo que cambio.
   const informe = {
     ts: Date.now(), hora: ahoraLocal, forzado: !!forzado,
-    modo: modo, simulacro: simulacro,
+    modo: modo,
     candidatos: sel.consultar.length, consultadas: consultadas,
     fallidas: fallidas, motivos: motivos,
     conCambio: escrituras.length, escritas: escritas,
@@ -1457,7 +1456,7 @@ async function _correrBarrido(forzado) {
   }
   console.log("barrido", JSON.stringify({
     hora: ahoraLocal, consultadas, conCambio: escrituras.length,
-    escritas, simulacro, cortado, forzado: !!forzado,
+    escritas, cortado, forzado: !!forzado,
   }));
   return informe;
 }

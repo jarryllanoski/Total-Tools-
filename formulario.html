@@ -1774,7 +1774,9 @@ function _construirWaMsg(order, trackCode, trackToken){
     `🚚 *Courier:* ${order.courier}\n`+
     `📅 *Fecha de envío:* ${dateLabel}${notesLine}\n`+
     `━━━━━━━━━━━━━━━\n`+
-    `🔑 *Código de seguimiento:* #${trackCode}${nroLine}\n\n`+
+    /* Con factura/boleta, ESE es el código: sale solo él. Sin ella, el
+       código de seguimiento de siempre. */
+    (nroLine ? `${nroLine.slice(1)}\n\n` : `🔑 *Código de seguimiento:* #${trackCode}\n\n`)+
     `📍 *Para ver el estado de tu pedido en tiempo real, abre este enlace:*\n${trackUrl}`;
 }
 
@@ -2226,7 +2228,11 @@ function renderTrackResult(ship, code){
     : String(ship.dni||ship.dniRecoger||ship.dniDestinatario||'').trim();
   const _dniTkLbl = window.DniPedido ? DniPedido.etiqueta(ship) : 'DNI';
   const meta   = STATUS_META[ship.status]||{color:'#6b7280',emoji:'🏷️',step:0};
-  const tc     = codigoSeg(ship.id, ship.createdAt);
+  /* Con N° de factura/boleta, el código que ve el cliente es ESE —el mismo
+     de su WhatsApp y de la etiqueta—. Sin él, el de siempre. Se filtra
+     igual que en el mensaje: solo letras, números y guion. */
+  const _nroTk = String(ship.nroComprobante||'').replace(/[^A-Z0-9-]/g,'').slice(0,20);
+  const tc     = _nroTk || codigoSeg(ship.id, ship.createdAt);
 
   // Bloque de seguimiento Shalom (línea de tiempo propia del courier). El estado
   // grande (badge) ya comunica el avance para todos, así que no hay barra genérica.
@@ -2252,8 +2258,8 @@ function renderTrackResult(ship, code){
     </div>
     <div class="track-card">
       <div class="tk-section">
-        <div class="tk-lbl">Código de seguimiento</div>
-        <div style="font-size:22px;font-weight:700;color:var(--purple);letter-spacing:3px">#${esc(tc)}</div>
+        <div class="tk-lbl">${_nroTk ? 'Factura / Boleta' : 'Código de seguimiento'}</div>
+        <div style="font-size:22px;font-weight:700;color:var(--purple);letter-spacing:${_nroTk ? '1px' : '3px'};word-break:break-all">${_nroTk ? '' : '#'}${esc(tc)}</div>
       </div>
       <div class="tk-section">
         <div class="tk-lbl">Estado actual</div>

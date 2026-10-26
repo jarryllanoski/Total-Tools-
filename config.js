@@ -9,10 +9,10 @@
  * Este módulo solo contiene las funciones JS
  * ──────────────────────────────────────────────────────────────── */
 
-function openPin(cb){
+function openPin(cb, msg){
   _pinEntry=''; _pinCallback=cb;
   updatePinDots();
-  $('pinMsg').textContent='Ingresa la clave para cambiar el estado';
+  $('pinMsg').textContent=msg||'Ingresa la clave para cambiar el estado';
   $('pinMsg').style.color='var(--text2)';
   openOverlay('pinOverlay');
 }
@@ -2897,7 +2897,6 @@ function loadCfgUI(){
     if($('cfgBarridoHoras')) $('cfgBarridoHoras').value=b.horas||'';
     if($('cfgBarridoModo'))  $('cfgBarridoModo').value=b.modo||'semi';
     const ta=$('tglBarridoActivo');    if(ta) ta.classList.toggle('on', b.activo!==false);
-    const ts=$('tglBarridoSimulacro'); if(ts) ts.classList.toggle('on', b.simulacro!==false);
   }
   if(typeof _pintarUltimoBarrido==='function') _pintarUltimoBarrido();
   if(typeof _pintarOrigen==='function') _pintarOrigen();

@@ -478,3 +478,8 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);max
 @keyframes fbPulse{0%,100%{opacity:1}50%{opacity:.4}}
 @keyframes shalomMicPulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.45;transform:scale(1.18)}}
 #fbDot[data-ready]{animation:none}
+.cfg-lock{font-size:10px;opacity:.55;margin-left:2px}
+/* Fila de dos campos cuyas etiquetas llevan marcas de distinto tamaño
+   (el ✓ del DNI): misma altura de etiqueta → casillas alineadas. */
+.frow-par{align-items:flex-start}
+.frow-par .fl{height:14px;line-height:14px;display:flex;align-items:center;gap:4px;white-space:nowrap;overflow:hidden}

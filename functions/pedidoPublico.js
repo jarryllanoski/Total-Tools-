@@ -48,6 +48,11 @@
   const CAMPOS = [
     // Identidad del pedido
     "id", "code", "frozen", "createdAt", "date", "status",
+    /* El N° de factura/boleta (26/10/2026). Cuando existe, ES el código que
+       el cliente ve en su seguimiento: ya lo recibió en su WhatsApp de
+       confirmación y es su propio comprobante. Si no saliera aquí, el link
+       le mostraría un código distinto al del mensaje. */
+    "nroComprobante",
     // A quién y a dónde
     "name", "address", "ciudadDestino", "referencia", "encAgencia",
     "dni", "dniRecoger", "dniDestinatario",
