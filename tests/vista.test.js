@@ -33,14 +33,15 @@ module.exports = (t) => {
      compartido— en vez de un doble amable: una sustituta mas simple que la
      real es como se cuela un fallo por la rendija entre las dos. */
   const DP = require('../functions/dniPedido.js');
-  const api = new Function('S', '$', '_adv', '_dniDe',
+  const NC = require('../functions/nroComprobante.js');
+  const api = new Function('S', '$', '_adv', '_dniDe', 'NroComprobante',
       'let _filt="", _advActive=false;' + src +
       ';return {vis:visibleShipments, set:(f,a)=>{_filt=f;_advActive=a;}};'
   )(S, (id) => (id === 'fSearch' ? {value: busqueda} : null),
       // Los filtros avanzados vacíos: la búsqueda avanzada se activa por el
       // flag, no por tener filtros puestos — que es justo el caso a probar.
       {dateFrom: '', dateTo: '', couriers: [], costMin: '', costMax: '', doc: 'any'},
-      DP.de);
+      DP.de, NC);
   const ver = (filtro, texto, avanzada) => {
     busqueda = texto || ''; api.set(filtro || '', !!avanzada); return api.vis();
   };

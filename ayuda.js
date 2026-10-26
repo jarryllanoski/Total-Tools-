@@ -236,6 +236,7 @@
         'Genera un link con los datos del cliente ya cargados (nombre, teléfono) para que complete su pedido más rápido en el formulario público.',
         'Podés cargar <b>Monto</b> y <b>Adelanto</b>: viajan con el pedido (el cliente NO los ve) y al crearse aparece la <b>Deuda</b> = monto − adelanto. Después la editás desde el pedido con ✏️ Editar.',
         'Podés adjuntar un <b>🔗 link</b> (Drive, Mega, etc.) y ponerle <b>vencimiento</b> (1, 3, 7 o 30 días, o sin vencimiento).',
+        'Podés poner el <b>🧾 N° de factura o boleta</b> (ej. F001-123). Pasa a ser el código del pedido: sale en la etiqueta con su QR pequeño, en la campana, en ✏️ Editar, y lo encuentra el buscador.',
         'Usá <b>📋 Generar y copiar</b> para copiarlo, o <b>🔑 Generar y compartir</b>: manda por WhatsApp <b>solo el link del formulario</b> (con tu mensaje), y si hay documento adjunto va en un bloque aparte rotulado.',
         'Cada link es de <b>un solo uso</b>: se bloquea después de abrirse una vez, por seguridad.'
       ],

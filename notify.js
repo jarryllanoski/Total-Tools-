@@ -117,6 +117,14 @@
     });
   }
 
+  /* N° de factura/boleta, leído del PEDIDO al pintar, no copiado en la
+     notificación: si se corrige en «Editar», la campana dice el nuevo. */
+  function _nroDe(shipId){
+    if(!window.NroComprobante || !shipId || !window.S || !S.shipments) return '';
+    var s = S.shipments.find(function(x){ return x && x.id === shipId; });
+    return s ? NroComprobante.de(s) : '';
+  }
+
   /* ── RENDER ──────────────────────────────────────────────────────── */
   function _render(){
     var list  = document.getElementById('notifyList');
@@ -150,6 +158,7 @@
         '<div class="notify-content">' +
           '<div class="notify-title">' + _esc(n.title) + '</div>' +
           '<div class="notify-sub">'   + _esc(n.sub)   + '</div>' +
+          (_nroDe(n.shipId) ? '<div class="notify-sub" style="opacity:.75;margin-top:-4px">🧾 ' + _esc(_nroDe(n.shipId)) + '</div>' : '') +
           '<div class="notify-actions">' +
             '<button class="notify-btn notify-btn-ver" onclick="NotifyModule.ver('+i+')">👁 Ver</button>' +
             printedHtml +

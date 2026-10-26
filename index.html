@@ -31,6 +31,7 @@
 <script src="functions/enlaceSeguimiento.js?v=1"></script>
 <script src="functions/registroShalom.js?v=3"></script>
 <script src="functions/dniPedido.js?v=1"></script>
+<script src="functions/nroComprobante.js?v=1"></script>
 <script src="appcheck.js?v=1"></script>
 <!-- FIREBASE via REST API — sin SDK, funciona en Brave/Chrome/Firefox/Safari -->
 <script>
@@ -955,8 +956,11 @@
       <div class="fg"><input class="fi phone-norm" id="tokPhone" type="tel" inputmode="numeric" placeholder="Teléfono (opcional)" autocomplete="off"></div>
       <div class="fg"><input class="fi" id="tokAdelanto" type="number" inputmode="decimal" placeholder="Adelanto S/" min="0" step="0.5" autocomplete="off"></div>
     </div>
-    <div class="fg">
-      <input class="fi" id="tokLink" type="url" inputmode="url" placeholder="🔗 Link adjunto (Drive, Mega, etc.) — opcional" autocomplete="off">
+    <!-- N° de factura/boleta: va DENTRO del token (como el monto) y el
+         servidor lo copia al pedido. Ver functions/nroComprobante.js. -->
+    <div class="frow">
+      <div class="fg" style="flex:1.6"><input class="fi" id="tokLink" type="url" inputmode="url" placeholder="🔗 Link adjunto (Drive, Mega…) — opcional" autocomplete="off"></div>
+      <div class="fg"><input class="fi" id="tokComprobante" placeholder="🧾 N° Factura/Boleta" maxlength="24" autocomplete="off" autocapitalize="characters" spellcheck="false" title="Opcional. Reemplaza el código de 6 dígitos del pedido (etiqueta, QR, buscador)."></div>
     </div>
     <select class="fs" id="tokExp" style="width:100%;margin-bottom:14px">
       <option value="">Sin vencimiento</option>
@@ -1187,8 +1191,9 @@
     </div>
     <div class="frow">
       <div class="fg"><label class="fl">DNI <span id="fDniMarca"></span></label><input class="fi" id="fDni" placeholder="12345678" maxlength="8" inputmode="numeric" oninput="if(typeof _clienteHintUpdate==='function')_clienteHintUpdate();if(typeof _dniReniec==='function')_dniReniec(this.value)"><div id="fDniReniec" style="display:none"></div></div>
-      <div class="fg" id="fEncAgenciaGroup" style="display:none"><label class="fl">Agencia</label><input class="fi" id="fEncAgencia" placeholder="Nombre de la agencia"></div>
+      <div class="fg"><label class="fl">🧾 N° Factura / Boleta</label><input class="fi" id="fComprobante" placeholder="F001-00123" maxlength="24" autocomplete="off" autocapitalize="characters" spellcheck="false" title="Opcional. Si lo pones, reemplaza el código de 6 dígitos en la etiqueta, el QR y el buscador."></div>
     </div>
+    <div class="fg" id="fEncAgenciaGroup" style="display:none"><label class="fl">Agencia</label><input class="fi" id="fEncAgencia" placeholder="Nombre de la agencia"></div>
     <div id="clienteHint" style="display:none;margin-bottom:11px"></div>
     <div class="fg" style="position:relative"><label class="fl" id="fAddrLabel"><span id="fAddrLabelTxt">Dirección *</span> <span id="fAgenciaMarca"></span></label><input class="fi" id="fAddr" placeholder="Av., Mz., Lote..." autocomplete="off" oninput="onAddrInput(this.value)" onfocus="onAddrInput(this.value)"><div id="shDrop" style="display:none;position:absolute;left:0;right:0;top:100%;z-index:50;background:var(--bg2);border:1px solid var(--bd);border-radius:9px;margin-top:4px;max-height:230px;overflow-y:auto;box-shadow:0 8px 24px rgba(0,0,0,.4)"></div><div id="fAgenciaEstado" style="display:none"></div></div>
     <div class="frow">
@@ -2676,7 +2681,8 @@ function visibleShipments(){
   let data=S.shipments;
   if(_filt) data=data.filter(x=>x.status===_filt);
   else if(_soloActivos()) data=data.filter(x=>x.status!=='FINALIZADO');
-  if(srch) data=data.filter(x=>x.name.toLowerCase().includes(srch)||x.phone.includes(srch)||(_dniDe(x)&&_dniDe(x).includes(srch))||x.address.toLowerCase().includes(srch)||x.courier.toLowerCase().includes(srch));
+  // El N° de factura/boleta entra con su propia regla: «f001 123» encuentra F001-123.
+  if(srch) data=data.filter(x=>x.name.toLowerCase().includes(srch)||x.phone.includes(srch)||(_dniDe(x)&&_dniDe(x).includes(srch))||x.address.toLowerCase().includes(srch)||x.courier.toLowerCase().includes(srch)||(typeof NroComprobante!=='undefined'&&NroComprobante.coincide(x,srch)));
   if(_advActive){
     if(_adv.dateFrom) data=data.filter(x=>x.date&&x.date>=_adv.dateFrom);
     if(_adv.dateTo)   data=data.filter(x=>x.date&&x.date<=_adv.dateTo);
@@ -2913,6 +2919,7 @@ function cardHTML(s){
       <span class="meta">${esUsuarioWA(s.phone)?'':`<a href="tel:+51${escH(s.phone)}" class="ph-call" onclick="event.stopPropagation()" title="Llamar">📞</a>`}${escH(s.phone)}<button class="ph-copy" onclick="event.stopPropagation();copyPhone('${escH(s.phone)}')" title="Copiar número"><svg viewBox="0 0 448 512" width="11" height="11" fill="currentColor" aria-hidden="true"><path d="M320 448v40c0 13.255-10.745 24-24 24H24c-13.255 0-24-10.745-24-24V120c0-13.255 10.745-24 24-24h72v296c0 30.879 25.121 56 56 56h168zm0-344V0H152c-13.255 0-24 10.745-24 24v368c0 13.255 10.745 24 24 24h272c13.255 0 24-10.745 24-24V128H344c-13.2 0-24-10.8-24-24zm120.971-31.029L375.029 7.029A24 24 0 0 0 358.059 0H352v96h96v-6.059a24 24 0 0 0-7.029-16.97z"/></svg></button></span>
       <span class="meta">📅 ${escH(s.date||'—')} <button onclick="copyCardLink('${s.id}')" title="Copiar link" style="background:none;border:none;color:#388bfd;font-size:11px;cursor:pointer;padding:0 0 0 2px;vertical-align:middle">🔗</button></span>
       ${s.cost?`<span class="meta">💰 S/ ${escH(s.cost)}</span>`:''}
+      ${(window.NroComprobante&&NroComprobante.de(s))?`<span class="meta" title="Factura / Boleta" style="opacity:.75">🧾 ${escH(NroComprobante.de(s))}</span>`:''}
     </div>
     ${(s.courier||'').toUpperCase().includes('ENCOMIENDA')?((s.ciudadDestino||s.address)?`<div class="card-addr">📦 ${escH(s.ciudadDestino||s.address)}${s.encAgencia?' · 🏪 '+escH(s.encAgencia):''}</div>`:''): (s.address?`<div class="card-addr">🏠 ${escH(s.address)}</div>`:'' )}
     ${s.notes?`<div class="card-note">📝 ${escH(s.notes)}</div>`:''}
@@ -4718,11 +4725,42 @@ function handleQR(raw){
   // número para buscar. Desde 2026 ese primer tramo puede ser un usuario de
   // WhatsApp (@nombre) en vez de un número: se acepta tal cual, ya viene en
   // minúsculas desde el campo, así que compara igual que el resto del panel.
+  /* ★ EL QR PEQUEÑO DEL PIE (`TTPED:<id>`): un pedido exacto, sin buscar.
+     Lleva el id, no el número impreso, porque el id no se repite nunca.
+     Se va a él igual que con «Ver»: su etiqueta, la marca y el scroll. */
+  const _idPie=window.NroComprobante?NroComprobante.leerQrPedido(raw):'';
+  if(_idPie){
+    const _p=S.shipments.find(x=>x.id===_idPie);
+    const _f=$('qrFound');_f.textContent=_p?('✅ '+_p.name):'⚠️ Pedido no encontrado';_f.style.display='block';
+    setTimeout(()=>{closeQR();irAlPedido(_idPie);if(_p)toast('✅ '+_p.name);},600);
+    return;
+  }
   const _qrBruto=String(raw).split('#')[0].trim();
   let phone;
   if(esUsuarioWA(_qrBruto)){ phone=_qrBruto.toLowerCase(); }
   else { phone=_qrBruto.replace(/\D/g,'');if(phone.startsWith('51')&&phone.length===11)phone=phone.slice(2);if(phone.length!==9){toast('QR no reconocido');_qrAF=requestAnimationFrame(scanLoop);return} }
+  /* Etiqueta nueva (`número#código`): si el código señala UN pedido, se va
+     directo a él. Si no (etiqueta vieja, o dos pedidos con el mismo código),
+     se busca por número como siempre. */
+  const _exactos=_qrPorCodigo(phone,String(raw).split('#')[1]);
+  if(_exactos.length===1){
+    const _f=$('qrFound');_f.textContent='✅ '+_exactos[0].name;_f.style.display='block';
+    setTimeout(()=>{closeQR();irAlPedido(_exactos[0].id);toast('✅ '+_exactos[0].name);},600);
+    return;
+  }
   const f=$('qrFound');f.textContent=`✅ ${phone}`;f.style.display='block';const m=S.shipments.find(s=>s.phone===phone);setTimeout(()=>{closeQR();$('fSearch').value=phone;_filt='';renderChips();render();if(m){setTimeout(()=>{document.querySelectorAll('.card').forEach(c=>{if(c.innerHTML.includes(phone)){c.style.background='rgba(56,139,253,.15)';setTimeout(()=>c.style.background='',1500)}})},200);toast(`✅ ${m.name}`)}else{toast(`⚠️ No encontrado: ${phone}`)}},800)}
+/* Pedidos de ese número cuyo código es `code`. El código vale de DOS
+   formas, y las dos tienen que entrar: el N° de factura/boleta (lo que
+   imprime hoy la etiqueta) y el de 6 dígitos (lo que imprimió si se
+   imprimió ANTES de ponerle el número). Sin la segunda, una etiqueta ya
+   pegada al paquete dejaría de escanearse por haber añadido la factura. */
+function _qrPorCodigo(phone, code){
+  const c=String(code||'').trim().toUpperCase();
+  if(!c||!window.PrintModule||!PrintModule.codigoEnvio) return [];
+  return S.shipments.filter(s=>s.phone===phone && (
+    String(PrintModule.codigoEnvio(s)).toUpperCase()===c ||
+    (PrintModule.codigoBase && String(PrintModule.codigoBase(s)).toUpperCase()===c)));
+}
 function closeQR(){if(_qrAF)cancelAnimationFrame(_qrAF);if(_qrStream)_qrStream.getTracks().forEach(t=>t.stop());_qrStream=null;_qrAF=null;$('qrVideo').srcObject=null;$('qrOverlay').classList.remove('open')}
 
 /* ═══════════════════════════════════════════════════════════════════════
@@ -4803,16 +4841,23 @@ function _qrMoveFallo(msg){
 function _qrMoveOnScan(raw){
   closeQR(); // uno por uno
   _qrMoveArmTimer(); // hubo actividad: reinicia el minuto de inactividad
+  const all=allStatuses(); const target=_qrMove.status; const ti=all.indexOf(target);
+  // QR pequeño del pie: el pedido exacto por su id.
+  const _idPie=window.NroComprobante?NroComprobante.leerQrPedido(raw):'';
   const parts=String(raw).split('#');
   let phone=parts[0].replace(/\D/g,''); if(phone.startsWith('51')&&phone.length===11)phone=phone.slice(2);
   const code=(parts[1]||'').trim().toUpperCase();
-  if(phone.length!==9){ _qrMoveFallo('⚠️ QR no reconocido — usa la etiqueta del pedido'); return; }
-  const all=allStatuses(); const target=_qrMove.status; const ti=all.indexOf(target);
+  if(!_idPie && phone.length!==9){ _qrMoveFallo('⚠️ QR no reconocido — usa la etiqueta del pedido'); return; }
   if(ti<0){ _qrMoveFallo('⚠️ Estado no válido'); return; }
   let match=null;
-  if(code && window.PrintModule && PrintModule.codigoEnvio){
-    match=S.shipments.find(s=>s.phone===phone && String(PrintModule.codigoEnvio(s)).toUpperCase()===code);
-    if(!match){ _qrMoveFallo('⚠️ '+phone+' #'+code+' no encontrado'); return; }
+  if(_idPie){
+    match=S.shipments.find(s=>s.id===_idPie);
+    if(!match){ _qrMoveFallo('⚠️ Ese pedido ya no está en la lista'); return; }
+  } else if(code && window.PrintModule && PrintModule.codigoEnvio){
+    const _c=_qrPorCodigo(phone, code);
+    if(!_c.length){ _qrMoveFallo('⚠️ '+phone+' #'+code+' no encontrado'); return; }
+    if(_c.length>1){ _qrMoveFallo('⚠️ Varios pedidos con '+phone+' #'+code+' — escanea el QR pequeño'); return; }
+    match=_c[0];
   } else {
     // Viejo (sin código): candidatos con ese número que PUEDEN avanzar a este estado.
     const cand=S.shipments.filter(s=>s.phone===phone && all.indexOf(s.status)>=0 && all.indexOf(s.status)<ti);
@@ -4988,9 +5033,9 @@ render();
      lo usa. config.js, print.js y voz.js preguntan por los pedidos marcados,
      así que siguen yendo detrás. El orden de carga es un contrato
      (ver docs/ARQUITECTURA.md). -->
-<script src="config.js?v=53"></script>
-<script src="print.js?v=17"></script>
-<script src="notify.js?v=5"></script>
+<script src="config.js?v=54"></script>
+<script src="print.js?v=18"></script>
+<script src="notify.js?v=6"></script>
 <script src="shalom.js?v=33"></script>
 <script src="tracking.js?v=22"></script>
 <script src="floatpanel.js?v=4"></script>
@@ -4999,7 +5044,7 @@ render();
 <script src="ticket.js?v=5"></script>
 <script src="agencias-extractor.js?v=11"></script>
 <script src="respaldo.js?v=2"></script>
-<script src="ayuda.js?v=6"></script>
+<script src="ayuda.js?v=7"></script>
 <script src="recursos.js?v=2"></script>
 <script src="dashboard.js?v=2"></script>
 <script src="voz.js?v=3"></script>

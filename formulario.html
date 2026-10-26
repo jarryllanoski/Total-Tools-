@@ -1756,6 +1756,11 @@ function _construirWaMsg(order, trackCode, trackToken){
   const dniLine  = order.dni ? `\n🪪 *${_dniLbl}:* ${order.dni}` : '';
   const encLine  = order.ciudadDestino ? `\n📦 *Ciudad destino:* ${order.ciudadDestino}` : '';
   const notesLine= order.notes ? `\n📝 *Notas:* ${order.notes}` : '';
+  /* N° de factura/boleta: lo puso la tienda en el link y lo devuelve el
+     servidor al crear el pedido (el cliente no lo escribe). Solo letras,
+     números y guion — ya viene limpio, pero se vuelve a filtrar. */
+  const _nroTxt  = String(order.nroComprobante||'').replace(/[^A-Z0-9-]/g,'').slice(0,20);
+  const nroLine  = _nroTxt ? `\n🧾 *Factura/Boleta:* ${_nroTxt}` : '';
   const dirLabel = selCourierType==='agencia'
     ? `\n🏢 *Agencia:* ${order.address||'—'}`
     : `\n🏠 *Dirección:* ${order.address||order.ciudadDestino||'—'}`;
@@ -1769,7 +1774,7 @@ function _construirWaMsg(order, trackCode, trackToken){
     `🚚 *Courier:* ${order.courier}\n`+
     `📅 *Fecha de envío:* ${dateLabel}${notesLine}\n`+
     `━━━━━━━━━━━━━━━\n`+
-    `🔑 *Código de seguimiento:* #${trackCode}\n\n`+
+    `🔑 *Código de seguimiento:* #${trackCode}${nroLine}\n\n`+
     `📍 *Para ver el estado de tu pedido en tiempo real, abre este enlace:*\n${trackUrl}`;
 }
 
@@ -1931,6 +1936,7 @@ async function submitOrder(){
       throw new Error((resp && resp.error) || 'No se pudo registrar');
     }
     order.id = resp.orderId; // id real asignado por el servidor
+    if(resp.nroComprobante) order.nroComprobante = String(resp.nroComprobante);
     showOverlay(false);
     localStorage.setItem('dpanel_order_'+wsId, JSON.stringify({
       trackToken: resp.trackToken, orderId: resp.orderId, name: order.name

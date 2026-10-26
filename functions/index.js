@@ -29,6 +29,7 @@ const agencias = require("./agencias");
 const pedidoPublico = require("./pedidoPublico");
 const enlace = require("./enlaceSeguimiento");
 const registroShalom = require("./registroShalom");
+const nroComp = require("./nroComprobante");
 const instanciaShalom = require("./instanciaShalom");
 const puertaInstancias = require("./puertaInstancias");
 const reniecPublico = require("./reniecPublico");
@@ -488,6 +489,15 @@ async function handleCreate(req, res) {
     orderToSave.cost = deuda > 0 ? String(deuda) : "";
   }
 
+  /* ★ EL NÚMERO DE FACTURA O BOLETA, DEL TOKEN Y NUNCA DEL CLIENTE.
+     Igual que el monto: lo escribió el dueño al generar el link. No está
+     en ORDER_FIELDS, así que si el formulario manda `nroComprobante` se
+     tira antes de llegar aquí — nadie puede ponerse el número de otra
+     venta. Se vuelve a limpiar aunque lo haya escrito el panel: en el QR
+     de la etiqueta un `#` de más rompe la lectura. */
+  const nroComprobante = tokData ? nroComp.de(tokData) : "";
+  if (nroComprobante) orderToSave.nroComprobante = nroComprobante;
+
   // Escritura atómica: pedido + token + señal al panel
   const batch = db.batch();
 
@@ -517,7 +527,12 @@ async function handleCreate(req, res) {
 
   await batch.commit();
 
-  res.json({status: "ok", orderId, trackCode, trackToken});
+  /* El formulario lo usa como código en el WhatsApp del cliente, para que
+     diga lo mismo que la etiqueta. Solo si existe: los links sin número
+     responden exactamente igual que antes. */
+  const resp = {status: "ok", orderId, trackCode, trackToken};
+  if (nroComprobante) resp.nroComprobante = nroComprobante;
+  res.json(resp);
 }
 
 // ── action=token ───────────────────────────────────────────────────────────

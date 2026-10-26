@@ -356,7 +356,7 @@ function _loadMontoFields(s){
 window._formSnap = '';
 function _formSnapshot(){
   const ids=['fName','fPhone','fDni','fAddr','fEncAgencia','fCourier','fDate',
-    'fStatus','fNotes','fMonto','fAdelanto','fShalomGuia','fShalomCodigo'];
+    'fStatus','fNotes','fMonto','fAdelanto','fShalomGuia','fShalomCodigo','fComprobante'];
   let out=ids.map(i=>{const e=$(i);return e?(e.value||''):'';}).join('');
   document.querySelectorAll('.xf').forEach(el=>{ out+=''+(el.value||''); });
   out+=''+((_docs&&(_docs.guia||_docs.embalado||_docs.ticket))?'D':'')
@@ -441,6 +441,7 @@ function openForm(id){
     if($('fEncAgencia'))$('fEncAgencia').value=s.encAgencia||'';
     $('fCourier').value=s.courier;$('fDate').value=s.date;$('fStatus').value=s.status;
     $('fNotes').value=s.notes||'';_loadMontoFields(s);
+    if($('fComprobante'))$('fComprobante').value=_nroDe(s);
     document.querySelectorAll('.xf').forEach(el=>{el.value=(s.extra&&s.extra[el.dataset.f])||''});
     if(s.docGuia){_docs.guia=s.docGuia;refreshSlot('guia')}
     if(s.docEmbalado){_docs.embalado=s.docEmbalado;refreshSlot('embalado')}
@@ -454,7 +455,7 @@ function openForm(id){
     }
     _links=s.links?JSON.parse(JSON.stringify(s.links)):[];renderLinks();
   }else{
-    ['fName','fPhone','fAddr','fNotes'].forEach(i=>$(i).value='');if($('fDni'))$('fDni').value='';if($('fEncAgencia'))$('fEncAgencia').value='';
+    ['fName','fPhone','fAddr','fNotes'].forEach(i=>$(i).value='');if($('fDni'))$('fDni').value='';if($('fComprobante'))$('fComprobante').value='';if($('fEncAgencia'))$('fEncAgencia').value='';
     $('fDate').valueAsDate=new Date();
     // Courier por defecto: SHALOM (siempre está en la lista del panel)
     if($('fCourier')){ const _sh=Array.from($('fCourier').options).find(o=>(o.value||'').toUpperCase().includes('SHALOM')); if(_sh) $('fCourier').value=_sh.value; }
@@ -2015,6 +2016,20 @@ function saveShipment(){
 
      SOLO las que el pedido YA TENÍA: abrir y guardar un pedido antiguo no le
      estrena campos. Misma regla que `shalomClave`, dos bloques más arriba. */
+  /* ★ EL NÚMERO DE FACTURA/BOLETA. Misma regla que `shalomClave`: se
+     escribe si HAY algo, o si el pedido YA lo tenía —y entonces también
+     vacío, para que BORRARLO viaje a la nube y el pedido vuelva a su
+     código de 6 dígitos—. Abrir y guardar un pedido antiguo no le estrena
+     el campo. */
+  {
+    const _nro = _nroLimpio(($('fComprobante')||{value:''}).value);
+    const _prevNro = _editId ?
+      ((S.shipments||[]).find(x=>x.id===_editId)||{}).nroComprobante : undefined;
+    if(_nro || (_prevNro !== undefined && _prevNro !== null && _prevNro !== '')) data.nroComprobante = _nro;
+    const _otro = _nroRepetido(_nro, _editId);
+    // Aviso, no bloqueo: una factura puede cubrir dos bultos.
+    if(_otro) toast('🧾 '+_nro+' también está en el pedido de '+(_otro.name||'otro cliente'));
+  }
   if(_editId && window.DniPedido){
     Object.assign(data, DniPedido.copiasAlDia(
         (S.shipments||[]).find(x=>x.id===_editId), dni));
@@ -2242,7 +2257,7 @@ function importExcel(input){
 }
 
 /* EXPORT CSV */
-function doCSV(){if(!S.shipments.length){toast('Sin envíos');return}const h=['Nombre','Teléfono','Dirección','Courier','Fecha','Estado','Costo','Notas'];const rows=S.shipments.map(s=>[s.name,s.phone,`"${s.address}"`,s.courier,s.date,s.status,s.cost,`"${s.notes}"`]);const csv=[h,...rows].map(r=>r.join(',')).join('\n');const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));a.download=`envios_${new Date().toLocaleDateString('es')}.csv`;a.click();toast('📊 CSV exportado')}
+function doCSV(){if(!S.shipments.length){toast('Sin envíos');return}const h=['Nombre','Teléfono','Dirección','Courier','Fecha','Estado','Costo','Notas','Factura/Boleta'];const rows=S.shipments.map(s=>[s.name,s.phone,`"${s.address}"`,s.courier,s.date,s.status,s.cost,`"${s.notes}"`,_nroDe(s)]);const csv=[h,...rows].map(r=>r.join(',')).join('\n');const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));a.download=`envios_${new Date().toLocaleDateString('es')}.csv`;a.click();toast('📊 CSV exportado')}
 
 function doPrint(){
   if(window.PrintModule){ PrintModule.open(); }
@@ -2531,6 +2546,18 @@ function tokPrintSel(){
   } else { toast('⚠️ Impresión no disponible'); }
 }
 
+/* N° de factura/boleta: la regla vive en functions/nroComprobante.js
+   (la misma que aplica el servidor). Estas dos líneas solo la protegen de
+   que ese archivo no haya cargado: sin él, no hay número, y todo sigue
+   como antes. */
+function _nroLimpio(x){ return window.NroComprobante ? NroComprobante.limpiar(x) : ''; }
+function _nroDe(s){ return window.NroComprobante ? NroComprobante.de(s) : ''; }
+/** Otro pedido (no este) con el mismo número, o null. */
+function _nroRepetido(nro, idPropio){
+  if(!nro) return null;
+  return (S.shipments||[]).find(x=>x && x.id!==idPropio && _nroDe(x)===nro) || null;
+}
+
 function _genTokId(){
   const c='ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
   let r=''; for(let i=0;i<20;i++) r+=c[Math.floor(Math.random()*c.length)];
@@ -2541,6 +2568,7 @@ async function _genTokenDo(action){
   const name    = ($('tokName').value||'').trim();
   const phone   = ($('tokPhone').value||'').trim();
   const link    = ($('tokLink').value||'').trim();
+  const nroComp = _nroLimpio(($('tokComprobante')||{}).value);
   const monto   = (($('tokMonto')||{}).value||'').trim();
   const adelanto= (($('tokAdelanto')||{}).value||'').trim();
   const expDays = parseInt($('tokExp').value||'0')||0;
@@ -2560,6 +2588,10 @@ async function _genTokenDo(action){
     used:         false,
     expiresAt:    expDays ? new Date(Date.now()+expDays*864e5).toISOString() : null,
   };
+  /* El número de factura/boleta viaja DENTRO del token, como el monto: el
+     servidor lo copia al pedido y el cliente no puede cambiarlo. Solo si
+     hay: los links sin número quedan exactamente como antes. */
+  if(nroComp) tok.nroComprobante = nroComp;
   try {
     /* ★ LA FOTO VA PRIMERO, Y SU ID DENTRO DEL TOKEN.
        Antes se guardaba el token y DESPUÉS la foto, y si la foto fallaba el
@@ -2575,6 +2607,7 @@ async function _genTokenDo(action){
     await window._fbSaveTok(tok);
     const url = getFormLink()+'?t='+id+'&cfg='+cfgId;
     $('tokName').value=''; $('tokPhone').value=''; $('tokLink').value=''; $('tokExp').value='';
+    if($('tokComprobante')) $('tokComprobante').value='';
     if($('tokMonto')) $('tokMonto').value=''; if($('tokAdelanto')) $('tokAdelanto').value='';
     // Pequeño delay para que Firebase indexe el documento
     await new Promise(r=>setTimeout(r,800));
@@ -2709,6 +2742,8 @@ function _renderTokList(){
       var nmRaw = (ord && ord.name) ? ord.name : (tok.name||'—');
       var nm = String(nmRaw).replace(/</g,'&lt;').replace(/>/g,'&gt;');
       var dni = ord ? _dniDe(ord) : '';
+      // El del PEDIDO si ya existe (pudo corregirse en «Editar»); si no, el del link.
+      var nroTok = (window.NroComprobante ? NroComprobante.de(ord || tok) : '');
       var cour = ord ? String(ord.courier||'').trim() : '';
       var dniEsc = dni.replace(/</g,'&lt;').replace(/>/g,'&gt;');
       var courEsc = cour.replace(/</g,'&lt;').replace(/>/g,'&gt;');
@@ -2738,6 +2773,7 @@ function _renderTokList(){
         +'<div class="tok-list-meta">'
         +(ph?'📞 '+ph:'')+(showTime?((ph?'  · ':'')+tiempo):'')
         +(dni?'<br>🪪 DNI '+dniEsc:'')
+        +(nroTok?'<br>🧾 '+nroTok:'')
         +(cour?'<br>'+(courIcon?courIcon+' ':'🚚 ')+courEsc:'')
         +(expTxt?'<br>⏱ '+expTxt:'')
         +(lk?'<br><a href="'+lkHref+'" target="_blank" rel="noopener" class="link-chip" onclick="event.stopPropagation()" style="margin-top:4px">🔗 '+shortLk+'</a>':'')

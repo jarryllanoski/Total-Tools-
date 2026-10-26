@@ -350,7 +350,16 @@ window.PrintModule = {
      que un alfanumérico). Determinístico: mismo pedido → mismo código (reimprimir
      da igual), sin guardar nada nuevo en la base. */
 var _CODIGO_CUTOFF = '2026-08-08';
+/* ★ Desde el 26/10/2026: si el pedido tiene N° de factura/boleta, ESE es su
+   código (etiqueta, QR, escáner). Sin número, el de siempre. La regla del
+   número vive en functions/nroComprobante.js. */
+function _nroPrint(s){ return window.NroComprobante ? NroComprobante.de(s) : ''; }
 function _codigoEnvio(s){
+  return _nroPrint(s) || _codigoBase(s);
+}
+// El código de antes del N° de factura. El escáner lo sigue aceptando: una
+// etiqueta impresa antes de poner la factura tiene que seguir sirviendo.
+function _codigoBase(s){
   if(!s || !s.id) return '???';
   var esNuevo = ((s.createdAt||'').slice(0,10) >= _CODIGO_CUTOFF);
   var idNum = String(s.id).replace(/\D/g,'');
@@ -361,6 +370,7 @@ function _codigoEnvio(s){
 }
 // Exponer el código para que el escáner (index.html) identifique el pedido exacto.
 window.PrintModule.codigoEnvio = _codigoEnvio;
+window.PrintModule.codigoBase = _codigoBase;
 // Valor del QR de la etiqueta: número (viejos) o "número#código" (hoy en adelante,
 // mismo corte que el código impreso). Deja escanear 1-a-1 sin ambigüedad.
 function _qrValor(s){
@@ -390,6 +400,25 @@ function _agenciaLinea(s, cls){
   var dest = String(_destino(s)).toLowerCase();
   if(dest.indexOf(ag.toLowerCase()) >= 0) return '';
   return '<div class="'+(cls||'agencia')+'">🏪 '+esc(ag)+'</div>';
+}
+
+/* ── PIE: QR PEQUEÑO DEL PEDIDO ───────────────────────────────────
+   Debajo de toda la etiqueta. Con factura/boleta dice «FACTURA F001-123»;
+   sin ella (links rápidos, pedidos a mano) dice «PEDIDO #307321».
+   El QR lleva el ID del pedido (`TTPED:<id>`), no el número impreso: el
+   número puede repetirse, el id no. Escanearlo en el panel lleva a ESE
+   pedido, solo. Pedidos de antes del 26/10/2026 sin número: no lo llevan,
+   su etiqueta sale exactamente igual que siempre. */
+function _pieQrPedido(s, qrUrl){
+  var v = window.NroComprobante ? NroComprobante.valorQrPedido(s) : '';
+  if(!v) return '';
+  var nro = _nroPrint(s);
+  var tipo = nro ? NroComprobante.tipo(nro) : 'PEDIDO';
+  return '<div class="card-pie">' +
+    '<img src="'+qrUrl(v)+'" alt="QR pedido" width="60" height="60">' +
+    '<div class="card-pie-txt"><span class="card-pie-tipo">'+esc(tipo)+'</span>' +
+    '<span class="card-pie-nro">'+esc(nro || ('#'+_codigoBase(s)))+'</span></div>' +
+  '</div>';
 }
 
 /* ── FORMATO 1: ETIQUETA ─────────────────────────────────────────── */
@@ -434,12 +463,13 @@ function _htmlEtiqueta(list, bultos, bizName, bizPhone, bizCity, fecha, qrUrl){
           <div class="card-footer">
             <span class="courier">${esc(s.courier||'—')}</span>
             <span class="fecha">${esc(s.date||'—')}</span>
-            <span class="codigo">#${esc(_codigoEnvio(s))}</span>
+            <span class="codigo${_codigoEnvio(s).length>8?' codigo-largo':''}">#${esc(_codigoEnvio(s))}</span>
           </div>
           <div class="card-thanks">
             <span class="card-thanks-time">${new Date().toLocaleDateString('es-PE',{day:'2-digit',month:'2-digit',year:'numeric'})} · ${new Date().toLocaleTimeString('es-PE',{hour:'numeric',minute:'2-digit',hour12:true})}</span>
             <span class="card-thanks-txt">Gracias por tu preferencia</span>
           </div>
+          ${_pieQrPedido(s, qrUrl)}
         </div>`);
     }
   });
@@ -506,6 +536,15 @@ function _htmlEtiqueta(list, bultos, bizName, bizPhone, bizCity, fecha, qrUrl){
   .card-thanks { display:flex; flex-direction:column; align-items:center; text-align:center; gap:0.8mm; margin-top:2.5mm; padding-top:1.8mm; border-top:1px dashed #333; }
   .card-thanks-txt  { font-size:clamp(7.5pt,1.4vw,9pt); color:#555; font-weight:600; text-transform:uppercase; letter-spacing:2px; }
   .card-thanks-time { font-size:clamp(7pt,1.1vw,8pt); color:#333; font-weight:600; letter-spacing:.5px; }
+  /* Un N° de factura es más largo que 6 dígitos: menos espaciado para que
+     no empuje al courier y la fecha. */
+  .codigo.codigo-largo { letter-spacing:.5px; font-size:clamp(9pt,1.9vw,11.5pt); }
+  /* Pie con el QR pequeño: discreto, debajo de todo. */
+  .card-pie { display:flex; align-items:center; justify-content:center; gap:2.5mm; margin-top:2mm; padding-top:1.8mm; border-top:1px dashed #333; }
+  .card-pie img { display:block; width:14mm; height:14mm; }
+  .card-pie-txt { display:flex; flex-direction:column; line-height:1.2; }
+  .card-pie-tipo { font-size:clamp(6pt,1vw,7pt); color:#555; font-weight:700; letter-spacing:1.5px; }
+  .card-pie-nro  { font-size:clamp(9pt,1.8vw,11pt); color:#000; font-weight:900; letter-spacing:.5px; }
 
   @media print {
     body { padding:2mm; }
