@@ -483,6 +483,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);max
    (el ✓ del DNI): misma altura de etiqueta → casillas alineadas. */
 .frow-par{align-items:flex-start}
 .frow-par .fl{height:14px;line-height:14px;display:flex;align-items:center;gap:4px;white-space:nowrap;overflow:hidden}
-/* 🖨️ de la tarjeta: sin color hasta imprimir; círculo azul relleno después. */
+/* 🖨️ de la tarjeta: sin color hasta imprimir; después, SOLO el borde azul —el
+   mismo anillo que el botón de seleccionar (.tb-btn.sel-on)—. */
 .prn-btn{background:transparent;border:1px solid var(--bd);filter:grayscale(1);opacity:.75}
-.prn-btn.on{background:var(--blue);border-color:var(--blue);filter:none;opacity:1}
+.prn-btn.on{background:transparent;border-color:var(--blue);box-shadow:0 0 0 2px rgba(56,139,253,.45);filter:none;opacity:1}

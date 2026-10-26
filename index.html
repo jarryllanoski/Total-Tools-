@@ -800,7 +800,7 @@
   window._fbReady=true;
 })();
 </script>
-<link rel="stylesheet" href="panel.css?v=8">
+<link rel="stylesheet" href="panel.css?v=9">
 </head>
 <body>
 
@@ -2894,7 +2894,7 @@ function _montoCard(s){
 }
 /* 🖨️ de la tarjeta: imprime SOLO este pedido (el mismo panel de impresión
    de siempre, vía PrintModule.openOne, sin tocar la selección). Círculo
-   azul relleno si ya se imprimió; sin color si no. La respuesta a «¿se
+   con borde azul si ya se imprimió; sin color si no. La respuesta a «¿se
    imprimió?» es una sola: PrintModule.impreso. */
 function _btnImprimir(s){
   const on = (window.PrintModule && PrintModule.impreso) ? PrintModule.impreso(s) : !!(s && s.printed);

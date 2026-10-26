@@ -86,7 +86,8 @@ module.exports = async ({bloque, ok}) => {
     ok(iBtn > card.indexOf('class="cname"') && iBtn < card.indexOf('title="Cotización"'),
        'entre el nombre y el 🧾');
     const css = E.leer('panel.css');
-    ok(/\.prn-btn\.on\{background:var\(--blue\)/.test(css), 'azul relleno al imprimir');
+    ok(/\.prn-btn\.on\{background:transparent;border-color:var\(--blue\);box-shadow:0 0 0 2px rgba\(56,139,253,\.45\)/.test(css),
+       'al imprimir, SOLO el borde azul: el mismo anillo que el botón de seleccionar');
     ok(/\.prn-btn\{[^}]*grayscale/.test(css), 'gris sin imprimir');
   }
 
