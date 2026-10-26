@@ -325,9 +325,11 @@ function recalcDeuda(){
   const a=parseFloat(($('fAdelanto')||{value:''}).value)||0;
   const d=Math.max(0, m-a);
   const el=$('fDeudaDisplay'); if(!el) return;
-  const fmt=n=>'S/ '+(Math.round(n*100)/100).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
   el.style.color='';   // texto plano, sin color
   // Pagado (monto>0 y deuda=0) → monto tachado. Debe / sin monto → texto normal.
+  // La regla vive en functions/montoPedido.js: la MISMA que la tarjeta.
+  if(window.MontoPedido){ el.innerHTML=MontoPedido.html(MontoPedido.deDatos(m, a)); return; }
+  const fmt=n=>'S/ '+(Math.round(n*100)/100).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
   if(m>0 && d<=0){ el.innerHTML='<s>'+fmt(m)+'</s>'; }
   else{ el.textContent=fmt(d); }
 }

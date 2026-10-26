@@ -344,6 +344,16 @@ function _btn(txt, css){
   var b = document.createElement('button'); b.textContent = txt; b.style.cssText = css; return b;
 }
 
+// El monto de la tira: regla única para los pedidos de hoy en adelante;
+// los de antes, solo si deben (lo mismo que enseña su tarjeta).
+function _montoTira(ship){
+  var M = window.MontoPedido;
+  if (!M) return '';
+  var e = M.de(ship);
+  if (M.esNuevo(ship)) return M.html(e);
+  return e.tipo === 'debe' ? M.html(e) : '';
+}
+
 // Construye la tira de UN pedido (no la inserta). Misma tarjeta de siempre.
 // DOM + addEventListener → el teléfono no va en un onclick inline (cierra el
 // vector XSS del hallazgo #5).
@@ -353,7 +363,32 @@ function _tiraDestino(ship){
   var head = document.createElement('div');
   head.innerHTML = '<div style="font-size:12px;font-weight:800;color:#a78bfa;margin-bottom:6px">📍 PEDIDO LLEGÓ A DESTINO</div>'+
     '<div style="font-size:13px;color:#e6edf3;margin-bottom:4px"><b>'+_esc(ship.name)+'</b></div>'+
-    '<div style="font-size:11px;color:#8b949e;margin-bottom:10px">Guía: '+_esc(ship.trackingOrderNumber||'')+'</div>';
+    '';
+  /* ★ CELULAR Y MONTO EN UNA LÍNEA (26/10/2026). Antes iba la guía, que
+     para avisar al cliente no sirve. El celular se copia al tocarlo —con la
+     misma función que la tarjeta— y a la derecha va lo que debe, con la
+     regla de functions/montoPedido.js. Los pedidos de antes solo enseñan
+     monto si deben, como su tarjeta. */
+  var linea = document.createElement('div');
+  linea.style.cssText = 'display:flex;justify-content:space-between;align-items:center;gap:10px;font-size:12px;margin-bottom:10px';
+  var tel = document.createElement('span');
+  tel.className = 'trk-tel';
+  tel.textContent = String(ship.phone || '');
+  tel.title = 'Copiar';
+  tel.style.cssText = 'color:#e6edf3;font-weight:700;cursor:pointer;user-select:none';
+  tel.addEventListener('click', function(){
+    if (typeof window.copyPhone === 'function') window.copyPhone(String(ship.phone || ''));
+  });
+  linea.appendChild(tel);
+  var mt = _montoTira(ship);
+  if (mt){
+    var mo = document.createElement('span');
+    mo.className = 'trk-monto';
+    mo.style.cssText = 'color:#e6edf3;font-weight:700;white-space:nowrap';
+    mo.innerHTML = mt;   // solo dígitos, «S/» y <s>: lo arma MontoPedido.html
+    linea.appendChild(mo);
+  }
+  head.appendChild(linea);
   var row = document.createElement('div'); row.style.cssText = 'display:flex;gap:8px';
   var bClose = _btn('Cerrar', 'flex:1;background:#30363d;border:none;border-radius:8px;color:#8b949e;padding:8px;font-size:12px;cursor:pointer;font-family:inherit');
   bClose.addEventListener('click', function(){ _quitarTira(d); });
@@ -377,17 +412,39 @@ function _quitarTira(card){
     if (!mazo.children.length) mazo.remove();
     else _ordenarMazo(mazo);
   }
+  _barraCerrarTodos();
 }
 
-// Mazo: la primera tira se ve entera y las siguientes asoman por debajo.
+// Mazo: una tira DEBAJO de otra, enteras (26/10/2026). Antes se montaban
+// (-62px) y solo se leía la primera: avisar al cliente número 7 obligaba a
+// cerrar las seis de encima.
 function _ordenarMazo(mazo){
-  var n = mazo.children.length;
-  for (var i = 0; i < n; i++){
+  mazo.style.cssText = 'display:flex;flex-direction:column;gap:8px';
+  for (var i = 0; i < mazo.children.length; i++){
     var c = mazo.children[i];
-    c.style.position  = 'relative';
-    c.style.zIndex    = String(n - i);   // la de arriba, al frente
-    c.style.marginTop = i === 0 ? '0' : '-62px';
+    c.style.position = ''; c.style.zIndex = ''; c.style.marginTop = '';
   }
+  _barraCerrarTodos();
+}
+
+// «Cerrar todos»: solo cuando hay dos o más tiras. Cerrarlas una por una
+// con doce en lista es pesado.
+function _barraCerrarTodos(){
+  var stack = document.getElementById('trkDestinoStack');
+  if (!stack) return;
+  var n = stack.querySelectorAll('[data-ship]').length;
+  var bar = document.getElementById('trkDestinoTodos');
+  if (n < 2){ if (bar) bar.remove(); return; }
+  if (!bar){
+    bar = _btn('Cerrar todos', 'align-self:flex-end;background:#30363d;border:none;border-radius:8px;color:#8b949e;padding:6px 12px;font-size:11px;cursor:pointer;font-family:inherit');
+    bar.id = 'trkDestinoTodos';
+    bar.addEventListener('click', function(){
+      stack.querySelectorAll('[data-ship]').forEach(function(c){ c.remove(); });
+      stack.querySelectorAll('.trk-mazo').forEach(function(m){ m.remove(); });
+      bar.remove();
+    });
+  }
+  if (stack.firstChild !== bar) stack.insertBefore(bar, stack.firstChild);
 }
 
 // Aviso individual (fijo hasta cerrar).
@@ -396,6 +453,7 @@ function _mostrarAlertaDestino(ship){
   var stack = _destinoStack();
   if (stack.querySelector('[data-ship="'+ship.id+'"]')) return; // dedup: ya visible
   stack.appendChild(_tiraDestino(ship));
+  _barraCerrarTodos();
 }
 
 // Aviso resumen cuando llegan varios de golpe (fijo hasta cerrar).
@@ -431,6 +489,7 @@ function _desplegarMazo(ships){
   if (!mazo.children.length) return;
   _ordenarMazo(mazo);
   stack.appendChild(mazo);
+  _barraCerrarTodos();   // el mazo ya está dentro: ahora sí se cuentan sus tiras
 }
 
 

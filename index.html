@@ -32,6 +32,7 @@
 <script src="functions/registroShalom.js?v=3"></script>
 <script src="functions/dniPedido.js?v=1"></script>
 <script src="functions/nroComprobante.js?v=1"></script>
+<script src="functions/montoPedido.js?v=1"></script>
 <script src="appcheck.js?v=1"></script>
 <!-- FIREBASE via REST API — sin SDK, funciona en Brave/Chrome/Firefox/Safari -->
 <script>
@@ -2880,6 +2881,17 @@ function scrollCard(dir){
   window.scrollTo({top:Math.max(0,y), behavior:'smooth'});
 }
 function escU(u){ u=String(u==null?'':u).trim(); return (/^https?:\/\//i.test(u)||/^data:image\//i.test(u))?escH(u):'#'; }
+/* El monto de la tarjeta. Pedidos de hoy en adelante: la regla única de
+   functions/montoPedido.js (debe · S/ 0.00 · tachado si pagó, redondeado).
+   Pedidos de antes: EXACTAMENTE lo de siempre — el dueño pidió no cambiarle
+   la cara a los de ayer. */
+function _montoCard(s){
+  if(typeof MontoPedido!=='undefined' && MontoPedido.esNuevo(s)){
+    const e=MontoPedido.de(s);
+    return `<span class="meta">💰 ${MontoPedido.html(e)}</span>`;
+  }
+  return s.cost?`<span class="meta">💰 S/ ${escH(s.cost)}</span>`:'';
+}
 function cardHTML(s){
   const gChk=s.chkGuia||false, tChk=s.chkTicket||false, eChk=s.chkEmbalado||false;
   const msgs=S.msgTemplates[s.status]||['',''];
@@ -2918,7 +2930,7 @@ function cardHTML(s){
     <div class="card-meta">
       <span class="meta">${esUsuarioWA(s.phone)?'':`<a href="tel:+51${escH(s.phone)}" class="ph-call" onclick="event.stopPropagation()" title="Llamar">📞</a>`}${escH(s.phone)}<button class="ph-copy" onclick="event.stopPropagation();copyPhone('${escH(s.phone)}')" title="Copiar número"><svg viewBox="0 0 448 512" width="11" height="11" fill="currentColor" aria-hidden="true"><path d="M320 448v40c0 13.255-10.745 24-24 24H24c-13.255 0-24-10.745-24-24V120c0-13.255 10.745-24 24-24h72v296c0 30.879 25.121 56 56 56h168zm0-344V0H152c-13.255 0-24 10.745-24 24v368c0 13.255 10.745 24 24 24h272c13.255 0 24-10.745 24-24V128H344c-13.2 0-24-10.8-24-24zm120.971-31.029L375.029 7.029A24 24 0 0 0 358.059 0H352v96h96v-6.059a24 24 0 0 0-7.029-16.97z"/></svg></button></span>
       <span class="meta">📅 ${escH(s.date||'—')} <button onclick="copyCardLink('${s.id}')" title="Copiar link" style="background:none;border:none;color:#388bfd;font-size:11px;cursor:pointer;padding:0 0 0 2px;vertical-align:middle">🔗</button></span>
-      ${s.cost?`<span class="meta">💰 S/ ${escH(s.cost)}</span>`:''}
+      ${_montoCard(s)}
       ${(window.NroComprobante&&NroComprobante.de(s))?`<span class="meta" title="Factura / Boleta" style="opacity:.75">🧾 ${escH(NroComprobante.de(s))}</span>`:''}
     </div>
     ${(s.courier||'').toUpperCase().includes('ENCOMIENDA')?((s.ciudadDestino||s.address)?`<div class="card-addr">📦 ${escH(s.ciudadDestino||s.address)}${s.encAgencia?' · 🏪 '+escH(s.encAgencia):''}</div>`:''): (s.address?`<div class="card-addr">🏠 ${escH(s.address)}</div>`:'' )}
@@ -5047,11 +5059,11 @@ render();
      lo usa. config.js, print.js y voz.js preguntan por los pedidos marcados,
      así que siguen yendo detrás. El orden de carga es un contrato
      (ver docs/ARQUITECTURA.md). -->
-<script src="config.js?v=55"></script>
+<script src="config.js?v=56"></script>
 <script src="print.js?v=18"></script>
 <script src="notify.js?v=6"></script>
 <script src="shalom.js?v=33"></script>
-<script src="tracking.js?v=22"></script>
+<script src="tracking.js?v=23"></script>
 <script src="floatpanel.js?v=4"></script>
 <script src="delivery.js?v=8"></script>
 <script src="qrtracking.js?v=3"></script>
