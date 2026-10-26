@@ -580,6 +580,10 @@ async function checkToken(tok){
     if(data.prefillName)  _prefillName  = data.prefillName;
     if(data.prefillPhone) _prefillPhone = data.prefillPhone;
     if(data.prefillLink)  _prefillLink  = data.prefillLink;
+    /* La foto de configuración de ESTE link, tal como la guardó el panel en
+       el token. Manda sobre la de la URL: la URL la puede editar el cliente,
+       el token no. Los tokens viejos no la traen y se sigue con la URL. */
+    if(data.cfgId) _tokCfgId = String(data.cfgId);
     loadCfg();
   }catch(e){
     if(e.message==='timeout'){
@@ -602,11 +606,15 @@ function showTokenScreen(icon, title, msg){
 /* ─── LOAD CONFIG (vía Cloud Function) ───────────────────────────── */
 function _cfgHasPhone(c){ return !!(c && (c.phone || (c.config && c.config.phone))); }
 
+/* El id de la foto que trae el TOKEN. Vacío si el link es viejo o no hay
+   token: entonces se usa el de la URL, como siempre. */
+var _tokCfgId = '';
+
 async function loadCfg(){
   CFG = null;
   renderForm();
   try{
-    const cfgId = new URLSearchParams(location.search).get('cfg');
+    const cfgId = _tokCfgId || new URLSearchParams(location.search).get('cfg');
     const withTO = (pr,ms)=>Promise.race([pr, new Promise(r=>setTimeout(()=>r(null),ms))]);
     let cfg = null;
     if(cfgId){

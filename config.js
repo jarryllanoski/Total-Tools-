@@ -2258,20 +2258,139 @@ function updateShareLink(){
   const el = document.getElementById('shareUrl');
   if(el) el.textContent = link;
 }
+/* ★ «ESTE LINK»: QUÉ DÍAS Y QUÉ COURIERS OFRECE, ELEGIDO EN COMPARTIR.
+   Cada link ya congelaba su configuración al generarse (la «foto» de abajo),
+   pero la sacaba de la configuración GLOBAL. Para hacer un link solo con
+   Shalom había que cambiar Config, guardar, generar y volver a dejarlo — y
+   si en otra PC alguien generaba en ese momento, se llevaba el cambio a
+   medias. Ahí se cruzaban.
+
+   Ahora la selección vive en ESTE navegador (localStorage) y nunca en la
+   nube: no hay ningún documento que dos PCs escriban a la vez, así que no
+   hay nada que se pueda pisar. Config sigue siendo la configuración por
+   defecto —la que usa el formulario abierto sin link— y desde aquí no se
+   toca nunca. Es el principio de una factura: el precio se fija al emitirla,
+   y cambiar el catálogo después no la toca. */
+const _LINK_SEL_KEY = 'tt_link_sel';
+const _LINK_DIAS = [{n:'L',v:1},{n:'M',v:2},{n:'X',v:3},{n:'J',v:4},{n:'V',v:5},{n:'S',v:6},{n:'D',v:0}];
+
+/* La selección EFECTIVA, siempre cuadrada contra los couriers de HOY.
+   · Un courier nuevo en Config entra con el valor de Config.
+   · Uno borrado en Config desaparece: no queda un fantasma que el
+     formulario intente ofrecer. */
+function _linkSel(){
+  let guardado = null;
+  try{ guardado = JSON.parse(localStorage.getItem(_LINK_SEL_KEY) || 'null'); }catch(e){}
+  const cfgAct = S.courierActive || {};
+  const couriers = {};
+  (S.couriers || []).forEach(function(c){
+    const g = guardado && guardado.couriers ? guardado.couriers[c] : undefined;
+    couriers[c] = (typeof g === 'boolean') ? g : (cfgAct[c] !== false);
+  });
+  const dias = (guardado && Array.isArray(guardado.days))
+    ? guardado.days.filter(function(d){ return d >= 0 && d <= 6; })
+    : ((S.dispatch && S.dispatch.days) || []).slice();
+  return {days: dias, couriers: couriers};
+}
+
+function _linkSelGuardar(sel){
+  try{ localStorage.setItem(_LINK_SEL_KEY, JSON.stringify(sel)); }catch(e){}
+}
+
+function linkSelDia(v){
+  const sel = _linkSel();
+  const i = sel.days.indexOf(v);
+  if(i >= 0) sel.days.splice(i, 1); else sel.days.push(v);
+  _linkSelGuardar(sel); _pintarLinkSel();
+}
+
+function linkSelCourier(nombre){
+  const sel = _linkSel();
+  sel.couriers[nombre] = !sel.couriers[nombre];
+  _linkSelGuardar(sel); _pintarLinkSel();
+}
+
+function linkSelComoConfig(){
+  try{ localStorage.removeItem(_LINK_SEL_KEY); }catch(e){}
+  _pintarLinkSel();
+  if(typeof toast === 'function') toast('↺ Igual que en Config');
+}
+
+/* Lo que impide generar un link inservible. Se comprueba ANTES del spinner,
+   como el nombre del cliente: un link sin días o sin couriers abre un
+   formulario en el que el cliente no puede elegir nada. */
+function _linkSelFalta(){
+  const sel = _linkSel();
+  if(!sel.days.length) return '⚠️ Marca al menos un día de despacho para este link';
+  const alguno = Object.keys(sel.couriers).some(function(c){ return sel.couriers[c]; });
+  if(!alguno) return '⚠️ Marca al menos una forma de envío para este link';
+  return '';
+}
+
+function _pintarLinkSel(){
+  const box = $('linkSelBox'); if(!box) return;
+  const sel = _linkSel();
+  const chip = function(on, txt, onclick, titulo){
+    /* `onclick` lleva el nombre del courier, que escribe el dueño en Config.
+       Doble escape, en este orden: `escJs` para la cadena de JavaScript y
+       `escH` para el atributo HTML. Con uno solo, un courier llamado
+       «D'Rosa» o con comillas rompería el botón. */
+    return '<button type="button" onclick="'+escH(onclick)+'" title="'+escH(titulo||txt)+'" ' +
+      'style="flex-shrink:0;padding:7px 11px;border-radius:9px;font-size:12px;font-weight:700;' +
+      'cursor:pointer;font-family:inherit;white-space:nowrap;' +
+      (on ? 'background:var(--blue);border:1px solid var(--blue);color:#fff'
+          : 'background:var(--bg3);border:1px solid var(--bd);color:var(--text2)') +
+      '">'+escH(txt)+'</button>';
+  };
+  const fila = function(etq, contenido){
+    return '<div style="display:flex;align-items:center;gap:8px;margin-top:8px">' +
+      '<div style="font-size:11px;color:var(--text2);width:42px;flex-shrink:0">'+etq+'</div>' +
+      /* Una sola fila que se desliza, no una que se parte en tres: así son
+         DOS filas, como pidió el dueño, con 7 couriers o con 12. */
+      '<div style="display:flex;gap:6px;overflow-x:auto;padding-bottom:2px;' +
+      'scrollbar-width:thin">'+contenido+'</div></div>';
+  };
+  const dias = _LINK_DIAS.map(function(d){
+    return chip(sel.days.indexOf(d.v) >= 0, d.n, 'linkSelDia('+d.v+')');
+  }).join('');
+  const envios = (S.couriers || []).map(function(c){
+    return chip(!!sel.couriers[c], c, "linkSelCourier('"+escJs(c)+"')");
+  }).join('');
+  box.innerHTML =
+    '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px">' +
+      '<div class="cfg-ttl" style="margin:0">📦 Este link</div>' +
+      '<button type="button" onclick="linkSelComoConfig()" style="background:none;border:none;' +
+      'color:var(--blue);font-size:11.5px;font-weight:700;cursor:pointer;font-family:inherit;' +
+      'padding:4px 2px">↺ como en Config</button>' +
+    '</div>' +
+    fila('Días', dias) + fila('Envío', envios);
+}
+
 async function _snapshotFormConfig(){
   const uuid=Math.random().toString(36).slice(2,9)+Date.now().toString(36);
+  /* La foto sale de lo marcado en «Este link», no de la configuración
+     global: ver `_linkSel`. Hora de corte y anticipación sí siguen saliendo
+     de Config — no se piden aquí para no meter una tercera fila. */
+  const sel=_linkSel();
+  const courierActive={};
+  (S.couriers||[]).forEach(function(c){ courierActive[c]=!!sel.couriers[c]; });
   const snap={
     name:(S.config&&S.config.name)||'',
     city:(S.config&&S.config.city)||'',
     phone:(S.config&&S.config.phone)||'',
     couriers:S.couriers||[],
-    courierActive:S.courierActive||{},
+    courierActive:courierActive,
     courierTypes:S.courierTypes||{},
-    dispatch:S.dispatch||{},
+    dispatch:Object.assign({},S.dispatch||{},{days:sel.days.slice()}),
     extraFields:S.extraFields||[],
     createdAt:new Date().toISOString()
   };
-  if(window._fbSaveFormConfig) await window._fbSaveFormConfig(uuid,snap);
+  /* Sin la función de guardar, NO se devuelve el id. Antes se devolvía
+     igual: el link salía apuntando a una foto que nunca se escribió, el
+     formulario recibía «no encontrada» y caía a la configuración global —
+     justo lo que «Este link» viene a evitar. */
+  if(!window._fbSaveFormConfig) throw new Error('guardado de la foto no disponible');
+  await window._fbSaveFormConfig(uuid,snap);
   return uuid;
 }
 /* ── LINKS RÁPIDOS: ahora generan un TOKEN de un solo uso ──────────────
@@ -2312,10 +2431,13 @@ async function _genQuickDo(action){
     expiresAt:    new Date(Date.now()+7*864e5).toISOString(), // vence en 7 días (autolimpieza)
   };
   try{
+    // Igual que el link personalizado: foto primero, y su id dentro del token.
+    let cfgId='';
+    try{ cfgId=await _snapshotFormConfig(); }catch(e){ console.warn('cfg snapshot:',e); }
+    if(!cfgId){ if(win)win.close(); toast('⚠️ No se pudo guardar la configuración del link. Intenta de nuevo.'); return; }
+    tok.cfgId=cfgId;
     await window._fbSaveTok(tok);
-    let cfgParam='';
-    try{ const cfgId=await _snapshotFormConfig(); cfgParam=`&cfg=${cfgId}`; }catch(e){ console.warn('cfg snapshot:',e); }
-    const url = getFormLink()+'?t='+id+cfgParam;
+    const url = getFormLink()+'?t='+id+'&cfg='+cfgId;
     if(action==='copy'){
       navigator.clipboard.writeText(url).then(()=>toast('🔗 Link copiado')).catch(()=>{
         const ta=document.createElement('textarea');ta.value=url;document.body.appendChild(ta);ta.select();document.execCommand('copy');document.body.removeChild(ta);toast('🔗 Link copiado');
@@ -2329,7 +2451,11 @@ async function _genQuickDo(action){
     if(typeof loadTokenList==='function') loadTokenList(true); // aparece en "Links generados"
   }catch(e){ if(win)win.close(); toast('⚠️ Error: '+e.message); }
 }
-function genQuickToken(action, btn){ return _genGuard(btn, ()=>_genQuickDo(action)); }
+function genQuickToken(action, btn){
+  const _falta=_linkSelFalta();
+  if(_falta){ if(typeof toast==='function') toast(_falta); return; }
+  return _genGuard(btn, ()=>_genQuickDo(action));
+}
 function copyLink(btn){ return genQuickToken('copy', btn); }
 function openFormLink(btn){ return genQuickToken('open', btn); }
 function shareWA(btn){ return genQuickToken('wa', btn); }
@@ -2422,10 +2548,19 @@ async function _genTokenDo(action){
     expiresAt:    expDays ? new Date(Date.now()+expDays*864e5).toISOString() : null,
   };
   try {
+    /* ★ LA FOTO VA PRIMERO, Y SU ID DENTRO DEL TOKEN.
+       Antes se guardaba el token y DESPUÉS la foto, y si la foto fallaba el
+       link salía igual, sin ella: el formulario caía a la configuración
+       global y ofrecía couriers que acababas de desmarcar para este link.
+       Ahora, sin foto no hay link — y se dice.
+       Y el id viaja en el token, no solo en la URL: la URL la puede editar
+       el cliente, el token no. */
+    let cfgId='';
+    try{ cfgId=await _snapshotFormConfig(); }catch(e){ console.warn('cfg snapshot:',e); }
+    if(!cfgId){ toast('⚠️ No se pudo guardar la configuración del link. Intenta de nuevo.'); return; }
+    tok.cfgId=cfgId;
     await window._fbSaveTok(tok);
-    let cfgParam='';
-    try{const cfgId=await _snapshotFormConfig();cfgParam=`&cfg=${cfgId}`;}catch(e){console.warn('cfg snapshot:',e);}
-    const url = getFormLink()+'?t='+id+cfgParam;
+    const url = getFormLink()+'?t='+id+'&cfg='+cfgId;
     $('tokName').value=''; $('tokPhone').value=''; $('tokLink').value=''; $('tokExp').value='';
     if($('tokMonto')) $('tokMonto').value=''; if($('tokAdelanto')) $('tokAdelanto').value='';
     // Pequeño delay para que Firebase indexe el documento
@@ -2454,6 +2589,8 @@ function genToken(action, btn){
   // Validación ANTES del spinner (para no bloquear el botón por un dato faltante).
   const name=($('tokName').value||'').trim(), phone=($('tokPhone').value||'').trim();
   if(!name && !phone){ if(typeof toast==='function') toast('⚠️ Escribe el nombre o teléfono del cliente'); return; }
+  const _falta=_linkSelFalta();
+  if(_falta){ if(typeof toast==='function') toast(_falta); return; }
   return _genGuard(btn, ()=>_genTokenDo(action));
 }
 

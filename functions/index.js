@@ -545,11 +545,23 @@ async function handleToken(req, res) {
     res.json({status: "expired"});
     return;
   }
+  /* ★ LA FOTO DE LA CONFIGURACIÓN VIAJA CON EL TOKEN, NO SOLO EN LA URL.
+     Cada link congela al generarse qué días y qué couriers ofrece (la
+     «foto», en FORMCFG_COL). Hasta el 26/10/2026 su id viajaba solo en la
+     URL (`&cfg=…`), y un cliente que editara el enlace podía cambiarlo por
+     el de otro link y ver otros couriers u otros días. Ahora el panel lo
+     guarda también DENTRO del token, y el formulario prefiere este.
+     Los tokens viejos no lo tienen: devuelven "" y el formulario sigue con
+     el de la URL, como antes. Se valida la forma para no devolver basura
+     que el formulario usaría como ruta. */
+  const cfgId = /^[A-Za-z0-9_-]{6,40}$/.test(String(d.cfgId || "")) ?
+    String(d.cfgId) : "";
   res.json({
     status: "valid",
     prefillName: d.prefillName || "",
     prefillPhone: d.prefillPhone || "",
     prefillLink: d.prefillLink || "",
+    cfgId: cfgId,
   });
 }
 

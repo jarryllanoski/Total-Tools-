@@ -798,7 +798,7 @@
   window._fbReady=true;
 })();
 </script>
-<link rel="stylesheet" href="panel.css?v=5">
+<link rel="stylesheet" href="panel.css?v=6">
 </head>
 <body>
 
@@ -936,12 +936,12 @@
 
 <!-- COMPARTIR -->
 <div class="page" id="page-compartir">
-  <!-- Hero -->
-  <div style="text-align:center;padding:24px 16px 8px">
-    <div style="font-size:40px;margin-bottom:10px">🔑</div>
-    <div style="font-size:20px;font-weight:700;margin-bottom:6px">Links para clientes</div>
-    <div style="font-size:13px;color:var(--text2);line-height:1.6">Generá un link único por cliente.<br>Una vez que lo usa queda bloqueado automáticamente.</div>
-  </div>
+  <!-- ★ «ESTE LINK» EN LUGAR DE LA LLAVE.
+       La llave y el texto ocupaban el primer tercio de la pantalla para
+       explicar algo que ya se sabe. Ahí van ahora los días y los couriers de
+       ESTE link: se eligen aquí, se congelan al pulsar «Generar…», y no
+       tocan Config. Ver `_linkSel` en config.js. -->
+  <div class="cfg-sec" id="linkSelBox" style="margin-top:12px"></div>
 
   <!-- LINK PERSONALIZADO -->
   <div class="cfg-sec">
@@ -2343,7 +2343,9 @@ function goPage(id){
   $('page-'+id).classList.add('active');
   ['envios','compartir','configurar'].forEach((n,i)=>{if(n===id)document.querySelectorAll('.tab')[i].classList.add('active')});
   if(id==='configurar') loadCfgUI();
-  if(id==='compartir') { updateShareLink(); loadTokenList(); }
+  if(id==='compartir') { updateShareLink(); loadTokenList();
+    // Se repinta al ENTRAR: si cambiaste los couriers en Config, aparecen.
+    if(typeof _pintarLinkSel === 'function') _pintarLinkSel(); }
   /* Recursos no tiene pestaña a propósito: cuatro no entran en un teléfono
      de 360 px sin que "Config" quede en "Confi…". Se entra por el 📚 de la
      cabecera y se sale tocando cualquier pestaña — el bucle de arriba no
@@ -4986,7 +4988,7 @@ render();
      lo usa. config.js, print.js y voz.js preguntan por los pedidos marcados,
      así que siguen yendo detrás. El orden de carga es un contrato
      (ver docs/ARQUITECTURA.md). -->
-<script src="config.js?v=51"></script>
+<script src="config.js?v=52"></script>
 <script src="print.js?v=17"></script>
 <script src="notify.js?v=5"></script>
 <script src="shalom.js?v=33"></script>
@@ -5049,6 +5051,11 @@ var _origOpenForm = typeof openForm === 'function' ? openForm : null;
 function _syncHdrHeight(){
   var h=document.querySelector('.hdr');
   if(h) document.documentElement.style.setProperty('--hdr-h', h.getBoundingClientRect().height+'px');
+  /* Y la de las pestañas, que desde el 26/10/2026 también se quedan fijas.
+     El encabezado de courier se pega debajo de LAS DOS: sin esta medida,
+     las pestañas lo taparían al desplazarse. */
+  var t=document.querySelector('.tabs');
+  if(t) document.documentElement.style.setProperty('--tabs-h', t.getBoundingClientRect().height+'px');
 }
 window.addEventListener('load', function(){
   // Asegurar window.S sincronizado
