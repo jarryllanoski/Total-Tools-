@@ -18,6 +18,7 @@ const SRC = E.trozo('config.js', "const _LINK_SEL_KEY = 'tt_link_sel';",
 function montar(op) {
   op = op || {};
   const almacen = Object.assign({}, op.almacen || {});
+  const caja = {innerHTML: ''};
   const fotos = [];
   const S = op.S || {
     couriers: ['SHALOM', 'OLVA COURIER', 'DELIVERY'],
@@ -30,7 +31,7 @@ function montar(op) {
     async (id, snap) => { fotos.push({id, snap}); }};
   const ctx = {
     S, window: win, toast: () => {},
-    $: () => null,
+    $: (id) => (id === 'linkSelBox' ? caja : null),
     escH: (x) => String(x), escJs: (x) => String(x),
     localStorage: {
       getItem: (k) => (k in almacen ? almacen[k] : null),
@@ -43,8 +44,9 @@ function montar(op) {
   new Function(...n, SRC + `
     salida.sel = _linkSel; salida.dia = linkSelDia; salida.cur = linkSelCourier;
     salida.reset = linkSelComoConfig; salida.falta = _linkSelFalta;
-    salida.foto = _snapshotFormConfig;`)(...n.map((k) => ctx[k]));
-  return {api: ctx.salida, S, almacen, fotos};
+    salida.foto = _snapshotFormConfig; salida.pintar = _pintarLinkSel;`)(
+      ...n.map((k) => ctx[k]));
+  return {api: ctx.salida, S, almacen, fotos, caja};
 }
 
 module.exports = async ({bloque, ok}) => {
@@ -180,5 +182,37 @@ module.exports = async ({bloque, ok}) => {
        'no, las pestañas lo taparian al desplazarse');
     ok(/--tabs-h/.test(E.leer('index.html')),
        'la altura de las pestañas se MIDE, no se pone a mano');
+  }
+
+  bloque('⚠️ Los couriers, en DOS filas y todos a la vista');
+
+  {
+    /* Primero fue una tira que se deslizaba: con 7 couriers, tres quedaban
+       fuera de la vista. Un courier que no se ve es uno que se olvida
+       apagar. Se PINTA de verdad y se mira el HTML que sale. */
+    const siete = ['ENCOMIENDA', 'RETIRO EN TIENDA', 'DELIVERY', 'DINSIDES',
+      'MARVISUR', 'OLVA COURIER', 'SHALOM'];
+    const m = montar({S: {couriers: siete, courierActive: {},
+      dispatch: {days: [4]}, config: {}, extraFields: []}});
+    m.api.pintar();
+    const html = m.caja.innerHTML;
+    ok(/grid-template-columns:repeat\(4,minmax\(0,1fr\)\)/.test(html),
+       '⚠️ con 7 couriers, 4 columnas: dos filas (4+3), no una tira');
+    ok(!/overflow-x:auto/.test(html),
+       'y nada se desliza: todos a la vista');
+    siete.forEach((c) => {
+      ok(html.indexOf(c) > 0, c + ' aparece');
+    });
+    ok(/white-space:normal/.test(html),
+       'y el nombre baja de linea DENTRO de su boton: «RETIRO EN TIENDA» no ' +
+       'estira la fila ni empuja a los demas fuera');
+  }
+  {
+    const nueve = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I'];
+    const m = montar({S: {couriers: nueve, courierActive: {},
+      dispatch: {days: [4]}, config: {}, extraFields: []}});
+    m.api.pintar();
+    ok(/repeat\(5,minmax/.test(m.caja.innerHTML),
+       'con 9, 5 columnas: siguen siendo DOS filas, crezca lo que crezca');
   }
 };

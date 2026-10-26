@@ -2330,32 +2330,43 @@ function _linkSelFalta(){
 function _pintarLinkSel(){
   const box = $('linkSelBox'); if(!box) return;
   const sel = _linkSel();
-  const chip = function(on, txt, onclick, titulo){
+  const chip = function(on, txt, onclick, titulo, enCasilla){
     /* `onclick` lleva el nombre del courier, que escribe el dueño en Config.
        Doble escape, en este orden: `escJs` para la cadena de JavaScript y
        `escH` para el atributo HTML. Con uno solo, un courier llamado
        «D'Rosa» o con comillas rompería el botón. */
     return '<button type="button" onclick="'+escH(onclick)+'" title="'+escH(titulo||txt)+'" ' +
-      'style="flex-shrink:0;padding:7px 11px;border-radius:9px;font-size:12px;font-weight:700;' +
-      'cursor:pointer;font-family:inherit;white-space:nowrap;' +
+      'style="' + (enCasilla
+        ? 'width:100%;min-width:0;padding:7px 4px;font-size:11px;line-height:1.2;' +
+          'white-space:normal;word-break:break-word;text-align:center;'
+        : 'flex-shrink:0;padding:7px 11px;font-size:12px;white-space:nowrap;') +
+      'border-radius:9px;font-weight:700;cursor:pointer;font-family:inherit;' +
       (on ? 'background:var(--blue);border:1px solid var(--blue);color:#fff'
           : 'background:var(--bg3);border:1px solid var(--bd);color:var(--text2)') +
       '">'+escH(txt)+'</button>';
   };
-  const fila = function(etq, contenido){
-    return '<div style="display:flex;align-items:center;gap:8px;margin-top:8px">' +
-      '<div style="font-size:11px;color:var(--text2);width:42px;flex-shrink:0">'+etq+'</div>' +
-      /* Una sola fila que se desliza, no una que se parte en tres: así son
-         DOS filas, como pidió el dueño, con 7 couriers o con 12. */
-      '<div style="display:flex;gap:6px;overflow-x:auto;padding-bottom:2px;' +
-      'scrollbar-width:thin">'+contenido+'</div></div>';
+  const fila = function(etq, contenido, cuerpoCss){
+    return '<div style="display:flex;align-items:flex-start;gap:8px;margin-top:8px">' +
+      '<div style="font-size:11px;color:var(--text2);width:42px;flex-shrink:0;' +
+      'padding-top:8px">'+etq+'</div>' +
+      '<div style="flex:1;min-width:0;'+cuerpoCss+'">'+contenido+'</div></div>';
   };
   const dias = _LINK_DIAS.map(function(d){
     return chip(sel.days.indexOf(d.v) >= 0, d.n, 'linkSelDia('+d.v+')');
   }).join('');
-  const envios = (S.couriers || []).map(function(c){
-    return chip(!!sel.couriers[c], c, "linkSelCourier('"+escJs(c)+"')");
+  const lista = S.couriers || [];
+  const envios = lista.map(function(c){
+    return chip(!!sel.couriers[c], c, "linkSelCourier('"+escJs(c)+"')", c, true);
   }).join('');
+  /* ★ LOS COURIERS, EN DOS FILAS Y TODOS A LA VISTA.
+     Primero fue una tira que se deslizaba: con 7 couriers, «DINSIDES»,
+     «MARVISUR» y «OLVA» quedaban fuera, y un courier que no se ve es uno que
+     se olvida apagar. El dueño lo pidió en dos filas.
+     Las columnas se calculan con cuántos hay —ceil(n/2)—, así que son DOS
+     filas siempre: 7 couriers dan 4+3, 9 darían 5+4. Y el nombre baja de
+     línea DENTRO de su botón: «RETIRO EN TIENDA» ocupa dos líneas en su
+     casilla en vez de estirar la fila y empujar a los demás fuera. */
+  const cols = Math.max(1, Math.ceil(lista.length / 2));
   box.innerHTML =
     '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px">' +
       '<div class="cfg-ttl" style="margin:0">📦 Este link</div>' +
@@ -2363,7 +2374,9 @@ function _pintarLinkSel(){
       'color:var(--blue);font-size:11.5px;font-weight:700;cursor:pointer;font-family:inherit;' +
       'padding:4px 2px">↺ como en Config</button>' +
     '</div>' +
-    fila('Días', dias) + fila('Envío', envios);
+    fila('Días', dias, 'display:flex;gap:6px;flex-wrap:wrap') +
+    fila('Envío', envios, 'display:grid;gap:6px;' +
+      'grid-template-columns:repeat('+cols+',minmax(0,1fr))');
 }
 
 async function _snapshotFormConfig(){
