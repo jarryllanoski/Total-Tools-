@@ -800,7 +800,7 @@
   window._fbReady=true;
 })();
 </script>
-<link rel="stylesheet" href="panel.css?v=7">
+<link rel="stylesheet" href="panel.css?v=8">
 </head>
 <body>
 
@@ -2892,6 +2892,14 @@ function _montoCard(s){
   }
   return s.cost?`<span class="meta">💰 S/ ${escH(s.cost)}</span>`:'';
 }
+/* 🖨️ de la tarjeta: imprime SOLO este pedido (el mismo panel de impresión
+   de siempre, vía PrintModule.openOne, sin tocar la selección). Círculo
+   azul relleno si ya se imprimió; sin color si no. La respuesta a «¿se
+   imprimió?» es una sola: PrintModule.impreso. */
+function _btnImprimir(s){
+  const on = (window.PrintModule && PrintModule.impreso) ? PrintModule.impreso(s) : !!(s && s.printed);
+  return `<button class="wa-btn prn-btn${on?' on':''}" onclick="event.stopPropagation();if(window.PrintModule)PrintModule.openOne('${s.id}')" title="${on?'Impreso — imprimir otra vez':'Imprimir este pedido'}">🖨️</button>`;
+}
 function cardHTML(s){
   const gChk=s.chkGuia||false, tChk=s.chkTicket||false, eChk=s.chkEmbalado||false;
   const msgs=S.msgTemplates[s.status]||['',''];
@@ -2923,6 +2931,7 @@ function cardHTML(s){
         style="cursor:pointer;flex:1;user-select:none">
         ${escH(s.name)}${pvtNote?` <span style="font-size:11px;color:var(--purple);opacity:.7">🔒</span>`:''}
       </div>
+      ${_btnImprimir(s)}
       <button class="wa-btn" onclick="event.stopPropagation();if(window.Cotizacion)Cotizacion.abrir('${s.id}')" title="Cotización">🧾${(Array.isArray(s.cotizItems)&&s.cotizItems.length)?`<span style="font-size:9px;font-weight:700;color:var(--blue);margin-left:1px">${s.cotizItems.length}</span>`:''}</button>
       <button class="wa-btn" onclick="openWA('${s.id}')">💬</button>
     </div>
@@ -5060,8 +5069,8 @@ render();
      así que siguen yendo detrás. El orden de carga es un contrato
      (ver docs/ARQUITECTURA.md). -->
 <script src="config.js?v=56"></script>
-<script src="print.js?v=18"></script>
-<script src="notify.js?v=6"></script>
+<script src="print.js?v=19"></script>
+<script src="notify.js?v=7"></script>
 <script src="shalom.js?v=33"></script>
 <script src="tracking.js?v=23"></script>
 <script src="floatpanel.js?v=4"></script>

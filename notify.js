@@ -117,6 +117,15 @@
     });
   }
 
+  /* ¿Se imprimió? La misma respuesta que la tarjeta y el panel de
+     impresión (PrintModule.impreso): antes la campana solo miraba
+     `_printed`, que casi nunca se ponía, y ofrecía «Imprimir» de pedidos
+     ya impresos. */
+  function _impreso(s){
+    if(window.PrintModule && typeof window.PrintModule.impreso === 'function') return window.PrintModule.impreso(s);
+    return !!(s && (s.printed || s._printed));
+  }
+
   /* N° de factura/boleta, leído del PEDIDO al pintar, no copiado en la
      notificación: si se corrige en «Editar», la campana dice el nuevo. */
   function _nroDe(shipId){
@@ -247,7 +256,7 @@
       if(_seenIds[s.id]) {
         // Actualizar estado impreso si cambió en Firebase
         var existing = _notifs.find(function(n){ return n.shipId === s.id; });
-        if(existing && s._printed && !existing.printed){
+        if(existing && _impreso(s) && !existing.printed){
           existing.printed = true;
           _render();
         }
@@ -266,7 +275,7 @@
           title:   'Nuevo pedido — ' + s.name,
           sub:     s.courier + ' · ' + (s.address||s.ciudadDestino||'—').substring(0,45),
           shipId:  s.id,
-          printed: !!s._printed,
+          printed: _impreso(s),
           ts:      ts,
           link:    (s.links && s.links[0] && s.links[0].u) || ''
         });

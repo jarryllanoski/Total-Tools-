@@ -122,7 +122,7 @@ function _injectModal(){
 }
 
 /* ── ESTADO ─────────────────────────────────────────────────────── */
-let _scope   = 'sel';   // 'sel' | 'new'
+let _scope   = 'sel';   // 'sel' | 'all' | 'one' | 'list'
 let _fmt     = 'etiqueta';
 let _bultos  = 1;
 let _list    = [];
@@ -141,15 +141,16 @@ window.PrintModule = {
     if(!S||!S.shipments||!S.shipments.length){ window.toast&&toast('Sin envíos'); return; }
 
     const sel = Seleccion.marcados();
-    const newOnes = S.shipments.filter(x=>x.status==='NUEVO PEDIDO'&&!x.printed);
 
-    // Decidir scope inicial
-    _scope = sel.length ? 'sel' : 'new';
-    _list  = _scope==='sel' ? sel : newOnes;
+    /* Decidir scope inicial. «✨ Nuevos» se retiró el 26/10/2026: cada
+       tarjeta tiene su 🖨️ para imprimir un pedido suelto. Sin selección
+       queda «Todos», que es lo que ya pasaba cuando no había nuevos. */
+    _scope = sel.length ? 'sel' : 'all';
+    _list  = _scope==='sel' ? sel : S.shipments;
     _bultos = 1;  // siempre empieza en 1 por impresión (no persistir valor viejo)
     _fmt    = localStorage.getItem('print_fmt') || 'etiqueta';
 
-    this._renderScope(sel, newOnes);
+    this._renderScope(sel);
     this._updateBultos();
     this.selectFmt(_fmt);
     this._show();
@@ -213,15 +214,12 @@ window.PrintModule = {
     }, 300);
   },
 
-  _renderScope(sel, newOnes){
+  _renderScope(sel){
     const row = document.getElementById('printScopeRow');
     if(!row) return;
     const opts = [];
     if(sel.length){
       opts.push({ key:'sel', label:`✅ Seleccionados · ${sel.length}` });
-    }
-    if(newOnes.length){
-      opts.push({ key:'new', label:`✨ Nuevos · ${newOnes.length}` });
     }
     if(!opts.length){
       opts.push({ key:'all', label:`📦 Todos · ${window.S.shipments.length}` });
@@ -243,11 +241,10 @@ window.PrintModule = {
     const S = window.S;
     _scope = key;
     if(key==='sel') _list = Seleccion.marcados();
-    else if(key==='new') _list = S.shipments.filter(x=>x.status==='NUEVO PEDIDO'&&!x.printed);
     else _list = S.shipments;
 
     // Actualizar estilos botones
-    ['sel','new','all'].forEach(k=>{
+    ['sel','all'].forEach(k=>{
       const btn = document.getElementById('scope_'+k);
       if(!btn) return;
       btn.style.background = k===key ? '#388bfd' : '#161b22';
@@ -339,6 +336,10 @@ window.PrintModule = {
     // Lista de ids en UNA llamada: "imprimir todos" puede ser 700 pedidos y
     // save(id) en bucle reescribe el estado completo cada vez (7,6 s de bloqueo).
     window.save && window.save(_list.map(s=>s.id));
+    // La 🖨️ de cada tarjeta se pinta de azul AHORA, no en la próxima
+    // sincronización; y la campana deja de ofrecer «Imprimir».
+    if(typeof window.render === 'function') window.render();
+    if(window.NotifyModule && typeof window.NotifyModule.check === 'function') window.NotifyModule.check();
 
     this.close();
   }
@@ -368,6 +369,12 @@ function _codigoBase(s){
   }
   return String(s.id).slice(-4).toUpperCase();    // antiguos: 4 dígitos
 }
+/* ★ ¿SE IMPRIMIÓ? UNA SOLA RESPUESTA. `printed` lo pone print() al generar
+   la etiqueta y viaja a la nube; es lo que contaba «Nuevos» y la campana
+   de impresión. `_printed` era de la campana de notificaciones y dependía
+   del aviso `afterprint`, que casi nunca llega porque la etiqueta se
+   imprime en OTRA pestaña. Se sigue aceptando para los que ya lo tengan. */
+window.PrintModule.impreso = function(s){ return !!(s && (s.printed || s._printed)); };
 // Exponer el código para que el escáner (index.html) identifique el pedido exacto.
 window.PrintModule.codigoEnvio = _codigoEnvio;
 window.PrintModule.codigoBase = _codigoBase;
