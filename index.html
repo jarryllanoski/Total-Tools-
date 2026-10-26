@@ -33,6 +33,7 @@
 <script src="functions/dniPedido.js?v=1"></script>
 <script src="functions/nroComprobante.js?v=1"></script>
 <script src="functions/montoPedido.js?v=1"></script>
+<script src="functions/fechaPedido.js?v=1"></script>
 <script src="appcheck.js?v=1"></script>
 <!-- FIREBASE via REST API — sin SDK, funciona en Brave/Chrome/Firefox/Safari -->
 <script>
@@ -1592,9 +1593,17 @@
 
     <!-- FECHA -->
     <div style="font-size:10px;font-weight:700;color:var(--text2);letter-spacing:.8px;text-transform:uppercase;margin-bottom:8px">📅 Rango de fecha</div>
+    <!-- Qué fecha mira el rango. Por defecto la de ENVÍO: sin tocar esto, la
+         búsqueda filtra igual que siempre. «Hoy» cambia a registro y rellena
+         Desde/Hasta con hoy, a la vista. Regla: functions/fechaPedido.js. -->
+    <div style="display:flex;flex-wrap:wrap;gap:7px;margin-bottom:10px">
+      <div class="as-opt" id="asCampoEnvio" onclick="setAsCampo('envio')">🚚 Fecha de envío</div>
+      <div class="as-opt" id="asCampoRegistro" onclick="setAsCampo('registro')">📝 Fecha de registro</div>
+      <div class="as-opt" id="asCampoHoy" onclick="asHoy()">⏱️ Hoy</div>
+    </div>
     <div class="frow" style="margin-bottom:14px">
-      <div class="fg"><label class="fl">Desde</label><input class="fi" type="date" id="asDateFrom"></div>
-      <div class="fg"><label class="fl">Hasta</label><input class="fi" type="date" id="asDateTo"></div>
+      <div class="fg"><label class="fl">Desde</label><input class="fi" type="date" id="asDateFrom" onchange="_pintarAsCampo()"></div>
+      <div class="fg"><label class="fl">Hasta</label><input class="fi" type="date" id="asDateTo" onchange="_pintarAsCampo()"></div>
     </div>
 
     <!-- COURIER -->
@@ -2484,12 +2493,15 @@ function openAllLabels(){
 }
 
 /* ADVANCED SEARCH */
-let _adv={dateFrom:'',dateTo:'',couriers:[],costMin:'',costMax:'',doc:'any',sort:'newest'};
+/* `campo`: qué fecha mira el rango — 'envio' (como siempre) o 'registro'. */
+function _advVacio(){ return {campo:'envio',dateFrom:'',dateTo:'',couriers:[],costMin:'',costMax:'',doc:'any',sort:'newest'}; }
+let _adv=_advVacio();
 let _advActive=false;
 
 function openAdvSearch(){
   $('asCourierList').innerHTML=S.couriers.map(c=>`<div class="as-courier-chip ${_adv.couriers.includes(c)?'active':''}" onclick="toggleAsCourier('${c.replace(/'/g,"\\'")}')">🚚 ${c}</div>`).join('');
   $('asDateFrom').value=_adv.dateFrom; $('asDateTo').value=_adv.dateTo;
+  _pintarAsCampo();
   $('asCostMin').value=_adv.costMin; $('asCostMax').value=_adv.costMax;
   ['asDocAny','asDocGuia','asDocTicket','asDocNone'].forEach(id=>$(id)?.classList.remove('active'));
   const dm={any:'asDocAny',guia:'asDocGuia',ticket:'asDocTicket',none:'asDocNone'};
@@ -2504,17 +2516,40 @@ function toggleAsCourier(c){
   if(idx>=0) _adv.couriers.splice(idx,1); else _adv.couriers.push(c);
   document.querySelectorAll('.as-courier-chip').forEach(el=>el.classList.toggle('active',_adv.couriers.includes(el.textContent.replace('🚚 ','').trim())));
 }
+/* ¿«Hoy» está puesto? Registro, y Desde = Hasta = hoy en Lima. No es un
+   modo escondido: se deduce de lo que se ve en los campos. */
+function _asEsHoy(campo, desde, hasta){
+  const hoy = (typeof FechaPedido!=='undefined') ? FechaPedido.hoyLima() : '';
+  return campo==='registro' && !!hoy && desde===hoy && hasta===hoy;
+}
+function _pintarAsCampo(){
+  const hoy=_asEsHoy(_adv.campo, $('asDateFrom').value, $('asDateTo').value);
+  $('asCampoEnvio')?.classList.toggle('active', _adv.campo!=='registro');
+  $('asCampoRegistro')?.classList.toggle('active', _adv.campo==='registro' && !hoy);
+  $('asCampoHoy')?.classList.toggle('active', hoy);
+}
+function setAsCampo(v){ _adv.campo=(v==='registro')?'registro':'envio'; _pintarAsCampo(); }
+function asHoy(){
+  const hoy=(typeof FechaPedido!=='undefined') ? FechaPedido.hoyLima() : '';
+  if(!hoy) return;
+  _adv.campo='registro';
+  $('asDateFrom').value=hoy; $('asDateTo').value=hoy;
+  _pintarAsCampo();
+}
 function setAsDoc(v){ _adv.doc=v; const dm={any:'asDocAny',guia:'asDocGuia',ticket:'asDocTicket',none:'asDocNone'}; ['asDocAny','asDocGuia','asDocTicket','asDocNone'].forEach(id=>$(id)?.classList.remove('active')); $(dm[v])?.classList.add('active'); }
 function setSort(v){ _adv.sort=v; const sm={newest:'sortNewest',oldest:'sortOldest',name:'sortName',cost:'sortCost'}; ['sortNewest','sortOldest','sortName','sortCost'].forEach(id=>$(id)?.classList.remove('active')); $(sm[v])?.classList.add('active'); }
 function applyAdvSearch(){ _adv.dateFrom=$('asDateFrom').value; _adv.dateTo=$('asDateTo').value; _adv.costMin=$('asCostMin').value; _adv.costMax=$('asCostMax').value; _advActive=hasAdvFilters(); closeOverlay('advSearchOverlay'); render(); }
-function clearAdvSearch(){ _adv={dateFrom:'',dateTo:'',couriers:[],costMin:'',costMax:'',doc:'any',sort:'newest'}; _advActive=false; render(); }
+function clearAdvSearch(){ _adv=_advVacio(); _advActive=false; if($('asDateFrom')){ $('asDateFrom').value=''; $('asDateTo').value=''; _pintarAsCampo(); } render(); }
 function hasAdvFilters(){ return !!(  _adv.dateFrom||_adv.dateTo||_adv.couriers.length||_adv.costMin||_adv.costMax||_adv.doc!=='any'||_adv.sort!=='newest'); }
 function updateAdvBar(){
   const bar=$('activeFiltersBar');
   if(!_advActive){bar.style.display='none'; $('advSearchBtn').style.color='var(--text2)'; return;}
   $('advSearchBtn').style.color='var(--blue)';
   const tags=[];
-  if(_adv.dateFrom||_adv.dateTo) tags.push(`📅 ${_adv.dateFrom||'...'} → ${_adv.dateTo||'...'}`);
+  if(_adv.dateFrom||_adv.dateTo){
+    if(_asEsHoy(_adv.campo, _adv.dateFrom, _adv.dateTo)) tags.push('📅 Registrados hoy');
+    else tags.push(`📅 ${_adv.campo==='registro'?'Registro':'Envío'}: ${_adv.dateFrom||'...'} → ${_adv.dateTo||'...'}`);
+  }
   if(_adv.couriers.length) tags.push(`🚚 ${_adv.couriers.join(', ')}`);
   if(_adv.costMin||_adv.costMax) tags.push(`💰 S/${_adv.costMin||0}–${_adv.costMax||'∞'}`);
   if(_adv.doc!=='any') tags.push({guia:'🚚 Con guía',ticket:'🧾 Con ticket',none:'Sin docs'}[_adv.doc]||'');
@@ -2685,8 +2720,12 @@ function visibleShipments(){
   // El N° de factura/boleta entra con su propia regla: «f001 123» encuentra F001-123.
   if(srch) data=data.filter(x=>x.name.toLowerCase().includes(srch)||x.phone.includes(srch)||(_dniDe(x)&&_dniDe(x).includes(srch))||x.address.toLowerCase().includes(srch)||x.courier.toLowerCase().includes(srch)||(typeof NroComprobante!=='undefined'&&NroComprobante.coincide(x,srch)));
   if(_advActive){
-    if(_adv.dateFrom) data=data.filter(x=>x.date&&x.date>=_adv.dateFrom);
-    if(_adv.dateTo)   data=data.filter(x=>x.date&&x.date<=_adv.dateTo);
+    if(typeof FechaPedido!=='undefined'){
+      if(_adv.dateFrom||_adv.dateTo) data=data.filter(x=>FechaPedido.enRango(x,_adv.campo,_adv.dateFrom,_adv.dateTo));
+    } else {
+      if(_adv.dateFrom) data=data.filter(x=>x.date&&x.date>=_adv.dateFrom);
+      if(_adv.dateTo)   data=data.filter(x=>x.date&&x.date<=_adv.dateTo);
+    }
     if(_adv.couriers.length) data=data.filter(x=>_adv.couriers.includes(x.courier));
     if(_adv.costMin)  data=data.filter(x=>parseFloat(x.cost||0)>=parseFloat(_adv.costMin));
     if(_adv.costMax)  data=data.filter(x=>parseFloat(x.cost||0)<=parseFloat(_adv.costMax));
@@ -2759,7 +2798,12 @@ function _renderAhora(){
 
   // Ordenamiento (los filtros avanzados ya se aplicaron en visibleShipments)
   if(_advActive){
-    if(_adv.sort==='oldest') data=[...data].sort((a,b)=>(a.date||'').localeCompare(b.date||''));
+    // Con «Fecha de registro», más reciente/antiguo es por CUÁNDO ENTRÓ (con
+    // hora, no solo el día). Con «Fecha de envío», como siempre.
+    const _tsReg=x=>{ const t=x.createdAt?new Date(x.createdAt).getTime():0; return isNaN(t)?0:t; };
+    if(_adv.campo==='registro' && (_adv.sort==='oldest'||_adv.sort==='newest'))
+      data=[...data].sort((a,b)=>_adv.sort==='oldest' ? _tsReg(a)-_tsReg(b) : _tsReg(b)-_tsReg(a));
+    else if(_adv.sort==='oldest') data=[...data].sort((a,b)=>(a.date||'').localeCompare(b.date||''));
     else if(_adv.sort==='newest') data=[...data].sort((a,b)=>(b.date||'').localeCompare(a.date||''));
     else if(_adv.sort==='name') data=[...data].sort((a,b)=>a.name.localeCompare(b.name));
     else if(_adv.sort==='cost') data=[...data].sort((a,b)=>parseFloat(b.cost||0)-parseFloat(a.cost||0));
