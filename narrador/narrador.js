@@ -61,12 +61,19 @@
     welcome:'¡Hola! 👋 Soy Delfi, jefe de logística. Desde ahora te acompaño hasta que recibas tu pedido.',
     s0:'Tu pedido llegó bien y ya está registrado. 📋 Comenzamos a trabajarlo.',
     s1:'Los especialistas están alistando y protegiendo tu herramienta para que llegue en excelentes condiciones. 📦',
-    s2:'¡Ya salió de nuestra tienda! 🚚 Tu pedido está en viaje y sigo el recorrido en tiempo real.',
-    s2_retiro:'Tu pedido está casi listo. Te avisaremos apenas puedas pasar a recogerlo. ⏳',
+    /* ENVIADO según el tipo de envío. Antes decía a todos «sigo el recorrido
+       en tiempo real», y eso solo es verdad en Shalom: un delivery o una
+       otra agencia no tienen rastreo en vivo. */
+    s2:'¡Ya salió de nuestra tienda! 🚚 Tu pedido viaja hacia la agencia de destino.',
+    s2_shalom:'¡Ya salió de nuestra tienda! 🚚 Tu pedido viaja con Shalom; mira su recorrido en el bloque de Shalom.',
+    s2_delivery:'¡Ya salió! 🛵 Nuestro motorizado lleva tu pedido hacia tu dirección.',
+    s2_encomienda:function(ci){ return 'Dejamos tu pedido en la agencia; ya viaja'+(ci?' a '+ci:'')+'. 📦'; },
+    /* Retiro en tienda: ALISTADO ya significa «pasa a recoger». La dirección
+       es la de Config (campo «Ciudad»), publicada en data-tienda-dir. */
+    s_retiro_listo:function(dir){ return '¡Tu pedido ya está listo! 🏪 Ya puedes pasar a recogerlo a nuestra tienda'+(dir?' en '+dir:'')+'. Trae tu DNI.'; },
     s3_agencia:function(a,dir){ return '¡Tu pedido llegó a la agencia'+(a?' '+a:'')+'! Acércate con tu DNI'+(dir?' a '+dir:'')+' para recogerlo. 🏢'; },
-    s3_delivery:'¡Tu pedido llegó a tu dirección! Sal a recibirlo y revisa tu herramienta al momento de la entrega. 🛵',
+    s3_delivery:'Nuestro motorizado está llegando a tu dirección. 🛵 Ten tu DNI a la mano y revisa tu herramienta al recibirla.',
     s3_encomienda:function(ci){ return 'Tu envío llegó'+(ci?' a '+ci:'')+'. Acércate con tu DNI a la agencia de destino para recogerlo. 📦'; },
-    s3_retiro:'¡Tu pedido está listo para recoger en nuestra tienda! Acércate con tu DNI y te lo entregamos. 🏪',
     pago:'Tu pedido está en destino. Coordina el pago para completar la entrega. 💳',
     s4:'🎉 ¡Entrega completada! Gracias por confiar en Total. Espero acompañarte en tu próxima compra.',
     notfound:'No encuentro tu pedido con ese código. Escríbenos y lo revisamos enseguida. 💬'
@@ -140,6 +147,11 @@
   }
   // Tipo de envío deducido del DOM visible (funciona en form Y en tracking)
   function tipoEnvio(){
+    // Seguimiento: la página publica el tipo con la MISMA regla que el
+    // formulario (data-tipo). Deducirlo de las filas fallaba: un pedido
+    // Shalom con fila «DNI destinatario» pasaba por «otra agencia».
+    var card = app.querySelector('.track-card[data-tipo]');
+    if(card){ var dt=card.getAttribute('data-tipo'); if(/^(agencia|encomienda|retiro|delivery)$/.test(dt)) return dt; }
     // Formulario
     if(has('#f_ciudad')||has('#f_dni_dest')) return 'encomienda';
     if(has('#shalomSelTxt')||has('#f_dni_recoger')) return 'agencia';
@@ -182,7 +194,8 @@
     else if(/PENDIENTE DE PAGO/.test(badge)) base={st:3, pago:true};
     else if(/DESTINO/.test(badge))         base={st:3};
     else if(/ENVIADO/.test(badge))         base={st:2};
-    else if(/ALISTAR|ALISTADO/.test(badge)) base={st:1};
+    else if(/POR ALISTAR/.test(badge))     base={st:1};
+    else if(/ALISTADO/.test(badge))        base={st:1, alistado:true};
     else base={st:0};
     // Seguimiento Shalom: renderTrackResult publica la etapa real de Shalom en
     // data-shalom-st SOLO cuando va más adelantada que la etiqueta interna
@@ -192,7 +205,7 @@
     var card = app.querySelector('.track-card[data-shalom-st]');
     if(card){
       var ss = parseInt(card.getAttribute('data-shalom-st'), 10);
-      if(!isNaN(ss) && ss > base.st) return {st:ss};
+      if(!isNaN(ss) && ss > base.st) return {st:ss, shalom:true};
     }
     return base;
   }
@@ -245,6 +258,34 @@
   function isSuccess(){ return has('.success')||has('.tt-confirmed'); }
 
   // ── 8. Lógica del SEGUIMIENTO (Delfi) ──────────────────────────────
+  function tiendaDir(){
+    var c=app.querySelector('.track-card[data-tienda-dir]');
+    return c ? (c.getAttribute('data-tienda-dir')||'').trim() : '';
+  }
+  function esShalom(){ return /SHALOM/i.test(rowVal('Courier')); }
+  /* Qué dice Delfi: etapa × tipo de envío. Pura (sin DOM) y expuesta para
+     las pruebas. ⚠️ Nunca menciona la clave de recojo. */
+  function mensajeDelfi(e, t, d){
+    d = d || {};
+    if(e.st===0) return DELFI.welcome+' '+DELFI.s0;
+    if(t==='retiro' && (e.alistado || e.st===2 || (e.st===3 && !e.pago))) return DELFI.s_retiro_listo(d.tiendaDir);
+    if(e.st===1) return DELFI.s1;
+    if(e.st===2){
+      if(t==='delivery') return DELFI.s2_delivery;
+      if(t==='encomienda') return DELFI.s2_encomienda(d.ciudad);
+      return d.shalom ? DELFI.s2_shalom : DELFI.s2;
+    }
+    if(e.st===3){
+      if(e.pago) return DELFI.pago;
+      if(t==='encomienda') return DELFI.s3_encomienda(d.ciudad);
+      if(t==='agencia') return DELFI.s3_agencia(d.agencia,'');
+      return DELFI.s3_delivery;
+    }
+    if(e.st===4) return DELFI.s4;
+    return '';
+  }
+  window.__ttNarrador = {mensajeDelfi: mensajeDelfi, DELFI: DELFI,
+    estadoATexto: function(){ return estadoATexto(); }, tipoEnvio: function(){ return tipoEnvio(); }};
   var lastDelfiKey='';
   function delfiScan(){
     if(isNotFound()){ if(lastDelfiKey!=='nf'){ lastDelfiKey='nf'; say('delfi',DELFI.notfound); } return; }
@@ -252,19 +293,10 @@
     var e=estadoATexto(); if(!e) return;
     var key=JSON.stringify(e)+tipoEnvio();
     if(key===lastDelfiKey) return; lastDelfiKey=key;
-    var m, t=tipoEnvio();
-    if(e.st===0) m=DELFI.welcome+' '+DELFI.s0;
-    else if(e.st===1) m=DELFI.s1;
-    else if(e.st===2) m=(t==='retiro')?DELFI.s2_retiro:DELFI.s2;
-    else if(e.st===3){
-      if(e.pago) m=DELFI.pago;
-      else if(t==='retiro') m=DELFI.s3_retiro;
-      else if(t==='encomienda') m=DELFI.s3_encomienda(rowVal('Ciudad destino'));
-      else if(t==='agencia') m=DELFI.s3_agencia(agenciaSel(),'');
-      else m=DELFI.s3_delivery;
-    }
-    else if(e.st===4) m=DELFI.s4;
-    say('delfi', m);
+    say('delfi', mensajeDelfi(e, tipoEnvio(), {
+      ciudad: rowVal('Ciudad destino'), agencia: agenciaSel(), tiendaDir: tiendaDir(),
+      shalom: esShalom()
+    }));
   }
 
   // ── 9. Observador central: reacciona a cada cambio de pantalla ─────

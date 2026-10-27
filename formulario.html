@@ -713,6 +713,72 @@ function abrirAyudaForm(){
 }
 
 /* ─── Ayuda de la vista de SEGUIMIENTO (explica los estados) ──────── */
+/* ★ SEGÚN EL TIPO DE ENVÍO DE ESTE PEDIDO, con los nombres que el cliente VE
+   en su pantalla (NUEVO PEDIDO, ENVIADO, LLEGÓ A DESTINO…). Antes era una
+   sola ayuda con nombres inventados («Recibido», «Preparando») que no
+   aparecían en ningún sitio, y le decía «ya puedes recogerlo» a un pedido
+   de delivery.
+   ⚠️ LA CLAVE DE RECOJO NO SE MENCIONA NUNCA: es secreta, no viaja al link
+   (functions/pedidoPublico.js) y no se comparte por aquí.
+   Lógica pura (sin DOM): devuelve {estados, faq} con texto YA escapado. */
+function _ayudaTrackContenido(tipo, esShalom, tiendaDir){
+  const dir = esc(tiendaDir||'');
+  const enTienda = dir ? ' en <b>'+dir+'</b>' : '';
+  const T = {
+    delivery: {
+      envio:'🛵 Salió con nuestro motorizado hacia tu dirección.',
+      destino:'🛵 El motorizado está llegando. Ten tu DNI a la mano y revisa tu pedido al recibirlo.',
+      pago:'Pagas al recibir tu pedido.'},
+    agencia: {
+      envio: esShalom ? '🚚 Lo dejamos en Shalom y viaja a tu ciudad. Mira su recorrido en el bloque <b>Seguimiento Shalom</b>.'
+                      : '🚚 Lo dejamos en la agencia y viaja a tu ciudad.',
+      destino:'🏢 Ya está en la agencia de destino: acércate con el DNI del destinatario para recogerlo.',
+      pago:'Completa el pago para poder recogerlo.'},
+    encomienda: {
+      envio:'📦 Lo dejamos en la agencia; ya viaja a tu ciudad.',
+      destino:'📦 Llegó a la agencia de tu ciudad: recógelo con el DNI del destinatario.',
+      pago:'Completa el pago para poder recogerlo.'},
+    retiro: {
+      envio:'🏪 ¡Listo! Ya puedes pasar a recogerlo a nuestra tienda'+enTienda+'.',
+      destino:'🏪 ¡Listo! Ya puedes pasar a recogerlo a nuestra tienda'+enTienda+'. Trae tu DNI.',
+      pago:'Pagas al recoger en tienda.'},
+  };
+  const t = T[tipo] || T.delivery;
+  const estados = [
+    {ico:'🆕', t:'NUEVO PEDIDO · EN PROCESO', d:'Recibimos tu pedido y lo estamos revisando.'},
+    tipo==='retiro'
+      ? {ico:'📦', t:'POR ALISTAR', d:'Estamos preparando tu pedido.'}
+      : {ico:'📦', t:'POR ALISTAR · ALISTADO', d:'Estamos empacando tu pedido.'},
+  ];
+  if(tipo==='retiro'){
+    estados.push({ico:'✅', t:'ALISTADO', d:t.envio});
+  } else {
+    estados.push({ico:'🚚', t:'ENVIADO', d:t.envio});
+    estados.push({ico:'📍', t:'LLEGÓ A DESTINO', d:t.destino});
+  }
+  estados.push({ico:'💰', t:'PENDIENTE DE PAGO', d:t.pago});
+  estados.push({ico:'🏁', t:'FINALIZADO', d:'Entregado. ¡Gracias por tu compra!'});
+
+  const faq = [];
+  if(esShalom){
+    faq.push({q:'¿Qué son el N.º de guía y el código?', a:'Son los datos de tu envío en Shalom. Con ellos puedes ver tu paquete en la app de Shalom (Seguimiento → ingresa la guía y el código). Toca <b>Copiar</b> para copiarlos juntos.'});
+    faq.push({q:'¿Cada cuánto se actualiza?', a:'El estado de Shalom se consulta varias veces al día, solo. No necesitas hacer nada: abre este enlace cuando quieras.'});
+  } else {
+    faq.push({q:'¿Cada cuánto se actualiza?', a:'Cada vez que tu pedido avanza lo actualizamos. Abre este enlace cuando quieras.'});
+  }
+  if(tipo==='agencia' || tipo==='encomienda'){
+    faq.push({q:'¿Qué llevo para recoger?', a:'El DNI de la persona que figura como destinatario.'});
+  } else if(tipo==='retiro'){
+    faq.push({q:'¿Dónde recojo mi pedido?', a:'En nuestra tienda'+enTienda+', cuando el estado diga <b>ALISTADO</b>. Trae tu DNI.'});
+  } else {
+    faq.push({q:'¿Quién recibe mi pedido?', a:'La persona que registraste. Ten tu DNI a la mano cuando llegue el motorizado.'});
+  }
+  faq.push({q:'«Presiona para ver tu documento»', a:'Es tu boleta o factura (si se adjuntó).'});
+  faq.push({q:'¿Por qué mi DNI sale con asteriscos?', a:'Por tu seguridad: este enlace se puede reenviar, así que no mostramos el número completo.'});
+  faq.push({q:'Tengo una consulta', a:'Usa el botón verde «Consultar por WhatsApp» para escribirnos directamente.'});
+  return {estados, faq};
+}
+
 function abrirAyudaTrack(){
   let ov = document.getElementById('ayudaFormOv');
   if(!ov){
@@ -723,18 +789,9 @@ function abrirAyudaTrack(){
     document.body.appendChild(ov);
   }
   ov.style.display = 'flex';
-  const estados = [
-    {ico:'📦', t:'Recibido', d:'Tu pedido llegó a nuestro sistema y lo estamos revisando.'},
-    {ico:'⚙️', t:'Preparando', d:'Estamos alistando y empacando tu pedido.'},
-    {ico:'🚚', t:'En camino', d:'Tu pedido ya fue enviado por el courier y va en camino.'},
-    {ico:'🏢', t:'En destino', d:'Tu pedido llegó a la agencia de destino. ¡Ya puedes recogerlo!'},
-    {ico:'✅', t:'Entregado', d:'Tu pedido fue entregado. ¡Gracias por tu compra!'}
-  ];
-  const faq = [
-    {q:'¿Cada cuánto se actualiza?', a:'El estado se actualiza solo cada cierto tiempo. No necesitas hacer nada, solo abrir este enlace.'},
-    {q:'¿Necesito recoger mi pedido?', a:'Si elegiste retiro en agencia, cuando el estado diga "En destino" puedes ir a recogerlo con tu DNI.'},
-    {q:'Tengo una consulta', a:'Usa el botón verde "Consultar por WhatsApp" para escribirnos directamente.'}
-  ];
+  const cc = (CFG && (CFG.config || CFG)) || {};
+  const {estados, faq} = _ayudaTrackContenido(window._trackTipo||'', !!window._trackEsShalom,
+    String(cc.city||'').trim());
   ov.innerHTML = `<div style="background:#0d1117;border:1px solid #30363d;border-radius:18px 18px 0 0;width:100%;max-width:520px;max-height:85vh;overflow-y:auto;padding:20px">
     <div style="font-weight:800;font-size:18px;margin-bottom:4px;color:#e6edf3">📖 ¿Cómo sigo mi pedido?</div>
     <div style="font-size:11px;color:#8b949e;margin-bottom:14px">Qué significa cada estado</div>
@@ -1255,7 +1312,10 @@ function pickCourier(name){
   });
 }
 
-function onCourierChange(name){
+/* El TIPO de envío de un courier: agencia · encomienda · retiro · delivery.
+   Una sola regla para el formulario (al elegir) y el seguimiento (la ayuda
+   y el narrador hablan según el tipo del pedido que se mira). */
+function _tipoEnvioDe(name){
   const cTypes=(CFG&&CFG.courierTypes)||{};
   const configType=name?(cTypes[name]||''):'';
   const u=(name||'').toUpperCase();
@@ -1264,10 +1324,14 @@ function onCourierChange(name){
   // Name-based RETIRO/OTRAS AGENCIAS takes priority over stored configType
   const isKnownAgency=['SHALOM','OLVA','MARVISUR','DINSIDES'].some(n=>u.includes(n));
   const isAgencia=!isRetiro&&!isEncomienda&&(configType==='agencia'||isKnownAgency);
-  selCourierType = isAgencia    ? 'agencia'
-                 : isEncomienda ? 'encomienda'
-                 : isRetiro     ? 'retiro'
-                 :                'delivery';
+  return isAgencia    ? 'agencia'
+       : isEncomienda ? 'encomienda'
+       : isRetiro     ? 'retiro'
+       :                'delivery';
+}
+
+function onCourierChange(name){
+  selCourierType = _tipoEnvioDe(name);
   selCourierName=name;
   // El formulario "publica" el tipo de courier para las capas de presentación
   // (boleta / narrador), que así no dependen de la visibilidad de los campos.
@@ -2093,11 +2157,51 @@ function setTrackContent(html){
 function notMyOrderBtn(){ return ''; }
 
 /* ── TRACKING SHALOM EN SEGUIMIENTO DEL CLIENTE ─────────────────── */
+/* ★ COPIAR, DE VERDAD. Casi todos los clientes abren el link desde
+   WhatsApp, y su navegador interno a menudo RECHAZA el portapapeles
+   moderno: `writeText` devuelve una promesa que falla, y el try/catch de
+   antes no la veía — decía «✓ Copiado» sin haber copiado nada. Ahora:
+   moderno → si falla, el método clásico → y solo se dice «Copiado» si
+   alguno funcionó. Si ninguno, se enseña el texto para copiarlo a mano. */
+function _copiarClasico(txt){
+  try{
+    var ta=document.createElement('textarea'); ta.value=txt; ta.setAttribute('readonly','');
+    ta.style.cssText='position:fixed;top:-9999px;opacity:0';
+    document.body.appendChild(ta); ta.select();
+    var ok=document.execCommand('copy'); document.body.removeChild(ta);
+    return !!ok;
+  }catch(_){ return false; }
+}
 function _copyTrack(txt, btn){
-  try{ navigator.clipboard.writeText(txt); }catch(e){
-    try{ var ta=document.createElement('textarea'); ta.value=txt; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta); }catch(_){}
-  }
-  if(btn){ var o=btn.textContent; btn.textContent='\u2713 Copiado'; setTimeout(function(){ btn.textContent=o; }, 1400); }
+  var hecho=function(ok){
+    if(!btn) return;
+    var o=btn.getAttribute('data-txt')||btn.textContent;
+    btn.setAttribute('data-txt', o);
+    btn.textContent= ok ? '\u2713 Copiado' : 'Mantén presionado para copiar';
+    if(!ok){ try{ window.prompt('Copia estos datos:', txt); }catch(_){} }
+    setTimeout(function(){ btn.textContent=o; }, ok?1400:2600);
+  };
+  try{
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      return navigator.clipboard.writeText(txt).then(function(){ hecho(true); },
+        function(){ hecho(_copiarClasico(txt)); });
+    }
+  }catch(_){}
+  hecho(_copiarClasico(txt));
+  return Promise.resolve();
+}
+/* Guía + código de Shalom, juntos y legibles para pegar en un chat o en la
+   app de Shalom. Se leen de data-* del botón: nada del pedido viaja dentro
+   de un onclick como código. La CLAVE DE RECOJO no está aquí ni en ningún
+   lado de esta página: no viaja al link (functions/pedidoPublico.js). */
+function _textoGuia(guia, codigo){
+  guia=String(guia||'').trim(); codigo=String(codigo||'').trim();
+  if(guia && codigo) return 'Guía: '+guia+' · Código: '+codigo;
+  return guia || codigo;
+}
+function _copyGuia(btn){
+  if(!btn) return;
+  return _copyTrack(_textoGuia(btn.getAttribute('data-guia'), btn.getAttribute('data-codigo')), btn);
 }
 
 /* Deriva la fase del recorrido a partir del estado LITERAL de Shalom.
@@ -2203,7 +2307,7 @@ function _shalomTrackingBlock(ship){
       +(guia?'<div style="font-size:15px;font-weight:800;font-family:ui-monospace,monospace;letter-spacing:1px;color:var(--text)">'+esc(guia)+'</div>':'')
       +(codigo?'<div style="font-size:11px;color:var(--text2);margin-top:1px">C\u00f3digo: <b style="color:var(--text);font-family:ui-monospace,monospace">'+esc(codigo)+'</b></div>':'')
       +'</div>'
-      +(guia?'<button type="button" onclick="_copyTrack(\''+esc(guia)+'\',this)" style="font-size:11px;font-weight:700;color:var(--blue);background:none;border:none;cursor:pointer;font-family:inherit;flex-shrink:0">Copiar</button>':'')
+      +((guia||codigo)?'<button type="button" onclick="_copyGuia(this)" data-guia="'+esc(guia)+'" data-codigo="'+esc(codigo)+'" style="font-size:11px;font-weight:700;color:var(--blue);background:none;border:none;cursor:pointer;font-family:inherit;flex-shrink:0">Copiar</button>':'')
       +'</div>';
   }
 
@@ -2214,6 +2318,33 @@ function _shalomTrackingBlock(ship){
     +'</div>'
     + heroHtml + stepHtml + guiaHtml
     +'</div>';
+}
+
+/* ★ LO QUE EL NARRADOR NECESITA SABER, PUBLICADO EN LA TARJETA.
+   El narrador (narrador/narrador.js) solo lee el DOM. Esperaba la etapa real
+   de Shalom en `data-shalom-st` y esta página NUNCA la ponía: Delfi leía
+   solo la etiqueta del panel, y con Shalom en «Entregado» y el panel aún
+   en ENVIADO seguía diciendo «ya salió de nuestra tienda».
+     data-tipo        agencia · encomienda · retiro · delivery (misma regla
+                      que el formulario: _tipoEnvioDe).
+     data-shalom-st   SOLO pedidos Shalom con estado visible (si el dueño
+                      apagó «Mostrar en el link del cliente», el servidor no
+                      lo manda y aquí no hay nada). Etapas del narrador:
+                      origen/camino → 2 · destino → 3 · entregado → 4. El
+                      narrador solo la usa si va MÁS adelante que el panel.
+     data-tienda-dir  retiro en tienda: la dirección de Config (campo
+                      «Ciudad»), para decir dónde pasar a recoger. */
+function _datosNarrador(ship){
+  const esShalom = !!(ship && /SHALOM/i.test(String(ship.courier||'')));
+  const tipo = _tipoEnvioDe(ship && ship.courier);
+  let shalomSt = null;
+  if(esShalom){
+    const f = _shalomFase((ship.trackingStatus||'').trim());
+    if(f.idx >= 0 && (ship.trackingStatus||'').trim()) shalomSt = [2,2,3,4][f.idx];
+  }
+  const cc = (CFG && (CFG.config || CFG)) || {};
+  const tiendaDir = tipo==='retiro' ? String(cc.city||'').trim() : '';
+  return {tipo, esShalom, shalomSt, tiendaDir};
 }
 
 function renderTrackResult(ship, code){
@@ -2237,6 +2368,10 @@ function renderTrackResult(ship, code){
   // Bloque de seguimiento Shalom (línea de tiempo propia del courier). El estado
   // grande (badge) ya comunica el avance para todos, así que no hay barra genérica.
   const shalomBlock = _shalomTrackingBlock(ship);
+  const narr = _datosNarrador(ship);
+  // La ayuda «¿Cómo sigo mi pedido?» habla del tipo de envío de ESTE pedido.
+  window._trackTipo = narr.tipo;
+  window._trackEsShalom = narr.esShalom;
 
   const dateLabel = ship.date
     ? new Date(ship.date+'T12:00:00').toLocaleDateString('es-PE',{weekday:'short',year:'numeric',month:'short',day:'numeric'})
@@ -2256,7 +2391,7 @@ function renderTrackResult(ship, code){
     <div id="refreshRow" class="refresh-row">
       <span class="refresh-lbl">🔄 Se actualiza automáticamente</span>
     </div>
-    <div class="track-card">
+    <div class="track-card" data-tipo="${esc(narr.tipo)}"${narr.shalomSt!==null?` data-shalom-st="${narr.shalomSt}"`:''}${narr.tiendaDir?` data-tienda-dir="${esc(narr.tiendaDir)}"`:''}>
       <div class="tk-section">
         <div class="tk-lbl">${_nroTk ? 'Factura / Boleta' : 'Código de seguimiento'}</div>
         <div style="font-size:22px;font-weight:700;color:var(--purple);letter-spacing:${_nroTk ? '1px' : '3px'};word-break:break-all">${_nroTk ? '' : '#'}${esc(tc)}</div>
@@ -3057,6 +3192,6 @@ window._notesCount          = _notesCount;
 </script>
 <script src="loading-screen.js?v=1"></script>
 <script defer src="narrador/etiqueta.js?v=11"></script>
-<script defer src="narrador/narrador.js?v=4"></script>
+<script defer src="narrador/narrador.js?v=5"></script>
 </body>
 </html>
