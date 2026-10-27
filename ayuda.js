@@ -195,13 +195,13 @@
       pasos: [
         'Sirve para mover muchos pedidos al mismo estado escaneando el QR de su etiqueta.',
         'Doble toque en el chip del estado (hasta <b>ALISTADO</b>) → abre "ordenar esta vista" → despliega <b>📷 Cambiar etiqueta por QR</b> → <b>Activar</b> (pide tu clave de cambio de etiqueta).',
-        'Toca el botón 📷 y apunta al QR de la etiqueta. Cada escaneo mueve ese pedido al estado activo.',
+        'Toca el botón 📷 y apunta al <b>QR pequeño de abajo</b> de la etiqueta. Cada escaneo mueve ese pedido al estado activo. El QR grande (el celular) no mueve nada: avisa.',
         'Debajo de la tarjeta movida aparece <b>de → a</b> con <b>↩ Revertir</b> (pide confirmación).',
         'Se escanea de uno en uno: la cámara se cierra tras cada lectura.',
         'Al cambiar de chip, el modo se apaga solo.'
       ],
       faq: [
-        {q:'¿Puede cambiar el pedido equivocado?', a:'No. Las etiquetas nuevas llevan número + código en el QR, así que identifican un pedido exacto. En etiquetas viejas (solo número), si hay varios pedidos con ese número no cambia ninguno y avisa.'},
+        {q:'¿Puede cambiar el pedido equivocado?', a:'No. Solo mueve con el QR pequeño de abajo, que identifica un pedido exacto. El QR grande lleva solo el celular (puede tener varios pedidos), así que no mueve. Si la etiqueta no tiene QR pequeño, reimprímela: toda etiqueta impresa desde el 27/10 lo lleva.'},
         {q:'¿Puede retroceder un estado?', a:'No. Solo AVANZA. Por eso los ENVIADO/FINALIZADO no se tocan por este medio.'},
         {q:'¿Funciona sin internet?', a:'Sí para leer y mover. Solo la impresión del QR usa internet.'},
         {q:'¿Sirve con etiquetas viejas?', a:'Sí: se buscan por número. Las nuevas (con código) son exactas.'}

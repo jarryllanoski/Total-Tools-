@@ -188,7 +188,7 @@ module.exports = async ({bloque, ok}) => {
     ok(!('shalomClave' in vista), 'y los secretos siguen fuera');
   }
 
-  bloque('La etiqueta: el número reemplaza al código; sin número, igual que hoy');
+  bloque('La etiqueta: QR grande = solo celular; el número va en el pie con su QR pequeño');
 
   {
     const P = cargarEtiqueta();
@@ -202,20 +202,23 @@ module.exports = async ({bloque, ok}) => {
       phone: '933333333', name: 'EVA'};
 
     ok(P.codigo(viejo) === '3456' && P.qr(viejo) === '911111111',
-       'pedido antiguo: 4 caracteres y QR solo con el número — sin tocar');
-    ok(P.codigo(ayer) === '987654' && P.qr(ayer) === '911111111#987654',
-       'pedido de ayer sin número: el de 6 dígitos de siempre');
+       'pedido antiguo: 4 caracteres y QR grande con el celular');
+    ok(P.codigo(ayer) === '987654' && P.qr(ayer) === '911111111',
+       '⚠️ QR grande = SOLO el celular (27/10), ya sin «#código»');
     ok(P.codigo(conNro) === 'F001-00123',
        'con número, el código ES el número');
-    ok(P.qr(conNro) === '922222222#F001-00123', 'y el QR grande lo lleva');
+    ok(P.qr(conNro) === '922222222',
+       'y aunque tenga boleta, el QR grande sigue siendo solo el celular');
     ok(P.base(conNro) === '555444',
        'el código de 6 dígitos sigue existiendo por debajo');
     ok(P.PM.codigoEnvio === P.codigo && P.PM.codigoBase === P.base,
        'y los dos se exponen al escáner');
 
-    ok(P.pie(viejo, (v) => 'QR:' + v) === '' &&
-       P.pie(ayer, (v) => 'QR:' + v) === '',
-       'pedidos de antes del 26/10 sin número: SIN QR pequeño, etiqueta igual');
+    ok(/QR:TTPED:id_1754000123456/.test(P.pie(viejo, (v) => 'QR:' + v)) &&
+       /QR:TTPED:id_1761400987654/.test(P.pie(ayer, (v) => 'QR:' + v)),
+       '⚠️ TODA etiqueta impresa lleva el QR pequeño, también la de un pedido ' +
+       'antiguo: sin él no se podría cambiar de etiqueta por QR');
+    ok(/#3456/.test(P.pie(viejo, (v) => v)), 'el antiguo, rotulado con su código de 4');
     const pieN = P.pie(conNro, (v) => 'QR:' + v);
     ok(/QR:TTPED:id_1761500555444/.test(pieN),
        'con número: QR pequeño con el ID del pedido');
@@ -233,8 +236,9 @@ module.exports = async ({bloque, ok}) => {
        'y el QR pequeño va DEBAJO de toda la etiqueta');
     const htmlV = P.etiqueta([ayer], 1, 'TOTAL TOOLS', '', '', 'hoy',
         (v) => 'QR:' + v);
-    ok(/#987654/.test(htmlV) && htmlV.indexOf('class="card-pie"') < 0,
-       'la etiqueta de un pedido de ayer sale igual que siempre');
+    ok(/#987654/.test(htmlV) && htmlV.indexOf('class="card-pie"') > 0 &&
+       htmlV.indexOf('QR:911111111"') > 0,
+       'la de un pedido de ayer: código de siempre abajo, QR grande con el celular y QR pequeño');
     const malo = Object.assign({}, conNro, {nroComprobante: '"><img src=x>'});
     ok(P.etiqueta([malo], 1, 'T', '', '', 'h', (v) => v).indexOf('<img src=x') < 0,
        'un número con HTML no se cuela en la etiqueta');
@@ -266,7 +270,7 @@ module.exports = async ({bloque, ok}) => {
        'ni se imprime');
   }
 
-  bloque('El escáner: directo al pedido, y las etiquetas viejas siguen valiendo');
+  bloque('El escáner: QR grande = búsqueda de siempre; QR pequeño = directo al pedido');
 
   {
     const P = cargarEtiqueta();
@@ -283,45 +287,78 @@ module.exports = async ({bloque, ok}) => {
     const avisos = [];
     const found = {style: {}, textContent: ''};
     const fSearch = {value: ''};
+    let mov = [];
     // eslint-disable-next-line no-new-func
     const api = new Function('S', '$', 'window', 'PrintModule',
         'NroComprobante', 'irAlPedido', 'closeQR', 'toast', 'setTimeout',
         'esUsuarioWA', 'renderChips', 'render', '_qrMove', 'document',
-        'requestAnimationFrame',
-        'let _filt="";' + src + ';return {handleQR, _qrPorCodigo};',
+        'requestAnimationFrame', '_qrMoveOnScan', 'scanLoop',
+        'let _filt="";' + src + ';return {handleQR};',
     )(S, (id) => (id === 'qrFound' ? found : fSearch),
         {PrintModule: P.PM, NroComprobante: N}, P.PM, N,
         (id) => fuimos.push(id), () => {}, (m) => avisos.push(m),
         (f) => f(), () => false, () => {}, () => {}, {on: false},
-        {querySelectorAll: () => []}, () => {});
+        {querySelectorAll: () => []}, () => {}, (r) => mov.push(r), () => {});
 
     api.handleQR('TTPED:id_1761500999888');
     ok(fuimos[0] === 'id_1761500999888',
        'QR pequeño → va directo a ESE pedido (como «Ver»)');
-    api.handleQR('922222222#F001-00123');
-    ok(fuimos[1] === 'id_1761500555444',
-       'QR grande con factura → directo a ese pedido, no a todos los del número');
-    api.handleQR('922222222#555444');
-    ok(fuimos[2] === 'id_1761500555444',
-       '⚠️ etiqueta impresa ANTES de poner la factura → sigue encontrándolo');
-    const antes = fuimos.length;
     api.handleQR('922222222');
-    ok(fuimos.length === antes && fSearch.value === '922222222',
-       'QR viejo (solo número) → búsqueda por número, como siempre');
-    ok(api._qrPorCodigo('922222222', '').length === 0,
-       'sin código no hay coincidencia exacta');
+    ok(fuimos.length === 1 && fSearch.value === '922222222',
+       '⚠️ QR grande (solo celular) → la búsqueda de siempre: todos los de ese número');
+    fSearch.value = '';
+    api.handleQR('922222222#F001-00123');
+    ok(fuimos.length === 1 && fSearch.value === '922222222',
+       'etiqueta impresa antes con «número#código» → también búsqueda por celular');
+    ok(!/_qrPorCodigo|_exactos/.test(src),
+       'ya no queda el atajo «directo por código» del QR grande');
   }
 
-  bloque('Cambio de etiqueta por QR: acepta el QR pequeño y no elige a ciegas');
+  bloque('Cambio de etiqueta: SOLO con el QR pequeño');
 
   {
     const src = E.trozo('index.html', 'function _qrMoveOnScan(raw){',
         '// Revertir (con confirmación');
-    ok(/leerQrPedido\(raw\)/.test(src), 'lee el QR pequeño');
-    ok(/_qrPorCodigo\(phone, code\)/.test(src),
-       'usa la misma búsqueda por código que el escáner normal');
-    ok(/_c\.length>1/.test(src),
-       'con dos pedidos del mismo código NO mueve el primero que encuentre');
+    const ESTADOS = ['NUEVO PEDIDO', 'EN PROCESO', 'POR ALISTAR', 'ALISTADO', 'ENVIADO'];
+    const correr = (estadoPedido, objetivo, raw) => {
+      const S = {shipments: [
+        {id: 'id_1', name: 'ANA', phone: '922222222', status: estadoPedido},
+        {id: 'id_2', name: 'LUIS', phone: '922222222', status: 'NUEVO PEDIDO'},
+      ]};
+      const r = {fallos: [], guardados: [], avisos: []};
+      const qm = {on: true, status: objetivo, last: null, shown: null};
+      // eslint-disable-next-line no-new-func
+      new Function('S', 'window', 'NroComprobante', '_qrMove', 'allStatuses', 'closeQR',
+          '_qrMoveArmTimer', '_qrMoveFallo', 'render', 'toast', 'save',
+          src + ';_qrMoveOnScan(' + JSON.stringify(raw) + ');',
+      )(S, {NroComprobante: N, _fbSaveShipmentNow: (x) => r.guardados.push(x.id)}, N, qm,
+          () => ESTADOS, () => {}, () => {}, (m) => r.fallos.push(m), () => {},
+          (m) => r.avisos.push(m), () => {});
+      r.S = S; r.qm = qm;
+      return r;
+    };
+    let r = correr('NUEVO PEDIDO', 'EN PROCESO', '922222222');
+    ok(r.guardados.length === 0 && /QR pequeño/.test(r.fallos[0] || ''),
+       '⚠️ QR grande en modo escaneo: NO mueve nada, y avisa «escanea el QR pequeño»');
+    r = correr('NUEVO PEDIDO', 'EN PROCESO', '922222222#F001-00123');
+    ok(r.guardados.length === 0 && r.S.shipments.every((x) => x.status === 'NUEVO PEDIDO'),
+       'una etiqueta vieja «número#código» tampoco mueve');
+    r = correr('NUEVO PEDIDO', 'EN PROCESO', 'TTPED:id_1');
+    ok(r.S.shipments[0].status === 'EN PROCESO' && r.guardados.join() === 'id_1' &&
+       r.S.shipments[1].status === 'NUEVO PEDIDO',
+       'QR pequeño: mueve ESE pedido, y no al otro del mismo celular');
+    ok(r.qm.last && r.qm.last.prev === 'NUEVO PEDIDO', 'con su tira «de → a» para revertir');
+    r = correr('ALISTADO', 'EN PROCESO', 'TTPED:id_1');
+    ok(r.guardados.length === 0 && /retroceder/.test(r.fallos[0] || ''), 'solo avanza');
+    r = correr('EN PROCESO', 'EN PROCESO', 'TTPED:id_1');
+    ok(r.guardados.length === 0 && r.qm.shown === 'id_1' && !r.fallos.length,
+       'si ya está en ese estado, solo lo muestra');
+    r = correr('NUEVO PEDIDO', 'EN PROCESO', 'TTPED:id_noexiste');
+    ok(r.guardados.length === 0 && /ya no está/.test(r.fallos[0] || ''),
+       'un pedido que ya no existe: avisa');
+    const idx = E.leer('index.html');
+    ok(/function qrMoveToggle\(\)\{[\s\S]{0,400}openPin\(/.test(idx),
+       'se sigue activando igual: con la clave');
   }
 
   bloque('Editar pedido: se guarda solo si hay algo, y borrarlo viaja');

@@ -22,8 +22,11 @@
  *
  * ⚠️ SOLO PEDIDOS DE HOY EN ADELANTE. Un pedido sin el campo devuelve "" y
  * todo lo demás sigue exactamente igual que antes: mismo código, mismo QR,
- * misma etiqueta. El QR pequeño del pie solo lo llevan los pedidos creados
- * desde `CORTE_QR_PEDIDO`, o los que tienen número.
+ * misma etiqueta.
+ *
+ * El QR pequeño del pie lo lleva TODA etiqueta impresa desde el 27/10/2026
+ * (también la de un pedido antiguo): es el único QR que cambia de etiqueta
+ * en modo escaneo, y un pedido sin él no se podría mover.
  */
 
 /* global globalThis, window */
@@ -35,7 +38,6 @@
   }
 })(typeof globalThis !== "undefined" ? globalThis : window, () => {
   const MAX = 20;
-  const CORTE_QR_PEDIDO = "2026-10-26";
   // Prefijo del QR pequeño. Lo distingue de los demás QR que lee el panel
   // (el de la etiqueta, `teléfono#código`, y el de la guía Shalom).
   const PREFIJO_QR = "TTPED:";
@@ -102,9 +104,7 @@
    */
   function llevaQrPedido(p) {
     const o = (p && typeof p === "object") ? p : {};
-    if (!ID_OK.test(String(o.id || ""))) return false;
-    if (de(o)) return true;
-    return String(o.createdAt || "").slice(0, 10) >= CORTE_QR_PEDIDO;
+    return ID_OK.test(String(o.id || ""));
   }
 
   /**
@@ -132,7 +132,7 @@
   }
 
   return {
-    MAX, CORTE_QR_PEDIDO, PREFIJO_QR,
+    MAX, PREFIJO_QR,
     limpiar, de, tipo, coincide, llevaQrPedido, valorQrPedido, leerQrPedido,
   };
 });

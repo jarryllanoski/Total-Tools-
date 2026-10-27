@@ -31,7 +31,7 @@
 <script src="functions/enlaceSeguimiento.js?v=1"></script>
 <script src="functions/registroShalom.js?v=3"></script>
 <script src="functions/dniPedido.js?v=1"></script>
-<script src="functions/nroComprobante.js?v=1"></script>
+<script src="functions/nroComprobante.js?v=2"></script>
 <script src="functions/montoPedido.js?v=1"></script>
 <script src="functions/fechaPedido.js?v=1"></script>
 <script src="appcheck.js?v=1"></script>
@@ -4864,10 +4864,6 @@ function handleQR(raw){
   if(_qrMove.on){ _qrMoveOnScan(raw); return; }
   // QR de Shalom (guía) — igual que siempre
   if(raw&&raw.includes('/document/')){const _parts=raw.split('/document/');const _qrId=parseInt(_parts[0]);if(!isNaN(_qrId)){const _ord=String(_qrId-3473503);const _found=S.shipments.find(s=>(s.trackingOrderNumber===_ord)||(s.shalomGuia===_ord));const _fEl=$('qrFound');_fEl.textContent='✅ Guía: '+_ord;_fEl.style.display='block';setTimeout(()=>{closeQR();$('fSearch').value=_ord;_filt='';renderChips();render();if(_found){setTimeout(()=>{document.querySelectorAll('.card').forEach(c=>{if(c.innerHTML.includes(_ord)){c.style.background='rgba(56,139,253,.15)';setTimeout(()=>c.style.background='',1500)}})},200);toast('✅ '+_found.name);}else{toast('⚠️ Guía no encontrada: '+_ord);}},800);return;}}
-  // Nuestra etiqueta: "número" (viejo) o "número#código" (nuevo). Solo usamos el
-  // número para buscar. Desde 2026 ese primer tramo puede ser un usuario de
-  // WhatsApp (@nombre) en vez de un número: se acepta tal cual, ya viene en
-  // minúsculas desde el campo, así que compara igual que el resto del panel.
   /* ★ EL QR PEQUEÑO DEL PIE (`TTPED:<id>`): un pedido exacto, sin buscar.
      Lleva el id, no el número impreso, porque el id no se repite nunca.
      Se va a él igual que con «Ver»: su etiqueta, la marca y el scroll. */
@@ -4878,32 +4874,16 @@ function handleQR(raw){
     setTimeout(()=>{closeQR();irAlPedido(_idPie);if(_p)toast('✅ '+_p.name);},600);
     return;
   }
+  /* EL QR GRANDE: el celular, y la búsqueda de siempre (todos los pedidos de
+     ese número). Desde el 27/10/2026 lleva SOLO el celular; las etiquetas
+     impresas antes con «número#código» se siguen leyendo: se usa el tramo
+     del número. Ese tramo puede ser un usuario de WhatsApp (@nombre): se
+     acepta tal cual, ya viene en minúsculas desde el campo. */
   const _qrBruto=String(raw).split('#')[0].trim();
   let phone;
   if(esUsuarioWA(_qrBruto)){ phone=_qrBruto.toLowerCase(); }
   else { phone=_qrBruto.replace(/\D/g,'');if(phone.startsWith('51')&&phone.length===11)phone=phone.slice(2);if(phone.length!==9){toast('QR no reconocido');_qrAF=requestAnimationFrame(scanLoop);return} }
-  /* Etiqueta nueva (`número#código`): si el código señala UN pedido, se va
-     directo a él. Si no (etiqueta vieja, o dos pedidos con el mismo código),
-     se busca por número como siempre. */
-  const _exactos=_qrPorCodigo(phone,String(raw).split('#')[1]);
-  if(_exactos.length===1){
-    const _f=$('qrFound');_f.textContent='✅ '+_exactos[0].name;_f.style.display='block';
-    setTimeout(()=>{closeQR();irAlPedido(_exactos[0].id);toast('✅ '+_exactos[0].name);},600);
-    return;
-  }
   const f=$('qrFound');f.textContent=`✅ ${phone}`;f.style.display='block';const m=S.shipments.find(s=>s.phone===phone);setTimeout(()=>{closeQR();$('fSearch').value=phone;_filt='';renderChips();render();if(m){setTimeout(()=>{document.querySelectorAll('.card').forEach(c=>{if(c.innerHTML.includes(phone)){c.style.background='rgba(56,139,253,.15)';setTimeout(()=>c.style.background='',1500)}})},200);toast(`✅ ${m.name}`)}else{toast(`⚠️ No encontrado: ${phone}`)}},800)}
-/* Pedidos de ese número cuyo código es `code`. El código vale de DOS
-   formas, y las dos tienen que entrar: el N° de factura/boleta (lo que
-   imprime hoy la etiqueta) y el de 6 dígitos (lo que imprimió si se
-   imprimió ANTES de ponerle el número). Sin la segunda, una etiqueta ya
-   pegada al paquete dejaría de escanearse por haber añadido la factura. */
-function _qrPorCodigo(phone, code){
-  const c=String(code||'').trim().toUpperCase();
-  if(!c||!window.PrintModule||!PrintModule.codigoEnvio) return [];
-  return S.shipments.filter(s=>s.phone===phone && (
-    String(PrintModule.codigoEnvio(s)).toUpperCase()===c ||
-    (PrintModule.codigoBase && String(PrintModule.codigoBase(s)).toUpperCase()===c)));
-}
 function closeQR(){if(_qrAF)cancelAnimationFrame(_qrAF);if(_qrStream)_qrStream.getTracks().forEach(t=>t.stop());_qrStream=null;_qrAF=null;$('qrVideo').srcObject=null;$('qrOverlay').classList.remove('open')}
 
 /* ═══════════════════════════════════════════════════════════════════════
@@ -4911,7 +4891,10 @@ function closeQR(){if(_qrAF)cancelAnimationFrame(_qrAF);if(_qrStream)_qrStream.g
    • Se activa desde el acordeón del sheet "ordenar esta vista" (solo estados
      hasta ALISTADO) con la clave de cambio de etiqueta (openPin).
    • Escanear mueve el pedido al estado activo. SOLO AVANZA. Uno por uno.
-   • QR nuevo = número#código (exacto). QR viejo = número (por coincidencia).
+   • SOLO con el QR PEQUEÑO del pie (`TTPED:<id>`, el pedido exacto). Desde
+     el 27/10/2026 el QR grande lleva solo el celular, y un celular puede
+     tener varios pedidos: mover «el que parezca» es cómo se cambia de
+     etiqueta el paquete equivocado. El QR grande aquí no mueve: avisa.
    • Bajo la tarjeta movida aparece "de → a" + Revertir (efímero, solo la última).
    No toca la búsqueda normal ni el render fuera del modo.
    ═══════════════════════════════════════════════════════════════════════ */
@@ -4985,35 +4968,12 @@ function _qrMoveOnScan(raw){
   closeQR(); // uno por uno
   _qrMoveArmTimer(); // hubo actividad: reinicia el minuto de inactividad
   const all=allStatuses(); const target=_qrMove.status; const ti=all.indexOf(target);
-  // QR pequeño del pie: el pedido exacto por su id.
+  // Solo el QR pequeño del pie: el pedido exacto por su id.
   const _idPie=window.NroComprobante?NroComprobante.leerQrPedido(raw):'';
-  const parts=String(raw).split('#');
-  let phone=parts[0].replace(/\D/g,''); if(phone.startsWith('51')&&phone.length===11)phone=phone.slice(2);
-  const code=(parts[1]||'').trim().toUpperCase();
-  if(!_idPie && phone.length!==9){ _qrMoveFallo('⚠️ QR no reconocido — usa la etiqueta del pedido'); return; }
+  if(!_idPie){ _qrMoveFallo('⚠️ Para cambiar de etiqueta escanea el QR pequeño de abajo'); return; }
   if(ti<0){ _qrMoveFallo('⚠️ Estado no válido'); return; }
-  let match=null;
-  if(_idPie){
-    match=S.shipments.find(s=>s.id===_idPie);
-    if(!match){ _qrMoveFallo('⚠️ Ese pedido ya no está en la lista'); return; }
-  } else if(code && window.PrintModule && PrintModule.codigoEnvio){
-    const _c=_qrPorCodigo(phone, code);
-    if(!_c.length){ _qrMoveFallo('⚠️ '+phone+' #'+code+' no encontrado'); return; }
-    if(_c.length>1){ _qrMoveFallo('⚠️ Varios pedidos con '+phone+' #'+code+' — escanea el QR pequeño'); return; }
-    match=_c[0];
-  } else {
-    // Viejo (sin código): candidatos con ese número que PUEDEN avanzar a este estado.
-    const cand=S.shipments.filter(s=>s.phone===phone && all.indexOf(s.status)>=0 && all.indexOf(s.status)<ti);
-    if(cand.length===1) match=cand[0];
-    else if(cand.length>1){ _qrMoveFallo('⚠️ Varios pedidos con '+phone+' — usa etiqueta nueva'); return; }
-    else {
-      // 0 candidatos que avancen. Si ya hay uno EXACTAMENTE en este estado → mostrarlo limpio.
-      const same=S.shipments.filter(s=>s.phone===phone && all.indexOf(s.status)===ti);
-      if(same.length===1){ _qrMove.last=null; _qrMove.shown=same[0].id; render(); return; }
-      const any=S.shipments.find(s=>s.phone===phone);
-      _qrMoveFallo(any?('⚠️ '+any.name+' está en '+any.status):('⚠️ '+phone+' no encontrado')); return;
-    }
-  }
+  const match=S.shipments.find(s=>s.id===_idPie);
+  if(!match){ _qrMoveFallo('⚠️ Ese pedido ya no está en la lista'); return; }
   const ci=all.indexOf(match.status);
   if(ci<0){ _qrMoveFallo('⚠️ Estado desconocido'); return; }
   // Ya está en ese estado: sin aviso ni tira, solo mostrar ese pedido (como una búsqueda).
@@ -5177,7 +5137,7 @@ render();
      así que siguen yendo detrás. El orden de carga es un contrato
      (ver docs/ARQUITECTURA.md). -->
 <script src="config.js?v=57"></script>
-<script src="print.js?v=19"></script>
+<script src="print.js?v=20"></script>
 <script src="notify.js?v=7"></script>
 <script src="shalom.js?v=33"></script>
 <script src="tracking.js?v=23"></script>
@@ -5187,7 +5147,7 @@ render();
 <script src="ticket.js?v=5"></script>
 <script src="agencias-extractor.js?v=11"></script>
 <script src="respaldo.js?v=2"></script>
-<script src="ayuda.js?v=7"></script>
+<script src="ayuda.js?v=8"></script>
 <script src="recursos.js?v=2"></script>
 <script src="dashboard.js?v=2"></script>
 <script src="voz.js?v=3"></script>

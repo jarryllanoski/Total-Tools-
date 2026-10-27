@@ -378,11 +378,13 @@ window.PrintModule.impreso = function(s){ return !!(s && (s.printed || s._printe
 // Exponer el código para que el escáner (index.html) identifique el pedido exacto.
 window.PrintModule.codigoEnvio = _codigoEnvio;
 window.PrintModule.codigoBase = _codigoBase;
-// Valor del QR de la etiqueta: número (viejos) o "número#código" (hoy en adelante,
-// mismo corte que el código impreso). Deja escanear 1-a-1 sin ambigüedad.
+/* Valor del QR GRANDE: solo el celular (27/10/2026). Escanearlo hace la
+   búsqueda de siempre: todos los pedidos de ese número. Identificar UN
+   pedido —para ir a él o cambiarlo de etiqueta— es trabajo del QR pequeño
+   del pie, que lleva su id (ver _pieQrPedido). Antes llevaba también
+   «#código»; las etiquetas ya impresas así se siguen leyendo. */
 function _qrValor(s){
-  var nuevo = ((s.createdAt||'').slice(0,10) >= _CODIGO_CUTOFF);
-  return nuevo ? (String(s.phone||'')+'#'+_codigoEnvio(s)) : String(s.phone||'');
+  return String(s.phone||'');
 }
 
 // ── ¿A DÓNDE VA ESTE ENVÍO? — un solo dueño de la regla ──────────────
@@ -414,8 +416,9 @@ function _agenciaLinea(s, cls){
    sin ella (links rápidos, pedidos a mano) dice «PEDIDO #307321».
    El QR lleva el ID del pedido (`TTPED:<id>`), no el número impreso: el
    número puede repetirse, el id no. Escanearlo en el panel lleva a ESE
-   pedido, solo. Pedidos de antes del 26/10/2026 sin número: no lo llevan,
-   su etiqueta sale exactamente igual que siempre. */
+   pedido, solo, y es el ÚNICO que cambia de etiqueta en modo escaneo.
+   Desde el 27/10/2026 lo lleva TODA etiqueta que se imprima, también la
+   de un pedido antiguo: sin él, ese pedido no se podría mover por QR. */
 function _pieQrPedido(s, qrUrl){
   var v = window.NroComprobante ? NroComprobante.valorQrPedido(s) : '';
   if(!v) return '';
