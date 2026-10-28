@@ -182,7 +182,19 @@
       }});
     },
 
-    ticket: _off,            // 2 · el PNG del ticket
+    /* ✅ CONECTADO · GET /track/voucher — 2026-10-28
+       El SERVIDOR descarga el ticket, lo guarda en Storage y lo apunta en
+       el pedido como «Guía / Ticket». Aquí solo viaja el id del pedido y la
+       guía/código; vuelve el enlace del archivo ya guardado.
+       → {ok:true, doc:{d:url, n, t, storage, path}} | {ok:false, motivo} */
+    ticket: function (pedidoId, guia, codigo) {
+      var id = String(pedidoId || '').trim();
+      if (!id || !String(guia || '').trim() || !String(codigo || '').trim()) {
+        return Promise.resolve({ok: false, motivo: 'SIN_DATO'});
+      }
+      return _pedir({op: 'jalarTicket', datos: {pedidoId: id,
+        orderNumber: String(guia).trim(), orderCode: String(codigo).trim()}});
+    },
     registrar: _off,         // 6 · alta de envío
 
     /* ✅ CONECTADO · GET /public/agencies — 2026-09-24

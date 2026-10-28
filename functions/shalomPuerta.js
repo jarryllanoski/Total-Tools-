@@ -175,7 +175,7 @@ const PERMITIDAS = {
        `****` ya seria confirmar su longitud.
      · La auditoria registra quien y cuando. El valor no. */
 const ORQUESTADAS = {registrarEnvio: true, recuperarEnvio: true,
-  conectarShalom: true, guardarCredenciales: true};
+  conectarShalom: true, guardarCredenciales: true, jalarTicket: true};
 
 /**
  * Quita de un texto cualquier cosa con forma de clave antes de devolverlo.
@@ -1007,8 +1007,104 @@ function traducir(op, json) {
   return {ok: false, motivo: "SIN_TRADUCTOR"};
 }
 
+/* ── GET /track/voucher — el TICKET (comprobante) ─────────────────────────
+   Devuelve un BINARIO (PNG por defecto), no JSON: por eso no pasa por
+   `llamar`, que parsea JSON. La doc de su API trae el ejemplo con
+   `res.json()`, que está mal (ver docs/SHALOM-API.md).
+
+   Cuatro comprobaciones antes de aceptar lo que llega, porque esto termina
+   GUARDADO en el bucket y enseñado al cliente:
+     · guía y código con su forma exacta (nada raro viaja en el querystring);
+     · HTTP 200;
+     · tamaño máximo — un 200 con 40 MB es un error, no un ticket;
+     · los BYTES dicen PNG o PDF (firma del archivo), no solo la cabecera:
+       un 200 con una página HTML de error no se guarda como «ticket». */
+const GUIA_FORMA = /^(?:[0-9]{8}|1[0-9]{8})$/; // = barrido.GUIA_OK
+const CODIGO_FORMA = /^[A-Za-z0-9]{3,8}$/;
+const VOUCHER_MAX = 3 * 1024 * 1024;
+
+/**
+ * Qué es un archivo, por sus primeros bytes.
+ * @param {Buffer} b bytes
+ * @return {string} "image/png" · "application/pdf" · ""
+ */
+function tipoPorFirma(b) {
+  if (!b || b.length < 5) return "";
+  if (b[0] === 0x89 && b[1] === 0x50 && b[2] === 0x4E && b[3] === 0x47) {
+    return "image/png";
+  }
+  if (b[0] === 0x25 && b[1] === 0x50 && b[2] === 0x44 && b[3] === 0x46) {
+    return "application/pdf";
+  }
+  return "";
+}
+
+/**
+ * Descarga el ticket de una guía.
+ * @param {string} clave API key (solo servidor)
+ * @param {Object} datos {orderNumber, orderCode}
+ * @return {Promise<Object>} {ok:true, bytes, tipo} o {ok:false, motivo}
+ */
+async function descargarVoucher(clave, datos) {
+  const d = datos || {};
+  const guia = String(d.orderNumber || "").trim();
+  const codigo = String(d.orderCode || "").trim().toUpperCase();
+  if (!GUIA_FORMA.test(guia) || !CODIGO_FORMA.test(codigo)) {
+    return {ok: false, motivo: "SIN_DATO",
+      detalle: "guía o código con forma no válida"};
+  }
+  if (!clave) return {ok: false, motivo: "BLOQUEADO", detalle: "sin clave"};
+  const url = BASE + "/track/voucher?orderNumber=" + encodeURIComponent(guia) +
+    "&orderCode=" + encodeURIComponent(codigo) + "&format=image";
+  let r;
+  try {
+    r = await fetch(url, {method: "GET", headers: {"x-api-key": clave},
+      signal: AbortSignal.timeout(TIEMPO_MAX_MS)});
+  } catch (e) {
+    const corte = e && (e.name === "TimeoutError" || e.name === "AbortError");
+    return {ok: false, motivo: corte ? "ERROR_SHALOM" : "SIN_RED",
+      detalle: sanear(e && e.message)};
+  }
+  if (!r.ok) {
+    let texto = "";
+    try {
+      texto = await r.text();
+    } catch (e) {
+      texto = "";
+    }
+    return {ok: false, http: r.status, motivo: motivoDeHttp(r.status, texto),
+      detalle: sanear(texto)};
+  }
+  const largo = Number(r.headers && r.headers.get &&
+    r.headers.get("content-length")) || 0;
+  if (largo > VOUCHER_MAX) {
+    return {ok: false, motivo: "FORMATO_DESCONOCIDO",
+      detalle: "archivo enorme"};
+  }
+  let bytes;
+  try {
+    bytes = Buffer.from(await r.arrayBuffer());
+  } catch (e) {
+    return {ok: false, motivo: "ERROR_SHALOM", detalle: "no se pudo leer"};
+  }
+  if (!bytes.length || bytes.length > VOUCHER_MAX) {
+    return {ok: false, motivo: "FORMATO_DESCONOCIDO",
+      detalle: bytes.length ? "archivo enorme" : "vacío"};
+  }
+  const tipo = tipoPorFirma(bytes);
+  if (!tipo) {
+    return {ok: false, motivo: "FORMATO_DESCONOCIDO",
+      detalle: "Shalom no devolvió una imagen ni un PDF"};
+  }
+  return {ok: true, bytes: bytes, tipo: tipo};
+}
+
 module.exports = {
   BASE,
+  GUIA_FORMA,
+  VOUCHER_MAX,
+  tipoPorFirma,
+  descargarVoucher,
   PERMITIDAS,
   ORQUESTADAS,
   sanear,

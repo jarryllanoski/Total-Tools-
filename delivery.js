@@ -356,13 +356,19 @@ DeliveryModule._confirmar=async function(){
       }
       return null;
     };
+    /* ★ Si tras los reintentos no sube, YA NO se pierde: entra a la cola de
+       fotos (fotos.js, IndexedDB) y se sube sola, escribiendo solo su campo. */
+    var _FM=global.FotosModule;
     if(_fotoBase64){
       var uF=await _subir(_fotoBase64,'delivery-foto.jpg','image/jpeg','delivery-foto');
-      if(uF) ship._dlvFoto=uF; else if(typeof global.toast==='function')global.toast('⚠️ No se pudo subir la foto — se guardó sin ella');
+      if(uF) ship._dlvFoto=uF;
+      else if(_FM&&_FM.encolarUrl){ _FM.encolarUrl(ship.id,'_dlvFoto','delivery-foto',SM.base64ToFile(_fotoBase64,'delivery-foto.jpg','image/jpeg')); if(typeof global.toast==='function')global.toast('⏳ La foto se subirá sola al volver la conexión'); }
+      else if(typeof global.toast==='function')global.toast('⚠️ No se pudo subir la foto — se guardó sin ella');
     }
     if(firmaB64){
       var uS=await _subir(firmaB64,'delivery-firma.png','image/png','delivery-firma');
-      if(uS) ship._dlvFirma=uS; // firma opcional: si falla, seguir
+      if(uS) ship._dlvFirma=uS; // firma opcional: si falla, a la cola
+      else if(_FM&&_FM.encolarUrl) _FM.encolarUrl(ship.id,'_dlvFirma','delivery-firma',SM.base64ToFile(firmaB64,'delivery-firma.png','image/png'));
     }
   }
 

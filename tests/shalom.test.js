@@ -39,9 +39,11 @@ module.exports = async (t) => {
         'DISPONIBLE sigue en false aunque consultarGuia ya funcione: el botón ' +
         '⟳ no la mira y el barrido automático sí — a mano se calibra, en masa ' +
         'se confía en un traductor sin comprobar');
-    const dormidos = ['ticket', 'registrar'];
+    // `ticket` se conectó el 28/10/2026 (GET /track/voucher): ver
+    // tests/ticket-fotos.test.js. Queda dormido `registrar`.
+    const dormidos = ['registrar'];
     ok(dormidos.every((m) => typeof S[m] === 'function'),
-        'los 2 que faltan existen: nadie explota al llamarlos');
+        'el que falta existe: nadie explota al llamarlo');
     // Se llaman DE VERDAD y se espera su respuesta. Comprobar solo que la
     // función existe dejaría pasar una que devuelve undefined.
     const respuestas = await Promise.all(dormidos.map((m) => S[m]()));
@@ -50,7 +52,7 @@ module.exports = async (t) => {
       return !(r && r.ok === false && r.motivo === 'DESCONECTADO');
     });
     ok(malas.length === 0,
-        'los 2 devuelven {ok:false, motivo:"DESCONECTADO"}' +
+        'devuelve {ok:false, motivo:"DESCONECTADO"}' +
         (malas.length ? ' — fallan: ' + malas.join(', ') : ''));
     ok(respuestas.every((r) => !r.ok), 'ninguno devuelve ok:true sin dato real');
   }
@@ -405,7 +407,8 @@ module.exports = async (t) => {
   {
     ok(/case 'DESCONECTADO':\s*return '🔧 Rastreo Shalom en reconstrucción'/.test(E.leer('tracking.js')),
         'el botón ⟳');
-    ok(/Jalar ticket en reconstrucción/.test(E.leer('ticket.js')), 'el botón 🧾');
+    ok(/Shalom no encontró esa guía con ese código/.test(E.leer('ticket.js')) &&
+       /textoMotivo/.test(E.leer('ticket.js')), 'el botón 🧾 (dice cada motivo)');
     ok(/Extraer agencias de Shalom está en reconstrucción/.test(E.leer('agencias-extractor.js')),
         'el extractor, y aclara que el catálogo actual sigue sirviendo');
     ok(/La integración con Shalom se está rehaciendo/.test(E.leer('index.html')),

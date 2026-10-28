@@ -452,11 +452,19 @@
     // acá, en la puerta de subida, porque el spread de arriba copia el objeto
     // entero y cualquier campo nuevo se colaría igual.
     const {sel, ...limpio} = s;
-    return{...limpio,
+    const out = {...limpio,
       docGuia:    _slimDoc(s.docGuia),
       docEmbalado:_slimDoc(s.docEmbalado),
       docTicket:  _slimDoc(s.docTicket)
     };
+    /* ★ UNA FOTO PENDIENTE NO SUBE NADA EN SU LUGAR. Antes subía «[img]» y
+       la foto quedaba perdida. Ahora el campo se OMITE: la cola de fotos
+       (fotos.js) lo escribe cuando la foto sube, y mientras tanto ninguna
+       PC con la marca vieja puede pisar el enlace bueno. */
+    ['docGuia','docEmbalado','docTicket'].forEach(k=>{
+      if(s[k] && s[k].pendiente) delete out[k];
+    });
+    return out;
   }
   function slimSupplier(sup){
     // Conserva las URLs de Storage; solo recorta base64 (reusa _slimDoc).
@@ -635,6 +643,15 @@
       }catch(_){}
       window._fbStatus&&window._fbStatus('err');
     }
+  };
+
+  /* Escribe SOLO estos campos de un pedido (updateMask: lo demás no se
+     toca). La usa la cola de fotos: cuando una foto pendiente por fin sube,
+     se escribe su campo y nada más — no el pedido entero de esta PC, que
+     podría estar desfasado respecto de otra. */
+  window._fbPatchShipment = async (id, campos) => {
+    if(!id || !campos || !Object.keys(campos).length) return;
+    await fsPatch(shipPath(id), campos);
   };
 
   // Guardar un shipment individual inmediatamente (sin debounce)
@@ -1777,6 +1794,14 @@
       <input type="file" id="restoreBackupFile" accept=".json" style="display:none" onchange="if(window.Respaldo)Respaldo.restaurarDesdeArchivo(this)">
       <button onclick="$('restoreBackupFile').click()" class="btn-sec" style="border-color:rgba(46,160,67,.4);color:var(--green)">♻️ Restaurar desde respaldo</button>
       <div id="respLastBackup" style="font-size:10px;color:var(--text2);margin-top:10px;text-align:center">Aún no has creado un respaldo</div>
+    </div>
+
+    <!-- Documentos que no llegaron a la nube (fotos.js · documentosPerdidos). -->
+    <div style="background:rgba(210,153,34,.06);border:1px solid rgba(210,153,34,.25);border-radius:9px;padding:14px;margin-bottom:12px">
+      <div style="font-size:13px;font-weight:800;color:#e3b341;font-family:Syne,sans-serif;margin-bottom:6px">🔎 Documentos perdidos</div>
+      <div style="font-size:11px;color:var(--text2);line-height:1.5;margin-bottom:10px">Pedidos cuya foto nunca llegó a la nube (sale ⚠️ en la tarjeta). Desde el 28/10/2026 una foto que no sube queda en cola y se reintenta sola.</div>
+      <button onclick="if(window.FotosModule)FotosModule.pintarPerdidos()" class="btn-sec" style="border-color:rgba(210,153,34,.4);color:#e3b341">🔎 Buscar documentos perdidos</button>
+      <div id="docsPerdidosList" style="font-size:11.5px;color:var(--text2);margin-top:10px;line-height:1.5"></div>
     </div>
 
     <button class="btn-sec" onclick="closeOverlay('excelOverlay')">Cerrar</button>
@@ -3090,22 +3115,36 @@ function dlvDriverBlock(s){
   </div>`;
 }
 
+/* La miniatura de un documento en la tarjeta. ★ La versión LIVIANA (`m`,
+   ~20 KB) si existe, y `loading="lazy"`: solo se descarga lo que está en
+   pantalla. Antes cada tarjeta bajaba la foto original de 3–8 MB para
+   enseñarla en 52×66 px, todas a la vez — por eso a veces no se pintaban.
+   Las fotos de antes (sin miniatura) siguen saliendo, también diferidas.
+   Una foto pendiente de subir enseña ⏳ (su vista previa es local). */
+function _docMini(doc, icono){
+  if(doc && doc.pendiente) return `<div class="doc-thumb-pdf" title="Por subir"><span style="font-size:18px">⏳</span></div>`;
+  if(doc && doc.t && doc.t.startsWith('image/') && doc.d && doc.d!=='[img]'){
+    return `<img src="${escU(doc.m||doc.d)}" loading="lazy" decoding="async" alt="" style="width:52px;height:66px;object-fit:cover;display:block">`;
+  }
+  if(doc && doc.d==='[img]') return `<div class="doc-thumb-pdf" title="Documento perdido: vuelve a subirlo"><span style="font-size:18px">⚠️</span></div>`;
+  return `<div class="doc-thumb-pdf"><span style="font-size:20px">${icono}</span></div>`;
+}
 function cardDocs(s,gChk,tChk,eChk){
   const has=s.docGuia||s.docEmbalado||s.docTicket||(s.links&&s.links.length);
   if(!has)return'';
   return`<div class="card-docs">
     ${s.docGuia?`<div class="doc-thumb" style="border:2px solid ${gChk?'var(--green)':'var(--bd)'}">
-      <div onclick="qView('${s.id}','guia')">${s.docGuia.t&&s.docGuia.t.startsWith('image/')?`<img src="${escU(s.docGuia.d)}" style="width:52px;height:66px;object-fit:cover;display:block">`:`<div class="doc-thumb-pdf"><span style="font-size:20px">📄</span></div>`}</div>
+      <div onclick="qView('${s.id}','guia')">${_docMini(s.docGuia,'📄')}</div>
       <div class="doc-lbl">GUÍA</div>
       <div class="doc-chk ${gChk?'on-g':''}" onclick="event.stopPropagation();togDoc('${s.id}','guia')">${gChk?'✓':''}</div>
     </div>`:''}
     ${s.docEmbalado?`<div class="doc-thumb" style="border:2px solid ${eChk?'var(--blue)':'var(--bd)'}">
-      <div onclick="qView('${s.id}','embalado')">${s.docEmbalado.t&&s.docEmbalado.t.startsWith('image/')?`<img src="${escU(s.docEmbalado.d)}" style="width:52px;height:66px;object-fit:cover;display:block">`:`<div class="doc-thumb-pdf"><span style="font-size:20px">📦</span></div>`}</div>
+      <div onclick="qView('${s.id}','embalado')">${_docMini(s.docEmbalado,'📦')}</div>
       <div class="doc-lbl">EMBALADO</div>
       <div class="doc-chk ${eChk?'on-e':''}" onclick="event.stopPropagation();togDoc('${s.id}','embalado')">${eChk?'✓':''}</div>
     </div>`:''}
     ${s.docTicket?`<div class="doc-thumb" style="border:2px solid ${tChk?'var(--purple)':'var(--bd)'}">
-      <div onclick="qView('${s.id}','ticket')">${s.docTicket.t&&s.docTicket.t.startsWith('image/')?`<img src="${escU(s.docTicket.d)}" style="width:52px;height:66px;object-fit:cover;display:block">`:`<div class="doc-thumb-pdf"><span style="font-size:20px">🧾</span></div>`}</div>
+      <div onclick="qView('${s.id}','ticket')">${_docMini(s.docTicket,'🧾')}</div>
       <div class="doc-lbl">TICKET</div>
       <div class="doc-chk ${tChk?'on-t':''}" onclick="event.stopPropagation();togDoc('${s.id}','ticket')">${tChk?'✓':''}</div>
     </div>`:''}
@@ -5131,20 +5170,21 @@ render();
 })();
 </script>
 <!-- ★ SHALOM tracking — cargado al final -->
-<script src="storage.js?v=5"></script>
+<script src="storage.js?v=6"></script>
+<script src="fotos.js?v=1"></script>
 <!-- seleccion.js ya se cargó en la cabecera, ANTES del script en línea que
      lo usa. config.js, print.js y voz.js preguntan por los pedidos marcados,
      así que siguen yendo detrás. El orden de carga es un contrato
      (ver docs/ARQUITECTURA.md). -->
-<script src="config.js?v=57"></script>
+<script src="config.js?v=58"></script>
 <script src="print.js?v=20"></script>
 <script src="notify.js?v=7"></script>
-<script src="shalom.js?v=33"></script>
+<script src="shalom.js?v=34"></script>
 <script src="tracking.js?v=23"></script>
 <script src="floatpanel.js?v=4"></script>
-<script src="delivery.js?v=8"></script>
+<script src="delivery.js?v=9"></script>
 <script src="qrtracking.js?v=3"></script>
-<script src="ticket.js?v=5"></script>
+<script src="ticket.js?v=6"></script>
 <script src="agencias-extractor.js?v=11"></script>
 <script src="respaldo.js?v=2"></script>
 <script src="ayuda.js?v=8"></script>

@@ -455,3 +455,18 @@ haría que el móvil no viera los pedidos editados en la PC. Arreglarlo bien
 exige escribir solo campos sueltos (`updateMask` de Firestore) y separar el
 reloj compartido de la configuración. Es un cambio de arquitectura, no un
 parche.
+
+## T-10 · Cada cambio vuelve a descargar TODOS los pedidos (abierta — «Fase 2»)
+
+El latido (`_poll` en index.html) detecta que algo cambió en la nube —otra
+PC, el formulario, el seguimiento automático— y llama a `_fbLoad()`, que baja
+la colección ENTERA de pedidos y proveedores. Con ~1500 pedidos y dos PCs
+abiertas son del orden de 150 000 lecturas al día, y crece con cada pedido.
+
+Remedio previsto: SDK oficial de Firebase con caché persistente (IndexedDB) y
+`onSnapshot`, que trae solo los documentos que cambiaron; reemplaza el sondeo
+y el respaldo de `localStorage` (que tiene ~5 MB de techo). Requiere que cada
+escritura (panel, formulario, barrido, ticket) marque su hora de cambio y que
+los borrados se avisen. Va en una fase propia, con interruptor para volver al
+sistema actual. La Fase 1 (28/10/2026: ticket, cola de fotos, compresión,
+miniaturas, diagnóstico) no lo toca.

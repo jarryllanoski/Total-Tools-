@@ -337,10 +337,15 @@ var StorageModule = {
     // Esperar a que config.js cargue sus funciones
     var attempts = 0;
     function tryPatch() {
-      var ok1 = patchLoadDoc();
-      var ok2 = patchSaveShipment();
+      /* ★ Ya NO se parchean loadDoc ni saveShipment (28/10/2026). Eran un
+         segundo camino de subida, con su propio «si falla, base64» —que al
+         guardar terminaba en «[img]», foto perdida— y un id anticipado
+         distinto del que luego tomaba el pedido nuevo. El único camino es
+         config.js _procesarDoc → fotos.js. Las funciones se conservan
+         (uploadFile, deleteFile…) porque las usan fotos.js y otros. */
+      var ok1 = true;
       patchOpenViewer();
-      if ((!ok1 || !ok2) && attempts < 30) {
+      if (!ok1 && attempts < 30) {
         attempts++;
         setTimeout(tryPatch, 200);
       } else {

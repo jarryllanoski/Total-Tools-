@@ -226,6 +226,24 @@ function _procesarDoc(file,slot){
   if(!file)return;
   if(file.size>8*1024*1024){toast('⚠️ Máximo 8MB');return}
   var shipId=(typeof _editId!=='undefined')?_editId:null;
+  /* ★ fotos.js: comprime, sube con miniatura y, si no se puede subir, deja
+     la foto PENDIENTE (vista previa local) para la cola — nunca base64,
+     que al guardar terminaba en «[img]» y perdida. Pedido nuevo: pendiente
+     hasta guardar, porque aún no tiene id. */
+  if(window.FotosModule){
+    var F=window.FotosModule;
+    if(!shipId){ _docs[slot]=F.marcaPendiente(file); refreshSlot(slot); toast('📎 Listo — se sube al guardar el pedido'); return; }
+    toast('⏳ Subiendo documento...');
+    F.subirDoc(file,shipId,slot).then(function(docObj){
+      _docs[slot]=docObj; refreshSlot(slot); _docToast(slot);
+    }).catch(function(e){
+      console.warn('[Doc] no se pudo subir ahora:',e&&e.message);
+      var t = window._authTextoMotivo && window._authTextoMotivo(e);
+      _docs[slot]=F.marcaPendiente(file); refreshSlot(slot);
+      toast(t || '⏳ Sin conexión con la nube — la foto se subirá sola al guardar el pedido');
+    });
+    return;
+  }
   if(shipId && window.StorageModule && StorageModule.uploadFile){
     toast('⏳ Subiendo documento...');
     StorageModule.uploadFile(file,shipId,slot).then(function(docObj){
@@ -290,8 +308,11 @@ function refreshSlot(slot){
     if(btn)btn.style.display='block';act.style.display='none';lbl.className='doc-tap';return;
   }
   lbl.className='doc-tap '+m.cls;if(btn)btn.style.display='none';act.style.display='flex';
+  // Pendiente de subir: vista previa local y aviso. Si no, la miniatura
+  // (liviana) si la hay; la original se abre al tocar.
+  const _marca = doc.pendiente ? '<div class="doc-ok" style="background:#d29922">⏳ por subir</div>' : '<div class="doc-ok">✓</div>';
   if(doc.t&&doc.t.startsWith('image/')){
-    prev.innerHTML=`<div class="doc-full"><img src="${doc.d}" style="width:100%;height:100%;object-fit:cover;display:block"><div class="doc-ok">✓</div></div>`;
+    prev.innerHTML=`<div class="doc-full"><img src="${escH(doc.m||doc.d)}" decoding="async" style="width:100%;height:100%;object-fit:cover;display:block">${_marca}</div>`;
   } else {
     const _n=doc.n||'';const sn=_n.length>16?_n.substring(0,16)+'…':_n;
     prev.innerHTML=`<div class="doc-full"><div class="doc-full-pdf"><span style="font-size:32px">📄</span><span style="font-size:10px;color:var(--text2);text-align:center;padding:0 6px;word-break:break-all">${sn}</span></div><div class="doc-ok">✓ PDF</div></div>`;
@@ -2120,6 +2141,7 @@ function saveShipment(){
     // qué quedó sin subir (dpanel_dirty), _mergeRemote no se lo lleva por
     // delante y el arranque lo sube solo. Ver INVARIANTES §7.
     save(_editId);closeOverlay('formOverlay');render(); // ★ incremental: solo este pedido
+    if(window.FotosModule) FotosModule.trasGuardar(_editId); // fotos pendientes → cola
     if(window.DeliveryModule&&DeliveryModule.refrescar)DeliveryModule.refrescar(); // ruta al día si está abierta
     toast('✅ Actualizado');}
   else{
@@ -2146,6 +2168,8 @@ function saveShipment(){
     // ★ Sin _fbSaveShipmentNow(): ver el comentario de arriba. Un pedido nuevo
     // que aún no subió ya sobrevive al latido y al cierre de la pestaña.
     save(data.id);closeOverlay('formOverlay');
+    // Sus fotos esperaban el id: entran a la cola y suben con ESTE id.
+    if(window.FotosModule) FotosModule.trasGuardar(data.id);
     /* Llevar al pedido nuevo y resaltarlo, por LA MISMA puerta que usa el
        boton "Ver" de la campana.
        Antes esto era `setFilt(data.status)` + `_highlightCard(data.id)`, y

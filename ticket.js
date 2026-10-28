@@ -19,11 +19,9 @@
  * Orden de carga: DESPUÉS de delivery.js (openForm / refreshSlot / _docs / _editId)
  *                 y DESPUÉS de storage.js (window.StorageModule).
  *
- * ESTADO (2026-09-13): el botón está puesto pero la descarga NO — la
- * integración con Shalom se rehace endpoint por endpoint. Este módulo pide el
- * ticket por la puerta única (shalom.js), que hoy responde DESCONECTADO, y
- * avisa "Jalar ticket en reconstrucción". Cuando la puerta devuelva
- * {ok:true, url|dataUrl}, se reescribe aquí la parte que lo guarda.
+ * ESTADO (2026-10-28): CONECTADO. El servidor descarga el ticket, lo guarda
+ * en Storage y lo apunta en el pedido (functions/ticketShalom.js). Aquí solo
+ * se pide y se pinta el enlace que vuelve: el navegador no toca el archivo.
  */
 (function (global) {
   'use strict';
@@ -69,25 +67,55 @@
       return;
     }
 
-    // Jalar el ticket pasa por la PUERTA ÚNICA (shalom.js). Hoy desconectada:
-    // la puerta devuelve {ok:false} y aquí avisamos honesto. Cuando la
-    // integración (pro.shalom.pe → Comprobantes) esté lista, devolverá
-    // {ok:true, url|dataUrl} y este botón cargará el ticket en el slot guía.
+    // El servidor guarda el ticket EN el pedido: hace falta que exista.
+    var id = (typeof _editId !== 'undefined') ? _editId : null;
+    if (!id) { _toast('⚠️ Guarda el pedido primero y luego jala el ticket'); return; }
     if (!global.Shalom || typeof global.Shalom.ticket !== 'function') {
-      _toast('🔧 Jalar ticket en reconstrucción');
+      _toast('⚠️ Recarga la página (falta shalom.js)'); return;
+    }
+    // Reemplazar un documento que ya está es una decisión: se pregunta.
+    var actual = (typeof _docs !== 'undefined' && _docs) ? _docs.guia : null;
+    if (actual && actual.d && typeof global.confirm === 'function' &&
+        !global.confirm('Este pedido ya tiene una Guía / Ticket. ¿Reemplazarla por el ticket de Shalom?')) {
       return;
     }
-    var rt = await global.Shalom.ticket(data.orderNumber, data.orderCode);
-    if (!rt || !rt.ok) {
-      _toast(rt && rt.motivo === 'NO_ENCONTRADO' ?
-        '⚠️ Shalom no encontró esa guía' : '🔧 Jalar ticket en reconstrucción');
-      return;
+    var btn = document.getElementById('btnJalarTicket');
+    var txt = btn ? btn.textContent : '';
+    if (btn) { btn.disabled = true; btn.textContent = '⏳ Jalando ticket…'; }
+    try {
+      var rt = await global.Shalom.ticket(id, data.orderNumber, data.orderCode);
+      if (!rt || !rt.ok || !rt.doc) {
+        _toast(TicketModule.textoMotivo(rt));
+        return;
+      }
+      // Ya está guardado en la nube. Se refleja en el formulario y en el
+      // pedido en memoria (si cierras sin guardar, el ticket sigue ahí).
+      if (typeof _docs !== 'undefined' && _docs) _docs.guia = rt.doc;
+      if (typeof global.refreshSlot === 'function') global.refreshSlot('guia');
+      var s = global.S && global.S.shipments &&
+        global.S.shipments.find(function (x) { return x.id === id; });
+      if (s) s.docGuia = rt.doc;
+      if (typeof global.render === 'function') global.render();
+      _toast('🧾 Ticket de Shalom guardado ✓');
+    } catch (e) {
+      _toast('📡 No se pudo conectar — revisa tu internet');
+    } finally {
+      if (btn) { btn.disabled = false; btn.textContent = txt; }
     }
-    // Cuando la puerta devuelva {ok:true, url|dataUrl}, el ticket se carga en
-    // el slot "Guía / Ticket" y se sube a Storage — ese código se reescribe
-    // junto al endpoint, no antes.
+  };
 
-    _toast('🔧 Jalar ticket en reconstrucción');
+  /* Qué decir de cada motivo: honesto, nunca mudo. */
+  TicketModule.textoMotivo = function (rt) {
+    var m = rt && rt.motivo;
+    if (m === 'SIN_DATO') return '⚠️ Revisa la guía y el código (guía de 8 o 9 dígitos)';
+    if (m === 'NO_ENCONTRADO') return '⚠️ Shalom no encontró esa guía con ese código';
+    if (m === 'SIN_SESION') return '🔒 Tu sesión venció — ingresa de nuevo';
+    if (m === 'SIN_PERMISO') return '🚫 Tu cuenta no está autorizada';
+    if (m === 'SIN_RED') return '📡 Sin conexión con Shalom — intenta en un momento';
+    if (m === 'LIMITE') return '⏳ Cuota de Shalom agotada — intenta más tarde';
+    if (m === 'PUERTA_CERRADA' || m === 'APAGADA') return '🚪 La puerta a Shalom está cerrada (Config)';
+    if (m === 'FORMATO_DESCONOCIDO') return '⚠️ Shalom no devolvió un ticket válido';
+    return '⚠️ No se pudo jalar el ticket' + (rt && rt.detalle ? ': ' + rt.detalle : '');
   };
 
   /* ── INYECTAR BOTÓN EN EL SLOT GUÍA / TICKET (agencia) ───────────── */

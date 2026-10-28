@@ -8,6 +8,8 @@ const {initializeApp} = require("firebase-admin/app");
 const {getFirestore, FieldValue} = require("firebase-admin/firestore");
 const {getAuth} = require("firebase-admin/auth");
 const {getAppCheck} = require("firebase-admin/app-check");
+const {getStorage} = require("firebase-admin/storage");
+const crypto = require("crypto");
 
 // Modulo aislado de extraccion de comprobantes.
 const comprobante = require("./comprobante");
@@ -30,6 +32,7 @@ const pedidoPublico = require("./pedidoPublico");
 const enlace = require("./enlaceSeguimiento");
 const registroShalom = require("./registroShalom");
 const nroComp = require("./nroComprobante");
+const ticketShalom = require("./ticketShalom");
 const instanciaShalom = require("./instanciaShalom");
 const puertaInstancias = require("./puertaInstancias");
 const reniecPublico = require("./reniecPublico");
@@ -190,6 +193,46 @@ async function _porLaPuerta(destino, datos, diagnostico) {
   const cambios = interruptor.tras(estado, r, Date.now(), llave.probando);
   if (cambios) await _guardarPuerta(cambios);
   return r;
+}
+
+/**
+ * El ticket (binario) por la MISMA puerta: respeta el interruptor —si la
+ * puerta está apagada o pausada tras fallos, no se llama— y cuenta como una
+ * consulta más para abrirla o cerrarla.
+ * @param {Object} datos {orderNumber, orderCode}
+ * @return {Promise<Object>} {ok:true, bytes, tipo} o {ok:false, motivo}
+ */
+async function _voucherPorLaPuerta(datos) {
+  const estado = await _leerPuerta();
+  const llave = interruptor.decidir(estado, Date.now(), false);
+  if (!llave.pasa) {
+    return {ok: false, motivo: llave.motivo, reabre: llave.reabre};
+  }
+  const r = await shalomPuerta.descargarVoucher(SHALOM_API_KEY.value(), datos);
+  const cambios = interruptor.tras(estado, r, Date.now(), llave.probando);
+  if (cambios) await _guardarPuerta(cambios);
+  return r;
+}
+
+/**
+ * Guarda bytes en el bucket con un token de descarga (el MISMO esquema de
+ * URL que usa el panel al subir: `…/o/<ruta>?alt=media&token=…`). No usa
+ * URLs firmadas: esas piden un permiso de IAM extra a la cuenta de servicio.
+ * @param {string} ruta "shipments/<id>/guia.png"
+ * @param {Buffer} bytes contenido
+ * @param {string} tipo content-type
+ * @return {Promise<string>} URL de descarga
+ */
+async function _subirAlBucket(ruta, bytes, tipo) {
+  const bucket = getStorage().bucket();
+  const token = crypto.randomUUID();
+  await bucket.file(ruta).save(bytes, {
+    resumable: false,
+    contentType: tipo,
+    metadata: {metadata: {firebaseStorageDownloadTokens: token}},
+  });
+  return "https://firebasestorage.googleapis.com/v0/b/" + bucket.name +
+    "/o/" + encodeURIComponent(ruta) + "?alt=media&token=" + token;
 }
 
 /* ── EL INTERRUPTOR DE LA PUERTA ───────────────────────────────────────────
@@ -1626,6 +1669,37 @@ exports.shalomPuerta = onRequest(
             motivo: "ERROR_SHALOM",
             detalle: "Algo se rompio a mitad y NO SABEMOS si el envio llego " +
               "a crearse. Verifica en pro.shalom.pe antes de reintentar."});
+        }
+        return;
+      }
+
+      /* ★ JALAR EL TICKET DE SHALOM. El servidor descarga, guarda en el
+         bucket y apunta en el pedido; el navegador recibe solo el enlace.
+         Ver functions/ticketShalom.js. */
+      if (paso.orquestar === "jalarTicket") {
+        try {
+          const pid = String((paso.datos && paso.datos.pedidoId) || "").trim();
+          const ok = ticketShalom.ID_PEDIDO.test(pid);
+          const ref = ok ? db.doc(`${SHIP_COL}/${pid}`) : null;
+          const salida4 = await ticketShalom.jalar(paso.datos, {
+            leerPedido: async () => {
+              if (!ref) return null;
+              const s4 = await ref.get();
+              return s4.exists ? s4.data() : null;
+            },
+            descargar: _voucherPorLaPuerta,
+            subir: _subirAlBucket,
+            guardar: async (campos) => {
+              await ref.set(campos, {merge: true});
+              // Que las otras PCs se enteren, como hace el barrido.
+              await db.doc(CFG_DOC).set({ts: Date.now()}, {merge: true});
+            },
+          });
+          res.status(200).json(salida4);
+        } catch (e) {
+          console.error("jalarTicket:", e);
+          res.status(200).json({ok: false, motivo: "ERROR_SHALOM",
+            detalle: "No se pudo guardar el ticket. Intenta de nuevo."});
         }
         return;
       }
