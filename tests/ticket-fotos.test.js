@@ -70,24 +70,25 @@ module.exports = async ({bloque, ok}) => {
     const con = (r) => { global.fetch = async (url, op) => { pedidas.push({url, op}); return r; }; };
     try {
       con(respuesta(200, PNG, {'content-type': 'image/png'}));
-      let r = await P.descargarVoucher('CLAVE-SECRETA', {orderNumber: '101035310', orderCode: 'pmc7'});
+      let r = await P.descargarVoucher('CLAVE-SECRETA', {orderNumber: '101035310', orderCode: 'pmc7',
+        instanceId: '5f0c7a2e-1b3d-4c9e-8a7f-2d6b9e1c4a30'});
       ok(r.ok && r.tipo === 'image/png' && r.bytes.length === PNG.length, 'guía de 9 dígitos: descarga el PNG');
-      ok(/\/track\/voucher\?orderNumber=101035310&orderCode=PMC7&format=image$/.test(pedidas[0].url),
-         'pide /track/voucher con guía y código');
+      ok(/\/track\/voucher\?orderNumber=101035310&orderCode=PMC7&format=image&instanceId=5f0c7a2e-/.test(pedidas[0].url),
+         'pide /track/voucher con guía, código y la cuenta de Shalom Pro (instanceId, que Shalom exige)');
       ok(pedidas[0].op.headers['x-api-key'] === 'CLAVE-SECRETA' && pedidas[0].url.indexOf('CLAVE') < 0,
          'la clave va en la cabecera, nunca en la URL');
 
       con(respuesta(200, Buffer.from('<html>oops</html>'), {'content-type': 'image/png'}));
-      r = await P.descargarVoucher('K', {orderNumber: '82037653', orderCode: 'AB12'});
+      r = await P.descargarVoucher('K', {orderNumber: '82037653', orderCode: 'AB12', instanceId: '5f0c7a2e-1b3d-4c9e-8a7f-2d6b9e1c4a30'});
       ok(!r.ok && r.motivo === 'FORMATO_DESCONOCIDO',
          '⚠️ un 200 que no es imagen ni PDF NO se acepta (aunque diga image/png)');
 
       con(respuesta(200, PNG, {'content-length': String(10 * 1024 * 1024)}));
-      r = await P.descargarVoucher('K', {orderNumber: '82037653', orderCode: 'AB12'});
+      r = await P.descargarVoucher('K', {orderNumber: '82037653', orderCode: 'AB12', instanceId: '5f0c7a2e-1b3d-4c9e-8a7f-2d6b9e1c4a30'});
       ok(!r.ok && /enorme/.test(r.detalle), 'un archivo enorme se rechaza');
 
       con(respuesta(404, Buffer.from('{"message":"no existe"}')));
-      r = await P.descargarVoucher('K', {orderNumber: '82037653', orderCode: 'AB12'});
+      r = await P.descargarVoucher('K', {orderNumber: '82037653', orderCode: 'AB12', instanceId: '5f0c7a2e-1b3d-4c9e-8a7f-2d6b9e1c4a30'});
       ok(!r.ok && r.http === 404, 'un 404 de Shalom se dice, no se calla');
 
       pedidas = [];
@@ -96,8 +97,14 @@ module.exports = async ({bloque, ok}) => {
          'guía o código con forma rara: no sale ninguna petición');
       r = await P.descargarVoucher('K', {orderNumber: '939726661', orderCode: 'AB12'});
       ok(!r.ok && pedidas.length === 0, 'el error de tipeo de 9 dígitos tampoco');
-      r = await P.descargarVoucher('', {orderNumber: '82037653', orderCode: 'AB12'});
+      r = await P.descargarVoucher('', {orderNumber: '82037653', orderCode: 'AB12', instanceId: '5f0c7a2e-1b3d-4c9e-8a7f-2d6b9e1c4a30'});
       ok(!r.ok && r.motivo === 'BLOQUEADO', 'sin clave no se llama');
+      pedidas = [];
+      r = await P.descargarVoucher('K', {orderNumber: '82037653', orderCode: 'AB12'});
+      ok(!r.ok && r.motivo === 'SIN_INSTANCIA' && pedidas.length === 0,
+         'sin cuenta de Shalom Pro: no se llama (Shalom respondería 400)');
+      r = await P.descargarVoucher('K', {orderNumber: '82037653', orderCode: 'AB12', instanceId: '../x'});
+      ok(!r.ok && pedidas.length === 0, 'un instanceId con forma rara tampoco');
     } finally {
       global.fetch = real;
     }
@@ -106,16 +113,20 @@ module.exports = async ({bloque, ok}) => {
   bloque('El ticket: el servidor guarda en el bucket y en el pedido');
 
   {
-    const hacer = (pedido, desc) => {
-      const v = {subido: null, guardado: null};
-      return T.jalar({pedidoId: 'id_1', orderNumber: '101035310', orderCode: 'PMC7'}, {
+    const hacer = (pedido, desc, inst) => {
+      const v = {subido: null, guardado: null, inst};
+      return T.jalar({pedidoId: 'id_1', orderNumber: '101035310', orderCode: 'PMC7',
+        instanceId: 'del-navegador-no'}, {
         leerPedido: async (id) => (id === 'id_1' ? pedido : null),
-        descargar: async () => desc,
+        instancia: async () => v.inst === undefined ? 'inst-del-servidor' : v.inst,
+        descargar: async (dd) => { v.pedido = dd; return desc; },
         subir: async (ruta, bytes, tipo) => { v.subido = {ruta, bytes, tipo}; return 'https://firebasestorage.googleapis.com/x?alt=media&token=t'; },
         guardar: async (c) => { v.guardado = c; },
       }).then((r) => Object.assign(v, {r}));
     };
     let v = await hacer({courier: 'SHALOM'}, {ok: true, bytes: PNG, tipo: 'image/png'});
+    ok(v.pedido.instanceId === 'inst-del-servidor',
+       '⚠️ el instanceId sale de la configuración del SERVIDOR; el del navegador se ignora');
     ok(v.r.ok && v.subido.ruta === 'shipments/id_1/guia.png' && v.subido.tipo === 'image/png',
        'se guarda en la carpeta del pedido, como «Guía / Ticket»');
     ok(v.guardado && v.guardado.docGuia && v.guardado.docGuia.d === v.r.doc.d &&
@@ -131,6 +142,9 @@ module.exports = async ({bloque, ok}) => {
     ok(!v.r.ok && !v.subido, 'solo pedidos de Shalom');
     v = await hacer({courier: 'SHALOM'}, {ok: false, motivo: 'NO_ENCONTRADO'});
     ok(!v.r.ok && v.r.motivo === 'NO_ENCONTRADO' && !v.guardado, 'si Shalom falla, no se toca el pedido');
+    v = await hacer({courier: 'SHALOM'}, {ok: true, bytes: PNG, tipo: 'image/png'}, '');
+    ok(!v.r.ok && v.r.motivo === 'SIN_INSTANCIA' && !v.pedido,
+       'sin cuenta de Shalom Pro conectada: avisa y no llama');
     const malo = await T.jalar({pedidoId: '../x'}, {leerPedido: async () => ({})});
     ok(!malo.ok && malo.motivo === 'SIN_DATO', 'un id de pedido raro se corta');
 
@@ -147,6 +161,22 @@ module.exports = async ({bloque, ok}) => {
         idx.slice(idx.indexOf('async function _voucherPorLaPuerta'))),
        'y respeta el interruptor de la puerta (apagada = no se llama)');
     ok(/firebaseStorageDownloadTokens/.test(idx), 'enlace con token, como los que sube el panel');
+    ok(/cfg5\.shalomInstancia && cfg5\.shalomInstancia\.id/.test(idx),
+       'la cuenta se lee de la configuración guardada al conectar');
+  }
+
+  bloque('⚠️ Un 400 (petición mal armada) NO cierra la puerta a Shalom');
+
+  {
+    const I = require('../functions/interruptor.js');
+    ok(P.motivoDeHttp(400, 'querystring must have required property') === 'PETICION_INVALIDA' &&
+       P.motivoDeHttp(422) === 'PETICION_INVALIDA', '400/422 = PETICION_INVALIDA');
+    ok(P.motivoDeHttp(500) === 'ERROR_SHALOM', 'un 500 sí es Shalom fallando');
+    ok(I.MOTIVOS_DE_SERVICIO.indexOf('PETICION_INVALIDA') < 0 &&
+       I.tras({fallos: 4}, {ok: false, motivo: 'PETICION_INVALIDA'}, Date.now(), false) === null,
+       '⚠️ no cuenta para el interruptor: cinco tickets mal pedidos ya no pausan el seguimiento');
+    ok(I.tras({fallos: 4}, {ok: false, motivo: 'ERROR_SHALOM'}, Date.now(), false).cerradaHasta > 0,
+       'mientras que un Shalom caído de verdad la sigue cerrando');
   }
 
   bloque('El botón: lo que hace el panel');

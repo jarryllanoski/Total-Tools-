@@ -17,7 +17,8 @@ const ID_PEDIDO = /^[A-Za-z0-9_-]{1,80}$/;
 
 /**
  * @param {Object} datos {pedidoId, orderNumber, orderCode} (del navegador)
- * @param {Object} deps {leerPedido(id), descargar({orderNumber,orderCode}),
+ * @param {Object} deps {leerPedido(id), instancia() → id de Shalom Pro,
+ *   descargar({orderNumber,orderCode,instanceId}),
  *   subir(ruta, bytes, tipo) → url, guardar(campos)}
  * @return {Promise<Object>} {ok:true, doc} o {ok:false, motivo, detalle}
  */
@@ -35,9 +36,18 @@ async function jalar(datos, deps) {
     return {ok: false, motivo: "SIN_DATO",
       detalle: "el ticket de Shalom es solo para pedidos de Shalom"};
   }
+  /* La cuenta de Shalom Pro: de la configuración del SERVIDOR (la guardó
+     «Conectar»). Lo que el navegador mandara con ese nombre se ignora. */
+  const instanceId = String((deps.instancia && await deps.instancia()) || "")
+      .trim();
+  if (!instanceId) {
+    return {ok: false, motivo: "SIN_INSTANCIA",
+      detalle: "Conecta tu cuenta de Shalom Pro en Config"};
+  }
   const r = await deps.descargar({
     orderNumber: String(d.orderNumber || "").trim(),
     orderCode: String(d.orderCode || "").trim(),
+    instanceId: instanceId,
   });
   if (!r || !r.ok) {
     return {ok: false, motivo: (r && r.motivo) || "ERROR_SHALOM",

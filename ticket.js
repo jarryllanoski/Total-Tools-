@@ -112,6 +112,10 @@
     if (m === 'SIN_SESION') return '🔒 Tu sesión venció — ingresa de nuevo';
     if (m === 'SIN_PERMISO') return '🚫 Tu cuenta no está autorizada';
     if (m === 'SIN_RED') return '📡 Sin conexión con Shalom — intenta en un momento';
+    if (m === 'SIN_INSTANCIA') return '🔌 Conecta tu cuenta de Shalom Pro en Config → Conectar';
+    if (m === 'SIN_INSTANCIA_VALIDA') return '🔌 La cuenta de Shalom Pro no responde — pulsa «comprobar» o Conectar en Config';
+    if (m === 'BLOQUEADO') return '🔒 Shalom rechazó la sesión — pulsa Conectar en Config';
+    if (m === 'PETICION_INVALIDA') return '⚠️ Shalom rechazó la petición del ticket. Avísame con una foto de este mensaje' + (rt && rt.detalle ? ': ' + String(rt.detalle).slice(0, 120) : '');
     if (m === 'LIMITE') return '⏳ Cuota de Shalom agotada — intenta más tarde';
     if (m === 'PUERTA_CERRADA' || m === 'APAGADA') return '🚪 La puerta a Shalom está cerrada (Config)';
     if (m === 'FORMATO_DESCONOCIDO') return '⚠️ Shalom no devolvió un ticket válido';

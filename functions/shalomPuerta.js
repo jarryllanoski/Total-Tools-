@@ -210,6 +210,14 @@ function motivoDeHttp(status, texto) {
   if (status === 401 || status === 403) return "BLOQUEADO";
   if (status === 429) return "LIMITE";
   if (status === 404) return "NO_ENCONTRADO";
+  /* ⚠️ UN 400 ES NUESTRA PETICIÓN, NO SHALOM CAÍDO (28/10/2026).
+     Shalom respondió 400 «querystring must have required property
+     'instanceId'» al pedir el ticket. Ese 400 se traducía a ERROR_SHALOM,
+     que el interruptor cuenta como servicio caído: cinco intentos del
+     botón y la puerta se CERRÓ para todo, también el seguimiento. Un 400 o
+     un 422 dicen que el pedido está mal armado: se arregla aquí, no
+     esperando a que Shalom «vuelva». No cuenta para el interruptor. */
+  if (status === 400 || status === 422) return "PETICION_INVALIDA";
   return "ERROR_SHALOM";
 }
 
@@ -1021,6 +1029,11 @@ function traducir(op, json) {
        un 200 con una página HTML de error no se guarda como «ticket». */
 const GUIA_FORMA = /^(?:[0-9]{8}|1[0-9]{8})$/; // = barrido.GUIA_OK
 const CODIGO_FORMA = /^[A-Za-z0-9]{3,8}$/;
+/* El id de la cuenta de Shalom Pro (UUID). Shalom lo EXIGE para el ticket
+   (medido el 28/10/2026: 400 sin él; su doc no lo menciona). Lo pone el
+   servidor desde la configuración guardada al conectar, nunca el
+   navegador: así nadie pide tickets con otra cuenta. */
+const INSTANCIA_FORMA = /^[A-Za-z0-9-]{8,64}$/;
 const VOUCHER_MAX = 3 * 1024 * 1024;
 
 /**
@@ -1042,20 +1055,26 @@ function tipoPorFirma(b) {
 /**
  * Descarga el ticket de una guía.
  * @param {string} clave API key (solo servidor)
- * @param {Object} datos {orderNumber, orderCode}
+ * @param {Object} datos {orderNumber, orderCode, instanceId}
  * @return {Promise<Object>} {ok:true, bytes, tipo} o {ok:false, motivo}
  */
 async function descargarVoucher(clave, datos) {
   const d = datos || {};
   const guia = String(d.orderNumber || "").trim();
   const codigo = String(d.orderCode || "").trim().toUpperCase();
+  const instancia = String(d.instanceId || "").trim();
   if (!GUIA_FORMA.test(guia) || !CODIGO_FORMA.test(codigo)) {
     return {ok: false, motivo: "SIN_DATO",
       detalle: "guía o código con forma no válida"};
   }
+  if (!INSTANCIA_FORMA.test(instancia)) {
+    return {ok: false, motivo: "SIN_INSTANCIA",
+      detalle: "no hay cuenta de Shalom Pro conectada"};
+  }
   if (!clave) return {ok: false, motivo: "BLOQUEADO", detalle: "sin clave"};
   const url = BASE + "/track/voucher?orderNumber=" + encodeURIComponent(guia) +
-    "&orderCode=" + encodeURIComponent(codigo) + "&format=image";
+    "&orderCode=" + encodeURIComponent(codigo) + "&format=image" +
+    "&instanceId=" + encodeURIComponent(instancia);
   let r;
   try {
     r = await fetch(url, {method: "GET", headers: {"x-api-key": clave},
@@ -1102,6 +1121,7 @@ async function descargarVoucher(clave, datos) {
 module.exports = {
   BASE,
   GUIA_FORMA,
+  INSTANCIA_FORMA,
   VOUCHER_MAX,
   tipoPorFirma,
   descargarVoucher,

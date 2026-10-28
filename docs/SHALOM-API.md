@@ -293,6 +293,12 @@ son los `ter_id`** de las agencias.
 
 `?orderNumber=…&orderCode=…&format=image|pdf` → binario (`image/png` por defecto)
 
+⚠️ **Medido el 28/10/2026: también exige `instanceId`** (la cuenta de Shalom Pro).
+Sin él responde `400 {"error":"Bad Request","message":"querystring must have
+required property 'instanceId'"}`. Su documentación no lo menciona — misma
+historia que `/track/label`. El servidor lo pone desde `config.shalomInstancia.id`
+(lo guarda «Conectar»), nunca desde el navegador.
+
 ⚠️ El ejemplo JavaScript de su documentación **está mal**: hace `res.json()`
 sobre una respuesta binaria. Va con `res.blob()` o `arrayBuffer()`.
 

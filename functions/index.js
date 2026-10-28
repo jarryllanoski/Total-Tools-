@@ -1687,6 +1687,11 @@ exports.shalomPuerta = onRequest(
               const s4 = await ref.get();
               return s4.exists ? s4.data() : null;
             },
+            instancia: async () => {
+              const c5 = await db.doc(CFG_DOC).get();
+              const cfg5 = c5.exists ? c5.data() : {};
+              return (cfg5.shalomInstancia && cfg5.shalomInstancia.id) || "";
+            },
             descargar: _voucherPorLaPuerta,
             subir: _subirAlBucket,
             guardar: async (campos) => {
