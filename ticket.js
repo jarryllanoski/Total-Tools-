@@ -118,7 +118,9 @@
     if (m === 'PETICION_INVALIDA') return '⚠️ Shalom rechazó la petición del ticket. Avísame con una foto de este mensaje' + (rt && rt.detalle ? ': ' + String(rt.detalle).slice(0, 120) : '');
     if (m === 'LIMITE') return '⏳ Cuota de Shalom agotada — intenta más tarde';
     if (m === 'PUERTA_CERRADA' || m === 'APAGADA') return '🚪 La puerta a Shalom está cerrada (Config)';
-    if (m === 'FORMATO_DESCONOCIDO') return '⚠️ Shalom no devolvió un ticket válido';
+    // Con el detalle (qué llegó: tipo y forma, sin datos del cliente) para
+    // poder adaptarlo sin adivinar. Mándame foto de este mensaje.
+    if (m === 'FORMATO_DESCONOCIDO') return '⚠️ Shalom no devolvió un ticket reconocible' + (rt && rt.detalle ? ' — ' + String(rt.detalle).slice(0, 220) : '');
     return '⚠️ No se pudo jalar el ticket' + (rt && rt.detalle ? ': ' + rt.detalle : '');
   };
 

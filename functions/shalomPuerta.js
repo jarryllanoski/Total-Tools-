@@ -1049,7 +1049,66 @@ function tipoPorFirma(b) {
   if (b[0] === 0x25 && b[1] === 0x50 && b[2] === 0x44 && b[3] === 0x46) {
     return "application/pdf";
   }
+  if (b[0] === 0xFF && b[1] === 0xD8 && b[2] === 0xFF) return "image/jpeg";
+  if (b.length >= 12 && b.toString("latin1", 0, 4) === "RIFF" &&
+      b.toString("latin1", 8, 12) === "WEBP") {
+    return "image/webp";
+  }
+  if (b.toString("latin1", 0, 4) === "GIF8") return "image/gif";
   return "";
+}
+
+/* ★ MEDIDO EL 28/10/2026: /track/voucher responde 200 y el cuerpo NO es un
+   PNG crudo (la doc dice binario). Antes de saber su forma exacta se
+   aceptan, sin aflojar la validación, las formas habituales:
+     · la imagen cruda (PNG, JPEG, WEBP, GIF) o un PDF;
+     · un JSON que la lleva dentro como `data:…;base64,…` o base64 suelto;
+     · un JSON con la URL https del archivo (se descarga y se valida igual).
+   Lo que se acepta SIEMPRE pasa por `tipoPorFirma`: los bytes mandan. */
+const _B64 = /^[A-Za-z0-9+/=\s]+$/;
+
+/**
+ * Busca dentro de un JSON una imagen/PDF en base64 o una URL https.
+ * @param {*} v el JSON
+ * @param {number} [prof] profundidad
+ * @return {Object} {bytes} | {url} | {}
+ */
+function buscarArchivo(v, prof) {
+  const p = prof || 0;
+  if (p > 6 || v === null || v === undefined) return {};
+  if (typeof v === "string") {
+    const s = v.trim();
+    const m = /^data:([a-z/+.-]+);base64,([\s\S]+)$/i.exec(s);
+    if (m) {
+      const b = Buffer.from(m[2], "base64");
+      return tipoPorFirma(b) ? {bytes: b} : {};
+    }
+    if (s.length > 200 && _B64.test(s)) {
+      const b = Buffer.from(s, "base64");
+      if (tipoPorFirma(b)) return {bytes: b};
+    }
+    if (/^https:\/\/[^\s]+$/i.test(s)) return {url: s};
+    return {};
+  }
+  if (Array.isArray(v)) {
+    for (let i = 0; i < v.length; i++) {
+      const r = buscarArchivo(v[i], p + 1);
+      if (r.bytes || r.url) return r;
+    }
+    return {};
+  }
+  if (typeof v === "object") {
+    // Primero lo que tenga base64 (es el archivo); la URL, de respaldo.
+    let url = null;
+    const ks = Object.keys(v);
+    for (let i = 0; i < ks.length; i++) {
+      const r = buscarArchivo(v[ks[i]], p + 1);
+      if (r.bytes) return r;
+      if (r.url && !url) url = r.url;
+    }
+    return url ? {url: url} : {};
+  }
+  return {};
 }
 
 /**
@@ -1110,12 +1169,72 @@ async function descargarVoucher(clave, datos) {
     return {ok: false, motivo: "FORMATO_DESCONOCIDO",
       detalle: bytes.length ? "archivo enorme" : "vacío"};
   }
-  const tipo = tipoPorFirma(bytes);
-  if (!tipo) {
-    return {ok: false, motivo: "FORMATO_DESCONOCIDO",
-      detalle: "Shalom no devolvió una imagen ni un PDF"};
+  let tipo = tipoPorFirma(bytes);
+  if (tipo) return {ok: true, bytes: bytes, tipo: tipo};
+
+  // ¿Un JSON con el archivo dentro?
+  const ct = String((r.headers && r.headers.get &&
+    r.headers.get("content-type")) || "");
+  let json = null;
+  try {
+    json = JSON.parse(bytes.toString("utf8"));
+  } catch (e) {
+    json = null;
   }
-  return {ok: true, bytes: bytes, tipo: tipo};
+  if (json !== null) {
+    const hallado = buscarArchivo(json);
+    if (hallado.bytes) {
+      tipo = tipoPorFirma(hallado.bytes);
+      if (hallado.bytes.length <= VOUCHER_MAX) {
+        return {ok: true, bytes: hallado.bytes, tipo: tipo};
+      }
+    }
+    if (hallado.url) {
+      const r2 = await _bajarUrl(hallado.url, clave);
+      if (r2.ok) return r2;
+    }
+  }
+  /* Nada reconocible: se dice QUÉ llegó —tipo de contenido y la FORMA del
+     JSON (claves y tipos, sin un solo valor)—, para poder adaptarlo sin
+     pedir datos de un cliente. */
+  const formaTxt = json !== null ?
+    "JSON " + JSON.stringify(forma(json)).slice(0, 220) :
+    "inicio «" + bytes.toString("latin1", 0, 8).replace(/[^\x20-\x7E]/g, "·") +
+      "»";
+  console.warn("voucher: forma no reconocida", ct, formaTxt);
+  return {ok: false, motivo: "FORMATO_DESCONOCIDO",
+    detalle: "Shalom no devolvió una imagen ni un PDF (" +
+      (ct || "sin tipo") + "; " + formaTxt + ")"};
+}
+
+/**
+ * Descarga una URL https que devolvió Shalom y valida que sea imagen/PDF.
+ * La clave SOLO viaja si la URL es del mismo servidor de la API.
+ * @param {string} url https://…
+ * @param {string} clave API key
+ * @return {Promise<Object>} {ok:true, bytes, tipo} o {ok:false}
+ */
+async function _bajarUrl(url, clave) {
+  let u;
+  try {
+    u = new URL(url);
+  } catch (e) {
+    return {ok: false};
+  }
+  if (u.protocol !== "https:") return {ok: false};
+  const mismo = u.origin === new URL(BASE).origin;
+  try {
+    const r = await fetch(u.toString(), {method: "GET",
+      headers: mismo ? {"x-api-key": clave} : {},
+      signal: AbortSignal.timeout(TIEMPO_MAX_MS)});
+    if (!r.ok) return {ok: false};
+    const b = Buffer.from(await r.arrayBuffer());
+    const t = tipoPorFirma(b);
+    if (!t || b.length > VOUCHER_MAX) return {ok: false};
+    return {ok: true, bytes: b, tipo: t};
+  } catch (e) {
+    return {ok: false};
+  }
 }
 
 module.exports = {
@@ -1124,6 +1243,7 @@ module.exports = {
   INSTANCIA_FORMA,
   VOUCHER_MAX,
   tipoPorFirma,
+  buscarArchivo,
   descargarVoucher,
   PERMITIDAS,
   ORQUESTADAS,

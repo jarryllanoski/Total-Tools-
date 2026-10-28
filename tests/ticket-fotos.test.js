@@ -110,6 +110,63 @@ module.exports = async ({bloque, ok}) => {
     }
   }
 
+  bloque('El ticket: Shalom responde 200 en otra forma (medido 28/10)');
+
+  {
+    const JPG = Buffer.from([0xFF, 0xD8, 0xFF, 0xE0, 1, 2, 3, 4]);
+    const WEBP = Buffer.concat([Buffer.from('RIFF'), Buffer.from([1, 2, 3, 4]), Buffer.from('WEBPVP8 ')]);
+    ok(P.tipoPorFirma(JPG) === 'image/jpeg' && P.tipoPorFirma(WEBP) === 'image/webp',
+       'JPEG y WEBP también se reconocen por sus bytes');
+    const INST = '5f0c7a2e-1b3d-4c9e-8a7f-2d6b9e1c4a30';
+    const D = {orderNumber: '100176134', orderCode: '99HC', instanceId: INST};
+    const real = global.fetch;
+    const json = (o) => Buffer.from(JSON.stringify(o));
+    let pedidas = [];
+    const secuencia = (lista) => {
+      pedidas = [];
+      global.fetch = async (url, op) => { pedidas.push({url, op}); return lista.shift(); };
+    };
+    try {
+      secuencia([respuesta(200, JPG, {'content-type': 'image/jpeg'})]);
+      let r = await P.descargarVoucher('K', D);
+      ok(r.ok && r.tipo === 'image/jpeg', 'imagen JPEG cruda: se acepta');
+
+      const b64 = PNG.toString('base64');
+      secuencia([respuesta(200, json({success: true, data: {image: 'data:image/png;base64,' + b64}}),
+          {'content-type': 'application/json'})]);
+      r = await P.descargarVoucher('K', D);
+      ok(r.ok && r.tipo === 'image/png' && r.bytes.equals(PNG),
+         'JSON con la imagen como data:…;base64: se extrae');
+
+      const largo = Buffer.concat([PNG, Buffer.alloc(300, 7)]).toString('base64');
+      secuencia([respuesta(200, json({voucher: largo}), {'content-type': 'application/json'})]);
+      r = await P.descargarVoucher('K', D);
+      ok(r.ok && r.tipo === 'image/png', 'JSON con base64 suelto: se extrae');
+
+      secuencia([respuesta(200, json({data: {url: 'https://cdn.ejemplo.com/t.png'}}),
+          {'content-type': 'application/json'}), respuesta(200, PNG, {})]);
+      r = await P.descargarVoucher('K', D);
+      ok(r.ok && pedidas.length === 2 && pedidas[1].url === 'https://cdn.ejemplo.com/t.png',
+         'JSON con una URL https: se descarga y se valida');
+      ok(!pedidas[1].op.headers['x-api-key'],
+         '⚠️ la clave NO viaja a un servidor que no es el de la API');
+
+      secuencia([respuesta(200, json({data: {url: 'https://cdn.ejemplo.com/x'}}), {}),
+        respuesta(200, Buffer.from('<html>no</html>'), {})]);
+      r = await P.descargarVoucher('K', D);
+      ok(!r.ok && r.motivo === 'FORMATO_DESCONOCIDO', 'si la URL no trae una imagen, no se acepta');
+
+      secuencia([respuesta(200, json({success: true, message: 'ok', nombre: 'ALAYA CHUGNAS'}),
+          {'content-type': 'application/json'})]);
+      r = await P.descargarVoucher('K', D);
+      ok(!r.ok && /application\/json/.test(r.detalle) && /success/.test(r.detalle) &&
+         r.detalle.indexOf('ALAYA') < 0,
+         'si no se reconoce, el aviso dice QUÉ llegó (claves y tipos) sin un solo dato del cliente');
+    } finally {
+      global.fetch = real;
+    }
+  }
+
   bloque('El ticket: el servidor guarda en el bucket y en el pedido');
 
   {

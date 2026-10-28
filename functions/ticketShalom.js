@@ -53,7 +53,8 @@ async function jalar(datos, deps) {
     return {ok: false, motivo: (r && r.motivo) || "ERROR_SHALOM",
       detalle: (r && r.detalle) || ""};
   }
-  const ext = r.tipo === "application/pdf" ? "pdf" : "png";
+  const ext = {"application/pdf": "pdf", "image/jpeg": "jpg",
+    "image/webp": "webp", "image/gif": "gif"}[r.tipo] || "png";
   const ruta = "shipments/" + pid + "/guia." + ext;
   const url = await deps.subir(ruta, r.bytes, r.tipo);
   const doc = {d: url, n: "ticket-shalom." + ext, t: r.tipo,
