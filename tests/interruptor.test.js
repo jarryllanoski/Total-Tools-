@@ -169,4 +169,9 @@ module.exports = async ({bloque, ok: afirmar}) => {
     afirmar(!e.cerradaHasta && !e.fallos,
         'y doce seguidos tampoco: no se acumulan hacia el cierre');
   }
+
+  {
+    // Pedido del dueño (28/10/2026): cerrada, como máximo UN minuto.
+    afirmar(I.DESCANSO_MS === 60 * 1000, 'la puerta descansa un minuto, no diez');
+  }
 };

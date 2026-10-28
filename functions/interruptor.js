@@ -25,14 +25,17 @@
  *
  * Este archivo es logica PURA: no habla con Firestore ni con la red. Recibe el
  * estado y la hora, y dice que hacer. Asi se puede probar cada transicion sin
- * esperar diez minutos reales.
+ * esperar el descanso real.
  */
 
 /** Fallos seguidos del servicio antes de cerrar. */
 const TOPE_FALLOS = 5;
 
-/** Cuanto descansa la puerta cerrada, en ms. */
-const DESCANSO_MS = 10 * 60 * 1000;
+/** Cuanto descansa la puerta cerrada, en ms. UN MINUTO como máximo
+    (pedido del dueño, 28/10/2026; antes 10). Basta para no martillar a un
+    Shalom caído, y si fue un tropiezo la puerta vuelve casi al instante.
+    Tras el minuto pasa UNA consulta de prueba: si falla, otro minuto. */
+const DESCANSO_MS = 60 * 1000;
 
 /**
  * Motivos que SI son culpa del servicio. Todo lo demas es informacion sobre
