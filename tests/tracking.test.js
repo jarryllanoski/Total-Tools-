@@ -126,7 +126,9 @@ module.exports = (t) => {
   {
     let chip = T._estadoChip({id: '1', trackingStatus: 'En tránsito',
       trackingLastUpdate: '2026-09-03T16:36:00', trackingLastAutoCheck: Date.now()});
-    ok(/>3\/9, 04:36 p\. m\.</.test(chip), 'formato es-PE exacto: 3/9, 04:36 p. m.');
+    // El espacio entre «p.» y «m.» depende del ICU de cada versión (espacio
+    // normal o U+00A0, que se ven igual): se aceptan los dos.
+    ok(/>3\/9, 04:36 p\.[ \u00a0]m\.</.test(chip), 'formato es-PE exacto: 3/9, 04:36 p. m.');
     ok(!/visto/.test(chip),
         'aunque la consulta sea de recién, NO dice "visto" — eso tapaba el dato con el que se trabaja');
     chip = T._estadoChip({id: '1', trackingStatus: 'En tránsito', trackingLastUpdate: ''});

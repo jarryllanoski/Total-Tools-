@@ -456,7 +456,7 @@ exige escribir solo campos sueltos (`updateMask` de Firestore) y separar el
 reloj compartido de la configuración. Es un cambio de arquitectura, no un
 parche.
 
-## T-10 · Cada cambio vuelve a descargar TODOS los pedidos (abierta — «Fase 2»)
+## T-10 · Cada cambio vuelve a descargar TODOS los pedidos (CERRADA 29/10/2026)
 
 El latido (`_poll` en index.html) detecta que algo cambió en la nube —otra
 PC, el formulario, el seguimiento automático— y llama a `_fbLoad()`, que baja
@@ -470,3 +470,14 @@ escritura (panel, formulario, barrido, ticket) marque su hora de cambio y que
 los borrados se avisen. Va en una fase propia, con interruptor para volver al
 sistema actual. La Fase 1 (28/10/2026: ticket, cola de fotos, compresión,
 miniaturas, diagnóstico) no lo toca.
+
+**Cerrada el 29/10/2026** sin el SDK (el inicio de sesión es REST y no se
+tocó): `_mts` con la hora del servidor en toda escritura de pedidos y
+proveedores (panel por `:commit` + REQUEST_TIME; servidor con `_conMts`),
+lápidas en `panel/borrados` en la misma operación que el borrado, y
+`_fbLoad` pide solo `_mts > marca − 60 s`. Carga completa ante cualquier
+duda: sin `syncV`, sin copia local o marca, más de 12 h, «cambio sin rastro»
+(alguien escribió sin `_mts`), pista `sinMarca`, error, o apagada en la PC.
+Lógica en `functions/sincro.js`; probado contra el emulador de Firestore
+(`tests/sincro-emulador.test.js`). Pendiente opcional: copia local en
+IndexedDB (2C) y limpiar lápidas viejas.

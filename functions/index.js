@@ -45,6 +45,22 @@ const db = getFirestore();
 // ── Rutas Firestore (deben coincidir exactamente con el panel) ─────────────
 const CFG_DOC = "panel/config";
 const SHIP_COL = "panel/shipments/items";
+
+/* ★ FASE 2 · LA HORA DE CAMBIO (functions/sincro.js). TODA escritura del
+   servidor sobre un pedido pasa por aquí y graba `_mts` con la hora del
+   servidor: es lo que el panel consulta para traer solo lo cambiado. Una
+   escritura que no la grabe sería invisible para el panel hasta su carga
+   completa de seguridad — hay una prueba que recorre este archivo y falla
+   si alguna escritura en SHIP_COL no pasa por `_conMts`. */
+const SYNC_V = 1;
+/**
+ * Los mismos campos, más la hora de cambio del servidor.
+ * @param {Object} campos lo que se escribe
+ * @return {Object} copia con `_mts`
+ */
+function _conMts(campos) {
+  return Object.assign({}, campos, {_mts: FieldValue.serverTimestamp()});
+}
 const TOK_COL = "panel/tokens/items";
 const FORMCFG_COL = "panel/forms/configs";
 
@@ -544,7 +560,7 @@ async function handleCreate(req, res) {
   // Escritura atómica: pedido + token + señal al panel
   const batch = db.batch();
 
-  batch.set(db.doc(`${SHIP_COL}/${orderId}`), orderToSave);
+  batch.set(db.doc(`${SHIP_COL}/${orderId}`), _conMts(orderToSave));
 
   if (tokenId) {
     batch.set(
@@ -564,7 +580,9 @@ async function handleCreate(req, res) {
   // ts   : señal legacy que el panel también escucha (threshold +500ms)
   batch.set(
       db.doc(CFG_DOC),
-      {ts: now, formTs: now},
+      // syncV: el servidor ya graba `_mts` → el panel puede pedir solo lo
+      // cambiado. Mientras no exista, el panel hace la carga completa.
+      {ts: now, formTs: now, syncV: SYNC_V},
       {merge: true},
   );
 
@@ -1185,10 +1203,10 @@ exports.extraerComprobante = onRequest(
 
         const r = await comprobante.procesarUrl(link);
         if (!r.ok) {
-          await ref.set({extraccion: {
+          await ref.set(_conMts({extraccion: {
             estado: "error", urlHash: urlHash, parserVersion: PV,
             errorMensaje: r.motivo || "", procesadoEn: new Date().toISOString(),
-          }}, {merge: true});
+          }}), {merge: true});
           res.status(400).json({ok: false, motivo: r.motivo});
           return;
         }
@@ -1203,7 +1221,7 @@ exports.extraerComprobante = onRequest(
         // No pisar ediciones: solo escribe cotizItems si el pedido no tenia.
         const tenia = Array.isArray(s.cotizItems) && s.cotizItems.length;
         if (!tenia) write.cotizItems = cotizItems;
-        await ref.set(write, {merge: true});
+        await ref.set(_conMts(write), {merge: true});
         res.status(200).json({
           ok: true, estado: "procesado",
           cotizItems: tenia ? s.cotizItems : cotizItems,
@@ -1464,7 +1482,8 @@ async function _correrBarrido(forzado) {
     for (let i = 0; i < escrituras.length; i += 400) {
       const lote = db.batch();
       escrituras.slice(i, i + 400).forEach((w) => {
-        lote.set(db.doc(SHIP_COL + "/" + w.id), w.campos, {merge: true});
+        lote.set(db.doc(SHIP_COL + "/" + w.id), _conMts(w.campos),
+            {merge: true});
       });
       try {
         await lote.commit();
@@ -1475,8 +1494,16 @@ async function _correrBarrido(forzado) {
     }
     // Que el panel se entere de que hay datos nuevos sin releerlo todo.
     try {
-      await db.doc(CFG_DOC).set({ts: Date.now()}, {merge: true});
+      await db.doc(CFG_DOC).set({ts: Date.now(), syncV: SYNC_V},
+          {merge: true});
     } catch (e) {/* el latido se encargara */}
+  } else {
+    /* Sin cambios: solo se anuncia que el servidor ya graba `_mts`, para
+       que «▶️ Correr ahora» active la sincronización rápida sin esperar a
+       un pedido. SIN `ts`: no hace recargar a ninguna PC. */
+    try {
+      await db.doc(CFG_DOC).set({syncV: SYNC_V}, {merge: true});
+    } catch (e) {/* lo anunciara el proximo pedido */}
   }
 
   // 5 · el informe. Es lo unico que se ve desde Config, asi que dice TODO:
@@ -1651,7 +1678,7 @@ exports.shalomPuerta = onRequest(
                   cfgDoc.shalomInstancia.id) || ""});
               return (pr && pr.ok && pr.json) || null;
             },
-            guardar: (campos) => ref.set(campos, {merge: true}),
+            guardar: (campos) => ref.set(_conMts(campos), {merge: true}),
           };
           /* `recuperarEnvio` SOLO LEE: busca el envio en pendientes y
              rellena la guia. Nunca llama a `register`, asi que no tiene
@@ -1695,9 +1722,10 @@ exports.shalomPuerta = onRequest(
             descargar: _voucherPorLaPuerta,
             subir: _subirAlBucket,
             guardar: async (campos) => {
-              await ref.set(campos, {merge: true});
+              await ref.set(_conMts(campos), {merge: true});
               // Que las otras PCs se enteren, como hace el barrido.
-              await db.doc(CFG_DOC).set({ts: Date.now()}, {merge: true});
+              await db.doc(CFG_DOC).set({ts: Date.now(), syncV: SYNC_V},
+                  {merge: true});
             },
           });
           res.status(200).json(salida4);

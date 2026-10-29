@@ -31,6 +31,7 @@
 <script src="functions/enlaceSeguimiento.js?v=1"></script>
 <script src="functions/registroShalom.js?v=3"></script>
 <script src="functions/dniPedido.js?v=1"></script>
+<script src="functions/sincro.js?v=1"></script>
 <script src="functions/nroComprobante.js?v=2"></script>
 <script src="functions/montoPedido.js?v=1"></script>
 <script src="functions/fechaPedido.js?v=1"></script>
@@ -90,6 +91,9 @@
     if('integerValue'in fv) return parseInt(fv.integerValue);
     if('doubleValue'in fv) return fv.doubleValue;
     if('stringValue'in fv) return fv.stringValue;
+    // `_mts` (hora de cambio, Fase 2) es un timestamp de Firestore. Antes
+    // este lector devolvía null para cualquier timestamp.
+    if('timestampValue'in fv) return fv.timestampValue;
     if('arrayValue'in fv) return(fv.arrayValue.values||[]).map(fromFs);
     if('mapValue'in fv){const o={};Object.keys(fv.mapValue.fields||{}).forEach(k=>{o[k]=fromFs(fv.mapValue.fields[k])});return o;}
     return null;
@@ -187,6 +191,32 @@
   }
 
   async function fsPatch(path,obj){
+    /* ★ FASE 2: pedidos y proveedores van por `:commit` con la hora del
+       SERVIDOR en `_mts` (functions/sincro.js). Mismo merge por campos que
+       el PATCH de abajo; solo cambia el método. Si `:commit` no sirve, se
+       cae al PATCH de siempre y se anota que esa escritura salió SIN marca:
+       las otras PCs harán la carga completa en vez de perderla. */
+    if(_estampable(path)){
+      let caer = _commitApagado;   // el camino rápido ya falló en esta sesión
+      if(!caer){
+        const w=_aWrite(path,obj);
+        if(!w) return;
+        const hc=await _authHeaders();
+        hc['Content-Type']='application/json';
+        const rc=await fetch(`${BASE}:commit?key=${KEY}`,{method:'POST',headers:hc,
+          body:JSON.stringify({writes:[w]})});
+        if(rc.ok) return;
+        const txt=await rc.text();
+        // Pasajero (5xx, 429) o sin sesión (401): se lanza, como siempre, y
+        // el guardado lo reintenta. Cualquier otro rechazo (403, 400…): el
+        // PATCH de siempre, para NO guardar nunca menos que antes.
+        if(rc.status===401||rc.status===429||rc.status>=500) throw _errorFs(rc, txt);
+        caer = true;
+      }
+      window._syncSinMarca=true;
+      try{ window.Errores && window.Errores.anotar('fs.sinMarca', new Error('escritura sin hora de cambio'), {path}); }catch(_){}
+      obj=Object.assign({},obj); delete obj._mts;
+    }
     const keys=Object.keys(obj);
     // Guard: nunca mandar un PATCH sin campos. Sin fields NI mask, Firestore
     // reemplazaría el documento con {} y borraría todo. Con 0 campos: no-op.
@@ -242,16 +272,48 @@
   // Un {path,obj} → un Write de la API. Devuelve null si no hay campos: misma
   // guarda que fsPatch, un write sin fields borraría el documento entero.
   function _aWrite(path, obj){
-    const keys = Object.keys(obj);
+    const marca = _estampable(path);
+    // `_mts` lo pone SOLO el servidor: el que traiga el pedido en memoria
+    // (leído de la nube) no viaja como dato.
+    const keys = Object.keys(obj).filter(k => !(marca && k === '_mts'));
     if(!keys.length) return null;
     const fields = {};
     keys.forEach(k => { fields[k] = toFs(obj[k]); });
-    return {
+    const w = {
       update: { name: _docName(path), fields },
       // Mismo escapado con backticks que fsPatch: la sintaxis de field path es
       // la misma en la URL y en el cuerpo, y admite cualquier nombre de campo.
       updateMask: { fieldPaths: keys.map(k => '`' + k.replace(/([\\`])/g,'\\$1') + '`') }
     };
+    if(marca) w.updateTransforms = [{ fieldPath: '_mts', setToServerValue: 'REQUEST_TIME' }];
+    return w;
+  }
+  /* ¿Este documento lleva hora de cambio? Pedidos y proveedores: lo que el
+     panel sincroniza por cambios (Fase 2). */
+  function _estampable(path){
+    return /^panel\/(shipments|suppliers)\/items\/[^/]+$/.test(String(path||''));
+  }
+  /* Borrar + LÁPIDA en una sola operación atómica: o pasan las dos o
+     ninguna. Sin lápida, otra PC que solo pide lo cambiado no se enteraría
+     del borrado. Si `:commit` no sirve, se borra como siempre y la lápida
+     se intenta aparte (y se anota). */
+  async function fsBorrarConLapida(path, col, id){
+    const lid = Sincro.idLapida(col, id);
+    const lapida = { update: { name: _docName(`${RAIZ}/borrados/items/${lid}`),
+      fields: { id: toFs(String(id)), col: toFs(col) } },
+      updateTransforms: [{ fieldPath: '_mts', setToServerValue: 'REQUEST_TIME' }] };
+    if(!_commitApagado){
+      const h = await _authHeaders();
+      h['Content-Type'] = 'application/json';
+      const r = await fetch(`${BASE}:commit?key=${KEY}`, { method:'POST', headers:h,
+        body: JSON.stringify({ writes: [{ delete: _docName(path) }, lapida] }) });
+      if(r.ok) return;
+      const txt = await r.text();
+      if(r.status===401||r.status===429||r.status>=500) throw _errorFs(r, txt);
+    }
+    await fsDel(path);
+    window._syncSinMarca = true;
+    try{ window.Errores && window.Errores.anotar('fs.sinLapida', new Error('commit '+r.status), {path}); }catch(_){}
   }
 
   // Reparte respetando a la vez el tope de 500 y un techo de bytes:
@@ -566,6 +628,11 @@
            En una operación que cuesta dinero, la duda se resuelve del lado
            de no gastar. */
         shalomRegistroSimulacro:data.shalomRegistroSimulacro,
+        /* ★ FASE 2: dice a las otras PCs si este guardado tocó pedidos. Si NO
+           (solo configuración), no hace falta buscarlos; si la pista no es de
+           este mismo `ts` (la escribió otro, o un panel viejo), no se fían y
+           comparan con lo que traiga la consulta. */
+        syncHint:{ts:saveTs, pedidos: true},  // se ajusta abajo, al saber qué se sube
         ts:saveTs // usar saveTs fijo para que _S_TS y config.ts coincidan tras la escritura
       }}];
       for(const s of(data.shipments||[])){
@@ -579,8 +646,17 @@
         items.push({ clave:'supp:'+sup.id, path: suppPath(sup.id), obj: slimSupplier(sup) });
       }
 
+      // La pista dice la VERDAD de este guardado: si subió pedidos/proveedores.
+      items[0].obj.syncHint = {ts: saveTs, pedidos: items.length > 1};
       const res = await _escribirVarios(items);
       const hechos = new Set(res.ok);
+      /* Si alguna escritura de este guardado cayó al PATCH sin hora de
+         cambio, se avisa en la pista: las otras PCs harán la carga completa
+         en vez de quedarse sin ese cambio. */
+      if(window._syncSinMarca && hechos.has('config')){
+        window._syncSinMarca = false;
+        try{ await fsPatch(cfgPath(), {syncHint:{ts:saveTs, pedidos:true, sinMarca:true}}); }catch(_){}
+      }
 
       // config es lo que fija el reloj compartido: solo si ENTRÓ se puede
       // adelantar _S_TS, o _poll recargaría creyendo que hay datos nuevos.
@@ -676,7 +752,7 @@
   window._fbDeleteShipment = async (id) => {
     for(let i=0; i<3; i++){
       try{
-        await fsDel(shipPath(id));
+        await fsBorrarConLapida(shipPath(id), 'shipments', id);
         return; // éxito
       }catch(e){
         if(i < 2) await new Promise(r=>setTimeout(r, 2000*(i+1)));
@@ -687,7 +763,7 @@
 
   window._fbDeleteSupplier = async (id) => {
     for(let i=0; i<3; i++){
-      try{ await fsDel(suppPath(id)); return; }
+      try{ await fsBorrarConLapida(suppPath(id), 'suppliers', id); return; }
       catch(e){ if(i < 2) await new Promise(r=>setTimeout(r, 2000*(i+1))); else console.warn('No se pudo eliminar proveedor:', id, e.message); }
     }
   };
@@ -783,10 +859,65 @@
     await fsDel(tokPath(id));
   };
 
-  window._fbLoad = async () => {
+  /* ★ FASE 2 · SOLO LO QUE CAMBIÓ. Tres consultas pequeñas: pedidos,
+     proveedores y lápidas con `_mts` posterior a `desde`. */
+  const _conId = d => { const {_id, _name, ...rest} = d; if(!rest.id) rest.id = _id; return rest; };
+  async function _traerCambios(desde){
+    const f = {where:{fieldFilter:{field:{fieldPath:'_mts'}, op:'GREATER_THAN',
+      value:{timestampValue:desde}}}, limit: Sincro.MAX_DELTA + 1};
+    const [ships, supps, laps] = await Promise.all([
+      fsQuery(`${RAIZ}/shipments`, 'items', f),
+      fsQuery(`${RAIZ}/suppliers`, 'items', f),
+      fsQuery(`${RAIZ}/borrados`, 'items', f),
+    ]);
+    return { ships: ships.map(_conId), supps: supps.map(_conId),
+      lapidas: laps.map(_conId).map(l => ({id: l.id, col: l.col, _mts: l._mts})) };
+  }
+  /* La sincronización rápida se puede apagar EN ESTA PC (📦 → Sincronización),
+     sin desplegar nada: entonces todo vuelve a la carga completa de siempre. */
+  window._syncRapidaActiva = () => { try{ return localStorage.getItem('tt_sync_rapida') !== 'off'; }catch(e){ return true; } };
+  window._syncUltimo = null;
+
+  /* `opc.huboCambio`: el latido vio que la nube cambió. Si entonces la
+     consulta no trae NADA, alguien escribió sin `_mts` (una pestaña con el
+     panel viejo, o una escritura que cayó al PATCH): carga completa.
+     `opc.completa`: «Sincronizar todo». */
+  window._fbLoad = async (opc) => {
+    opc = opc || {};
     try {
-      const [cfg, shipDocs, suppDocs] = await Promise.all([
-        fsGet(cfgPath()),
+      const cfg = await fsGet(cfgPath());
+      const sync = (typeof S !== 'undefined' && S) ? S._sync : null;
+      const tieneLocal = !!(typeof S !== 'undefined' && S && Array.isArray(S.shipments) && S.shipments.length);
+      const dec = window.Sincro ? Sincro.decidir({ activo: window._syncRapidaActiva(), cfg, sync,
+        tieneLocal, ahora: Date.now(), forzarCompleta: !!opc.completa }) : { modo: 'completa', motivo: 'sin sincro.js' };
+      let motivo = dec.motivo;
+      if(dec.modo === 'cambios'){
+        try {
+          const r = await _traerCambios(Sincro.desde(sync));
+          const n = Sincro.total(r);
+          const h = (cfg && cfg.syncHint) || {};
+          const hintVale = h.ts === cfg.ts;
+          if(n > Sincro.MAX_DELTA) throw new Error('demasiados cambios (' + n + ')');
+          if(hintVale && h.sinMarca) throw new Error('otra PC escribió sin hora de cambio');
+          /* Novedad REAL (no lo repetido por el margen): pedidos o proveedores
+             que no se tenían o con otra hora, más lápidas de algo que aún
+             está aquí. */
+          const nuevo = Sincro.novedadTotal({shipments: S.shipments, suppliers: S.suppliers || []}, r);
+          if(!nuevo && opc.huboCambio && !(hintVale && h.pedidos === false)) throw new Error('cambio sin rastro');
+          const result = cfg || {};
+          result.shipments = Sincro.aplicar(S.shipments, r.ships, r.lapidas.filter(l => l.col === 'shipments'));
+          result.suppliers = Sincro.aplicar(S.suppliers || [], r.supps, r.lapidas.filter(l => l.col === 'suppliers'));
+          result._sync = Sincro.marcaTras(sync, r.ships.concat(r.supps, r.lapidas), false, Date.now());
+          window._syncUltimo = { modo: 'cambios', n: n, ts: Date.now() };
+          window._fbStatus&&window._fbStatus('ok');
+          return result;
+        } catch(e){
+          if(e && e.auth) throw e;
+          motivo = e && e.message;
+          console.warn('[sync] solo-cambios → carga completa:', motivo);
+        }
+      }
+      const [shipDocs, suppDocs] = await Promise.all([
         fsList(shipCol()),
         fsList(suppCol())
       ]);
@@ -795,6 +926,9 @@
       const result = cfg||{};
       result.shipments = shipDocs.map(d=>{const{_id,...rest}=d;if(!rest.id){rest.id=_id;fsPatch(shipPath(_id),{id:_id}).catch(()=>{});}return rest;});
       result.suppliers = suppDocs.map(d=>{const{_id,...rest}=d;if(!rest.id){rest.id=_id;fsPatch(suppPath(_id),{id:_id}).catch(()=>{});}return rest;});
+      if(window.Sincro) result._sync = Sincro.marcaTras(sync, result.shipments.concat(result.suppliers), true, Date.now());
+      window._syncUltimo = { modo: 'completa', n: result.shipments.length + result.suppliers.length,
+        ts: Date.now(), motivo: motivo };
       window._fbStatus&&window._fbStatus('ok');
       return result;
     } catch(e){
@@ -834,7 +968,7 @@
           const nuncaCargo = !window._nubeLista;
           if(hasFormNew || hasPanelNew || nuncaCargo){
             if(hasFormNew) window._lastFormTs = formTs;
-            const remote = await window._fbLoad();
+            const remote = await window._fbLoad({huboCambio: hasFormNew || hasPanelNew});
             if(remote && window._mergeRemote) {
               window._mergeRemote(remote);
               window._S_TS = remoteTs; // registrar hasta qué ts se cargó
@@ -888,7 +1022,7 @@
 
 <!-- HEADER -->
 <div class="hdr">
-  <div class="hdr-logo" onclick="openOverlay('excelOverlay');if(window.Respaldo)Respaldo.refrescarFecha()" style="cursor:pointer" title="Importar / Exportar Excel">📦</div>
+  <div class="hdr-logo" onclick="openOverlay('excelOverlay');if(window.Respaldo)Respaldo.refrescarFecha();if(typeof pintarSync==='function')pintarSync()" style="cursor:pointer" title="Importar / Exportar Excel">📦</div>
   <div style="flex:1;min-width:0">
     <div style="display:flex;align-items:center;gap:6px">
       <div class="hdr-title" id="hdrName" style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer" title="Doble tap → Dashboard">Mi Negocio</div>
@@ -1796,6 +1930,17 @@
       <div id="respLastBackup" style="font-size:10px;color:var(--text2);margin-top:10px;text-align:center">Aún no has creado un respaldo</div>
     </div>
 
+    <!-- ⚡ Fase 2: sincronización por cambios (functions/sincro.js). -->
+    <div style="background:rgba(56,139,253,.06);border:1px solid rgba(56,139,253,.25);border-radius:9px;padding:14px;margin-bottom:12px">
+      <div style="font-size:13px;font-weight:800;color:var(--blue);font-family:Syne,sans-serif;margin-bottom:6px">⚡ Sincronización</div>
+      <div style="font-size:11px;color:var(--text2);line-height:1.5;margin-bottom:8px">Trae de la nube solo los pedidos que cambiaron. Cada 12 h, y ante cualquier duda, hace la carga completa de siempre.</div>
+      <div id="syncEstado" style="font-size:11.5px;color:var(--text2);margin-bottom:10px">—</div>
+      <button onclick="syncTodoAhora(this)" class="btn-sec" style="border-color:rgba(56,139,253,.4);color:var(--blue);margin-bottom:8px">🔄 Sincronizar todo ahora</button>
+      <label style="display:flex;align-items:center;gap:8px;font-size:11.5px;color:var(--text2);cursor:pointer">
+        <input type="checkbox" id="syncRapidaChk" onchange="syncRapidaCambiar(this.checked)"> Sincronización rápida en esta PC
+      </label>
+    </div>
+
     <!-- Documentos que no llegaron a la nube (fotos.js · documentosPerdidos). -->
     <div style="background:rgba(210,153,34,.06);border:1px solid rgba(210,153,34,.25);border-radius:9px;padding:14px;margin-bottom:12px">
       <div style="font-size:13px;font-weight:800;color:#e3b341;font-family:Syne,sans-serif;margin-bottom:6px">🔎 Documentos perdidos</div>
@@ -2579,6 +2724,30 @@ function openAllLabels(){
     })
   ].join('');
   openOverlay('allLabelsOverlay');
+}
+
+/* ⚡ SINCRONIZACIÓN (Fase 2) — estado y controles en 📦. */
+function pintarSync(){
+  const el=$('syncEstado'); if(!el) return;
+  const chk=$('syncRapidaChk'); if(chk) chk.checked=window._syncRapidaActiva?window._syncRapidaActiva():true;
+  const u=window._syncUltimo; const s=S&&S._sync;
+  const hace=t=>{ const m=Math.round((Date.now()-t)/60000); return m<1?'hace un momento':(m<60?'hace '+m+' min':'hace '+Math.round(m/60)+' h'); };
+  let txt = u ? (u.modo==='cambios' ? '⚡ Última: solo cambios ('+u.n+') · '+hace(u.ts)
+                                    : '📦 Última: carga completa ('+u.n+') · '+hace(u.ts)+(u.motivo?' · '+u.motivo:'')) : 'Aún no sincronizó en esta sesión';
+  if(s && s.full) txt += '<br>Carga completa: '+hace(s.full);
+  el.innerHTML = txt;
+}
+async function syncTodoAhora(btn){
+  if(!window._fbLoad||!window._mergeRemote) return;
+  const t=btn?btn.textContent:''; if(btn){btn.disabled=true;btn.textContent='⏳ Sincronizando…';}
+  try{ const r=await window._fbLoad({completa:true}); if(r) window._mergeRemote(r); }
+  catch(e){ toast('⚠️ No se pudo sincronizar: '+(e&&e.message||'')); }
+  finally{ if(btn){btn.disabled=false;btn.textContent=t;} pintarSync(); }
+}
+function syncRapidaCambiar(on){
+  try{ localStorage.setItem('tt_sync_rapida', on?'on':'off'); }catch(e){}
+  toast(on?'⚡ Sincronización rápida encendida en esta PC':'📦 Esta PC vuelve a la carga completa de siempre');
+  pintarSync();
 }
 
 /* ADVANCED SEARCH */

@@ -77,6 +77,23 @@ function montar(op) {
     red.urls.push(limpia);
     if (limpia.indexOf(':commit') >= 0) {
       const cuerpo = JSON.parse(init.body);
+      /* Fase 2 (29/10/2026): la escritura SUELTA de un pedido o proveedor ya
+         no es un PATCH sino un `:commit` de UNA escritura (lleva la hora del
+         servidor). Para estas pruebas sigue siendo «el desglose uno por
+         uno»: se cuenta y falla como el PATCH suelto. */
+      const w0 = cuerpo.writes && cuerpo.writes[0];
+      const nombre = w0 && w0.update && w0.update.name;
+      if (cuerpo.writes.length === 1 && /\/panel\/(shipments|suppliers)\/items\/[^/]+$/.test(String(nombre || ''))) {
+        red.vivos++; if (red.vivos > red.maxVivos) red.maxVivos = red.vivos;
+        red.patch.push(String(nombre));
+        red.sueltosConMarca = (red.sueltosConMarca || 0) +
+          ((w0.updateTransforms || []).some((t) => t.fieldPath === '_mts') ? 1 : 0);
+        await new Promise((r) => setTimeout(r, 1));
+        red.vivos--;
+        const cae1 = op.patchFalla || (op.patchFallaEn || []).some((id) => String(nombre).endsWith('/' + id));
+        if (cae1) return { ok: false, status: 500, text: async () => 'no' };
+        return { ok: true, status: 200, json: async () => ({ writeResults: [{}], commitTime: 'x' }) };
+      }
       red.commit.push(cuerpo);
       const r = (op.commit || [])[nCommit++] || {};
       if (r.http) return { ok: false, status: r.http, text: async () => 'feo' };
@@ -357,7 +374,9 @@ module.exports = async function ({ bloque, ok }) {
   const relleno = () => ({ trackingHistory: new Array(2600).fill('x'.repeat(1000)) });
   const m12 = montar({});
   await m12.win._fbSave(datos(2, relleno));
-  ok(m12.red.commit.length >= 2,
+  // Se cuentan TODAS las peticiones `:commit`: la segunda tanda lleva un
+  // solo pedido, y la red falsa la clasifica como «suelta» (Fase 2).
+  ok(m12.red.urls.filter((u) => u.indexOf(':commit') >= 0).length >= 2,
      '2 pedidos gordos no caben en una petición: se parten aunque no lleguen a 500');
 
   bloque('El latido ya no se lleva por delante lo que solo existe aquí');
