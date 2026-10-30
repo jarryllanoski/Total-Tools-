@@ -101,6 +101,12 @@ textarea.fi{resize:vertical;line-height:1.5}
 .cascade{display:flex;flex-direction:column;gap:10px}
 .agc-list{display:flex;flex-direction:column;gap:6px;margin-top:8px;max-height:180px;overflow-y:auto}
 .ag-ubic{background:rgba(79,142,247,.08);border:1.5px solid rgba(79,142,247,.35);border-radius:14px;padding:12px;margin:2px 0 12px}
+/* ★ El BOTÓN NATIVO <geolocation> (Chrome 144+). Chrome dibuja su texto e
+   ícono y limita el estilo; IGNORA box-sizing y añade relleno lateral
+   propio: con width:100% + ese relleno se sale de la pantalla y Chrome lo
+   declara inválido («intersection_out_of_viewport_or_clipped») y NO
+   responde al toque. Por eso relleno lateral 0. Medido en Chromium 153. */
+.ag-geo{display:block;width:100%;padding:16px 0;border:0;border-radius:12px;background:var(--blue);color:#fff;font-size:16px;font-weight:800;font-family:inherit}
 .ag-ubic-btn{width:100%;min-height:52px;border:none;border-radius:12px;background:var(--blue);color:#fff;font-size:15.5px;font-weight:800;font-family:inherit;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px}
 .ag-ubic-btn:disabled{opacity:.8;cursor:progress}
 .ag-ubic-sub{font-size:11.5px;color:var(--text2);line-height:1.45;margin-top:8px;text-align:center}
@@ -809,7 +815,7 @@ function _ayudaFormContenido(e){
   var tipo=e.tipo||'', paso=e.paso||1, retiro=tipo==='retiro';
   var dest={
     agencia: e.mapa
-      ? 'Toca <b>Usar mi ubicación</b> o busca tu <b>provincia o distrito</b> con la 🔍 lupa. Luego elige tu sede en la lista o tocando su <b>pin rojo</b>: queda marcada con ✓.'
+      ? 'Toca el botón azul de <b>ubicación</b> o busca tu <b>provincia o distrito</b> con la 🔍 lupa. Luego elige tu sede en la lista o tocando su <b>pin rojo</b>: queda marcada con ✓.'
       : 'Escribe tu ciudad o distrito y toca la sede donde recogerás.',
     delivery: 'Escribe tu dirección de entrega o toca <b>📍 Usar mi ubicación</b> para que el motorizado llegue exacto. Agrega una referencia.',
     encomienda: 'Escribe la <b>ciudad de destino</b> y, si la sabes, la agencia.'
@@ -826,7 +832,7 @@ function _ayudaFormContenido(e){
   else if(paso===1) toby='¡Hola! Soy Toby 🐢, tu guía. Pedir toma menos de un minuto: primero elige <b>cómo quieres recibir</b> tu pedido.';
   else if(paso===2) toby='Empieza por el <b>DNI</b> de quien recibe: así su nombre sale exacto, sin errores en la etiqueta.';
   else if(paso===3) toby=({
-    agencia: e.mapa ? 'Toca <b>Usar mi ubicación</b> o busca tu <b>provincia o distrito</b> con la 🔍 lupa: te muestro tus sedes.' : 'Escribe tu distrito y elige la sede donde recogerás.',
+    agencia: e.mapa ? 'Toca el botón azul de <b>ubicación</b> o busca tu <b>provincia o distrito</b> con la 🔍 lupa: te muestro tus sedes.' : 'Escribe tu distrito y elige la sede donde recogerás.',
     delivery: 'Con <b>📍 Usar mi ubicación</b> el motorizado llega exacto a tu puerta.',
     encomienda: 'Cuéntame a qué <b>ciudad</b> viaja tu pedido.'
   })[tipo] || 'Dime a dónde enviamos tu pedido.';
@@ -1623,9 +1629,15 @@ function renderAgencyBox(courierName){
            que salga el aviso del navegador (asi se acepta mas). Si falla o la
            niegan, aqui mismo se dice que hacer, y todo lo demas sigue. -->
       <div id="agUbicCaja" class="ag-ubic">
+        <!-- ★ BOTÓN NATIVO <geolocation> (Chrome 144+): lo dibuja el navegador,
+             que confía en ese toque y deja RECUPERAR un permiso bloqueado ahí
+             mismo. Donde no existe (Safari, Firefox, Chrome viejo, WhatsApp),
+             el navegador muestra lo de dentro: el botón de siempre. -->
+        <geolocation id="agGeoNativo" class="ag-geo">
         <button type="button" id="shalomCercaBtn" class="ag-ubic-btn" onclick="agUbicarme('${agKey}')"
           aria-label="Usar mi ubicación para ver las sedes más cercanas">
           <span class="geo-pin" aria-hidden="true">📍</span> <span class="cerca-txt">Usar mi ubicación</span></button>
+        </geolocation>
         <div class="ag-ubic-sub" id="agUbicSub">Te mostramos las sedes más cerca de ti. Solo la usamos para ordenarlas; no la guardamos.</div>
       </div>
       <!-- ORDEN = el orden en que se decide (30/10/2026): los DOS caminos
@@ -1665,6 +1677,7 @@ function renderAgencyBox(courierName){
       <div class="ferr" id="err_agency" style="margin-top:6px">Selecciona una agencia</div>
     </div>`;
     agPrecargar(agKey);
+    _agGeoNativo(agKey);
     agIniciarAlVer(agKey);
     return;
   }
@@ -2900,11 +2913,12 @@ function agIniciarAlVer(key){
 }
 
 // Estado del botón principal: el texto dice lo que GANA el cliente.
+var _AG_BUSCANDO='Buscando sedes cerca de ti…';   // UN texto para los dos botones
 function _cercaBtnBuscando(on){
   var btn=document.getElementById('shalomCercaBtn'); if(!btn) return;
   var txt=btn.querySelector('.cerca-txt'); if(!txt) return;
   btn.disabled=on;
-  txt.textContent=on?'Buscando sedes cerca de ti…':'Usar mi ubicación';
+  txt.textContent=on?_AG_BUSCANDO:'Usar mi ubicación';
 }
 // Si no se pudo ubicar: se dice QUÉ hacer, sin callejón sin salida.
 /* La ubicación no llegó. Mensaje amable y DOS salidas concretas, distinto
@@ -2954,7 +2968,9 @@ function _agUbicFallo(codigo, estado){
   var caso=_agCasoDe(codigo, estado||'');
   _agCaso=caso; _agReintentoVuelta=(caso==='gps');
   var msg = ({
-    sitio:     '<b>📍 Activa tu ubicación manualmente</b> (🔒 junto a la dirección web › Permisos › Ubicación) o '+lupa+'.',
+    sitio:     _agNativo
+      ? '<b>📍 Toca «Usar ubicación» y elige Permitir</b>, o '+lupa+'.'
+      : '<b>📍 Activa tu ubicación manualmente</b> (🔒 junto a la dirección web › Permisos › Ubicación) o '+lupa+'.',
     gps:       '<b>📍 Enciende la ubicación de tu celular</b> y vuelve a tocar, o '+lupa+'.',
     pregunta:  '<b>📍 Toca «Permitir»</b> cuando el navegador te pregunte, o '+lupa+'.',
     navegador: 'Este navegador no permite usar tu ubicación aquí: '+lupa+'.',
@@ -3007,24 +3023,81 @@ async function agUbicarme(key, opc){
   _obtenerUbicacion(function(pos){ luego(function(){
     _cercaEnCurso=false; _cercaBtnBuscando(false);
     if(myToken!==_cercaToken) return;            // el cliente ya escribió: manda eso
-    var la=pos.coords.latitude, lo=pos.coords.longitude;
-    // Fuera de Perú (VPN, dato raro): no se ordena por algo que no sirve.
-    if(!AgLista.coords({latitud:la, longitud:lo})){ if(!opc.silencioso) _agUbicFallo('fuera'); return; }
-    // No sale del navegador: solo ordena la lista y pinta tu punto.
-    _agFallosUbic=0;
-    _miUbic={la:la, lo:lo};
-    _agRef={la:la, lo:lo, tipo:'tu'};
-    _agCaso=''; _agReintentoVuelta=false;
-    var caja=$('agUbicCaja'); if(caja) caja.style.display='none';
-    var inp=$('shalomAgInput'); if(inp) inp.value='';
-    agMostrar(key, AgLista.cercanas(_agTodas(key), la, lo, _AG_CERCA_N), '');
+    _agUbicExito(key, pos, opc);
   }); }, function(codigo){ _agPermiso().then(function(estado){ luego(function(){
     _cercaEnCurso=false; _cercaBtnBuscando(false);
     if(myToken!==_cercaToken || opc.silencioso) return;
-    _agFallosUbic++;
-    _agUbicFallo(codigo, estado);
-    if(_agFallosUbic>=2) agIrALupa();   // segundo intento sin suerte: a la lupa
+    _agUbicError(codigo, estado);
   }); }); }, {rapida:true});
+}
+/* ★ UNA SOLA TUBERÍA (30/10/2026): el botón nativo y el de siempre entregan
+   aquí. Lista, mapa, mensajes por causa y el salto a la lupa son los mismos
+   venga de donde venga la posición. */
+function _agUbicExito(key, pos, opc){
+  var la=pos.coords.latitude, lo=pos.coords.longitude;
+  // Fuera de Perú (VPN, dato raro): no se ordena por algo que no sirve.
+  if(!AgLista.coords({latitud:la, longitud:lo})){ if(!(opc&&opc.silencioso)) _agUbicFallo('fuera'); return; }
+  // No sale del navegador: solo ordena la lista y pinta tu punto.
+  _agFallosUbic=0;
+  _miUbic={la:la, lo:lo};
+  _agRef={la:la, lo:lo, tipo:'tu'};
+  _agCaso=''; _agReintentoVuelta=false;
+  var caja=$('agUbicCaja'); if(caja) caja.style.display='none';
+  var inp=$('shalomAgInput'); if(inp) inp.value='';
+  agMostrar(key, AgLista.cercanas(_agTodas(key), la, lo, _AG_CERCA_N), '');
+}
+function _agUbicError(codigo, estado){
+  _agFallosUbic++;
+  _agUbicFallo(codigo, estado);
+  if(_agFallosUbic>=2) agIrALupa();   // segundo intento sin suerte: a la lupa
+}
+/* ★ EL BOTÓN NATIVO <geolocation> (Chrome 144+). Si el navegador no lo
+   conoce, no se hace nada: se ve y funciona el botón de siempre. Si lo
+   conoce, su toque pide la ubicación (y, si estaba bloqueada, Chrome deja
+   permitirla ahí mismo) y su resultado entra a la MISMA tubería. */
+var _agNativo=false;
+function _agGeoNativo(key){
+  var g=$('agGeoNativo');
+  _agNativo = !!(g && ('HTMLGeolocationElement' in window) && (g instanceof window.HTMLGeolocationElement));
+  if(!_agNativo) return;
+  var sub=$('agUbicSub'), t0=0, token=0, vigia=0;
+  var buscando=function(){
+    t0=Date.now(); token=++_cercaToken; _agUbicKey=key;
+    if(sub) sub.textContent=_AG_BUSCANDO;
+    /* Vigía: si el navegador no responde nada en 15 s (bloqueo silencioso,
+       aviso que nunca salió), no se queda en «Buscando…» para siempre. */
+    clearTimeout(vigia);
+    var mio=token;
+    vigia=setTimeout(function(){
+      if(mio!==_cercaToken) return;
+      _agPermiso().then(function(estado){ _agUbicError(estado==='denied'?'denegado':'fallo', estado); });
+    }, 15000);
+  };
+  // El toque se nota (igual que el botón de siempre): mínimo 0,7 s.
+  var luego=function(fn){ var r=Math.max(0, 700-(Date.now()-t0)); if(r) setTimeout(fn, r); else fn(); };
+  g.addEventListener('click', function(){
+    /* Si Chrome lo declara INVÁLIDO (tapado, recortado, estilo prohibido)
+       su toque no pide nada: «no pasa nada» otra vez. Entonces se pide por
+       el camino de siempre, dentro del mismo toque. */
+    if(g.isValid===false){ agUbicarme(key); return; }
+    buscando();
+  });
+  g.addEventListener('location', function(){
+    clearTimeout(vigia);
+    var mio=token;
+    luego(function(){
+      if(mio!==_cercaToken) return;            // ya escribió en la lupa: manda eso
+      if(g.position){ _agUbicExito(key, g.position, {}); return; }
+      var e=g.error, codigo = !e ? 'fallo' : (e.code===1 ? 'denegado' : 'fallo');
+      _agPermiso().then(function(estado){ _agUbicError(codigo, estado); });
+    });
+  });
+  // Cerró el aviso del navegador sin responder.
+  g.addEventListener('promptdismiss', function(){
+    clearTimeout(vigia);
+    var mio=token;
+    luego(function(){ if(mio===_cercaToken) _agUbicError('denegado', 'prompt'); });
+  });
 }
 // Compatibilidad: el nombre de antes sigue funcionando.
 function agCerca(key){ return agUbicarme(key); }

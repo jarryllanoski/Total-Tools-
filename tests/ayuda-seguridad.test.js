@@ -30,7 +30,7 @@ module.exports = async ({bloque, ok}) => {
     ok(C({paso: 1}).pasos.length === 4 && C({tipo: 'retiro', paso: 1}).pasos.length === 3,
        'retiro en tienda no tiene paso de destino: 3 pasos');
     ok(/DNI/.test(C({paso: 2}).pasos[1].d), 'el paso 2 empieza por el DNI, como en pantalla');
-    ok(/lupa/.test(C({tipo: 'agencia', paso: 3, mapa: true}).toby) && /Usar mi ubicación/.test(C({tipo: 'agencia', paso: 3, mapa: true}).toby), 'en el paso de la sede Toby señala los dos caminos: ubicación y lupa');
+    ok(/lupa/.test(C({tipo: 'agencia', paso: 3, mapa: true}).toby) && /botón azul de <b>ubicación/.test(C({tipo: 'agencia', paso: 3, mapa: true}).toby), 'en el paso de la sede Toby señala los dos caminos: ubicación y lupa');
     ok(!/pin rojo|ubicación/.test(C({tipo: 'agencia', paso: 3, mapa: false}).toby), 'sin mapa (Olva manual) no habla de pines ni ubicación');
     ok(/motorizado/.test(C({tipo: 'delivery', paso: 3}).toby), 'en delivery habla de la ubicación para el motorizado');
     ok(/ya está registrado/.test(C({confirmado: true}).toby), 'confirmado: «ya está registrado» + Ir a WhatsApp');

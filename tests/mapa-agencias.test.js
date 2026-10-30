@@ -165,7 +165,8 @@ module.exports = async ({bloque, ok}) => {
 
        Se EJECUTA la funcion contra un DOM de mentira: lo que se comprueba
        es el texto que acaba en el boton, no el que esta en el fuente. */
-    const src = form.slice(form.indexOf('function _cercaBtnBuscando'),
+    // Desde la constante: el texto vive UNA vez y lo comparten los dos botones.
+    const src = form.slice(form.indexOf('var _AG_BUSCANDO'),
         form.indexOf('function _agUbicFallo'));
     const txt = {textContent: ''};
     const btn = {style: {}, disabled: false,

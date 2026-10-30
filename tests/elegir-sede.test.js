@@ -163,6 +163,26 @@ module.exports = async ({bloque, ok}) => {
        'si enciende el GPS y vuelve a la página, se reintenta UNA vez sola');
   }
 
+  bloque('Botón nativo <geolocation> (Chrome 144+) con el de siempre como respaldo');
+
+  {
+    const t = form.slice(form.indexOf('<geolocation id="agGeoNativo"'), form.indexOf('</geolocation>') + 14);
+    ok(/id="shalomCercaBtn"/.test(t), 'el botón de siempre va DENTRO: donde no hay nativo, el navegador lo muestra');
+    ok(/\.ag-geo\{display:block;width:100%;padding:16px 0;/.test(form),
+       '⚠️ ancho 100% con relleno lateral 0: Chrome añade el suyo e ignora box-sizing; si se sale, lo declara inválido');
+    const n = form.slice(form.indexOf('function _agGeoNativo('), form.indexOf('function _agGeoNativo(') + 3200);
+    ok(/'HTMLGeolocationElement' in window/.test(n), 'detección de soporte');
+    ok(/if\(g\.isValid===false\)\{ agUbicarme\(key\); return; \}/.test(n), 'si Chrome lo da por inválido, el toque pide por el camino de siempre');
+    ok(/addEventListener\('location'/.test(n) && /_agUbicExito\(key, g\.position, \{\}\)/.test(n) && /_agUbicError\(codigo, estado\)/.test(n),
+       'posición y error entran a la MISMA tubería que el botón de siempre');
+    ok(/addEventListener\('promptdismiss'/.test(n), 'cerrar el aviso tiene su mensaje');
+    ok(/setTimeout\(function\(\)\{\n      if\(mio!==_cercaToken\) return;[\s\S]{0,140}\}, 15000\);/.test(n),
+       'vigía de 15 s: nunca se queda en «Buscando…» para siempre');
+    ok(/_agGeoNativo\(agKey\);/.test(form), 'se conecta al pintar el paso');
+    ok(/sitio:     _agNativo\n      \? '<b>📍 Toca «Usar ubicación» y elige Permitir<\/b>/.test(form),
+       'bloqueado + nativo: «Toca Usar ubicación y elige Permitir» (Chrome deja recuperarlo)');
+  }
+
   bloque('⚠️ «Iniciando fábrica…» al abrir el formulario sin link');
 
   {
