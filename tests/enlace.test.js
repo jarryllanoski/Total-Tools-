@@ -346,7 +346,7 @@ module.exports = async ({bloque, ok}) => {
     ok(/formApi_track:\s*\{/.test(fidx),
        '`track` tiene freno por IP, como sus hermanos');
 
-    const m = fidx.match(/formApi_track:\s*\{windowMs:\s*(\d+),\s*max:\s*(\d+)\}/);
+    const m = fidx.match(/formApi_track:\s*\{windowMs:\s*(\d+),\s*max:\s*(\d+)(?:,\s*memoria:\s*true)?\}/);
     ok(!!m, 'y el freno esta escrito donde se puede leer de un vistazo');
     if (m) {
       /* 120/min y no 30. La pagina de seguimiento se refresca sola cada 30 s

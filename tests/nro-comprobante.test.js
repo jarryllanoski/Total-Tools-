@@ -49,9 +49,12 @@ function cargarCreate(tokens) {
         return {exists: !!t, data: () => t};
       },
     }),
-    batch: () => ({
+    /* El alta es una transacción desde el 30/10/2026: mismo registro de
+       escrituras, ahora vía tx.create / tx.set. */
+    runTransaction: async (fn) => fn({
+      get: (ref) => ref.get(),
+      create: (ref, data) => escritos.push({p: ref._p, data, opt: 'create'}),
       set: (ref, data, opt) => escritos.push({p: ref._p, data, opt}),
-      commit: async () => {},
     }),
   };
   // eslint-disable-next-line no-new-func

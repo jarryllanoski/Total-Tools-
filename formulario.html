@@ -48,6 +48,12 @@ textarea.fi{resize:vertical;line-height:1.5}
 #courierCards{display:grid;grid-template-columns:repeat(6,1fr);gap:10px}
 .cour-card{grid-column:span 2;position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:7px;background:var(--card2);border:2px solid #626274;border-radius:14px;padding:16px 10px;min-height:106px;cursor:pointer;font-family:inherit;color:var(--text);transition:border-color .15s,background .15s,transform .05s}
 .cour-card:active{transform:scale(.98)}
+/* ★ «ESTOY ENCIMA» en las tarjetas de envío (30/10/2026): con mouse se
+   elevan y se iluminan; con el dedo se hunden al presionar. */
+.cour-card{-webkit-tap-highlight-color:transparent}
+@media(hover:hover){.cour-card:hover{transform:translateY(-2px);border-color:#12a5b4;box-shadow:0 6px 18px rgba(18,165,180,.22);transition:border-color .15s,background .15s,transform .15s,box-shadow .15s}.cour-card:hover .cc-radio{border-color:#12a5b4}}
+.cour-card:active{transform:scale(.97);box-shadow:0 0 0 3px rgba(18,165,180,.25)}
+@media(prefers-reduced-motion:reduce){.cour-card:hover,.cour-card:active{transform:none}}
 .cour-card.sel{border-color:#12a5b4;background:rgba(18,165,180,.10)}
 /* Sobrantes de la última fila: CENTRADOS, del mismo tamaño que el resto.
    Estirar la última a todo el ancho (como se hacía con 2 columnas) miente
@@ -69,6 +75,10 @@ textarea.fi{resize:vertical;line-height:1.5}
 .courier-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:6px}
 .c-opt{background:var(--card);border:1.5px solid var(--bd);border-radius:14px;padding:16px 10px;text-align:center;cursor:pointer;transition:border-color .15s,background .15s;user-select:none;min-height:72px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px}
 .c-opt:hover{border-color:var(--blue)}
+.c-opt,.date-opt{transition:border-color .15s,background .15s,transform .15s,box-shadow .15s;-webkit-tap-highlight-color:transparent}
+@media(hover:hover){.c-opt:hover,.date-opt:hover{transform:translateY(-2px);box-shadow:0 6px 18px rgba(91,155,255,.22)}}
+.c-opt:active,.date-opt:active{transform:scale(.97);box-shadow:0 0 0 3px rgba(91,155,255,.25)}
+@media(prefers-reduced-motion:reduce){.c-opt,.date-opt{transition:border-color .15s,background .15s}.c-opt:hover,.date-opt:hover,.c-opt:active,.date-opt:active{transform:none}}
 .c-opt.active{border-color:var(--blue);background:#12203d}
 .c-icon{font-size:32px;line-height:1}
 .c-name{font-size:12px;font-weight:600;color:var(--text2);line-height:1.3}
@@ -102,7 +112,21 @@ textarea.fi{resize:vertical;line-height:1.5}
 .ag-mapa-ley{position:absolute;top:8px;right:8px;z-index:1000;display:flex;gap:10px;background:rgba(255,255,255,.95);color:#1f2937;border-radius:16px;padding:5px 10px;font-size:11px;font-weight:700;box-shadow:0 1px 4px rgba(0,0,0,.2);pointer-events:none}
 .ag-mapa-ley span{display:flex;align-items:center;gap:5px}
 .ag-dot{display:inline-block;width:9px;height:9px;border-radius:50%}
-.ag-dot-r{background:#e11d2e}.ag-dot-a{background:#2d7ff9}
+.ag-dot-r{background:#e11d2e}.ag-dot-a{background:#2d7ff9;animation:agLate 2s ease-out infinite}
+/* ★ «TÚ ESTÁS AQUÍ» QUE LATE (30/10/2026): el mismo punto azul con halo de
+   Google Maps o Waze. El cliente ya lo conoce: se reconoce al instante y ve
+   las sedes rojas a su alrededor. Solo CSS: ni batería ni red. */
+@keyframes agLate{0%{box-shadow:0 0 0 0 rgba(45,127,249,.55)}100%{box-shadow:0 0 0 7px rgba(45,127,249,0)}}
+.ag-yo-halo{animation:agHalo 2s ease-out infinite}
+@keyframes agHalo{0%{stroke-width:2;stroke-opacity:.7}100%{stroke-width:30;stroke-opacity:0}}
+/* La lupa late mientras no hay sede elegida: invita sin gritar. Al escribir
+   o elegir se queda quieta (lo que late siempre se termina ignorando). */
+.ag-lupa{position:absolute;left:14px;top:50%;transform:translateY(-50%);font-size:15px;opacity:.75;pointer-events:none;animation:agLupa 1.8s ease-in-out infinite}
+.ag-buscar.quieto .ag-lupa{animation:none;opacity:.6}
+@keyframes agLupa{0%,100%{transform:translateY(-50%) scale(1)}50%{transform:translateY(-50%) scale(1.22)}}
+.ag-opc{position:absolute;right:12px;top:50%;transform:translateY(-50%);font-size:10px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--text2);background:rgba(255,255,255,.06);border:1px solid var(--bd);border-radius:8px;padding:2px 7px;pointer-events:none}
+.fi:not(:placeholder-shown) ~ .ag-opc{display:none}
+@media(prefers-reduced-motion:reduce){.ag-dot-a,.ag-yo-halo,.ag-lupa{animation:none}}
 .ag-mapa-btns{position:absolute;left:8px;bottom:8px;z-index:1000;display:flex;gap:6px}
 .ag-mapa-btns button{background:#fff;color:#1f2937;border:none;border-radius:16px;padding:7px 11px;font-size:12px;font-weight:700;font-family:inherit;cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,.25)}
 .ag-mapa-ayuda{font-size:11px;color:var(--text2);margin:0 0 10px;line-height:1.4}
@@ -110,6 +134,12 @@ textarea.fi{resize:vertical;line-height:1.5}
 .ag-lista{background:var(--card);border:1.5px solid var(--bd);border-radius:12px;overflow:hidden;max-height:320px;overflow-y:auto;margin-bottom:8px}
 .ag-item{display:flex;align-items:flex-start;gap:10px;padding:12px;border-bottom:1px solid var(--bd);cursor:pointer}
 .ag-item:last-child{border-bottom:none}
+.ag-item{transition:background .15s,box-shadow .15s}
+/* ★ «ESTOY ENCIMA» (30/10/2026): con mouse se ilumina al pasar; con el
+   dedo (no hay «pasar por encima») se hunde al presionar, como un botón
+   físico. Cada toque responde en menos de 0,1 s: se siente instantáneo. */
+@media(hover:hover){.ag-item:hover:not(.ag-item-sel){background:rgba(91,155,255,.08);box-shadow:inset 3px 0 0 var(--blue)}}
+.ag-item:active:not(.ag-item-sel){background:rgba(91,155,255,.14)}
 .ag-item-sel{background:rgba(34,197,94,.08);box-shadow:inset 0 0 0 2px var(--green)}
 .ag-item-ic{font-size:16px;line-height:1.2;flex-shrink:0;color:var(--text2)}
 .ag-item-sel .ag-item-ic{color:var(--green)}
@@ -564,8 +594,12 @@ function getAgencyData(courierName){
   return null;
 }
 
-/* ─── INIT ──────────────────────────────────────────────────────── */
-(function init(){
+/* ─── INIT ──────────────────────────────────────────────────────────
+   ⚠️ Se DECLARA aquí y se LLAMA al final del script (30/10/2026). Antes
+   corría en este punto, cuando aún no existían los `let`/`const` de más
+   abajo: así nació el «Iniciando fábrica…» colgado (TDZ). Llamarla al
+   final cierra esa familia de fallos entera, no solo el caso que se vio. */
+function init(){
   /* Seguimiento por token único: ?seg=TOKEN */
   const segTok = new URLSearchParams(location.search).get('seg');
   if(segTok){ loadCfgThenTrack(segTok); return; }
@@ -584,7 +618,7 @@ function getAgencyData(courierName){
   }
 
   loadCfg();
-})();
+}
 
 /* ─── TOKEN CHECK (link de registro) ─────────────────────────────── */
 async function checkToken(tok){
@@ -708,37 +742,138 @@ function headerHtml(ayudaTipo){
   return `<div class="biz-header" style="position:relative${isTrack?'':';min-height:34px'}">${brand}<div onclick="${ayudaFn}" style="position:absolute;top:2px;right:0;display:flex;align-items:center;gap:4px;background:rgba(167,139,250,.12);border:1px solid rgba(167,139,250,.3);color:#a78bfa;border-radius:8px;padding:5px 10px;cursor:pointer;font-size:12px;font-weight:700" title="Ayuda">📖 Ayuda</div></div>`;
 }
 
-/* ─── Ayuda del formulario (autocontenida, pública) ──────────────── */
+/* ─── Ayuda del formulario: TOBY, con el formato de Heavy ────────────
+   30/10/2026. La guía anterior describía otro formulario (nombre primero,
+   «Confirmar abre WhatsApp», «si no envías el WhatsApp no lo procesamos»).
+   Era falso: el pedido queda REGISTRADO al confirmar, y WhatsApp solo trae
+   el link de seguimiento. Ahora la ayuda sale del estado real:
+     · los pasos que ESTE cliente ve (retiro en tienda no tiene destino);
+     · el paso donde está, resaltado;
+     · Toby explica lo de ESE paso y ESE tipo de envío.
+   Solo presentación: no lee ni escribe nada en la nube. Si la imagen no
+   carga, queda el globo de texto. */
+function _ayudaFormCss(){
+  if(document.getElementById('ayudaCss')) return;
+  var st=document.createElement('style'); st.id='ayudaCss';
+  st.textContent=''
+   +'body.tt-ayuda-on #tt-narr{display:none!important}'
+   +'#ayudaFormOv .ay-sheet{background:#0d1117;border:1px solid #30363d;border-radius:18px 18px 0 0;width:100%;max-width:520px;max-height:88vh;overflow-y:auto;padding:18px 18px 20px;box-shadow:0 -10px 40px rgba(0,0,0,.5);animation:ayIn .28s ease}'
+   +'@keyframes ayIn{from{transform:translateY(24px);opacity:0}to{transform:none;opacity:1}}'
+   +'#ayudaFormOv .tb{display:flex;align-items:flex-end;gap:10px;margin-bottom:14px}'
+   +'#ayudaFormOv .tb-av{position:relative;flex:0 0 auto;width:74px;height:72px;filter:drop-shadow(0 6px 10px rgba(0,0,0,.4))}'
+   +'#ayudaFormOv .tb-av img{width:100%;height:100%;object-fit:contain;object-position:bottom;-webkit-mask-image:linear-gradient(to bottom,#000 80%,transparent);mask-image:linear-gradient(to bottom,#000 80%,transparent);animation:ttbobA 3.6s ease-in-out infinite}'
+   +'@keyframes ttbobA{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}'
+   +'#ayudaFormOv .tb-tag{position:absolute;left:0;bottom:-2px;background:#2dd4bf;color:#04122c;font-size:8px;font-weight:800;padding:1px 4px;border-radius:5px}'
+   +'#ayudaFormOv .tb-bub{position:relative;flex:1;min-width:0;background:#12203d;color:#eaf1ff;border:1px solid #2b3f66;border-radius:14px;padding:11px 14px 12px;font-size:13.5px;line-height:1.45}'
+   +'#ayudaFormOv .tb-bub:after{content:"";position:absolute;left:-7px;bottom:16px;border:7px solid transparent;border-right-color:#12203d;border-left:0}'
+   +'#ayudaFormOv .tb-who{font-size:10px;letter-spacing:.05em;text-transform:uppercase;color:#2dd4bf;font-weight:700;margin-bottom:3px}'
+   +'#ayudaFormOv .ay-ttl{font-size:11px;font-weight:800;letter-spacing:.8px;color:#a78bfa;margin:14px 0 6px;text-transform:uppercase}'
+   +'#ayudaFormOv .ay-paso{display:flex;gap:10px;padding:10px;border-radius:12px;border:1px solid transparent;margin-bottom:4px}'
+   +'#ayudaFormOv .ay-paso.on{background:rgba(45,212,191,.08);border-color:rgba(45,212,191,.45)}'
+   +'#ayudaFormOv .ay-paso.ok{opacity:.6}'
+   +'#ayudaFormOv .ay-n{width:24px;height:24px;border-radius:50%;background:rgba(167,139,250,.15);border:1px solid rgba(167,139,250,.3);color:#a78bfa;font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0}'
+   +'#ayudaFormOv .ay-paso.on .ay-n{background:#2dd4bf;border-color:#2dd4bf;color:#04122c}'
+   +'#ayudaFormOv .ay-paso.ok .ay-n{background:rgba(30,185,84,.18);border-color:rgba(30,185,84,.5);color:#1eb954}'
+   +'#ayudaFormOv .ay-t{font-size:13.5px;color:#e6edf3;font-weight:700}'
+   +'#ayudaFormOv .ay-d{font-size:12.5px;color:#8b949e;line-height:1.5;margin-top:2px}'
+   +'#ayudaFormOv .ay-aqui{font-size:10px;font-weight:800;color:#2dd4bf;margin-left:6px;letter-spacing:.04em}'
+   +'#ayudaFormOv details{border-bottom:1px solid rgba(255,255,255,.06);padding:9px 2px}'
+   +'#ayudaFormOv summary{cursor:pointer;font-size:13px;color:#e6edf3;font-weight:700;list-style:none;display:flex;justify-content:space-between;gap:8px}'
+   +'#ayudaFormOv summary::-webkit-details-marker{display:none}'
+   +'#ayudaFormOv summary:after{content:"+";color:#8b949e;font-weight:400}'
+   +'#ayudaFormOv details[open] summary:after{content:"–"}'
+   +'#ayudaFormOv details p{font-size:12.5px;color:#8b949e;line-height:1.5;margin:6px 0 0}'
+   +'#ayudaFormOv .ay-btns{display:flex;gap:8px;margin-top:16px}'
+   +'#ayudaFormOv .ay-btns a,#ayudaFormOv .ay-btns button{flex:1;padding:12px;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;text-align:center;text-decoration:none}'
+   +'#ayudaFormOv .ay-wa{background:rgba(30,185,84,.12);border:1px solid rgba(30,185,84,.45);color:#1eb954}'
+   +'#ayudaFormOv .ay-x{background:#1c2333;border:1px solid #30363d;color:#c9d1d9}'
+   +'@media(prefers-reduced-motion:reduce){#ayudaFormOv .ay-sheet,#ayudaFormOv .tb-av img{animation:none}}';
+  document.head.appendChild(st);
+}
+/* Lo que dice Toby y los pasos, según el estado. PURA: se prueba sola. */
+function _ayudaFormContenido(e){
+  e=e||{};
+  var tipo=e.tipo||'', paso=e.paso||1, retiro=tipo==='retiro';
+  var dest={
+    agencia: e.mapa
+      ? 'Toca <b>Usar mi ubicación</b> para ver las sedes más cerca, o toca un <b>pin rojo</b> en el mapa. La sede elegida sube arriba con ✓. También puedes escribir tu distrito.'
+      : 'Escribe tu ciudad o distrito y toca la sede donde recogerás.',
+    delivery: 'Escribe tu dirección de entrega o toca <b>📍 Usar mi ubicación</b> para que el motorizado llegue exacto. Agrega una referencia.',
+    encomienda: 'Escribe la <b>ciudad de destino</b> y, si la sabes, la agencia.'
+  };
+  var pasos=[
+    {n:1, t:'Cómo recibir tu pedido', d:'Elige Shalom, delivery, otra agencia o retiro en tienda.'},
+    {n:2, t:'Datos de quien recibe', d:'Escribe el <b>DNI</b>: el nombre se completa solo. Luego tu número de <b>WhatsApp</b>.'},
+    {n:3, t:'Destino', d: dest[tipo] || 'La sede, tu dirección o la ciudad, según cómo lo recibas.'},
+    {n:4, t:'Fecha y confirmar', d:'Elige la fecha de envío y toca <b>Confirmar pedido</b>. Tu pedido queda registrado al instante.'}
+  ];
+  if(retiro) pasos=pasos.filter(function(p){ return p.n!==3; });
+  var toby;
+  if(e.confirmado) toby='¡Listo! 🎉 Tu pedido <b>ya está registrado</b>. Toca <b>Ir a WhatsApp</b> para recibir tu link de seguimiento.';
+  else if(paso===1) toby='¡Hola! Soy Toby 🐢, tu guía. Pedir toma menos de un minuto: primero elige <b>cómo quieres recibir</b> tu pedido.';
+  else if(paso===2) toby='Empieza por el <b>DNI</b> de quien recibe: así su nombre sale exacto, sin errores en la etiqueta.';
+  else if(paso===3) toby=({
+    agencia: e.mapa ? 'Toca <b>Usar mi ubicación</b> o un <b>pin rojo</b> en el mapa: te muestro las sedes más cerca de ti.' : 'Escribe tu distrito y elige la sede donde recogerás.',
+    delivery: 'Con <b>📍 Usar mi ubicación</b> el motorizado llega exacto a tu puerta.',
+    encomienda: 'Cuéntame a qué <b>ciudad</b> viaja tu pedido.'
+  })[tipo] || 'Dime a dónde enviamos tu pedido.';
+  else toby='Último paso: elige la <b>fecha</b> y toca <b>Confirmar pedido</b>.';
+  var faq=[
+    {q:'¿Mi pedido ya queda registrado?', a:'Sí. Al tocar «Confirmar pedido» ya nos llega. WhatsApp sirve para que recibas tu link de seguimiento y para escribirnos.'},
+    {q:'¿Para qué piden el DNI?', a:'Para que solo la persona indicada pueda recoger el pedido, y para escribir su nombre tal como figura en su documento.'},
+    {q:'¿Guardan mi ubicación?', a:'Para elegir sede, no: solo se usa en tu teléfono para ordenar las sedes por cercanía. En delivery se envía el punto de entrega para que el motorizado llegue.'},
+    {q:'¿Cómo sigo mi pedido?', a:'Con el link que recibes por WhatsApp. Ahí ves cada estado de tu pedido.'},
+    {q:'Me equivoqué en un dato', a:'Si aún no confirmas, vuelve con «← Atrás». Si ya confirmaste, escríbenos por WhatsApp y lo corregimos.'}
+  ];
+  if(retiro && e.tiendaDir) faq.splice(1,0,{q:'¿Dónde recojo mi pedido?', a:'En nuestra tienda: '+esc(e.tiendaDir)+'. Te avisamos cuando esté listo. Trae tu DNI.'});
+  return {toby:toby, pasos:pasos, faq:faq};
+}
+function cerrarAyudaForm(){
+  var ov=document.getElementById('ayudaFormOv'); if(ov) ov.style.display='none';
+  document.body.classList.remove('tt-ayuda-on');
+}
 function abrirAyudaForm(){
+  _ayudaFormCss();
   let ov = document.getElementById('ayudaFormOv');
   if(!ov){
     ov = document.createElement('div');
     ov.id = 'ayudaFormOv';
+    ov.setAttribute('role','dialog'); ov.setAttribute('aria-modal','true'); ov.setAttribute('aria-label','Ayuda');
     ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:99999;display:flex;align-items:flex-end;justify-content:center';
-    ov.addEventListener('click', e=>{ if(e.target===ov) ov.style.display='none'; });
+    ov.addEventListener('click', e=>{ if(e.target===ov) cerrarAyudaForm(); });
+    document.addEventListener('keydown', e=>{ if(e.key==='Escape' && ov.style.display!=='none') cerrarAyudaForm(); });
     document.body.appendChild(ov);
   }
-  ov.style.display = 'flex';
-  const pasos = [
-    'Escribe tu <b>nombre completo</b> y tu <b>número de WhatsApp</b>.',
-    'Elige <b>cómo quieres recibir</b> tu pedido (delivery, retiro en agencia, etc.).',
-    'Indica tu <b>dirección</b>: usa "Mi ubicación" para enviar tu ubicación actual, o "Otra dirección" para escribirla.',
-    'Elige la <b>fecha de envío</b>.',
-    'Toca <b>Confirmar pedido</b>. Se abrirá WhatsApp con tu pedido listo — solo dale <b>enviar</b> para que lo recibamos.'
-  ];
-  const faq = [
-    {q:'¿Es obligatorio enviar el WhatsApp?', a:'Sí. Tu pedido se confirma cuando nos llega el mensaje por WhatsApp. Si no lo envías, no podremos procesarlo.'},
-    {q:'¿Cómo sigo mi pedido?', a:'Con el enlace de seguimiento que aparece en tu mensaje de WhatsApp. Ahí ves el estado en tiempo real.'},
-    {q:'¿Y si me equivoqué en un dato?', a:'Escríbenos por WhatsApp y lo corregimos.'}
-  ];
-  ov.innerHTML = `<div style="background:#0d1117;border:1px solid #30363d;border-radius:18px 18px 0 0;width:100%;max-width:520px;max-height:85vh;overflow-y:auto;padding:20px">
-    <div style="font-weight:800;font-size:18px;margin-bottom:4px;color:#e6edf3">❓ Cómo hacer tu pedido</div>
-    <div style="font-size:11px;color:#8b949e;margin-bottom:14px">Guía rápida</div>
-    ${pasos.map((p,i)=>`<div style="display:flex;gap:10px;padding:10px 0;border-bottom:1px solid rgba(255,255,255,.05)"><div style="width:22px;height:22px;border-radius:50%;background:rgba(167,139,250,.15);border:1px solid rgba(167,139,250,.3);color:#a78bfa;font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0">${i+1}</div><div style="font-size:13px;color:#e6edf3;line-height:1.5">${p}</div></div>`).join('')}
-    <div style="font-size:11px;font-weight:800;letter-spacing:.8px;color:#a78bfa;margin:16px 0 8px;text-transform:uppercase">Preguntas frecuentes</div>
-    ${faq.map(f=>`<div style="padding:8px 0;border-bottom:1px solid rgba(255,255,255,.05)"><div style="font-size:13px;color:#e6edf3;font-weight:700;margin-bottom:3px">${f.q}</div><div style="font-size:12px;color:#8b949e;line-height:1.5">${f.a}</div></div>`).join('')}
-    <button onclick="document.getElementById('ayudaFormOv').style.display='none'" style="width:100%;margin-top:18px;padding:12px;background:#1c2333;border:1px solid #30363d;border-radius:9px;color:#8b949e;font-size:13px;cursor:pointer;font-family:inherit">Cerrar</button>
+  const seq = (typeof wzSeq==='function') ? wzSeq() : [1,2,3,4];
+  const c = _ayudaFormContenido({
+    tipo: selCourierType, paso: _wzStep, confirmado: !!window._ttFrozen,
+    mapa: selCourierType==='agencia' && !$('agcManualInput'),
+    tiendaDir: String(((CFG && (CFG.config||CFG)) || {}).city || '').trim()
+  });
+  const actual = seq.indexOf(_wzStep);
+  let bizPhone = String((CFG&&(CFG.config&&CFG.config.phone||CFG.phone))||'').replace(/\D/g,'');
+  if(bizPhone.startsWith('51') && bizPhone.length>9) bizPhone = bizPhone.slice(2);
+  const wa = bizPhone ? `https://wa.me/51${bizPhone}?text=${encodeURIComponent('Hola, necesito ayuda con mi pedido')}` : '';
+  ov.innerHTML = `<div class="ay-sheet">
+    <div class="tb">
+      <div class="tb-av"><img src="narrador/toby.webp?v=1" alt="" onerror="this.parentNode.style.display='none'"><span class="tb-tag">TOBY</span></div>
+      <div class="tb-bub"><div class="tb-who">Toby · Guía de pedidos</div>${c.toby}</div>
+    </div>
+    <div class="ay-ttl">Tu pedido en ${c.pasos.length} pasos</div>
+    ${c.pasos.map((p,i)=>{
+      const est = window._ttFrozen ? 'ok' : (i===actual ? 'on' : (i<actual ? 'ok' : ''));
+      return `<div class="ay-paso ${est}"><div class="ay-n">${est==='ok'?'✓':i+1}</div><div><div class="ay-t">${p.t}${est==='on'?'<span class="ay-aqui">ESTÁS AQUÍ</span>':''}</div><div class="ay-d">${p.d}</div></div></div>`;
+    }).join('')}
+    <div class="ay-ttl">Preguntas frecuentes</div>
+    ${c.faq.map(f=>`<details><summary>${f.q}</summary><p>${f.a}</p></details>`).join('')}
+    <div class="ay-btns">
+      ${wa?`<a class="ay-wa" href="${esc(wa)}" target="_blank" rel="noopener">💬 Escríbenos</a>`:''}
+      <button class="ay-x" onclick="cerrarAyudaForm()">Entendido</button>
+    </div>
   </div>`;
+  ov.style.display = 'flex';
+  document.body.classList.add('tt-ayuda-on');
+  try{ ov.querySelector('.ay-x').focus({preventScroll:true}); }catch(_){}
 }
 
 /* ─── Ayuda de la vista de SEGUIMIENTO (explica los estados) ──────── */
@@ -1169,7 +1304,10 @@ function onPhoneInput(val){
   }
   _phoneTimer=setTimeout(async ()=>{
     try{
-      const c = await _api('client', {phone: phone});
+      /* El link va con el celular: solo si el link personalizado es de ESE
+         número el servidor devuelve nombre completo y dirección. Si no,
+         solo el primer nombre (sin fuga de datos por celular). */
+      const c = await _api('client', currentToken ? {phone: phone, t: currentToken} : {phone: phone});
       if(c && c.name){
         _knownClient = c;
         _showKnownBadge();
@@ -1322,7 +1460,9 @@ function _showKnownBadge(){
   badge.style.display='block';
   badge.innerHTML=`<div style="display:inline-flex;align-items:center;gap:8px;background:rgba(34,197,94,.12);border:1px solid rgba(34,197,94,.35);border-radius:10px;padding:8px 12px;font-size:13px;color:var(--green)">🌟 ¡Te conocemos, ${esc(first)}!</div>`;
   const nameEl=$('f_name');
-  if(nameEl&&!nameEl.value.trim()) nameEl.value=_knownClient.name||'';
+  // Con solo el primer nombre (`parcial`) no se rellena: un nombre a medias
+  // en una etiqueta de envío es peor que el campo vacío.
+  if(nameEl&&!nameEl.value.trim()&&!_knownClient.parcial) nameEl.value=_knownClient.name||'';
   _updateKnownAddrShortcut();
 }
 
@@ -1484,14 +1624,15 @@ function renderAgencyBox(courierName){
         </div>
       </div>
       <div id="agMapaAyuda" class="ag-mapa-ayuda" style="display:none">Toca el mapa para ver las sedes cerca de ese punto. Elige un pin o una sede de la lista.</div>
-      <div style="position:relative;margin-bottom:10px">
-        <span style="position:absolute;left:14px;top:50%;transform:translateY(-50%);font-size:15px;opacity:.65;pointer-events:none">🔍</span>
+      <div class="ag-buscar" style="position:relative;margin-bottom:10px">
+        <span class="ag-lupa" aria-hidden="true">🔍</span>
         <!-- SIN data-wz-focus, a proposito: al llegar al paso el teclado no
              debe abrirse encima del mapa y de la lista. -->
         <input class="fi" id="shalomAgInput" autocomplete="off"
-          style="padding-left:42px"
-          placeholder="O escribe tu ciudad o distrito…"
+          style="padding-left:42px;padding-right:92px;text-overflow:ellipsis"
+          placeholder="O escribe tu distrito…"
           oninput="agOnInput('${agKey}', this.value)">
+        <span class="ag-opc">Opcional</span>
         <div id="shalomSpin" style="display:none;position:absolute;right:14px;top:50%;
           transform:translateY(-50%);width:16px;height:16px;border:2px solid #1e1e30;
           border-top-color:var(--blue);border-radius:50%;animation:spin .7s linear infinite"></div>
@@ -2586,7 +2727,12 @@ function toggleShalomHelp(){
   if(btn) btn.style.background = visible ? 'rgba(56,139,253,.15)' : 'rgba(56,139,253,.3)';
 }
 
+/* La lupa late solo mientras el cliente aún no busca ni elige. */
+function _agLupa(late){
+  var b=document.querySelector('.ag-buscar'); if(b) b.classList.toggle('quieto', !late);
+}
 function agOnInput(key, val){
+  _agLupa(!String(val||'').trim());
   /* Escribir para buscar OTRA sede deshace la elección ENTERA. Antes solo se
      vaciaba la dirección y la lista habría seguido marcando «Seleccionada»
      una sede que el pedido ya no tenía. */
@@ -3030,10 +3176,16 @@ async function agMapaPintar(key, agencias, opc){
     /* ★ DÓNDE ESTÁS TÚ — un PUNTO azul, no un pin: no se elige ni se toca. */
     if(_miPunto){ try{ _mapa.removeLayer(_miPunto); }catch(e){} _miPunto=null; }
     if(_miUbic){
-      _miPunto=L.circleMarker([_miUbic.la,_miUbic.lo],{
-        radius:7, color:'#fff', weight:2.5, fillColor:'#2d7ff9', fillOpacity:1,
-        interactive:false
-      }).addTo(_mapa);
+      // Halo que late (CSS .ag-yo-halo) + el punto encima. Ninguno se toca.
+      _miPunto=L.layerGroup([
+        L.circleMarker([_miUbic.la,_miUbic.lo],{
+          radius:7, color:'#2d7ff9', weight:2, fill:false, interactive:false, className:'ag-yo-halo'
+        }),
+        L.circleMarker([_miUbic.la,_miUbic.lo],{
+          radius:7, color:'#fff', weight:2.5, fillColor:'#2d7ff9', fillOpacity:1,
+          interactive:false
+        })
+      ]).addTo(_mapa);
     }
     // El punto que tocaste, para que se vea desde dónde se midió.
     if(_puntoRef){ try{ _mapa.removeLayer(_puntoRef); }catch(e){} _puntoRef=null; }
@@ -3085,6 +3237,7 @@ function agSel(key, i){
    mapa es fácil tocar un pin por error). */
 function _agElegir(key, ag){
   if(!ag) return;
+  _agLupa(false);
   const nombre = ag.lugar_over||ag.nombre||'';
   const dir    = ag.direccion||'';
   const geo    = [ag.zona||ag.distrito, ag.provincia, ag.departamento].filter(Boolean).join(', ');
@@ -3125,6 +3278,7 @@ function agManual(key, val){
 }
 
 function agReset(key){
+  _agLupa(true);
   agState.addr = '';
   window._agSel[key] = null;
   window._agIdent = null; window._agIdentTxt = '';
@@ -3354,10 +3508,18 @@ window.nuevoRegistro        = nuevoRegistro;
 window.checkToken           = checkToken;
 // ★ Funciones que faltaban exponer (por eso sus onclick no funcionaban)
 window.abrirAyudaForm       = abrirAyudaForm;
+window.cerrarAyudaForm      = cerrarAyudaForm;
 window.abrirAyudaTrack      = abrirAyudaTrack;
 window.onAgencyManual       = onAgencyManual;
 window.toggleShalomHelp     = toggleShalomHelp;
 window._notesCount          = _notesCount;
+
+// iOS Safari solo aplica :active (el «hundirse» al tocar) si hay un oyente
+// de toque en la página. Pasivo: no frena el scroll.
+try{ document.addEventListener('touchstart', function(){}, {passive:true}); }catch(e){}
+
+// Arranque AL FINAL: todo lo de arriba ya existe (ver INIT).
+init();
 
 })();
 </script>

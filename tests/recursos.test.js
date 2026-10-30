@@ -179,9 +179,10 @@ module.exports = async ({bloque, ok}) => {
     const fidx = E.leer('functions/index.js');
     const pub = fidx.slice(fidx.indexOf('async function handleConfig'),
         fidx.indexOf('// ── action=formcfg'));
-    ok(/config: d\.config \|\| \{\}/.test(pub),
-       'la función pública sigue devolviendo `config` entero — por eso los ' +
-       'recursos no pueden estar ahí dentro');
+    ok(/config: configPublica\(d\.config\)/.test(pub) &&
+       /const CONFIG_PUBLICA = \["name", "phone", "city"\];/.test(fidx),
+       'la función pública devuelve de `config` SOLO nombre, celular y ' +
+       'ciudad (lista blanca, 30/10/2026); aun así los recursos no van ahí');
     ok(pub.indexOf('recursos') < 0,
        'y NO devuelve los recursos: son internos hasta que exista el ' +
        'interruptor "visible para el cliente"');

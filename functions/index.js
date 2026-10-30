@@ -434,6 +434,13 @@ function pickOrderFields(src) {
   return out;
 }
 
+/* ★ LA FORMA DE UN ID, ANTES DE TOCAR LA BASE DE DATOS — 30/10/2026.
+   Los ids de link (20 letras/números) y de «foto» de configuración (~16) se
+   pegaban a una ruta sin mirarlos: un id con «/» leía OTRA ruta, y la basura
+   costaba una lectura por intento. Lo que no tiene forma de id se responde
+   ahí mismo, sin leer nada (igual que ya hace el seguimiento). */
+const ID_RE = /^[A-Za-z0-9_-]{2,64}$/;
+
 // ── action=create ──────────────────────────────────────────────────────────
 /**
  * @param {Object} req request
@@ -463,6 +470,10 @@ async function handleCreate(req, res) {
   // Re-validar token para evitar carreras: si ya fue usado entre ?t= y submit
   let tokData = null;
   if (tokenId) {
+    if (!ID_RE.test(tokenId)) {
+      res.status(400).json({status: "error", error: "Token inválido"});
+      return;
+    }
     const tokSnap = await db.doc(`${TOK_COL}/${tokenId}`).get();
     if (!tokSnap.exists) {
       res.status(400).json({status: "error", error: "Token inválido"});
@@ -480,15 +491,12 @@ async function handleCreate(req, res) {
   }
 
   const now = Date.now();
-  const orderId = `id_${now}`;
-  const trackCode = orderId.slice(-4).toUpperCase();
   /* El token del link ya NO es el id. Era `id_` + el reloj, o sea un numero
      que avanza solo y que cualquiera puede recorrer. Ahora son 128 bits del
      generador criptografico. Ver functions/enlaceSeguimiento.js. */
   const trackToken = enlace.generar();
 
   const orderToSave = Object.assign({}, pickOrderFields(order), {
-    id: orderId,
     status: order.status || "NUEVO PEDIDO",
     createdAt: order.createdAt || new Date().toISOString(),
     fromForm: true,
@@ -557,36 +565,59 @@ async function handleCreate(req, res) {
   const nroComprobante = tokData ? nroComp.de(tokData) : "";
   if (nroComprobante) orderToSave.nroComprobante = nroComprobante;
 
-  // Escritura atómica: pedido + token + señal al panel
-  const batch = db.batch();
-
-  batch.set(db.doc(`${SHIP_COL}/${orderId}`), _conMts(orderToSave));
-
-  if (tokenId) {
-    batch.set(
-        db.doc(`${TOK_COL}/${tokenId}`),
-        {
+  /* ★ ESCRITURA EN UNA TRANSACCIÓN, Y CON `create`, NUNCA `set` — 30/10/2026.
+     Dos agujeros que el lote (batch) dejaba abiertos:
+       · CHOQUE DE ID. El id es `id_` + el milisegundo. Dos clientes que
+         confirman en el mismo milisegundo daban el MISMO id, y `set` hacía
+         que el segundo pedido BORRARA al primero sin avisar. Ahora se lee
+         el id dentro de la transacción y se graba con `create` (falla si
+         existe): ocupado → se prueba el milisegundo siguiente. El formato
+         del id no cambia (el panel y los links viejos dependen de él).
+       · LINK USADO DOS VECES. «¿Ya se usó?» se miraba ANTES y fuera: dos
+         pestañas con el mismo link pasaban las dos y nacían dos pedidos.
+         Ahora mirar y marcar son la MISMA operación. */
+  const tokRef = tokenId ? db.doc(`${TOK_COL}/${tokenId}`) : null;
+  let orderId = "";
+  let trackCode = "";
+  for (let intento = 0; intento < 5 && !orderId; intento++) {
+    const id = `id_${now + intento}`;
+    const code = id.slice(-4).toUpperCase();
+    const shipRef = db.doc(`${SHIP_COL}/${id}`);
+    const r = await db.runTransaction(async (tx) => {
+      const [ts, ss] = await Promise.all([
+        tokRef ? tx.get(tokRef) : Promise.resolve(null),
+        tx.get(shipRef),
+      ]);
+      if (tokRef && (!ts.exists || ts.data().used)) return "usado";
+      if (ss.exists) return "ocupado";
+      tx.create(shipRef, _conMts(Object.assign({}, orderToSave, {id: id})));
+      if (tokRef) {
+        tx.set(tokRef, {
           used: true,
-          orderId: orderId,
-          trackCode: trackCode,
+          orderId: id,
+          trackCode: code,
           clientName: order.name,
           usedAt: new Date().toISOString(),
-        },
-        {merge: true},
-    );
-  }
-
-  // formTs: campo exclusivo del formulario — el panel nunca lo sobreescribe
-  // ts   : señal legacy que el panel también escucha (threshold +500ms)
-  batch.set(
-      db.doc(CFG_DOC),
+        }, {merge: true});
+      }
+      // formTs: campo exclusivo del formulario — el panel nunca lo
+      // sobreescribe. ts: señal legacy que el panel también escucha.
       // syncV: el servidor ya graba `_mts` → el panel puede pedir solo lo
       // cambiado. Mientras no exista, el panel hace la carga completa.
-      {ts: now, formTs: now, syncV: SYNC_V},
-      {merge: true},
-  );
-
-  await batch.commit();
+      tx.set(db.doc(CFG_DOC), {ts: now, formTs: now, syncV: SYNC_V},
+          {merge: true});
+      return "ok";
+    });
+    if (r === "usado") {
+      res.status(400).json({status: "error", error: "Token ya utilizado"});
+      return;
+    }
+    if (r === "ok") {
+      orderId = id;
+      trackCode = code;
+    }
+  }
+  if (!orderId) throw new Error("create: 5 ids seguidos ocupados");
 
   /* El formulario lo usa como código en el WhatsApp del cliente, para que
      diga lo mismo que la etiqueta. Solo si existe: los links sin número
@@ -603,7 +634,7 @@ async function handleCreate(req, res) {
  */
 async function handleToken(req, res) {
   const tokenId = (req.query.t || "").trim();
-  if (!tokenId) {
+  if (!ID_RE.test(tokenId)) {
     res.json({status: "invalid"}); return;
   }
 
@@ -652,7 +683,7 @@ async function handleConfig(req, res) {
   // Solo campos públicos que el formulario necesita.
   // NUNCA exponer statusPin, trash, msgTemplates ni labels al público.
   res.json({
-    config: d.config || {},
+    config: configPublica(d.config),
     couriers: d.couriers || [],
     courierActive: d.courierActive || {},
     courierTypes: d.courierTypes || {},
@@ -668,10 +699,67 @@ async function handleConfig(req, res) {
  */
 async function handleFormCfg(req, res) {
   const id = (req.query.id || "").trim();
-  if (!id) return res.status(400).json({error: "missing id"});
+  if (!ID_RE.test(id)) return res.status(400).json({error: "missing id"});
   const snap = await db.doc(`${FORMCFG_COL}/${id}`).get();
   if (!snap.exists) return res.status(404).json({error: "not found"});
-  res.json(snap.data());
+  // Lista blanca también aquí: la «foto» la arma el panel, pero lo que
+  // sale al público se decide en el servidor, campo por campo.
+  res.json(soloCampos(snap.data(), FORMCFG_PUBLICO));
+}
+
+/* ★ LO QUE EL PÚBLICO VE DE LA CONFIGURACIÓN: LISTA BLANCA — 30/10/2026.
+   Antes salía el objeto `config` ENTERO (horarios del barrido,
+   interruptores de Shalom…). Nada era secreto, pero con ese diseño CADA
+   CAMPO NUEVO NACÍA PÚBLICO — el mismo error que sacó la clave de recojo
+   por el seguimiento (OWASP API3:2023). El formulario solo usa estos. */
+const CONFIG_PUBLICA = ["name", "phone", "city"];
+const FORMCFG_PUBLICO = ["name", "city", "phone", "couriers", "courierActive",
+  "courierTypes", "dispatch", "extraFields", "createdAt"];
+
+/**
+ * Copia con solo las claves permitidas.
+ * @param {Object} src objeto completo
+ * @param {Array} claves permitidas
+ * @return {Object} copia filtrada
+ */
+function soloCampos(src, claves) {
+  const out = {};
+  const o = src || {};
+  claves.forEach((k) => {
+    if (Object.prototype.hasOwnProperty.call(o, k)) out[k] = o[k];
+  });
+  return out;
+}
+
+/**
+ * La parte pública de `config`.
+ * @param {Object} c config completa
+ * @return {Object} config pública
+ */
+function configPublica(c) {
+  return soloCampos(c, CONFIG_PUBLICA);
+}
+
+/**
+ * ¿El link personalizado `t` (sin usar) es de este celular?
+ * @param {string} t id del token
+ * @param {string} phone 9 dígitos
+ * @return {Promise<boolean>} true si coincide
+ */
+async function _tokenDeEseCelular(t, phone) {
+  const id = String(t || "").trim();
+  if (!ID_RE.test(id)) return false;
+  try {
+    const s = await db.doc(`${TOK_COL}/${id}`).get();
+    if (!s.exists) return false;
+    const d = s.data() || {};
+    if (d.used) return false;
+    const tp = String(d.prefillPhone || d.phone || "").replace(/\D/g, "")
+        .slice(-9);
+    return tp.length === 9 && tp === phone;
+  } catch (e) {
+    return false;
+  }
 }
 
 // ── action=client ──────────────────────────────────────────────────────────
@@ -712,7 +800,17 @@ async function handleClient(req, res) {
     snap.forEach((d) => pedidos.push(d.data()));
 
     const cli = clienteLookup.elegirCliente(pedidos, Date.now());
-    return cli ? res.json(cli) : vacio();
+    if (!cli) return vacio();
+    /* ★ SIN FUGA POR CELULAR — 30/10/2026. Antes, escribir CUALQUIER
+       celular devolvía el nombre completo y la última dirección de esa
+       persona: un robot con IPs rotando podía recorrer números. Ahora:
+         · link personalizado de ESE MISMO celular → todo, como antes (el
+           dueño ya escribió ese número al generar el link);
+         · cualquier otro caso → solo el primer nombre, para el saludo.
+       El nombre completo lo pone el DNI (RENIEC), que va antes en el paso. */
+    if (await _tokenDeEseCelular(req.query.t, phone)) return res.json(cli);
+    return res.json({name: String(cli.name || "").split(/\s+/)[0] || "",
+      parcial: true});
   } catch (e) {
     console.error("handleClient error:", e);
     return vacio(); // nunca romper el formulario por esto
@@ -991,7 +1089,13 @@ const RATE_LIMITS = {
      resuelve. Con 120 caben 60 pestañas desde una misma IP, muy por encima
      del uso real, y aun asi recorrer un solo dia de milisegundos le tomaria
      a un raspador medio año. */
-  formApi_track: {windowMs: 60000, max: 120},
+  /* `memoria: true` desde el 30/10/2026: el freno del seguimiento costaba
+     una lectura + una escritura de Firestore EN CADA RECARGA (cada 30 s por
+     pestaña) — más caro que el seguimiento mismo. Ahora se cuenta en la
+     memoria de cada instancia: gratis. Con `maxInstances: 10` el techo real
+     es 10 × 120/min por IP, y aun así recorrer tokens de 128 bits es
+     imposible: el freno aquí solo corta la avalancha, no protege el secreto. */
+  formApi_track: {windowMs: 60000, max: 120, memoria: true},
   /* La consulta de DNI. 10/min: un cliente escribe UNO, como mucho lo
      corrige dos veces. Mas bajo que `client` (20) porque esta cuesta dinero
      de verdad y la otra solo una lectura. Y aun asi el freno por IP aqui es
@@ -1000,6 +1104,28 @@ const RATE_LIMITS = {
      daño es el tope diario de reniecPublico.js. */
   formApi_reniec: {windowMs: 60000, max: 10},
 };
+
+/* Contadores en memoria: {clave: {w: ventana, n: cuenta}}. Se vacía al
+   cambiar de ventana para no crecer sin fin. */
+const _frenoMem = new Map();
+let _frenoMemVentana = 0;
+
+/**
+ * Freno por IP en la memoria de la instancia (sin Firestore).
+ * @param {string} clave nombre|ip
+ * @param {number} ventana inicio de la ventana (ms)
+ * @param {number} max tope por ventana
+ * @return {boolean} true = permitir
+ */
+function _frenoMemoria(clave, ventana, max) {
+  if (ventana !== _frenoMemVentana) {
+    _frenoMem.clear();
+    _frenoMemVentana = ventana;
+  }
+  const n = (_frenoMem.get(clave) || 0) + 1;
+  _frenoMem.set(clave, n);
+  return n <= max;
+}
 
 /**
  * Devuelve false si la IP superó el límite en la ventana actual.
@@ -1013,6 +1139,7 @@ async function checkRateLimit(name, req) {
   const forwarded = req.get("x-forwarded-for") || req.ip || "unknown";
   const ip = forwarded.split(",")[0].trim();
   const windowStart = Math.floor(Date.now() / cfg.windowMs) * cfg.windowMs;
+  if (cfg.memoria) return _frenoMemoria(name + "|" + ip, windowStart, cfg.max);
   const docId = (name + "_" + ip + "_" + windowStart)
       .replace(/[^A-Za-z0-9_]/g, "_");
   const ref = db.doc("panel/rateLimits/items/" + docId);
@@ -1021,7 +1148,13 @@ async function checkRateLimit(name, req) {
       const snap = await tx.get(ref);
       const count = snap.exists ? (snap.data().count || 0) : 0;
       if (count >= cfg.max) return false;
-      tx.set(ref, {count: count + 1, windowStart: windowStart}, {merge: true});
+      /* `rlExpira`: para que Firestore BORRE SOLO estos registros con una
+         política TTL (consola → Firestore → TTL, grupo `items`, campo
+         `rlExpira`). Nombre propio a propósito: ningún otro documento de un
+         grupo `items` lo tiene, así que la política no toca nada más.
+         Sin la política, el campo no hace nada y todo sigue igual. */
+      tx.set(ref, {count: count + 1, windowStart: windowStart,
+        rlExpira: new Date(windowStart + 3600 * 1000)}, {merge: true});
       return true;
     });
   } catch (e) {
