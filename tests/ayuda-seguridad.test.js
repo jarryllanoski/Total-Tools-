@@ -37,8 +37,9 @@ module.exports = async ({bloque, ok}) => {
     const r = C({tipo: 'retiro', paso: 1, tiendaDir: '<b>Av X</b>'});
     ok(r.faq.some((f) => /Av X/.test(f.a) && !/<b>/.test(f.a)), 'retiro: dice dónde recoger, escapado');
     ok(/body\.tt-ayuda-on #tt-narr\{display:none!important\}/.test(form), 'Heavy se esconde mientras la Ayuda está abierta');
-    ok(/narrador\/toby\.webp/.test(form) && E.existe('narrador/toby.webp'), 'Toby tiene su imagen');
-    ok(/onerror="this\.parentNode\.style\.display='none'"/.test(form), 'si la imagen falla, queda el globo de texto');
+    const tb = E.leer('narrador/toby.js');
+    ok(/toby\.webp/.test(tb) && E.existe('narrador/toby.webp') && /narrador\/toby\.js/.test(form), 'Toby tiene su imagen (pieza compartida)');
+    ok(/onerror=\"this\.parentNode\.style\.display=\\'none\\'\"/.test(tb), 'si la imagen falla, queda el globo de texto');
     ok(/e\.key==='Escape'/.test(form) && /role','dialog'/.test(form), 'se cierra con Esc y se anuncia como diálogo');
   }
 

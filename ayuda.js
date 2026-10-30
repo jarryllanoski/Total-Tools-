@@ -19,7 +19,7 @@
  * NO MODIFICA NADA EXISTENTE. Se auto-registra como window.Ayuda.
  * Para desactivar: quitar <script src="ayuda.js"> del index.html
  *
- * Última actualización: 2026-06
+ * Última actualización: 2026-10-30 (Toby en todas las ayudas; contenido al día)
  */
 (function(){
   'use strict';
@@ -27,11 +27,12 @@
   var Ayuda = {};
   window.Ayuda = Ayuda;
 
-  var ACTUALIZADO = '2026-06-14';
+  var ACTUALIZADO = '2026-10-30';
 
   /* ══════════════════════════════════════════════════════════════════
      DOCUMENTACIÓN CENTRALIZADA
-     Cada entrada: { titulo, icono, pasos:[], faq:[], tips:[] }
+     Cada entrada: { titulo, icono, toby, pasos:[], faq:[], tips:[] }
+     - toby:  el consejo clave que Toby dice al abrir (si falta, el 1er tip)
      - pasos: lista numerada (círculos azules, como el Manual Shalom)
      - faq:   preguntas frecuentes [{q, a}]
      - tips:  recomendaciones (lista con viñeta)
@@ -42,19 +43,22 @@
     envios: {
       titulo: 'Envíos (Panel principal)',
       icono: '🚚',
-      actualizado: '2026-07-14',
+      actualizado: '2026-10-30',
+      toby: 'Usa la búsqueda avanzada con <b>Hoy</b> para ver de un vistazo lo que entró o sale hoy.',
       pasos: [
         'El panel muestra todos tus pedidos agrupados por courier.',
         'Cada tarjeta tiene el nombre, teléfono, dirección y estado del pedido.',
         'Usa el buscador de arriba para filtrar por nombre, teléfono o dirección.',
         'Toca los chips de estado (NUEVO PEDIDO, EN PROCESO, etc.) para ver solo esos pedidos.',
         'El botón ✏️ edita el pedido; el 🗑️ lo manda a la papelera.',
-        'El botón 💬 abre WhatsApp con el cliente.'
+        'El botón 💬 abre WhatsApp con el cliente; el 🖨️ de la tarjeta imprime <b>solo ese pedido</b>.',
+        'Búsqueda avanzada: filtra por <b>🚚 Fecha de envío</b> o <b>📝 Fecha de registro</b> (cuándo entró), o toca <b>Hoy</b>.'
       ],
       faq: [
         {q:'¿Cómo cambio el estado de un pedido?', a:'Toca la etiqueta de estado grande de la tarjeta y elige el nuevo estado.'},
         {q:'¿Puedo seleccionar varios pedidos a la vez?', a:'Sí, usa las casillas de cada tarjeta para aplicar un cambio a varios.'},
-        {q:'¿Hay forma de seleccionar todos de una vez?', a:'Sí. El botón de seleccionar todo es de tres estados: si no hay nada marcado, marca todos los visibles; si ya hay algo marcado (se ve azul), lo deselecciona todo.'}
+        {q:'¿Hay forma de seleccionar todos de una vez?', a:'Sí. El botón de seleccionar todo es de tres estados: si no hay nada marcado, marca todos los visibles; si ya hay algo marcado (se ve azul), lo deselecciona todo.'},
+        {q:'¿Por qué el panel carga más rápido ahora?', a:'Con la <b>Sincronización rápida en esta PC</b> (📦) solo se trae de la nube lo que cambió. Ante cualquier duda hace la carga completa, y tienes <b>🔄 Sincronizar todo ahora</b> si quieres forzarla.'}
       ],
       tips: [
         'Los pedidos finalizados dejan de consultar Shalom automáticamente para ahorrar recursos.',
@@ -65,25 +69,23 @@
     tracking: {
       titulo: 'Tracking Shalom',
       icono: '📦',
+      actualizado: '2026-10-30',
+      toby: 'No tienes que consultar a mano: el <b>Seguimiento automático</b> revisa tus guías en los horarios que elijas, aunque el panel esté cerrado.',
       pasos: [
-        'El cliente elige agencia Shalom en el formulario.',
-        'El pedido llega al panel como <b>NUEVO PEDIDO</b>.',
-        'Edita el pedido y coloca número de orden y código.',
-        'Guarda tracking → el pedido pasa automáticamente a <b>ENVIADO</b>.',
-        'Presiona ⟳ <b>Consultar</b> en cualquier momento para actualizar al instante.',
-        'El sistema consulta Shalom automáticamente cada <b>12 horas</b> (en tránsito) y cada <b>24 horas</b> al llegar a destino. Al entregarse deja de consultar.',
-        'Shalom dice "En tránsito" → etiqueta <b>ENVIADO</b>.',
-        'Shalom dice "En destino" → cambia a <b>LLEGÓ A DESTINO</b>.',
-        'Si tiene saldo pendiente → <b>PENDIENTE DE PAGO</b>.',
-        'Shalom dice "Entregado" → cambia a <b>FINALIZADO</b>.'
+        'Al registrar el envío en Shalom (o al escribir guía y código en el pedido), el pedido queda con su guía.',
+        'El <b>🕐 Seguimiento automático</b> (⚙️ Config → Shalom) consulta tus guías vivas desde el servidor en los horarios elegidos (de fábrica 08:00, 11:30, 16:30 y 19:00). Funciona con el panel cerrado.',
+        '<b>Mover etiquetas</b> decide qué hace con lo que encuentra: <b>Apagado</b> (solo registra), <b>Semiautomática</b> (mueve todo menos FINALIZADO) o <b>Automática</b> (mueve todo).',
+        'Con el botón ⟳ de la tarjeta consultas esa guía al instante.',
+        'Shalom «En tránsito» → <b>ENVIADO</b> · «En destino» → <b>LLEGÓ A DESTINO</b> · «Entregado» → <b>FINALIZADO</b>.'
       ],
       faq: [
-        {q:'¿Por qué no se actualiza solo?', a:'El auto-tracking corre cada 12-24h. Si quieres ver el estado al instante, usa ⟳ Consultar.'},
-        {q:'¿Qué pasa si Shalom no responde?', a:'La consulta se cancela a los 12 segundos y el sistema sigue con el siguiente pedido, sin trabarse.'}
+        {q:'¿Por qué no se movió la etiqueta?', a:'Revisa <b>Mover etiquetas</b>: en Semiautomática, FINALIZADO lo pones tú; en Apagado no mueve nada. Y la <b>🚪 Puerta a Shalom</b> tiene que estar abierta.'},
+        {q:'¿Qué pasa si Shalom falla varias veces?', a:'La puerta se pausa sola un rato para no gastar de más. Su estado real se ve en ⚙️ Config → Shalom.'},
+        {q:'¿El cliente ve el estado de Shalom?', a:'Solo si activas <b>📱 Mostrar en el link del cliente</b>.'}
       ],
       tips: [
         'El código de la guía no distingue mayúsculas: se convierte solo.',
-        'Si cambias la guía de un pedido, su estado de tracking se reinicia.'
+        '▶️ <b>Correr ahora</b> hace una vuelta del seguimiento sin esperar al horario.'
       ]
     },
 
@@ -130,6 +132,8 @@
     config: {
       titulo: 'Configuración',
       icono: '⚙️',
+      actualizado: '2026-10-30',
+      toby: 'Si dejas <b>un solo</b> envío activo, el formulario no le pregunta al cliente cómo recibirlo: empieza directo en sus datos.',
       pasos: [
         'Aquí defines los couriers disponibles y cuáles se ven en el formulario público.',
         'Prende o apaga un courier con su interruptor.',
@@ -139,7 +143,8 @@
       ],
       faq: [
         {q:'¿Qué hace ocultar un courier?', a:'Deja de aparecer en el formulario público, pero los pedidos que ya lo usan se mantienen.'},
-        {q:'¿Para qué sirve la clave (PIN)?', a:'Pide confirmación antes de ciertos cambios de estado, para evitar toques accidentales.'}
+        {q:'¿Para qué sirve la clave (PIN)?', a:'Pide confirmación antes de ciertos cambios de estado y para encender, apagar o cambiar los ajustes de Shalom: así un toque sin querer no detiene nada.'},
+        {q:'¿Qué ve el cliente si solo hay un envío activo?', a:'No ve la pregunta «¿Cómo quieres recibir tu pedido?»: se elige sola y arriba ve «Envío: …».'}
       ],
       tips: [
         'Cambiar config solo guarda la configuración, no reescribe todos los pedidos.',
@@ -150,18 +155,20 @@
     documentos: {
       titulo: 'Documentos del envío',
       icono: '📎',
+      actualizado: '2026-10-30',
+      toby: 'Con la guía y el código puestos, <b>Jalar ticket de Shalom</b> trae el ticket oficial solo.',
       pasos: [
         'Cada envío tiene 3 documentos. De izquierda a derecha:',
-        '🧾 <b>Boleta / Factura</b>: el comprobante del cliente. Al subirlo, el pedido pasa a <b>EN PROCESO</b>.',
-        '📦 <b>Embalado</b>: foto del paquete ya empacado. Al subirlo, pasa a <b>ALISTADO</b>.',
-        '🚚 <b>Guía / Ticket</b>: la guía o ticket de la agencia (Shalom, Olva…). Al subirlo, pasa a <b>ENVIADO</b>. Aquí está el botón <b>Jalar ticket de Shalom</b>.',
+        '🧾 <b>Boleta / Factura</b>: el comprobante del cliente.',
+        '📦 <b>Embalado</b>: foto del paquete ya empacado.',
+        '🚚 <b>Guía / Ticket</b>: la guía o ticket de la agencia (Shalom, Olva…). Aquí está el botón <b>Jalar ticket de Shalom</b>.',
         'En cada uno: <b>＋ Agregar</b> → Tomar foto, Galería o PDF. Con el documento cargado aparecen <b>Ver</b> y <b>Quitar</b>.',
         'Con <b>🔗 Agregar link</b> pegas enlaces de Drive, Mega, etc.'
       ],
       faq: [
-        {q:'¿El estado cambia siempre solo?', a:'Solo si está encendido el interruptor <b>Auto-avanzar estado al subir documento</b> en Configuración. El estado solo AVANZA, nunca retrocede.'},
-        {q:'¿Puedo enviar los documentos por WhatsApp?', a:'Sí. Los tres (Boleta, Embalado y Guía) se pueden marcar en el envío de WhatsApp del pedido. Vienen desmarcados; marca los que quieras adjuntar.'},
-        {q:'¿Qué es "Jalar ticket de Shalom"?', a:'Trae automáticamente el ticket oficial de Shalom usando el número de guía y el código, y lo coloca en Guía / Ticket.'}
+        {q:'¿Subir un documento cambia el estado?', a:'No. El estado ya no se mueve solo al subir documentos: lo cambias tú (o el Seguimiento automático de Shalom).'},
+        {q:'¿Puedo enviar los documentos por WhatsApp?', a:'Sí. Los tres se pueden marcar en el envío de WhatsApp del pedido. Vienen desmarcados; marca los que quieras adjuntar.'},
+        {q:'¿Qué es "Jalar ticket de Shalom"?', a:'Trae el ticket oficial de Shalom con el número de guía y el código, y lo coloca en Guía / Ticket. Entre un intento y otro espera <b>1 minuto</b>, para no saturar.'}
       ],
       tips: [
         'Los documentos se guardan como imagen/PDF en la nube (no pesan en la base), por eso siguen ahí aunque cambies de teléfono.',
@@ -169,29 +176,11 @@
       ]
     },
 
-    autoEstadoDoc: {
-      titulo: 'Auto-avanzar estado al subir documento',
-      icono: '📄',
-      pasos: [
-        'Cuando subes un documento al pedido, su estado puede avanzar solo:',
-        '🧾 Boleta / Factura → <b>EN PROCESO</b>',
-        '📦 Embalado → <b>ALISTADO</b>',
-        '🚚 Guía / Ticket → <b>ENVIADO</b>',
-        'Solo avanza hacia adelante: nunca regresa un pedido a un estado anterior.',
-        'Con el interruptor <b>apagado</b>, subir documentos no toca el estado — lo cambias tú a mano.'
-      ],
-      faq: [
-        {q:'¿Qué pasa si el pedido ya está más adelantado?', a:'No lo toca. Ej.: si ya está ENVIADO y subes la boleta, no vuelve a EN PROCESO.'},
-        {q:'¿Afecta a los pedidos viejos?', a:'No. Solo actúa en el momento en que subes un documento; no reescribe nada del pasado.'}
-      ],
-      tips: [
-        'Déjalo encendido para que el estado siga el flujo real del pedido sin cambiarlo a mano.'
-      ]
-    },
 
     cambioEtiquetaQR: {
       titulo: 'Cambiar etiqueta por QR',
       icono: '📷',
+      toby: 'Escanea siempre el <b>QR pequeño de abajo</b>: identifica un pedido exacto. El grande es el celular del cliente.',
       pasos: [
         'Sirve para mover muchos pedidos al mismo estado escaneando el QR de su etiqueta.',
         'Doble toque en el chip del estado (hasta <b>ALISTADO</b>) → abre "ordenar esta vista" → despliega <b>📷 Cambiar etiqueta por QR</b> → <b>Activar</b> (pide tu clave de cambio de etiqueta).',
@@ -217,7 +206,7 @@
       icono: '🔗',
       pasos: [
         'Genera un enlace para que el cliente vea el seguimiento de su pedido.',
-        'El cliente abre el enlace y ve el progreso (Recibido → Preparando → En camino → En destino → Entregado).',
+        'El cliente abre el enlace y ve el estado con los mismos nombres que tú (NUEVO PEDIDO, POR ALISTAR, ENVIADO, LLEGÓ A DESTINO, FINALIZADO), con su ayuda y a Toby explicándole qué sigue.',
         'El enlace es único y seguro por cada pedido.'
       ],
       faq: [
@@ -231,22 +220,23 @@
     linkPersonalizado: {
       titulo: 'Link personalizado',
       icono: '✨',
-      actualizado: '2026-07-14',
+      actualizado: '2026-10-30',
+      toby: 'Si pones el <b>N° de factura o boleta</b>, el cliente lo ve en su etiqueta y en su WhatsApp: será el código de su pedido.',
       pasos: [
         'Genera un link con los datos del cliente ya cargados (nombre, teléfono) para que complete su pedido más rápido en el formulario público.',
-        'Podés cargar <b>Monto</b> y <b>Adelanto</b>: viajan con el pedido (el cliente NO los ve) y al crearse aparece la <b>Deuda</b> = monto − adelanto. Después la editás desde el pedido con ✏️ Editar.',
-        'Podés adjuntar un <b>🔗 link</b> (Drive, Mega, etc.) y ponerle <b>vencimiento</b> (1, 3, 7 o 30 días, o sin vencimiento).',
-        'Podés poner el <b>🧾 N° de factura o boleta</b> (ej. F001-123). Pasa a ser el código del pedido: sale en la etiqueta con su QR pequeño, en la campana, en ✏️ Editar, y lo encuentra el buscador.',
-        'Usá <b>📋 Generar y copiar</b> para copiarlo, o <b>🔑 Generar y compartir</b>: manda por WhatsApp <b>solo el link del formulario</b> (con tu mensaje), y si hay documento adjunto va en un bloque aparte rotulado.',
-        'Cada link es de <b>un solo uso</b>: se bloquea después de abrirse una vez, por seguridad.'
+        'En <b>Este link</b> eliges qué envíos y qué días ve ese cliente. Si dejas <b>un solo</b> envío, no tendrá que elegir: empieza directo en sus datos.',
+        'Puedes cargar <b>Monto</b> y <b>Adelanto</b>: viajan con el pedido (el cliente NO los ve) y al crearse aparece la <b>Deuda</b> = monto − adelanto.',
+        'Puedes poner el <b>🧾 N° de factura o boleta</b> (ej. F001-123). Pasa a ser el código del pedido: sale en la etiqueta con su QR pequeño, en el WhatsApp del cliente, en la campana, en ✏️ Editar, y lo encuentra el buscador.',
+        'Puedes adjuntar un <b>🔗 link</b> (Drive, Mega, etc.) y ponerle <b>vencimiento</b> (1, 3, 7 o 30 días, o sin vencimiento).',
+        'Usa <b>📋 Generar y copiar</b> o <b>🔑 Generar y compartir</b> (manda por WhatsApp solo el link del formulario, con tu mensaje).'
       ],
       faq: [
-        {q:'¿Por qué se bloquea tras un uso?', a:'Por seguridad: evita que el mismo link circule y lo usen personas no deseadas. Si necesitás otro, generá uno nuevo — toma un segundo.'},
-        {q:'¿Qué pasa si le pongo vencimiento?', a:'El link deja de funcionar al cumplirse el plazo (por ejemplo 7 días), aunque nadie lo haya usado.'},
-        {q:'¿El teléfono es obligatorio?', a:'No, es opcional. Solo sirve para precargarlo en el formulario del cliente.'}
+        {q:'¿Cuándo se bloquea un link?', a:'Cuando el cliente <b>confirma su pedido</b> con él (un solo pedido por link). Abrirlo sin confirmar no lo gasta. Si necesitas otro, genera uno nuevo.'},
+        {q:'¿Qué pasa si le pongo vencimiento?', a:'El link deja de funcionar al cumplirse el plazo, aunque nadie lo haya usado.'},
+        {q:'¿El teléfono es obligatorio?', a:'No. Sirve para precargarlo y, si coincide con el que escribe el cliente, para recordar su dirección de delivery.'}
       ],
       tips: [
-        'En la lista de "Links generados" ves los que creaste: cuáles ya se usaron y cuáles siguen disponibles.'
+        'En «Links generados» se cargan los que están por usar y los usados desde ayer; los más antiguos, solo cuando los pides (así no se gastan lecturas).'
       ]
     },
 
@@ -270,6 +260,7 @@
     respaldo: {
       titulo: 'Respaldo completo',
       icono: '🛡️',
+      toby: 'Haz un respaldo <b>antes</b> de importar Excel o de un cambio grande: si algo sale mal, vuelves exacto a como estabas.',
       pasos: [
         'Crear respaldo: descarga un archivo .json con <b>TODO</b> el sistema (pedidos, tracking, config, couriers, días, notas).',
         'Guarda ese archivo en un lugar seguro (tu PC, Drive, etc.).',
@@ -323,23 +314,26 @@
     },
 
     shalomConfig: {
-      titulo: 'Rastreo Shalom (Configuración)',
+      titulo: 'Configuración Shalom',
       icono: '🚚',
-      actualizado: '2026-09-13',
+      actualizado: '2026-10-30',
+      toby: 'Todo lo de esta sección pide tu <b>clave para cambiar estado</b> 🔒: así nadie apaga el seguimiento por un toque sin querer.',
       pasos: [
-        '<b>Mostrar en el link del cliente</b>: decides si el cliente ve el estado de Shalom en su seguimiento. Apagado = solo tú lo ves en el panel.',
-        '<b>🔌 Verificar sesión de Shalom Pro</b>: comprobará que la conexión con Shalom sigue viva, sin tocar ningún pedido ni gastar envíos. Hoy avisa "en reconstrucción".',
-        '<b>🏢 Agencias Olva / Agencias Shalom</b>: descargan el catálogo completo de agencias para que el buscador del formulario funcione sin gastar API en cada búsqueda.'
+        '<b>🚪 Puerta a Shalom</b> 🔒: el interruptor maestro. Apagada, nada consulta a Shalom (ni el botón ⟳). Debajo ves su <b>estado real</b>: puede pausarse sola tras varios fallos de Shalom aunque la tengas encendida.',
+        '<b>🕐 Seguimiento automático</b> 🔒: consulta tus guías vivas desde el servidor en los <b>Horarios</b> elegidos (en punto o y media). Funciona con el panel cerrado.',
+        '<b>Mover etiquetas</b> 🔒: Apagado (solo registra) · Semiautomática (todo menos FINALIZADO) · Automática (mueve todo).',
+        '<b>▶️ Correr ahora</b>: una vuelta del seguimiento sin esperar al horario. Debajo, la <b>Última corrida</b>.',
+        '<b>📱 Mostrar en el link del cliente</b> 🔒: si el cliente ve el estado de Shalom en su seguimiento.',
+        '<b>Shalom Pro</b>: una línea con el estado de la cuenta; si no hay sesión, aparecen correo, contraseña y <b>Conectar</b>.',
+        '<b>🏢 Agencia de origen</b>: desde dónde despachas (una sola para todo el negocio).'
       ],
       faq: [
-        {q:'¿Por qué la etiqueta del pedido no cambia sola?', a:'Porque ya no cambia sola, a propósito. El estado de Shalom se muestra, pero la etiqueta del pedido la mueves tú. Antes había un cambio automático y movía pedidos por su cuenta; se retiró.'},
-        {q:'¿El cliente ve el estado de Shalom?', a:'Solo si activas "Mostrar en el link del cliente". Por defecto está apagado — solo tú lo ves en el panel.'},
-        {q:'¿Dónde quedó el motor de rastreo y "Sincronizar ahora"?', a:'Se retiraron con el rastreo viejo, que leía la página pública de Shalom. La integración nueva se está rehaciendo endpoint por endpoint; mientras tanto los botones avisan "en reconstrucción".'},
-        {q:'¿Por qué todo lo de Shalom dice "en reconstrucción"?', a:'La integración se está rehaciendo desde cero, endpoint por endpoint, con la clave nueva. Lo que ya estaba guardado —guías, estados, el catálogo de agencias y el link del cliente— se sigue viendo con normalidad.'}
+        {q:'¿Por qué no cambió la etiqueta sola?', a:'Mira <b>Mover etiquetas</b>: en Semiautomática FINALIZADO lo pones tú, y en Apagado no se mueve nada.'},
+        {q:'¿El cliente ve el estado de Shalom?', a:'Solo con <b>📱 Mostrar en el link del cliente</b> encendido.'},
+        {q:'¿Qué significa «pausada»?', a:'Shalom falló varias veces seguidas y la puerta se cerró sola un rato para no gastar de más. Se reabre sola.'}
       ],
       tips: [
-        'Si un pedido no actualiza su estado, primero revisa que el número de guía y el código sean los del ticket: la mayoría de las consultas fallidas son un dígito cambiado.',
-        'El botón ⟳ de cada tarjeta consultará esa guía contra la API de Shalom. Hoy avisa "en reconstrucción": los estados que ya tenías guardados se siguen viendo.'
+        'Si una guía no actualiza, revisa que guía y código sean los del ticket: la mayoría de fallos es un dígito cambiado.'
       ]
     },
 
@@ -352,6 +346,7 @@
     registroShalom: {
       titulo: 'Registrar el envío en Shalom',
       icono: '🚚',
+      toby: 'Dicta la <b>🔑 clave de recojo</b> a tu cliente: sin ella, la agencia no le entrega el paquete.',
       actualizado: '2026-10-03',
       pasos: [
         '<b>🔑 Clave de recojo</b>: los 4 dígitos que tu cliente necesita para retirar el paquete en la agencia. Se genera sola al abrir un pedido nuevo de Shalom y se le manda a Shalom al registrar el envío. <b>Díctasela al cliente</b> — sin ella no se lo entregan.',
@@ -459,6 +454,13 @@
     var sheet = document.getElementById('ayudaSheet');
 
     var html = '';
+    /* ★ TOBY (30/10/2026): saluda con el nombre del negocio y dice el
+       consejo clave de ESTA sección. Sin lecturas: S ya está en memoria. */
+    if(window.Toby){
+      var neg=''; try{ neg = (typeof S!=='undefined' && S && S.config && S.config.name) || ''; }catch(e){}
+      var dice = doc.toby || (doc.tips && doc.tips[0]) || 'Aquí tienes cómo funciona esta sección.';
+      html += window.Toby.globo('¡Hola'+(neg?', '+_esc(neg):'')+'! 👋 '+_fmt(dice), 'Guía del panel');
+    }
     html += '<div class="ay-title">'+_esc(doc.icono||'📖')+' '+_esc(doc.titulo)+'</div>';
     html += '<div class="ay-sub">Guía del módulo · actualizado '+_esc(doc.actualizado||ACTUALIZADO)+'</div>';
 

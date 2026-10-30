@@ -696,14 +696,6 @@ function _ayudaFormCss(){
    +'body.tt-ayuda-on #tt-narr{display:none!important}'
    +'#ayudaFormOv .ay-sheet{background:#0d1117;border:1px solid #30363d;border-radius:18px 18px 0 0;width:100%;max-width:520px;max-height:88vh;overflow-y:auto;padding:18px 18px 20px;box-shadow:0 -10px 40px rgba(0,0,0,.5);animation:ayIn .28s ease}'
    +'@keyframes ayIn{from{transform:translateY(24px);opacity:0}to{transform:none;opacity:1}}'
-   +'#ayudaFormOv .tb{display:flex;align-items:flex-end;gap:10px;margin-bottom:14px}'
-   +'#ayudaFormOv .tb-av{position:relative;flex:0 0 auto;width:74px;height:72px;filter:drop-shadow(0 6px 10px rgba(0,0,0,.4))}'
-   +'#ayudaFormOv .tb-av img{width:100%;height:100%;object-fit:contain;object-position:bottom;-webkit-mask-image:linear-gradient(to bottom,#000 80%,transparent);mask-image:linear-gradient(to bottom,#000 80%,transparent);animation:ttbobA 3.6s ease-in-out infinite}'
-   +'@keyframes ttbobA{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}'
-   +'#ayudaFormOv .tb-tag{position:absolute;left:0;bottom:-2px;background:#2dd4bf;color:#04122c;font-size:8px;font-weight:800;padding:1px 4px;border-radius:5px}'
-   +'#ayudaFormOv .tb-bub{position:relative;flex:1;min-width:0;background:#12203d;color:#eaf1ff;border:1px solid #2b3f66;border-radius:14px;padding:11px 14px 12px;font-size:13.5px;line-height:1.45}'
-   +'#ayudaFormOv .tb-bub:after{content:"";position:absolute;left:-7px;bottom:16px;border:7px solid transparent;border-right-color:#12203d;border-left:0}'
-   +'#ayudaFormOv .tb-who{font-size:10px;letter-spacing:.05em;text-transform:uppercase;color:#2dd4bf;font-weight:700;margin-bottom:3px}'
    +'#ayudaFormOv .ay-ttl{font-size:11px;font-weight:800;letter-spacing:.8px;color:#a78bfa;margin:14px 0 6px;text-transform:uppercase}'
    +'#ayudaFormOv .ay-paso{display:flex;gap:10px;padding:10px;border-radius:12px;border:1px solid transparent;margin-bottom:4px}'
    +'#ayudaFormOv .ay-paso.on{background:rgba(45,212,191,.08);border-color:rgba(45,212,191,.45)}'
@@ -724,7 +716,7 @@ function _ayudaFormCss(){
    +'#ayudaFormOv .ay-btns a,#ayudaFormOv .ay-btns button{flex:1;padding:12px;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;text-align:center;text-decoration:none}'
    +'#ayudaFormOv .ay-wa{background:rgba(30,185,84,.12);border:1px solid rgba(30,185,84,.45);color:#1eb954}'
    +'#ayudaFormOv .ay-x{background:#1c2333;border:1px solid #30363d;color:#c9d1d9}'
-   +'@media(prefers-reduced-motion:reduce){#ayudaFormOv .ay-sheet,#ayudaFormOv .tb-av img{animation:none}}';
+   +'@media(prefers-reduced-motion:reduce){#ayudaFormOv .ay-sheet{animation:none}}';
   document.head.appendChild(st);
 }
 /* Lo que dice Toby y los pasos, según el estado. PURA: se prueba sola. */
@@ -766,11 +758,20 @@ function _ayudaFormContenido(e){
   if(retiro && e.tiendaDir) faq.splice(1,0,{q:'¿Dónde recojo mi pedido?', a:'En nuestra tienda: '+esc(e.tiendaDir)+'. Te avisamos cuando esté listo. Trae tu DNI.'});
   return {toby:toby, pasos:pasos, faq:faq};
 }
-function cerrarAyudaForm(){
-  var ov=document.getElementById('ayudaFormOv'); if(ov) ov.style.display='none';
-  document.body.classList.remove('tt-ayuda-on');
+/* Toby (narrador/toby.js, compartido con el seguimiento y el panel). Sin el
+   script —falla de red— queda el texto en una nota. `texto` ya escapado. */
+function _toby(texto, rol){
+  return window.Toby ? Toby.globo(texto, rol) : '<div class="ay-d" style="margin-bottom:12px">'+texto+'</div>';
 }
-function abrirAyudaForm(){
+/* El primer nombre, escapado, para saludar («¡Hola, Jarlyn!»). */
+function _holaNombre(n){
+  var p=String(n||'').trim().split(/\s+/)[0]||'';
+  if(!p) return '';
+  p=p.charAt(0).toUpperCase()+p.slice(1).toLowerCase();
+  return '¡Hola, '+esc(p)+'! ';
+}
+/* La hoja de ayuda: UNA para el formulario y el seguimiento. */
+function _ayudaHoja(){
   _ayudaFormCss();
   let ov = document.getElementById('ayudaFormOv');
   if(!ov){
@@ -782,6 +783,19 @@ function abrirAyudaForm(){
     document.addEventListener('keydown', e=>{ if(e.key==='Escape' && ov.style.display!=='none') cerrarAyudaForm(); });
     document.body.appendChild(ov);
   }
+  return ov;
+}
+function _ayudaWa(texto){
+  let bizPhone = String((CFG&&(CFG.config&&CFG.config.phone||CFG.phone))||'').replace(/\D/g,'');
+  if(bizPhone.startsWith('51') && bizPhone.length>9) bizPhone = bizPhone.slice(2);
+  return bizPhone ? `https://wa.me/51${bizPhone}?text=${encodeURIComponent(texto)}` : '';
+}
+function cerrarAyudaForm(){
+  var ov=document.getElementById('ayudaFormOv'); if(ov) ov.style.display='none';
+  document.body.classList.remove('tt-ayuda-on');
+}
+function abrirAyudaForm(){
+  const ov = _ayudaHoja();
   const seq = (typeof wzSeq==='function') ? wzSeq() : [1,2,3,4];
   const c = _ayudaFormContenido({
     tipo: selCourierType, paso: _wzStep, confirmado: !!window._ttFrozen, unico: !!_wzUnico,
@@ -789,14 +803,9 @@ function abrirAyudaForm(){
     tiendaDir: String(((CFG && (CFG.config||CFG)) || {}).city || '').trim()
   });
   const actual = seq.indexOf(_wzStep);
-  let bizPhone = String((CFG&&(CFG.config&&CFG.config.phone||CFG.phone))||'').replace(/\D/g,'');
-  if(bizPhone.startsWith('51') && bizPhone.length>9) bizPhone = bizPhone.slice(2);
-  const wa = bizPhone ? `https://wa.me/51${bizPhone}?text=${encodeURIComponent('Hola, necesito ayuda con mi pedido')}` : '';
+  const wa = _ayudaWa('Hola, necesito ayuda con mi pedido');
   ov.innerHTML = `<div class="ay-sheet">
-    <div class="tb">
-      <div class="tb-av"><img src="narrador/toby.webp?v=1" alt="" onerror="this.parentNode.style.display='none'"><span class="tb-tag">TOBY</span></div>
-      <div class="tb-bub"><div class="tb-who">Toby · Guía de pedidos</div>${c.toby}</div>
-    </div>
+    ${_toby((window._ttFrozen ? '' : _holaNombre(($('f_name')||{value:''}).value)) + c.toby, 'Guía de pedidos')}
     <div class="ay-ttl">Tu pedido en ${c.pasos.length} pasos</div>
     ${c.pasos.map((p,i)=>{
       const est = window._ttFrozen ? 'ok' : (i===actual ? 'on' : (i<actual ? 'ok' : ''));
@@ -823,7 +832,7 @@ function abrirAyudaForm(){
    ⚠️ LA CLAVE DE RECOJO NO SE MENCIONA NUNCA: es secreta, no viaja al link
    (functions/pedidoPublico.js) y no se comparte por aquí.
    Lógica pura (sin DOM): devuelve {estados, faq} con texto YA escapado. */
-function _ayudaTrackContenido(tipo, esShalom, tiendaDir){
+function _ayudaTrackContenido(tipo, esShalom, tiendaDir, estado, nombre){
   const dir = esc(tiendaDir||'');
   const enTienda = dir ? ' en <b>'+dir+'</b>' : '';
   const T = {
@@ -846,20 +855,29 @@ function _ayudaTrackContenido(tipo, esShalom, tiendaDir){
       pago:'Pagas al recoger en tienda.'},
   };
   const t = T[tipo] || T.delivery;
+  // k: los estados del panel que caen en cada fila (para marcar «ESTÁS AQUÍ»).
   const estados = [
-    {ico:'🆕', t:'NUEVO PEDIDO · EN PROCESO', d:'Recibimos tu pedido y lo estamos revisando.'},
+    {ico:'🆕', t:'NUEVO PEDIDO · EN PROCESO', d:'Recibimos tu pedido y lo estamos revisando.', k:['NUEVO PEDIDO','EN PROCESO']},
     tipo==='retiro'
-      ? {ico:'📦', t:'POR ALISTAR', d:'Estamos preparando tu pedido.'}
-      : {ico:'📦', t:'POR ALISTAR · ALISTADO', d:'Estamos empacando tu pedido.'},
+      ? {ico:'📦', t:'POR ALISTAR', d:'Estamos preparando tu pedido.', k:['POR ALISTAR']}
+      : {ico:'📦', t:'POR ALISTAR · ALISTADO', d:'Estamos empacando tu pedido.', k:['POR ALISTAR','ALISTADO']},
   ];
   if(tipo==='retiro'){
-    estados.push({ico:'✅', t:'ALISTADO', d:t.envio});
+    estados.push({ico:'✅', t:'ALISTADO', d:t.envio, k:['ALISTADO','ENVIADO','LLEGÓ A DESTINO']});
   } else {
-    estados.push({ico:'🚚', t:'ENVIADO', d:t.envio});
-    estados.push({ico:'📍', t:'LLEGÓ A DESTINO', d:t.destino});
+    estados.push({ico:'🚚', t:'ENVIADO', d:t.envio, k:['ENVIADO']});
+    estados.push({ico:'📍', t:'LLEGÓ A DESTINO', d:t.destino, k:['LLEGÓ A DESTINO']});
   }
-  estados.push({ico:'💰', t:'PENDIENTE DE PAGO', d:t.pago});
-  estados.push({ico:'🏁', t:'FINALIZADO', d:'Entregado. ¡Gracias por tu compra!'});
+  estados.push({ico:'💰', t:'PENDIENTE DE PAGO', d:t.pago, k:['PENDIENTE DE PAGO']});
+  estados.push({ico:'🏁', t:'FINALIZADO', d:'Entregado. ¡Gracias por tu compra!', k:['FINALIZADO','ENTREGADO']});
+  /* ★ TOBY habla del estado REAL de este pedido (30/10/2026): lo mismo que
+     dice su fila, con el saludo. Una sola verdad: la fila y Toby salen del
+     mismo texto. Nunca la clave de recojo. */
+  const actual = estados.findIndex(e => e.k.indexOf(String(estado||'').toUpperCase()) >= 0);
+  const hola = nombre ? _holaNombre(nombre) : '';
+  const toby = actual >= 0
+    ? hola + 'Tu pedido: <b>' + esc(String(estado).toUpperCase()) + '</b>. ' + estados[actual].d
+    : hola + 'Aquí ves qué significa cada estado de tu pedido.';
 
   const faq = [];
   if(esShalom){
@@ -878,30 +896,32 @@ function _ayudaTrackContenido(tipo, esShalom, tiendaDir){
   faq.push({q:'«Presiona para ver tu documento»', a:'Es tu boleta o factura (si se adjuntó).'});
   faq.push({q:'¿Por qué mi DNI sale con asteriscos?', a:'Por tu seguridad: este enlace se puede reenviar, así que no mostramos el número completo.'});
   faq.push({q:'Tengo una consulta', a:'Usa el botón verde «Consultar por WhatsApp» para escribirnos directamente.'});
-  return {estados, faq};
+  return {estados, faq, actual, toby};
 }
 
 function abrirAyudaTrack(){
-  let ov = document.getElementById('ayudaFormOv');
-  if(!ov){
-    ov = document.createElement('div');
-    ov.id = 'ayudaFormOv';
-    ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:99999;display:flex;align-items:flex-end;justify-content:center';
-    ov.addEventListener('click', e=>{ if(e.target===ov) ov.style.display='none'; });
-    document.body.appendChild(ov);
-  }
-  ov.style.display = 'flex';
+  const ov = _ayudaHoja();
   const cc = (CFG && (CFG.config || CFG)) || {};
-  const {estados, faq} = _ayudaTrackContenido(window._trackTipo||'', !!window._trackEsShalom,
-    String(cc.city||'').trim());
-  ov.innerHTML = `<div style="background:#0d1117;border:1px solid #30363d;border-radius:18px 18px 0 0;width:100%;max-width:520px;max-height:85vh;overflow-y:auto;padding:20px">
-    <div style="font-weight:800;font-size:18px;margin-bottom:4px;color:#e6edf3">📖 ¿Cómo sigo mi pedido?</div>
-    <div style="font-size:11px;color:#8b949e;margin-bottom:14px">Qué significa cada estado</div>
-    ${estados.map(e=>`<div style="display:flex;gap:12px;padding:10px 0;border-bottom:1px solid rgba(255,255,255,.05)"><div style="font-size:22px;flex-shrink:0">${e.ico}</div><div><div style="font-size:14px;color:#e6edf3;font-weight:700;margin-bottom:2px">${e.t}</div><div style="font-size:12px;color:#8b949e;line-height:1.5">${e.d}</div></div></div>`).join('')}
-    <div style="font-size:11px;font-weight:800;letter-spacing:.8px;color:#a78bfa;margin:16px 0 8px;text-transform:uppercase">Preguntas frecuentes</div>
-    ${faq.map(f=>`<div style="padding:8px 0;border-bottom:1px solid rgba(255,255,255,.05)"><div style="font-size:13px;color:#e6edf3;font-weight:700;margin-bottom:3px">${f.q}</div><div style="font-size:12px;color:#8b949e;line-height:1.5">${f.a}</div></div>`).join('')}
-    <button onclick="document.getElementById('ayudaFormOv').style.display='none'" style="width:100%;margin-top:18px;padding:12px;background:#1c2333;border:1px solid #30363d;border-radius:9px;color:#8b949e;font-size:13px;cursor:pointer;font-family:inherit">Cerrar</button>
+  const c = _ayudaTrackContenido(window._trackTipo||'', !!window._trackEsShalom,
+    String(cc.city||'').trim(), window._trackEstado||'', window._trackNombre||'');
+  const wa = _ayudaWa('Hola, tengo una consulta sobre mi pedido');
+  ov.innerHTML = `<div class="ay-sheet">
+    ${_toby(c.toby, 'Guía de seguimiento')}
+    <div class="ay-ttl">Qué significa cada estado</div>
+    ${c.estados.map((e,i)=>{
+      const est = c.actual<0 ? '' : (i===c.actual ? 'on' : (i<c.actual ? 'ok' : ''));
+      return `<div class="ay-paso ${est}"><div class="ay-n">${est==='ok'?'✓':e.ico}</div><div><div class="ay-t">${e.t}${est==='on'?'<span class="ay-aqui">ESTÁS AQUÍ</span>':''}</div><div class="ay-d">${e.d}</div></div></div>`;
+    }).join('')}
+    <div class="ay-ttl">Preguntas frecuentes</div>
+    ${c.faq.map(f=>`<details><summary>${f.q}</summary><p>${f.a}</p></details>`).join('')}
+    <div class="ay-btns">
+      ${wa?`<a class="ay-wa" href="${esc(wa)}" target="_blank" rel="noopener">💬 Escríbenos</a>`:''}
+      <button class="ay-x" onclick="cerrarAyudaForm()">Entendido</button>
+    </div>
   </div>`;
+  ov.style.display = 'flex';
+  document.body.classList.add('tt-ayuda-on');
+  try{ ov.querySelector('.ay-x').focus({preventScroll:true}); }catch(_){}
 }
 function _courierLabel(name, type){
   const u=(name||'').toUpperCase();
@@ -2806,6 +2826,8 @@ function renderTrackResult(ship, code){
   // La ayuda «¿Cómo sigo mi pedido?» habla del tipo de envío de ESTE pedido.
   window._trackTipo = narr.tipo;
   window._trackEsShalom = narr.esShalom;
+  window._trackEstado = ship.status||'';
+  window._trackNombre = ship.name||'';
 
   const dateLabel = ship.date
     ? new Date(ship.date+'T12:00:00').toLocaleDateString('es-PE',{weekday:'short',year:'numeric',month:'short',day:'numeric'})
@@ -4118,5 +4140,6 @@ if(new URLSearchParams(location.search).has('seg')) document.write('<script src=
 </script>
 <script defer src="narrador/etiqueta.js?v=11"></script>
 <script defer src="narrador/narrador.js?v=5"></script>
+<script defer src="narrador/toby.js?v=1"></script>
 </body>
 </html>
