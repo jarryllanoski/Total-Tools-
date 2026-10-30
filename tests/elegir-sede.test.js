@@ -92,7 +92,7 @@ module.exports = async ({bloque, ok}) => {
 
   {
     ok(!/ag-mapa-ley/.test(form) && !/ag-dot-a/.test(form), 'sin leyenda en el mapa (pines y punto se entienden solos)');
-    const f = form.slice(form.indexOf('function _agUbicFallo('), form.indexOf('function agIrALupa('));
+    const f = form.slice(form.indexOf('function _ubicMensaje('), form.indexOf('function agIrALupa('));
     ok(/Activa tu ubicación manualmente/.test(f) && /onclick="agIrALupa\(\)"/.test(f),
        'el mensaje dice cómo activarla a mano O lleva a la lupa');
     const u = form.slice(form.indexOf('async function agUbicarme('), form.indexOf('function agCerca('));
@@ -135,19 +135,19 @@ module.exports = async ({bloque, ok}) => {
     ok(/const recogida = !!el && !_agListaAbierta;/.test(form) && /class="ag-cambiar" onclick="agCambiar\(/.test(form),
        'tras elegir queda «✓ Tu sede» y «Cambiar sede»');
     ok(/_agElegidaK = AgLista\.clave\(ag\);\n  _agListaAbierta = false;/.test(form), 'elegir siempre la recoge');
-    const c = form.slice(form.indexOf('function _agContinuar('), form.indexOf('function _agGuiarEleccion('));
-    ok(/'Continuar con esta sede →' : 'Elige una sede para continuar'/.test(c) && /wz-apagado/.test(c),
-       'Continuar: apagado sin sede, «Continuar con esta sede →» con sede');
-    ok(/if\(!aplica\)\{ b\.textContent='Continuar →';/.test(c), 'delivery y Olva manual: el Continuar de siempre');
+    const c = form.slice(form.indexOf('function _paso3Continuar('), form.indexOf('function _agGuiarEleccion('));
+    ok(/'Continuar con esta sede →' : 'Continuar con esta dirección →'/.test(c) && /'Elige una sede para continuar' : 'Escribe tu dirección para continuar'/.test(c) && /wz-apagado/.test(c),
+       'Continuar dice el estado: sede o dirección (apagado sin ella)');
+    ok(/if\(!sede && !dlv\)\{ b\.textContent='Continuar →';/.test(c), 'otra agencia y Olva manual: el Continuar de siempre');
     ok(/if\(\$\('shalomDrop'\)\) _agGuiarEleccion\(\); else/.test(form), 'sin sede: guía a los dos caminos, no error rojo');
   }
 
   bloque('Ubicación: un mensaje por causa, el toque se nota y se ubica sola al arreglarlo');
 
   {
-    const i = form.indexOf('function _agCasoDe(');
+    const i = form.indexOf('function _ubicCasoDe(');
     const ctx = vm.createContext({});
-    vm.runInContext(form.slice(i, form.indexOf('function _agUbicFallo(', i)) + ';this.C=_agCasoDe;', ctx);
+    vm.runInContext(form.slice(i, form.indexOf('function _ubicTrasFallo(', i)) + ';this.C=_ubicCasoDe;', ctx);
     const C = ctx.C;
     ok(C('denegado', 'denied') === 'sitio', 'sitio bloqueado en el navegador → «Activa tu ubicación manualmente»');
     ok(C('fallo', 'granted') === 'gps' && C('denegado', 'granted') === 'gps', '⚠️ permiso dado sin posición → «Enciende la ubicación de tu celular»');
@@ -157,29 +157,35 @@ module.exports = async ({bloque, ok}) => {
     const u = form.slice(form.indexOf('async function agUbicarme('), form.indexOf('function agCerca('));
     ok(/Math\.max\(0, 700-\(Date\.now\(\)-t0\)\)/.test(u), '«Buscando…» se ve al menos 0,7 s: el toque se nota');
     ok(/_agUbicFallo\(codigo, estado\)/.test(u) && /_agPermiso\(\)\.then/.test(u), 'el mensaje sale de la causa real');
-    ok(/st\.state==='granted' && _agFallosUbic>0 && _agUbicKey && \$\('agUbicCaja'\)\) agUbicarme\(_agUbicKey\)/.test(form),
-       'si lo permite desde el 🔒, se ubica sola');
-    ok(/_agCaso!=='gps'[\s\S]{0,120}agUbicarme\(_agUbicKey\);/.test(form) && /_agReintentoVuelta=\(caso==='gps'\)/.test(form),
+    ok(/st\.state==='granted' && _ubicReintento\)\{ var f=_ubicReintento; _ubicReintento=null; f\(\); \}/.test(form),
+       'si lo permite desde el 🔒, se ubica sola (sedes o delivery: el flujo que falló)');
+    ok(/!_ubicReintentoGps \|\| !_ubicReintento\) return;/.test(form) && /_ubicReintentoGps = \(caso==='gps'\);/.test(form),
        'si enciende el GPS y vuelve a la página, se reintenta UNA vez sola');
+    ok(/_ubicTrasFallo\(caso, function\(\)\{ if\(_agUbicKey && \$\('agUbicCaja'\)\) agUbicarme\(_agUbicKey\); \}\);/.test(form),
+       'sedes: reintenta la sede');
   }
 
   bloque('Botón nativo <geolocation> (Chrome 144+) con el de siempre como respaldo');
 
   {
-    const t = form.slice(form.indexOf('<geolocation id="agGeoNativo"'), form.indexOf('</geolocation>') + 14);
+    const g0 = form.indexOf('<geolocation id="agGeoNativo"');
+    const t = form.slice(g0, form.indexOf('</geolocation>', g0) + 14);
     ok(/id="shalomCercaBtn"/.test(t), 'el botón de siempre va DENTRO: donde no hay nativo, el navegador lo muestra');
     ok(/\.ag-geo\{display:block;width:100%;padding:16px 0;/.test(form),
        '⚠️ ancho 100% con relleno lateral 0: Chrome añade el suyo e ignora box-sizing; si se sale, lo declara inválido');
-    const n = form.slice(form.indexOf('function _agGeoNativo('), form.indexOf('function _agGeoNativo(') + 3200);
+    const n = form.slice(form.indexOf('function _ubicNativo('), form.indexOf('/* ── Sedes: el fallo'));
     ok(/'HTMLGeolocationElement' in window/.test(n), 'detección de soporte');
-    ok(/if\(g\.isValid===false\)\{ agUbicarme\(key\); return; \}/.test(n), 'si Chrome lo da por inválido, el toque pide por el camino de siempre');
-    ok(/addEventListener\('location'/.test(n) && /_agUbicExito\(key, g\.position, \{\}\)/.test(n) && /_agUbicError\(codigo, estado\)/.test(n),
-       'posición y error entran a la MISMA tubería que el botón de siempre');
+    ok(/if\(g\.isValid===false\)\{ h\.invalido\(\); return; \}/.test(n), 'si Chrome lo da por inválido, el toque pide por el camino de siempre');
+    ok(/addEventListener\('location'/.test(n) && /h\.exito\(g\.position\)/.test(n) && /falla\(c, e\)/.test(n),
+       'posición y error salen a quien lo conectó');
     ok(/addEventListener\('promptdismiss'/.test(n), 'cerrar el aviso tiene su mensaje');
-    ok(/setTimeout\(function\(\)\{\n      if\(mio!==_cercaToken\) return;[\s\S]{0,140}\}, 15000\);/.test(n),
+    ok(/vigia=setTimeout\(function\(\)\{\n      if\(!h\.vigente\(\)\) return;[\s\S]{0,140}\}, 15000\);/.test(n),
        'vigía de 15 s: nunca se queda en «Buscando…» para siempre');
+    const a = form.slice(form.indexOf('function _agGeoNativo('), form.indexOf('function agCerca('));
+    ok(/invalido: function\(\)\{ agUbicarme\(key\); \}/.test(a) && /exito:    function\(pos\)\{ _agUbicExito\(key, pos, \{\}\); \}/.test(a),
+       'sedes: conectado a la MISMA tubería que el botón de siempre');
     ok(/_agGeoNativo\(agKey\);/.test(form), 'se conecta al pintar el paso');
-    ok(/sitio:     _agNativo\n      \? '<b>📍 Toca «Usar ubicación» y elige Permitir<\/b>/.test(form),
+    ok(/sitio:     nativo\n      \? '<b>📍 Toca «Usar ubicación» y elige Permitir<\/b>/.test(form),
        'bloqueado + nativo: «Toca Usar ubicación y elige Permitir» (Chrome deja recuperarlo)');
   }
 
