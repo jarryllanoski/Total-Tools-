@@ -809,7 +809,7 @@ function _ayudaFormContenido(e){
   var tipo=e.tipo||'', paso=e.paso||1, retiro=tipo==='retiro';
   var dest={
     agencia: e.mapa
-      ? 'Toca <b>Usar mi ubicación</b> para ver las sedes más cerca, o toca un <b>pin rojo</b> en el mapa. La sede elegida sube arriba con ✓. También puedes buscar tu provincia o distrito con la 🔍 lupa.'
+      ? 'Toca <b>Usar mi ubicación</b> o busca tu <b>provincia o distrito</b> con la 🔍 lupa. Luego elige tu sede en la lista o tocando su <b>pin rojo</b>: queda marcada con ✓.'
       : 'Escribe tu ciudad o distrito y toca la sede donde recogerás.',
     delivery: 'Escribe tu dirección de entrega o toca <b>📍 Usar mi ubicación</b> para que el motorizado llegue exacto. Agrega una referencia.',
     encomienda: 'Escribe la <b>ciudad de destino</b> y, si la sabes, la agencia.'
@@ -826,7 +826,7 @@ function _ayudaFormContenido(e){
   else if(paso===1) toby='¡Hola! Soy Toby 🐢, tu guía. Pedir toma menos de un minuto: primero elige <b>cómo quieres recibir</b> tu pedido.';
   else if(paso===2) toby='Empieza por el <b>DNI</b> de quien recibe: así su nombre sale exacto, sin errores en la etiqueta.';
   else if(paso===3) toby=({
-    agencia: e.mapa ? 'Toca <b>Usar mi ubicación</b> o un <b>pin rojo</b> en el mapa: te muestro las sedes más cerca de ti.' : 'Escribe tu distrito y elige la sede donde recogerás.',
+    agencia: e.mapa ? 'Toca <b>Usar mi ubicación</b> o busca tu <b>provincia o distrito</b> con la 🔍 lupa: te muestro tus sedes.' : 'Escribe tu distrito y elige la sede donde recogerás.',
     delivery: 'Con <b>📍 Usar mi ubicación</b> el motorizado llega exacto a tu puerta.',
     encomienda: 'Cuéntame a qué <b>ciudad</b> viaja tu pedido.'
   })[tipo] || 'Dime a dónde enviamos tu pedido.';
@@ -1654,7 +1654,7 @@ function renderAgencyBox(courierName){
           <button type="button" onclick="agMiPosicion('${agKey}')">◎ Mi posición</button>
         </div>
       </div>
-      <div id="agMapaAyuda" class="ag-mapa-ayuda" style="display:none">Toca el mapa para ver las sedes cerca de ese punto. Elige un pin o una sede de la lista.</div>
+      <div id="agMapaAyuda" class="ag-mapa-ayuda" style="display:none"></div>
       <!-- La sede elegida tambien queda aqui, en texto: la etiqueta viva y el
            narrador la leen de este span. Se ve en la lista (arriba, con su
            marca), asi que este bloque va oculto. -->
@@ -2796,7 +2796,7 @@ function _haversineKm(la1,lo1,la2,lo2){
    UNA VERDAD: la LISTA (_agCache[key]). Todo lo demás solo decide QUÉ
    lista se ve:
      · «Usar mi ubicación» → las más cercanas a ti;
-     · tocar el mapa       → las más cercanas a ese punto (sin permiso);
+     · tocar el mapa       → nada (sin filtro avisa los dos caminos);
      · escribir            → las que coinciden;
      · tocar un pin        → esa sede, elegida, ARRIBA de la lista.
    Elegir es UNA puerta (_agElegir), venga de un pin o de una fila: dos
@@ -2805,7 +2805,7 @@ function _haversineKm(la1,lo1,la2,lo2){
    lecturas en la nube: catálogo local y distancias en el teléfono. */
 var _cercaToken=0;        // invalida resultados tardíos si el cliente ya escribió
 var _cercaEnCurso=false;  // guard doble-toque
-var _agRef=null;          // {la, lo, tipo:'tu'|'punto'|'sede'} desde dónde se mide
+var _agRef=null;          // {la, lo, tipo:'tu'|'sede'} desde dónde se mide
 var _agElegidaK='';       // clave de la sede elegida (ter_id, o nombre+dirección)
 var _AG_CERCA_N=20;       // cuántas sedes cercanas se listan
 
@@ -3029,13 +3029,17 @@ async function agUbicarme(key, opc){
 // Compatibilidad: el nombre de antes sigue funcionando.
 function agCerca(key){ return agUbicarme(key); }
 
-/* Tocar el mapa en un punto vacío: las sedes cerca de ESE punto. Funciona
-   sin permiso de ubicación — es el camino de quien no la quiere dar. */
-function agPuntoMapa(key, la, lo){
-  _cercaToken++;
-  _agRef={la:la, lo:lo, tipo:'punto'};
-  var inp=$('shalomAgInput'); if(inp) inp.value='';
-  agMostrar(key, AgLista.cercanas(_agTodas(key), la, lo, _AG_CERCA_N), '');
+/* ★ EL MAPA NO FILTRA (30/10/2026). Antes, tocar un punto vacío listaba
+   las sedes de esa zona: un toque sin querer (o en la vista de todo el
+   Perú) mandaba al cliente a otra ciudad. Ahora los filtros salen SOLO de
+   dos caminos: su ubicación o la lupa. Tocar el mapa sin filtro avisa
+   cuáles son, sin mover nada. */
+function _agMapaAviso(){
+  var d=$('agMapaDedos'); if(!d) return;
+  d.textContent='Usa tu ubicación o busca tu provincia o distrito';
+  d.classList.add('on'); clearTimeout(_agMapaAviso._t);
+  _agMapaAviso._t=setTimeout(function(){ d.classList.remove('on'); }, 1800);
+  _agGuiarEleccion();
 }
 function agVerTodos(key){
   try{
@@ -3164,7 +3168,6 @@ function agMostrar(key, agencias, aviso){
   let cab = '';
   if(aviso) cab = '📍 '+esc(aviso);
   else if(!_q && _agRef && _agRef.tipo==='tu') cab = '📍 Sedes más cercanas a ti';
-  else if(!_q && _agRef && _agRef.tipo==='punto') cab = '📍 Sedes cerca del punto que tocaste';
   if(!el && !_q) cab = (cab ? cab+' · ' : '') + '👇 Toca tu sede';
   if(recogida) cab = '✓ Tu sede';
   drop.innerHTML = (cab ? '<div class="ag-lista-cab">'+cab+'</div>' : '') + (recogida ? lista.slice(0,1) : lista).map((ag,i)=>{
@@ -3226,7 +3229,7 @@ function _agGuiarEleccion(){
 
    No cuesta ni una llamada: `latitud` y `longitud` ya venían en el
    catálogo local, cacheado con su versión. */
-var _mapa=null, _mapaMarcas=[], _mapaCarga=null, _miUbic=null, _miPunto=null, _puntoRef=null, _mapaKey='';
+var _mapa=null, _mapaMarcas=[], _mapaCarga=null, _miUbic=null, _miPunto=null, _mapaKey='', _mapaTodas=false;
 
 /** Carga Leaflet UNA vez y solo cuando hace falta (perezoso: quien pide a
     domicilio no llega a este paso). */
@@ -3285,7 +3288,7 @@ async function agMapaPintar(key, agencias, opc){
     ay.style.display='block';
     var dedos=(window.matchMedia && matchMedia('(pointer:coarse)').matches) ? ' Muévelo con dos dedos.' : '';
     ay.textContent = opc.todas
-      ? 'Toca tu zona en el mapa para acercarte y ver sus sedes.'+dedos
+      ? 'Usa tu ubicación o busca tu provincia o distrito para ver tus sedes aquí.'+dedos
       : 'Toca un pin rojo o una sede de la lista para elegirla.'+dedos;
   }
   try{
@@ -3305,6 +3308,7 @@ async function agMapaPintar(key, agencias, opc){
         var _dd=$('agMapaDedos'), _ddT=0;
         _mapa.getContainer().addEventListener('touchmove', function(ev){
           if(!_dd || !ev.touches || ev.touches.length!==1) return;
+          _dd.textContent='Usa dos dedos para mover el mapa';
           _dd.classList.add('on'); clearTimeout(_ddT);
           _ddT=setTimeout(function(){ _dd.classList.remove('on'); }, 1400);
         }, {passive:true});
@@ -3314,8 +3318,8 @@ async function agMapaPintar(key, agencias, opc){
       // …salvo después de hacer clic en el mapa; al salir se apaga.
       _mapa.on('click focus', function(){ try{ _mapa.scrollWheelZoom.enable(); }catch(e){} });
       _mapa.on('mouseout blur', function(){ try{ _mapa.scrollWheelZoom.disable(); }catch(e){} });
-      // Tocar un punto VACÍO: las sedes cerca de ese punto.
-      _mapa.on('click', function(e){ if(e && e.latlng) agPuntoMapa(_mapaKey, e.latlng.lat, e.latlng.lng); });
+      // Tocar el mapa SIN filtro: aviso de los dos caminos, sin mover nada.
+      _mapa.on('click', function(){ if(_mapaTodas) _agMapaAviso(); });
     }
     _mapaKey=key;
     /* ★ PINES TOCABLES SOLO CON FILTRO (30/10/2026). En la vista de todo el
@@ -3323,6 +3327,7 @@ async function agMapaPintar(key, agencias, opc){
        VEN (cobertura); tocar el mapa acerca esa zona y lista sus sedes. Con
        ubicación, búsqueda o zona tocada, los pocos que quedan sí se tocan. */
     var tocables = !opc.todas;
+    _mapaTodas = !!opc.todas;
     _mapaMarcas.forEach(function(x){ try{ _mapa.removeLayer(x.m); }catch(e){} });
     _mapaMarcas=[];
     conGeo.forEach(function(g){
@@ -3349,12 +3354,6 @@ async function agMapaPintar(key, agencias, opc){
           interactive:false
         })
       ]).addTo(_mapa);
-    }
-    // El punto que tocaste, para que se vea desde dónde se midió.
-    if(_puntoRef){ try{ _mapa.removeLayer(_puntoRef); }catch(e){} _puntoRef=null; }
-    if(_agRef && _agRef.tipo==='punto'){
-      _puntoRef=L.circleMarker([_agRef.la,_agRef.lo],{radius:6, color:'#2d7ff9', weight:2,
-        fillColor:'#fff', fillOpacity:1, interactive:false}).addTo(_mapa);
     }
     var elegida=_mapaMarcas.find(function(x){ return x.k===_agElegidaK; });
     if(elegida){

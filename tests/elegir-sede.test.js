@@ -78,8 +78,8 @@ module.exports = async ({bloque, ok}) => {
        'se arrastra con el mouse en PC; en celular con dos dedos (un dedo desplaza la página)');
     ok(/ev\.touches\.length!==1\) return;/.test(form) && /Usa dos dedos para mover el mapa/.test(form),
        'con un dedo sobre el mapa avisa «Usa dos dedos»');
-    ok(/_mapa\.on\('click', function\(e\)\{ if\(e && e\.latlng\) agPuntoMapa\(_mapaKey/.test(form),
-       'tocar un punto vacío lista las sedes cerca de ese punto');
+    ok(!/agPuntoMapa/.test(form) && /_mapa\.on\('click', function\(\)\{ if\(_mapaTodas\) _agMapaAviso\(\); \}\);/.test(form),
+       '⚠️ tocar el mapa NO filtra ni mueve: sin filtro solo avisa «Usa tu ubicación o busca…»');
     ok(/bubblingMouseEvents:false/.test(form), 'tocar un pin NO cuenta como tocar el mapa');
     ok(/m\.on\('click', function\(\)\{ _agElegir\(key, g\.ag\); \}\)/.test(form), 'tocar un pin elige por la misma puerta');
     const ver = form.slice(form.indexOf('function agIniciarAlVer'), form.indexOf('function agIniciarAlVer') + 1200);
