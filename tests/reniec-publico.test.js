@@ -206,7 +206,7 @@ module.exports = async ({bloque, ok}) => {
         form.indexOf('function onDniInput'));
     const campos = {};
     const el = (v) => ({value: v, style: {}, innerHTML: '',
-      classList: {remove: () => {}, add: () => {}}});
+      classList: {remove: () => {}, add: () => {}, toggle: () => {}}});
     campos['f_name'] = el('');
     campos['dniMarca'] = el('');
     campos['err_name'] = el('');
@@ -223,20 +223,20 @@ module.exports = async ({bloque, ok}) => {
     };
 
     const igual = monta('JARLYN LLANOS ARTEAGA', 'JARLYN LLANOS ARTEAGA');
-    ok(/Verificado con tu DNI/.test(igual.innerHTML),
-       'coincide → una MARCA, no un recuadro');
+    ok(/Nombre según tu DNI/.test(igual.innerHTML),
+       'coincide → una MARCA (y el campo se ilumina), no un recuadro');
     ok(igual.innerHTML.indexOf('JARLYN') < 0,
        '⚠️ y la marca NO repite el nombre: esta dos dedos mas arriba, en su ' +
        'campo. Decirlo dos veces es lo que pidio quitar el dueño');
 
     const tildes = monta('JOSÉ  LINO', 'jose lino');
-    ok(/Verificado/.test(tildes.innerHTML),
+    ok(/Nombre según tu DNI/.test(tildes.innerHTML),
        'las tildes, las mayusculas y los dobles espacios no son una ' +
        'discrepancia: un aviso que salta donde no hay problema es el que ' +
        'nadie lee cuando si lo hay');
 
     const distinto = monta('JARLYN LLANOS ARTEAGA', 'Jarlyn');
-    ok(/Tu DNI dice/.test(distinto.innerHTML) &&
+    ok(/(Según tu DNI|Completa tu nombre como en tu DNI)/.test(distinto.innerHTML) &&
        distinto.innerHTML.indexOf('JARLYN LLANOS ARTEAGA') > 0,
        '⚠️ y si NO coincide, ahi si se dice el nombre entero: es el dato ' +
        'que falta en pantalla, y el cliente puede tener razon');
@@ -253,14 +253,15 @@ module.exports = async ({bloque, ok}) => {
   }
   {
     const form = E.leer('formulario.html');
-    ok(/id="f_name"[\s\S]{0,120}oninput="_dniMarca\(\)"/.test(form),
+    ok(/id="f_name"[\s\S]{0,120}oninput="onNombreInput\(this\)"/.test(form) &&
+       /function onNombreInput\(el\)\{[\s\S]{0,500}_dniMarca\(\);/.test(form),
        '⚠️ la marca se repinta al ESCRIBIR en el nombre. Sin esto, corregir ' +
        'el nombre deja un ✅ en pantalla afirmando algo que ya no es cierto');
     const i = form.indexOf('function onDniInput');
     const fn = form.slice(i, i + 3000);
     ok(/_dniOficial=''/.test(fn),
        'y al cambiar el DNI se olvida lo oficial del anterior');
-    ok(/_callar\(\);\s*\n\s*_dniMarca\(\);/.test(fn),
+    ok(/_dniOficial=comp;\s*\n\s*_callar\(\);/.test(fn) && /_dniMarca\(\);\s+\/\/ había un nombre/.test(fn),
        'cuando sale bien, el aviso bajo el DNI se CALLA y habla la marca: ' +
        'el recuadro verde con el nombre dentro ya no existe');
   }
@@ -286,7 +287,7 @@ module.exports = async ({bloque, ok}) => {
     ok(/value\.replace\(\/\\D\/g,''\)!==dni\) return/.test(fn),
        '⚠️ y si el DNI cambio MIENTRAS se consultaba, lo que vuelve se tira: ' +
        'es la respuesta de otro documento');
-    ok(/Escribe tu nombre completo/.test(fn),
+    ok(/escribe tu nombre completo/i.test(fn),
        'si falla, se pide el nombre a mano — jamas se bloquea el pedido');
   }
 };

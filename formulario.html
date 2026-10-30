@@ -36,6 +36,26 @@ body{background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,
 
 /* FIELDS */
 .fg{margin-bottom:14px}
+/* ★ DNI Y NOMBRE (30/10/2026): escanear, aparecer, iluminarse. */
+#f_dni.dni-escanea{background-image:linear-gradient(90deg,transparent,rgba(79,142,247,.28),transparent);background-size:40% 100%;background-repeat:no-repeat;animation:dniEscanea 1s linear infinite}
+@keyframes dniEscanea{from{background-position:-60% 0}to{background-position:160% 0}}
+.dni-buscando{font-size:12.5px;color:var(--blue);font-weight:700}
+.dni-puntos::after{content:'';animation:dniPuntos 1.2s steps(4) infinite}
+@keyframes dniPuntos{0%{content:''}25%{content:'.'}50%{content:'..'}75%{content:'...'}}
+.dni-nada{font-size:12.5px;color:var(--text2)}
+#f_name.nom-ok{border-color:var(--green);padding-right:42px;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M5 12.5l4.5 4.5L19 7.5' fill='none' stroke='%2322c55e' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center;background-size:22px}
+#f_name.nom-brilla{animation:nomBrilla 1s ease}
+@keyframes nomBrilla{0%{box-shadow:0 0 0 0 rgba(34,197,94,.6)}100%{box-shadow:0 0 0 12px rgba(34,197,94,0)}}
+.dni-ok{color:var(--green);font-weight:800;font-size:12.5px}
+.dni-sug{background:rgba(79,142,247,.08);border:1px solid rgba(79,142,247,.35);border-radius:12px;padding:12px;margin-top:8px;animation:ttIn .3s ease}
+.dni-sug-t{font-size:12.5px;color:var(--text2);font-weight:700}
+.dni-sug-n{font-size:16px;font-weight:900;color:var(--text);margin:4px 0 10px;letter-spacing:.02em}
+.dni-sug-si{width:100%;min-height:44px;border:none;border-radius:10px;background:var(--green);color:#04120a;font-weight:800;font-size:14px;font-family:inherit;cursor:pointer}
+.dni-link{background:none;border:none;color:var(--text2);text-decoration:underline;font-size:12px;cursor:pointer;font-family:inherit;padding:8px 0 0;display:block;margin:0 auto}
+.dni-sug-p{font-size:11.5px;color:var(--text2);text-align:center;margin-top:4px}
+.dni-mant{font-size:12px;color:var(--text2)}
+.dni-mant .dni-link{display:inline;padding:0;margin:0;color:var(--blue)}
+@media(prefers-reduced-motion:reduce){#f_dni.dni-escanea,#f_name.nom-brilla,.dni-sug,.dni-puntos::after{animation:none}}
 .fi{width:100%;background:var(--card);border:1.5px solid var(--bd);border-radius:12px;color:var(--text);font-family:inherit;font-size:16px;padding:14px 16px;outline:none;transition:border-color .15s;appearance:none;-webkit-appearance:none}
 .fi:focus{border-color:var(--blue)}
 .fi::placeholder{color:var(--text2)}
@@ -1082,7 +1102,7 @@ function renderForm(){
       </div>
       <div class="fg">
         <input class="fi" id="f_name" type="text" placeholder="Nombre completo *"
-          autocomplete="name" oninput="_dniMarca()">
+          autocomplete="name" oninput="onNombreInput(this)">
         <div class="ferr" id="err_name">Ingresa tu nombre completo</div>
         <!-- ★ LA MARCA, no el recibo. Cuando RENIEC contesta y el nombre ya
              está en el campo de arriba, repetirlo aquí es decir dos veces lo
@@ -1286,108 +1306,159 @@ var _dniTimer=null, _dniPuesto='', _dniOficial='';
    discrepancia donde no hay ninguna — el aviso que se da de mas es el que
    nadie lee cuando de verdad importa. */
 function _nrmNom(x){
-  return String(x||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+  return String(x||'').normalize('NFD').replace(/[̀-ͯ]/g,'')
     .replace(/\s+/g,' ').trim().toUpperCase();
 }
-
-/* ★ LA MARCA DEL NOMBRE — se recalcula, nunca se recuerda.
-   Antes esto era un recuadro verde con el nombre dentro, justo encima del
-   campo que ya tenia ese mismo nombre: el dato dos veces a dos dedos de
-   distancia. Y peor — se pintaba UNA vez, al consultar, asi que si el
-   cliente corregia su nombre despues, el recuadro seguia en pantalla
-   afirmando algo que ya no era cierto. Esa es la misma clase de mentira en
-   pantalla que costo la etiqueta con el DNI de otra persona.
-   Ahora se recalcula tambien al escribir en el nombre, y dice SOLO lo que
-   es verdad en ese momento. */
-function _dniMarca(){
-  var el=$('dniMarca'); if(!el) return;
-  var nom=($('f_name')||{value:''}).value;
-  if(!_dniOficial || !nom.trim()){
-    el.style.display='none'; el.innerHTML=''; return;
-  }
-  el.style.display='block';
-  if(_nrmNom(nom)===_nrmNom(_dniOficial)){
-    // Coincide: una marca, sin repetir el nombre que esta justo arriba.
-    el.innerHTML='<span style="color:var(--green)">✅ Verificado con tu DNI</span>';
-    return;
-  }
-  /* NO coincide: aqui SI se dice el nombre, porque es el dato que falta en
-     pantalla. El cliente puede tener razon —se llama distinto a lo que dice
-     su documento— asi que no se le pisa: se le enseña y se le ofrece. */
-  el.innerHTML='<span style="color:#d29922">⚠️ Tu DNI dice: <b>'+esc(_dniOficial)+
-    '</b></span> <button type="button" onclick="usarNombreDni()" '+
-    'style="background:none;border:none;color:var(--blue);font-weight:700;'+
-    'font-size:11.5px;cursor:pointer;font-family:inherit;padding:2px 4px;'+
-    'min-height:32px">usar este</button>';
+/* ¿Lo escrito es una versión corta del nombre oficial? («Jarlyn Llanos»
+   frente a «JARLYN LLANOS ARTEAGA»): todas sus palabras están en el DNI. */
+function _nomParecido(escrito, oficial){
+  var a=_nrmNom(escrito).split(' ').filter(Boolean), b=_nrmNom(oficial).split(' ');
+  return a.length>0 && a.every(function(p){ return b.indexOf(p)>=0; });
 }
-
-function usarNombreDni(){
-  if(!_dniOficial) return;
-  var nm=$('f_name'); if(!nm) return;
-  nm.value=_dniOficial; _dniPuesto=_dniOficial;
-  var e=$('err_name'); if(e) e.classList.remove('show');
-  nm.classList.remove('err');
+/* ★ EL NOMBRE EMPIEZA CON LETRA (30/10/2026). Números o símbolos AL INICIO
+   se quitan mientras escribe (o al pegar «123Juan» → «Juan»); después de la
+   primera letra se permite lo demás. Para seguir: al menos 2 letras. */
+var _NOM_LETRA=/[A-Za-zÁÉÍÓÚÜÑáéíóúüñ]/;
+function _nombreValido(n){
+  var t=String(n||'').trim();
+  return !!t && _NOM_LETRA.test(t.charAt(0)) && (t.match(/[A-Za-zÁÉÍÓÚÜÑáéíóúüñ]/g)||[]).length>=2;
+}
+function onNombreInput(el){
+  if(!el) return;
+  clearInterval(_dniEscribir._t);          // escribe el cliente: manda él
+  var v=el.value, limpio=v.replace(/^[^A-Za-zÁÉÍÓÚÜÑáéíóúüñ]+/,'');
+  if(limpio!==v){
+    var pos=Math.max(0,(el.selectionStart||0)-(v.length-limpio.length));
+    el.value=limpio;
+    try{ el.setSelectionRange(pos,pos); }catch(e){}
+  }
   _dniMarca();
 }
 
-/* ★ EL DNI RELLENA EL NOMBRE — 15/10/2026.
-   Lo pidio el dueño, y para el negocio es claro: un nombre escrito a mano
-   llega con faltas, sin tildes o con el apellido delante, y eso es justo lo
-   que Shalom rechaza al registrar el envio.
+/* ★ LA MARCA DEL NOMBRE — se recalcula, nunca se recuerda (30/10/2026).
+     · coincide → el campo se ilumina en verde con su ✓ y «✓ Nombre según tu
+       DNI» (sin repetir el nombre: está en su campo);
+     · NO coincide → una SUGERENCIA, no una alarma: el nombre del DNI y un
+       botón grande para usarlo; mantener el propio es un enlace pequeño
+       (lo correcto es lo más fácil). Si se parece, «Completa tu nombre»;
+     · eligió mantener el suyo → una línea discreta, por si cambia de idea. */
+var _dniMantener='';
+function _dniMarca(){
+  var el=$('dniMarca'); if(!el) return;
+  var nmEl=$('f_name'), nom=(nmEl||{value:''}).value;
+  var igual=!!_dniOficial && !!nom.trim() && _nrmNom(nom)===_nrmNom(_dniOficial);
+  if(nmEl) nmEl.classList.toggle('nom-ok', igual);
+  if(!_dniOficial || !nom.trim()){ el.style.display='none'; el.innerHTML=''; return; }
+  el.style.display='block';
+  if(igual){ el.innerHTML='<span class="dni-ok">✓ Nombre según tu DNI</span>'; return; }
+  if(_dniMantener && _nrmNom(_dniMantener)===_nrmNom(nom)){
+    el.innerHTML='<span class="dni-mant">Tu DNI dice <b>'+esc(_dniOficial)+'</b> · '
+      +'<button type="button" class="dni-link" onclick="usarNombreDni()">usar el del DNI</button></span>';
+    return;
+  }
+  var parecido=_nomParecido(nom, _dniOficial);
+  el.innerHTML='<div class="dni-sug">'
+    +'<div class="dni-sug-t">🪪 '+(parecido?'Completa tu nombre como en tu DNI:':'Según tu DNI:')+'</div>'
+    +'<div class="dni-sug-n">'+esc(_dniOficial)+'</div>'
+    +'<button type="button" class="dni-sug-si" onclick="usarNombreDni()">✓ Usar el nombre del DNI</button>'
+    +'<button type="button" class="dni-link" onclick="dniMantener()">Mantener «'+esc(nom.trim().slice(0,30))+'»</button>'
+    +'<div class="dni-sug-p">Así coincide con tu DNI al recoger o recibir tu pedido.</div></div>';
+}
+function dniMantener(){ _dniMantener=($('f_name')||{value:''}).value; _dniMarca(); }
+function usarNombreDni(){
+  if(!_dniOficial) return;
+  var nm=$('f_name'); if(!nm) return;
+  _dniPuesto=_dniOficial; _dniMantener='';
+  var e=$('err_name'); if(e) e.classList.remove('show');
+  nm.classList.remove('err');
+  _dniEscribir(nm, _dniOficial);
+}
+/* El nombre «aparece» letra por letra (≈0,4 s), el campo se ilumina y suena
+   el ding. Con «reducir movimiento», de golpe. */
+function _dniEscribir(nm, texto){
+  clearInterval(_dniEscribir._t);
+  var fin=function(){
+    nm.value=texto;
+    nm.classList.remove('nom-brilla'); void nm.offsetWidth; nm.classList.add('nom-brilla');
+    _dniMarca(); _dniDing();
+  };
+  if(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches){ fin(); return; }
+  var i=0, paso=Math.max(1, Math.ceil(texto.length/14));
+  nm.value='';
+  _dniEscribir._t=setInterval(function(){
+    i+=paso; nm.value=texto.slice(0,i);
+    if(i>=texto.length){ clearInterval(_dniEscribir._t); _dniEscribir._t=0; fin(); }
+  }, 28);
+}
+/* «Ding»: dos notas suaves (<0,2 s) hechas por el navegador (sin descargar
+   nada). UNA vez por DNI, nunca con la página en segundo plano. */
+var _dniDingHecho='';
+function _dniDing(){
+  try{
+    var dni=($('f_dni')||{value:''}).value.replace(/\D/g,'');
+    if(_dniDingHecho===dni || document.hidden) return;
+    _dniDingHecho=dni;
+    if(navigator.vibrate) navigator.vibrate(12);
+    var C=window.AudioContext||window.webkitAudioContext; if(!C) return;
+    var a=_dniDing._c||(_dniDing._c=new C());
+    if(a.state==='suspended') a.resume();
+    var t=a.currentTime;
+    [[880,0],[1318.5,0.09]].forEach(function(n){
+      var o=a.createOscillator(), g=a.createGain();
+      o.type='sine'; o.frequency.value=n[0];
+      g.gain.setValueAtTime(0.0001, t+n[1]);
+      g.gain.exponentialRampToValueAtTime(0.06, t+n[1]+0.01);
+      g.gain.exponentialRampToValueAtTime(0.0001, t+n[1]+0.12);
+      o.connect(g); g.connect(a.destination); o.start(t+n[1]); o.stop(t+n[1]+0.14);
+    });
+  }catch(e){}
+}
 
-   Automatico y no con un boton: el dueño lo pidio asi («al poner dni
-   consulte reniec»), y un boton mas es una cosa mas que explicar en una
-   pantalla que ya tiene cuatro pasos.
-
-   ⚠️ LO QUE ESCRIBIO EL CLIENTE NO SE PISA. Se rellena si el campo esta
-   vacio, o si lo que hay lo puso una consulta anterior. Si el cliente
-   corrigio su nombre a mano —se llama distinto a lo que dice su documento,
-   o usa su nombre de siempre— eso es SUYO y manda. Un formulario que
-   deshace lo que acabas de escribir es un formulario del que te vas.
-
-   ⚠️ Y SI EL DNI CAMBIA, EL NOMBRE AUTOMATICO SE BORRA. Un nombre pegado a
-   otro documento es el nombre de otra persona, y de ahi sale una etiqueta
-   con el DNI de uno y el nombre de otro — que ya paso una vez en el panel,
-   por otro camino. */
+/* ★ EL DNI RELLENA EL NOMBRE — 15/10/2026 (animado el 30/10/2026).
+   ⚠️ LO QUE ESCRIBIO EL CLIENTE NO SE PISA: se rellena solo si el campo
+   esta vacio; si hay algo distinto, se SUGIERE (ver _dniMarca).
+   ⚠️ Y SI EL DNI CAMBIA, EL NOMBRE AUTOMATICO SE BORRA: un nombre pegado a
+   otro documento es el nombre de otra persona.
+   Mientras consulta: el campo «escanea» y dice «Buscando en RENIEC…». */
 function onDniInput(val){
   clearTimeout(_dniTimer);
   const dni=String(val||'').replace(/\D/g,'');
   const badge=$('dniBadge');
   const nm=$('f_name');
-  // Cambio de documento: lo que puso la consulta anterior deja de valer.
-  if(_dniPuesto && nm && nm.value.trim()===_dniPuesto){ nm.value=''; }
-  _dniPuesto=''; _dniOficial='';
+  const dniEl=$('f_dni');
+  // El nombre que puso el DNI (completo o a medio aparecer) se va con él.
+  if(_dniPuesto && nm && _dniPuesto.indexOf(nm.value.trim())===0){ clearInterval(_dniEscribir._t); nm.value=''; }
+  _dniPuesto=''; _dniOficial=''; _dniMantener='';
+  if(dniEl) dniEl.classList.remove('dni-escanea');
   if(badge){ badge.style.display='none'; badge.innerHTML=''; }
   _dniMarca();
   if(dni.length!==8) return;
   _dniTimer=setTimeout(async ()=>{
     const _decir=(html)=>{ if(badge){ badge.style.display='block'; badge.innerHTML=html; } };
     const _callar=()=>{ if(badge){ badge.style.display='none'; badge.innerHTML=''; } };
-    _decir('<div style="font-size:12.5px;color:var(--text2)">Buscando tu nombre…</div>');
+    if(dniEl) dniEl.classList.add('dni-escanea');
+    _decir('<span class="dni-buscando">🪪 Buscando en RENIEC<span class="dni-puntos"></span></span>');
     let r=null;
     try{ r = await _api('reniec', {dni: dni}); }catch(e){ r=null; }
-    // El campo pudo cambiar mientras se consultaba: lo que vuelve es de otro
-    // documento y pegarlo seria pegar el nombre de otra persona.
     if(($('f_dni')||{value:''}).value.replace(/\D/g,'')!==dni) return;
+    if(dniEl) dniEl.classList.remove('dni-escanea');
     if(!r || !r.ok || !r.persona || !r.persona.completo){
-      /* Nunca se bloquea el pedido: se dice y el cliente escribe. Es lo que
-         hacia ayer, asi que lo peor que pasa es que nada mejore. */
-      _decir('<div style="font-size:12.5px;color:var(--text2)">Escribe tu nombre completo.</div>');
+      /* Nunca se bloquea el pedido: se dice y el cliente escribe. */
+      _decir('<span class="dni-nada">No encontramos ese DNI: escribe tu nombre completo como figura en tu documento.</span>');
       return;
     }
     const comp=r.persona.completo;
     _dniOficial=comp;
+    _callar();
     if(nm && !nm.value.trim()){
-      nm.value=comp; _dniPuesto=comp;
+      _dniPuesto=comp;
       const e=$('err_name'); if(e) e.classList.remove('show');
       nm.classList.remove('err');
+      _dniEscribir(nm, comp);             // aparece, se ilumina y suena
+      return;
     }
-    /* Salio bien: el aviso bajo el DNI se calla y habla la marca, que vive
-       junto al nombre. El recuadro verde con el nombre dentro desaparecio
-       aqui — repetia el dato que esta dos dedos mas abajo. */
-    _callar();
-    _dniMarca();
-  },600);
+    _dniMarca();                          // había un nombre: coincide o se sugiere
+  },250);
 }
 
 function _showKnownBadge(){
@@ -2152,7 +2223,7 @@ async function submitOrder(){
   }
 
   let ok=true;
-  if(chk('f_name','err_name',!name))           ok=false;
+  if(chk('f_name','err_name',!_nombreValido(name))) ok=false;
   if(chk('f_phone','err_phone',!/^\d{9}$/.test(phone))) ok=false;
 
   if(!selCourierName){ $('err_courier')&&$('err_courier').classList.add('show'); ok=false; }
@@ -3845,7 +3916,7 @@ function wzValidate(step){
     if(_wzErr('f_dni','err_dni', !/^\d{8}$/.test(dni1))) ok=false;
     var name=($('f_name')||{value:''}).value.trim();
     var phone=($('f_phone')||{value:''}).value.trim();
-    if(_wzErr('f_name','err_name',!name)) ok=false;
+    if(_wzErr('f_name','err_name',!_nombreValido(name))) ok=false;
     if(_wzErr('f_phone','err_phone',!/^\d{9}$/.test(phone))) ok=false;
     var extraF=((CFG&&CFG.extraFields)||[]).filter(function(f){return f&&f.visible!==false;});
     extraF.forEach(function(f){
@@ -3962,6 +4033,8 @@ function wzInit(){
 window.onDniInput           = onDniInput;
 window._dniMarca            = _dniMarca;
 window.usarNombreDni        = usarNombreDni;
+window.dniMantener          = dniMantener;
+window.onNombreInput        = onNombreInput;
 window.loadCfg              = loadCfg;
 window.renderForm           = renderForm;
 window.wzNext               = wzNext;
