@@ -97,6 +97,6 @@ module.exports = async ({bloque, ok}) => {
        'Configuración Shalom: Puerta, Seguimiento automático y Mover etiquetas (ya no «en reconstrucción»)');
     const tr = ay.slice(ay.indexOf('    tracking: {'), ay.indexOf('    nuevoPedido: {'));
     ok(!/cada <b>12 horas<\/b>/.test(tr) && /08:00, 11:30, 16:30 y 19:00/.test(tr), 'Tracking: horarios del seguimiento automático');
-    ok(/var ACTUALIZADO = '2026-10-30';/.test(ay) && /ayuda\.js\?v=9/.test(panel), 'fecha y versión nuevas');
+    ok(/var ACTUALIZADO = '2026-10-30';/.test(ay) && /ayuda\.js\?v=10/.test(panel), 'fecha y versión nuevas');
   }
 };

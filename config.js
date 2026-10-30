@@ -2594,6 +2594,15 @@ function _genTokId(){
   return r;
 }
 
+/* ★ UN SOLO DATO BASTA (30/10/2026). Antes había que poner nombre o
+   teléfono; ahora vale cualquiera: nombre, teléfono, monto, adelanto, link o
+   N° de factura/boleta (p. ej. solo la factura). UNA regla para el botón y
+   para el guardado. */
+function _tokAlgunDato(){
+  return ['tokName','tokPhone','tokMonto','tokAdelanto','tokLink','tokComprobante']
+    .some(function(id){ var e=$(id); return !!(e && String(e.value||'').trim()); });
+}
+var _TOK_FALTA='⚠️ Escribe al menos un dato: nombre, teléfono, monto, link o N° de factura';
 async function _genTokenDo(action){
   const name    = ($('tokName').value||'').trim();
   const phone   = ($('tokPhone').value||'').trim();
@@ -2602,7 +2611,7 @@ async function _genTokenDo(action){
   const monto   = (($('tokMonto')||{}).value||'').trim();
   const adelanto= (($('tokAdelanto')||{}).value||'').trim();
   const expDays = parseInt($('tokExp').value||'0')||0;
-  if(!name && !phone){ toast('⚠️ Escribe el nombre o teléfono del cliente'); return; }
+  if(!_tokAlgunDato()){ toast(_TOK_FALTA); return; }
   // Esperar Firebase
   let t=0; while(!window._fbSaveTok && t<30){ await new Promise(r=>setTimeout(r,100)); t++; }
   if(!window._fbSaveTok){ toast('⚠️ Firebase no listo, intenta de nuevo'); return; }
@@ -2654,7 +2663,7 @@ async function _genTokenDo(action){
       const registro='📦 Programa tu envío aquí 👇\n📝 así registramos bien tu pedido y evitamos errores en el envío\n🔗 Es rápido y nos ayuda a brindarte una mejor atención 👍\n\n'+url;
       const msg=registro+(link?'\n\n─────────\n📎 Aquí tu documento:\n'+link:'');
       if(phone){ window.waOpen(phone, msg); }
-      else if(navigator.share){ navigator.share({title:'Pedido - '+name,text:msg}).catch(()=>window.open('https://wa.me/?text='+encodeURIComponent(msg),'_blank')); }
+      else if(navigator.share){ navigator.share({title:'Pedido'+(name?' - '+name:''),text:msg}).catch(()=>window.open('https://wa.me/?text='+encodeURIComponent(msg),'_blank')); }
       else { window.open('https://wa.me/?text='+encodeURIComponent(msg),'_blank'); }
       toast('🔑 Link generado');
     }
@@ -2663,8 +2672,7 @@ async function _genTokenDo(action){
 }
 function genToken(action, btn){
   // Validación ANTES del spinner (para no bloquear el botón por un dato faltante).
-  const name=($('tokName').value||'').trim(), phone=($('tokPhone').value||'').trim();
-  if(!name && !phone){ if(typeof toast==='function') toast('⚠️ Escribe el nombre o teléfono del cliente'); return; }
+  if(!_tokAlgunDato()){ if(typeof toast==='function') toast(_TOK_FALTA); return; }
   const _falta=_linkSelFalta();
   if(_falta){ if(typeof toast==='function') toast(_falta); return; }
   return _genGuard(btn, ()=>_genTokenDo(action));
@@ -2947,10 +2955,10 @@ function _tokAction(id, action){
   if(!tok){ console.error('Token no encontrado:', id); return; }
   var url = getFormLink()+'?t='+(tok.id||tok._id||'');
   var link = tok.prefillLink||'';
-  var msg = '📦 Hola '+tok.name+', aquí tu link para registrar tu pedido:\n\n'+url+(link?'\n\n📎 '+link:'');
+  var msg = '📦 Hola'+(tok.name?' '+tok.name:'')+', aquí tu link para registrar tu pedido:\n\n'+url+(link?'\n\n📎 '+link:'');
   if(action==='share'){
     if(navigator.share){
-      navigator.share({title:'Pedido - '+tok.name, text:msg}).catch(function(){
+      navigator.share({title:'Pedido'+(tok.name?' - '+tok.name:''), text:msg}).catch(function(){
         window.open('https://wa.me/?text='+encodeURIComponent(msg),'_blank');
       });
     } else {

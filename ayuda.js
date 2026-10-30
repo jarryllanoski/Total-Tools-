@@ -233,7 +233,8 @@
       faq: [
         {q:'¿Cuándo se bloquea un link?', a:'Cuando el cliente <b>confirma su pedido</b> con él (un solo pedido por link). Abrirlo sin confirmar no lo gasta. Si necesitas otro, genera uno nuevo.'},
         {q:'¿Qué pasa si le pongo vencimiento?', a:'El link deja de funcionar al cumplirse el plazo, aunque nadie lo haya usado.'},
-        {q:'¿El teléfono es obligatorio?', a:'No. Sirve para precargarlo y, si coincide con el que escribe el cliente, para recordar su dirección de delivery.'}
+        {q:'¿Qué datos son obligatorios?', a:'<b>Solo uno</b>, el que quieras: nombre, teléfono, monto, adelanto, link o N° de factura/boleta. Lo demás es opcional.'},
+        {q:'¿Para qué sirve el teléfono?', a:'Para precargarlo y, si coincide con el que escribe el cliente, para recordar su dirección de delivery.'}
       ],
       tips: [
         'En «Links generados» se cargan los que están por usar y los usados desde ayer; los más antiguos, solo cuando los pides (así no se gastan lecturas).'

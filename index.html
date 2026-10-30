@@ -1164,7 +1164,7 @@
   <!-- LINK PERSONALIZADO -->
   <div class="cfg-sec">
     <div class="cfg-ttl">✨ Link personalizado <span onclick="if(window.Ayuda)Ayuda.abrir('linkPersonalizado')" style="font-size:11px;color:#8b949e;cursor:pointer;font-weight:400;margin-left:6px" title="Ayuda">📖 Ayuda</span></div>
-    <div style="font-size:11px;color:var(--text2);margin-bottom:12px;line-height:1.5">Genera un link único con datos del cliente. Se bloquea tras un uso.</div>
+    <div style="font-size:11px;color:var(--text2);margin-bottom:12px;line-height:1.5">Genera un link único con datos del cliente. Basta <b>un dato</b> (nombre, teléfono, monto, link o factura). Se bloquea cuando el cliente confirma su pedido.</div>
     <div class="frow">
       <div class="fg"><input class="fi" id="tokName" placeholder="Nombre del cliente" maxlength="60" autocomplete="off"></div>
       <div class="fg"><input class="fi" id="tokMonto" type="number" inputmode="decimal" placeholder="Monto S/" min="0" step="0.5" autocomplete="off"></div>
@@ -5346,7 +5346,7 @@ render();
      lo usa. config.js, print.js y voz.js preguntan por los pedidos marcados,
      así que siguen yendo detrás. El orden de carga es un contrato
      (ver docs/ARQUITECTURA.md). -->
-<script src="config.js?v=59"></script>
+<script src="config.js?v=60"></script>
 <script src="print.js?v=20"></script>
 <script src="notify.js?v=7"></script>
 <script src="shalom.js?v=34"></script>
@@ -5358,7 +5358,7 @@ render();
 <script src="agencias-extractor.js?v=11"></script>
 <script src="respaldo.js?v=2"></script>
 <script src="narrador/toby.js?v=1"></script>
-<script src="ayuda.js?v=9"></script>
+<script src="ayuda.js?v=10"></script>
 <script src="recursos.js?v=2"></script>
 <script src="dashboard.js?v=2"></script>
 <script src="voz.js?v=3"></script>
