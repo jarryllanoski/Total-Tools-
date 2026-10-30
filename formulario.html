@@ -89,7 +89,35 @@ textarea.fi{resize:vertical;line-height:1.5}
 .dates-scroll::-webkit-scrollbar{display:none}
 .date-opt{background:var(--card);border:1.5px solid var(--bd);border-radius:12px;padding:10px 14px;text-align:center;cursor:pointer;transition:border-color .15s,background .15s;user-select:none;flex-shrink:0;min-width:60px}
 .date-opt:hover{border-color:var(--blue)}
-.date-opt.active{border-color:var(--blue);background:#12203d}
+.date-opt.active{border-color:var(--blue);background:#1b3466}
+/* ★ TOCAR Y ELEGIR SE SIENTE (30/10/2026). Microinteracciones breves
+   (≤0,3 s), UNA vez por elección; vibración solo al ELEGIR (Android). */
+.date-opt{position:relative}
+.date-opt.active::after{content:"✓";position:absolute;top:2px;right:2px;width:14px;height:14px;border-radius:50%;background:var(--blue);color:#fff;font-size:9px;font-weight:900;display:flex;align-items:center;justify-content:center}
+/* El dedo apoyó: respuesta AL INSTANTE (el navegador demora :active en
+   filas que se deslizan). Si el dedo se mueve, se quita y no elige. */
+.date-opt.tocando{transform:scale(.95);border-color:var(--blue);box-shadow:0 0 0 4px rgba(79,142,247,.25);background:#162a52}
+.cour-card.tocando{transform:scale(.96);border-color:#12a5b4;box-shadow:0 0 0 4px rgba(18,165,180,.25)}
+.ag-item.tocando:not(.ag-item-sel){background:rgba(79,142,247,.16)}
+.tt-pop{animation:ttPop .3s cubic-bezier(.34,1.56,.64,1)}
+@keyframes ttPop{0%{transform:scale(.94)}60%{transform:scale(1.06)}100%{transform:scale(1)}}
+.dates-wrap{position:relative}
+.dates-wrap::after{content:"";position:absolute;right:0;top:0;bottom:4px;width:30px;background:linear-gradient(90deg,rgba(8,8,16,0),var(--bg));pointer-events:none}
+.tt-ok{display:none;margin-top:10px;font-size:13.5px;font-weight:700;color:var(--green);line-height:1.4}
+.tt-ok.on{display:block;animation:ttIn .3s ease}
+@keyframes ttIn{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
+.btn-main.tt-brillo{position:relative;overflow:hidden}
+.btn-main.tt-brillo::after{content:"";position:absolute;top:0;bottom:0;left:-60%;width:45%;background:linear-gradient(100deg,transparent,rgba(255,255,255,.45),transparent);animation:ttBrillo .9s ease-out 1 forwards;pointer-events:none}
+@keyframes ttBrillo{to{left:130%}}
+.ag-chk{width:18px;height:18px;fill:none;stroke:var(--green);stroke-width:3;stroke-linecap:round;stroke-linejoin:round}
+.ag-recien .ag-chk path{stroke-dasharray:24;stroke-dashoffset:24;animation:ttTrazo .35s ease-out .05s forwards}
+@keyframes ttTrazo{to{stroke-dashoffset:0}}
+.ag-recien .ag-item-sel{animation:ttPop .3s cubic-bezier(.34,1.56,.64,1)}
+.ag-recien{animation:ttIn .3s ease}
+.ag-pin-salta svg{animation:ttSalta .5s cubic-bezier(.34,1.56,.64,1);transform-origin:50% 100%}
+@keyframes ttSalta{0%{transform:translateY(0) scale(.8)}40%{transform:translateY(-14px) scale(1.05)}100%{transform:none}}
+.wz-pbar i.tt-casi{box-shadow:0 0 10px rgba(91,155,255,.8)}
+@media(prefers-reduced-motion:reduce){.tt-pop,.ag-recien,.ag-recien .ag-item-sel,.ag-pin-salta svg,.tt-ok.on{animation:none}.btn-main.tt-brillo::after{display:none}.ag-recien .ag-chk path{animation:none;stroke-dashoffset:0}.date-opt.tocando,.cour-card.tocando{transform:none}}
 .d-day{font-size:11px;color:var(--text2);text-transform:uppercase;font-weight:600}
 .d-num{font-size:20px;font-weight:700;line-height:1.2}
 .d-mon{font-size:10px;color:var(--text2)}
@@ -1237,7 +1265,8 @@ function renderForm(){
       <div class="wz-step" data-step="4" hidden>
       <div style="margin-top:18px">
         <div class="section-ttl">Fecha de envío *</div>
-        <div class="dates-scroll" id="datesGrid">${datesChips}</div>
+        <div class="dates-wrap"><div class="dates-scroll" id="datesGrid">${datesChips}</div></div>
+        <div class="tt-ok" id="dateOk" aria-live="polite"></div>
         <div class="ferr" id="err_date" style="margin-top:6px">Selecciona una fecha</div>
       </div>
 
@@ -1997,11 +2026,35 @@ function buildDatesChips(dispatch){
 }
 
 function selDate(iso, lbl){
+  /* Solo un toque REAL del cliente anima y vibra: el formulario preelige la
+     primera fecha con un clic del programa (isTrusted=false). */
+  const ev = window.event;
+  const nueva = iso!==selDateIso && !!(ev && ev.isTrusted);
   selDateIso=iso; selDateLbl=lbl;
   document.querySelectorAll('.date-opt').forEach(el=>el.classList.remove('active'));
   const el=$('dopt_'+iso);
   if(el) el.classList.add('active');
   $('err_date')&&$('err_date').classList.remove('show');
+  /* ★ La decisión, dicha con todas sus palabras («sale el martes 3 de
+     noviembre»): quita la duda de haber tocado el día equivocado. */
+  const ok=$('dateOk');
+  if(ok){
+    let txt='';
+    try{ txt=new Date(iso+'T12:00:00').toLocaleDateString('es-PE',{weekday:'long',day:'numeric',month:'long'}).replace(',',''); }catch(e){ txt=lbl; }
+    ok.textContent='📦 Tu pedido sale el '+txt;
+    ok.classList.remove('on'); void ok.offsetWidth; ok.classList.add('on');
+  }
+  if(nueva){ _ttPop(el); _ttVibrar(); _ttBrillo($('confirmBtn')); }
+}
+/* Microinteracciones compartidas (fecha y sede). */
+function _ttPop(el){ if(!el) return; el.classList.remove('tt-pop'); void el.offsetWidth; el.classList.add('tt-pop'); }
+function _ttBrillo(b){ if(!b) return; b.classList.remove('tt-brillo'); void b.offsetWidth; b.classList.add('tt-brillo'); setTimeout(function(){ b.classList.remove('tt-brillo'); }, 1000); }
+// Vibración corta SOLO al elegir (no en cada toque). Android; iPhone no la tiene.
+function _ttVibrar(){
+  try{
+    if(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    if(navigator.vibrate) navigator.vibrate(12);
+  }catch(e){}
 }
 
 /* ─── SUBMIT ────────────────────────────────────────────────────── */
@@ -2880,7 +2933,7 @@ function _agElegidaObj(key){
    preguntar nada. Nunca se pide permiso sin que el cliente toque algo. */
 function agIniciar(key){
   var el=_agElegidaObj(key);
-  if(el){ _agElegir(key, el); return; }               // volvió al paso: su sede sigue arriba
+  if(el){ _agElegir(key, el, {restaurar:true}); return; }   // volvió al paso: su sede sigue arriba
   agMapaPintar(key, _agTodas(key), {todas:true});
   try{
     if(navigator.permissions && navigator.permissions.query){
@@ -3242,14 +3295,15 @@ function agMostrar(key, agencias, aviso){
   if(aviso) cab = '📍 '+esc(aviso);
   else if(!_q && _agRef && _agRef.tipo==='tu') cab = '📍 Sedes más cercanas a ti';
   if(!el && !_q) cab = (cab ? cab+' · ' : '') + '👇 Toca tu sede';
-  if(recogida) cab = '✓ Tu sede';
+  // El nombre ya está en la tarjeta de abajo: el encabezado solo celebra.
+  if(recogida) cab = '✓ ¡Listo! Aquí recogerás tu pedido';
   drop.innerHTML = (cab ? '<div class="ag-lista-cab">'+cab+'</div>' : '') + (recogida ? lista.slice(0,1) : lista).map((ag,i)=>{
     const sel = !!el && AgLista.clave(ag)===_agElegidaK;
     const km  = (_agRef && _agRef.tipo!=='sede') ? AgLista.km(ag._distKm) : '';
     const pie = [esc(ag.departamento||''), ag.ter_id ? 'Agencia #'+esc(ag.ter_id) : '']
       .filter(Boolean).join(' · ');
     return `<div onclick="agSel('${key}', ${i})" class="ag-item${sel?' ag-item-sel':''}" role="button" aria-pressed="${sel}">
-      <div class="ag-item-ic" aria-hidden="true">${sel?'✓':'📍'}</div>
+      <div class="ag-item-ic" aria-hidden="true">${sel?'<svg class="ag-chk" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>':'📍'}</div>
       <div style="flex:1;min-width:0">
         <div class="ag-item-t">${esc(AgLista.titulo(ag, cfg.label||''))}</div>
         ${ag.direccion?`<div class="ag-item-d">${esc(ag.direccion)}</div>`:''}
@@ -3258,10 +3312,14 @@ function agMostrar(key, agencias, aviso){
       </div>
     </div>`;
   }).join('') + (recogida ? `<button type="button" class="ag-cambiar" onclick="agCambiar('${key}')">Cambiar sede</button>` : '');
+  // El momento de elegir es un pequeño pico (regla del pico y el final).
+  drop.classList.toggle('ag-recien', recogida && _agRecien);
   drop.style.display='block';
   agMapaPintar(key, lista, {});
   _agContinuar();
+  _agRecien=false;
 }
+var _agRecien=false;   // true SOLO justo después de que el cliente elige
 var _agListaAbierta=false;
 function agCambiar(key){
   _agListaAbierta=true;
@@ -3275,8 +3333,23 @@ function _agContinuar(){
   var aplica = selCourierType==='agencia' && !!$('shalomDrop') && !$('agcManualInput');
   if(!aplica){ b.textContent='Continuar →'; b.classList.remove('wz-apagado'); return; }
   var ok=!!agState.addr;
+  var antes=!b.classList.contains('wz-apagado') && /esta sede/.test(b.textContent);
   b.textContent = ok ? 'Continuar con esta sede →' : 'Elige una sede para continuar';
   b.classList.toggle('wz-apagado', !ok);
+  if(ok && !antes) _ttBrillo(b);
+  /* Gradiente de meta: con la sede elegida la barra avanza un poco más y
+     dice «¡Ya casi!». Sin sede vuelve a su sitio. */
+  try{
+    if(_wzStep===3){
+      wzProgress();
+      if(ok){
+        var bar=document.querySelector('#wzProgress .wz-pbar i'), t=document.querySelector('#wzProgress .wz-ptxt');
+        var seq=wzSeq(), n=seq.length, i=seq.indexOf(3);
+        if(bar && i>=0){ bar.style.width=Math.round(((i+1.5)/n)*100)+'%'; bar.classList.add('tt-casi'); }
+        if(t) t.textContent+=' · ¡Ya casi! Solo falta la fecha';
+      }
+    }
+  }catch(e){}
 }
 /* Tocó Continuar sin sede: en vez de un error rojo, se le lleva a los dos
    caminos (ubicación y lupa), iluminados. Sin teclado: elige él. */
@@ -3335,9 +3408,9 @@ function _agCoords(ag){
 }
 
 /* El pin rojo (SVG en línea). `grande` = la elegida. */
-function _agIcono(grande){
+function _agIcono(grande, salta){
   var w=grande?36:26, h=grande?48:35;
-  return L.divIcon({className:'ag-pin', iconSize:[w,h], iconAnchor:[w/2,h], popupAnchor:[0,-h+4],
+  return L.divIcon({className:'ag-pin'+(salta?' ag-pin-salta':''), iconSize:[w,h], iconAnchor:[w/2,h], popupAnchor:[0,-h+4],
     html:'<svg width="'+w+'" height="'+h+'" viewBox="0 0 26 35" aria-hidden="true"><path d="M13 0C5.8 0 0 5.7 0 12.8 0 22.4 13 35 13 35s13-12.6 13-22.2C26 5.7 20.2 0 13 0z" fill="'+(grande?'#b91c1c':'#e11d2e')+'" stroke="#fff" stroke-width="1.6"/><circle cx="13" cy="12.6" r="4.6" fill="#fff"/></svg>'});
 }
 
@@ -3345,6 +3418,8 @@ function _agIcono(grande){
    sin él, las de la lista que se está viendo. */
 async function agMapaPintar(key, agencias, opc){
   opc=opc||{};
+  // Se lee YA (antes del await): agMostrar baja la bandera al terminar.
+  var salta=_agRecien;
   var wrap=$('shalomMapaWrap');
   if(!wrap) return;
   var conGeo=[];
@@ -3405,7 +3480,7 @@ async function agMapaPintar(key, agencias, opc){
     _mapaMarcas=[];
     conGeo.forEach(function(g){
       var sel = AgLista.clave(g.ag)===_agElegidaK;
-      var m=L.marker(g.c, {icon:_agIcono(sel), zIndexOffset: sel?1000:0, bubblingMouseEvents:false,
+      var m=L.marker(g.c, {icon:_agIcono(sel, sel && salta), zIndexOffset: sel?1000:0, bubblingMouseEvents:false,
         interactive:tocables, keyboard:tocables}).addTo(_mapa);
       if(tocables){
         m.bindPopup('<b>'+esc(AgLista.titulo(g.ag, (AGENCY_SOURCES[key]||{}).label||''))+'</b><br>'+esc(g.ag.direccion||''));
@@ -3470,9 +3545,11 @@ function agSel(key, i){
    necesita —igual que siempre— y repinta la lista con la elegida ARRIBA y
    marcada. No avanza de paso: el cliente lo ve y pulsa «Continuar» (en un
    mapa es fácil tocar un pin por error). */
-function _agElegir(key, ag){
+function _agElegir(key, ag, opc){
   if(!ag) return;
   _agLupa(false);
+  // Solo cuando ELIGE el cliente (no al volver al paso): animación y vibración.
+  if(!(opc && opc.restaurar)){ _agRecien=true; _ttVibrar(); }
   const nombre = ag.lugar_over||ag.nombre||'';
   const dir    = ag.direccion||'';
   const geo    = [ag.zona||ag.distrito, ag.provincia, ag.departamento].filter(Boolean).join(', ');
@@ -3755,6 +3832,23 @@ window.abrirAyudaTrack      = abrirAyudaTrack;
 window.onAgencyManual       = onAgencyManual;
 window.toggleShalomHelp     = toggleShalomHelp;
 window._notesCount          = _notesCount;
+
+/* ★ EL DEDO APOYÓ: se marca al instante (.tocando). Si se mueve más de
+   10 px es un deslizamiento: se quita y no elige (el clic no llega). */
+try{
+  (function(){
+    var el=null, x=0, y=0;
+    var fuera=function(){ if(el){ var e=el; setTimeout(function(){ e.classList.remove('tocando'); }, 110); el=null; } };
+    document.addEventListener('pointerdown', function(ev){
+      var t=ev.target && ev.target.closest && ev.target.closest('.date-opt,.cour-card,.ag-item');
+      if(!t) return; el=t; x=ev.clientX; y=ev.clientY; t.classList.add('tocando');
+    }, {passive:true});
+    document.addEventListener('pointermove', function(ev){
+      if(el && (Math.abs(ev.clientX-x)>10 || Math.abs(ev.clientY-y)>10)){ el.classList.remove('tocando'); el=null; }
+    }, {passive:true});
+    ['pointerup','pointercancel'].forEach(function(n){ document.addEventListener(n, fuera, {passive:true}); });
+  })();
+}catch(e){}
 
 // iOS Safari solo aplica :active (el «hundirse» al tocar) si hay un oyente
 // de toque en la página. Pasivo: no frena el scroll.

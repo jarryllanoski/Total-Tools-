@@ -183,6 +183,26 @@ module.exports = async ({bloque, ok}) => {
        'bloqueado + nativo: «Toca Usar ubicación y elige Permitir» (Chrome deja recuperarlo)');
   }
 
+  bloque('Tocar y elegir se siente: respuesta al instante y un pequeño pico al elegir');
+
+  {
+    ok(/closest\('\.date-opt,\.cour-card,\.ag-item'\)/.test(form) && /Math\.abs\(ev\.clientX-x\)>10/.test(form),
+       'el dedo apoyado marca al instante; si se mueve (deslizar) se quita');
+    const sd = form.slice(form.indexOf('function selDate('), form.indexOf('function _ttPop('));
+    ok(/const nueva = iso!==selDateIso && !!\(ev && ev\.isTrusted\);/.test(sd),
+       '⚠️ solo un toque REAL anima y vibra (la fecha preelegida por el programa no)');
+    ok(/'📦 Tu pedido sale el '/.test(sd), 'la fecha elegida se dice con todas sus palabras');
+    ok(/if\(nueva\)\{ _ttPop\(el\); _ttVibrar\(\); _ttBrillo\(\$\('confirmBtn'\)\); \}/.test(sd), 'rebote, vibración y brillo en Confirmar');
+    ok(/navigator\.vibrate\(12\)/.test(form) && /prefers-reduced-motion: reduce\)'\)\.matches\) return;/.test(form),
+       'vibración corta y nunca con «reducir movimiento»');
+    const el = form.slice(form.indexOf('function _agElegir('), form.indexOf('function agManual'));
+    ok(/if\(!\(opc && opc\.restaurar\)\)\{ _agRecien=true; _ttVibrar\(\); \}/.test(el), 'elegir sede: pico; volver al paso: sin animación');
+    ok(/_agElegir\(key, el, \{restaurar:true\}\)/.test(form), 'agIniciar restaura sin celebrar');
+    ok(/var salta=_agRecien;/.test(form), 'el pin salta (se lee antes del await del mapa)');
+    ok(/¡Ya casi! Solo falta la fecha/.test(form), 'gradiente de meta en la barra');
+    ok(/@media\(prefers-reduced-motion:reduce\)\{\.tt-pop,\.ag-recien/.test(form), 'reducir movimiento: sin rebotes ni brillos');
+  }
+
   bloque('⚠️ «Iniciando fábrica…» al abrir el formulario sin link');
 
   {

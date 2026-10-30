@@ -36,7 +36,7 @@ module.exports = async ({bloque, ok}) => {
     ok(!/_agIdent\s*=/.test(fn),
        'y el mapa NO toca `_agIdent` por su cuenta: quien identifica la ' +
        'agencia es `_agElegir`, en un solo sitio');
-    const sel = form.slice(form.indexOf('function agSel(key, i)'), form.indexOf('function _agElegir(key, ag)'));
+    const sel = form.slice(form.indexOf('function agSel(key, i)'), form.indexOf('function _agElegir(key, ag, opc)'));
     ok(/if\(ag\) _agElegir\(key, ag\);/.test(sel), 'y la fila de la lista entra por la misma puerta');
   }
   {
@@ -321,7 +321,7 @@ module.exports = async ({bloque, ok}) => {
        contrario y tiene razon: con la elegida marcada, el mapa deja de ser
        una invitacion y pasa a ser la confirmacion de adonde va el paquete.
        Y un toque de mas no es un problema — vuelve a pasar por `agSel`. */
-    const i = form.indexOf('function _agElegir(key, ag)');
+    const i = form.indexOf('function _agElegir(key, ag, opc)');
     const fn = form.slice(i, form.indexOf('function agManual', i));
     ok(/agMostrar\(key, lista, ''\);/.test(fn),
        'al elegir se repinta la lista (la elegida ARRIBA) y con ella el mapa');
@@ -332,7 +332,7 @@ module.exports = async ({bloque, ok}) => {
   {
     const i = form.indexOf('async function agMapaPintar');
     const fn = form.slice(i, form.indexOf('function agMapaMarcar', i));
-    ok(/icon:_agIcono\(sel\), zIndexOffset: sel\?1000:0/.test(fn),
+    ok(/icon:_agIcono\(sel, sel && salta\), zIndexOffset: sel\?1000:0/.test(fn),
        'la elegida: pin GRANDE y delante de las demás');
     ok(/setView\(elegida\.m\.getLatLng\(\)/.test(fn), 'y el mapa se mueve hasta ella');
     ok(/catch\(e\)\{[\s\S]{0,200}wrap\.style\.display='none';/.test(fn),
@@ -348,7 +348,7 @@ module.exports = async ({bloque, ok}) => {
   {
     /* Tocar una FILA de la lista tambien marca el mapa, porque las dos
        pasan por `agSel` con el mismo indice. Una sola puerta, otra vez. */
-    const i = form.indexOf('function _agElegir(key, ag)');
+    const i = form.indexOf('function _agElegir(key, ag, opc)');
     const fn = form.slice(i, form.indexOf('function agManual', i));
     const marca = fn.indexOf('agMostrar(key, lista');
     const guarda = fn.indexOf('window._agIdent');
