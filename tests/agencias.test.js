@@ -229,9 +229,9 @@ module.exports = async ({bloque, ok}) => {
     ok(/window\._agIdent = \(window\.Agencias \? Agencias\.elegida\(ag, key\) : null\)/
         .test(pub),
        'el formulario del cliente guarda el ter_id que ya capturaba y tiraba');
-    ok((pub.match(/window\._agIdent = null;/g) || []).length === 3,
-       'y lo suelta en los TRES caminos que rompen la correspondencia: ' +
-       'escribir a mano, la ✕ y la entrada manual de Olva');
+    ok((pub.match(/window\._agIdent = null;/g) || []).length === 4,
+       'y lo suelta en los CUATRO caminos que rompen la correspondencia: ' +
+       'escribir a mano, la ✕, la entrada manual de Olva y escribir en el buscador');
     ok(/window\._agIdentTxt === finalAddress/.test(pub),
        'y al enviar se compara el texto, igual que en el panel: entre elegir ' +
        'y enviar puede haber pasado cualquier cosa');

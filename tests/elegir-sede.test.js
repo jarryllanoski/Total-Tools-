@@ -1,0 +1,94 @@
+/**
+ * tests/elegir-sede.test.js — el paso «Elige tu sede» del formulario
+ * ==================================================================
+ * Mapa con pines rojos, «Usar mi ubicación», «Ver todos» / «Mi posición».
+ * Tocar un pin rojo marca la sede y la sube arriba de la lista; el cliente
+ * pulsa Continuar (no se avanza solo). Aquí se prueba:
+ *   1. la lógica PURA de la lista (AgLista), ejecutada de verdad;
+ *   2. que la ubicación nunca se pida sin que el cliente toque algo;
+ *   3. que, si algo falla (sin mapa, sin GPS), elegir sigue funcionando;
+ *   4. el fallo «Iniciando fábrica…» al abrir el formulario sin link.
+ */
+'use strict';
+const E = require('./_entorno.js');
+const vm = require('vm');
+
+module.exports = async ({bloque, ok}) => {
+  const form = E.leer('formulario.html');
+
+  /* El código que se despliega, no una copia: se corta del formulario. */
+  const hav = form.slice(form.indexOf('function _haversineKm('), form.indexOf('\n}\n', form.indexOf('function _haversineKm(')) + 3);
+  const i0 = form.indexOf('var AgLista = {');
+  const lst = form.slice(i0, form.indexOf('\n};\n', i0) + 4);
+  const ctx = vm.createContext({});
+  vm.runInContext(hav + lst + ';this.AgLista=AgLista;', ctx);
+  const A = ctx.AgLista;
+
+  bloque('AgLista: una sola verdad para la lista');
+
+  {
+    ok(A.clave({ter_id: 77, nombre: 'x'}) === 'id:77', 'Shalom se identifica por ter_id');
+    ok(A.clave({nombre: 'TIENDA X', direccion: 'JR 1'}) === 'n:TIENDA X|JR 1', 'Olva (sin ter_id) por nombre + dirección');
+    ok(A.clave(null) === '', 'nada → clave vacía, sin reventar');
+    ok(A.coords({latitud: '-12.05', longitud: '-77.04'})[0] === -12.05, 'coordenadas en texto se leen');
+    ok(A.coords({latitud: '40.4', longitud: '-3.7'}) === null, 'fuera de Perú = dato malo, no se pinta');
+    ok(A.coords({latitud: '', longitud: 'x'}) === null, 'sin coordenadas → null');
+    ok(A.titulo({nombre: 'LIMA / LIMA / CARABAYLLO / AV JOSE SACO ROJAS'}, 'Shalom') === 'Shalom Carabayllo (Av Jose Saco Rojas)',
+       'título legible para Shalom');
+    ok(A.titulo({nombre: 'TIENDA CHACHAPOYAS - JR AMAZONAS'}) === 'Tienda Chachapoyas - Jr Amazonas', 'Olva en minúsculas bonitas');
+    ok(A.km(0.6) === '600 m' && A.km(3.456) === '3.5 km' && A.km(null) === '', 'distancia legible');
+    const todas = [
+      {ter_id: 1, latitud: -12.0, longitud: -77.0},
+      {ter_id: 2, latitud: -12.5, longitud: -77.0},
+      {ter_id: 3, latitud: -12.1, longitud: -77.0},
+      {ter_id: 4, latitud: '', longitud: ''},
+    ];
+    const c = A.cercanas(todas, -12.0, -77.0, 2);
+    ok(c.length === 2 && c[0].ter_id === 1 && c[1].ter_id === 3, 'las N más cercanas, en orden');
+    ok(!todas[0]._distKm, 'no ensucia los datos originales (copia)');
+    ok(A.cercanas(todas, -12, -77, 20).every((x) => x.ter_id !== 4), 'una sede sin coordenadas no se dice «cerca»');
+    const l = A.conElegida(c, {ter_id: 3});
+    ok(l[0].ter_id === 3 && l.length === 2, '⚠️ la elegida va PRIMERA, sin duplicarse');
+    ok(A.conElegida(c, {ter_id: 9})[0].ter_id === 9 && A.conElegida(c, {ter_id: 9}).length === 3,
+       'si no estaba en la lista, se añade arriba');
+    ok(A.conElegida(c, null).length === 2, 'sin elegida, la lista igual');
+  }
+
+  bloque('Psicología: nunca pedir la ubicación sin que el cliente toque algo');
+
+  {
+    const ini = form.slice(form.indexOf('function agIniciar(key)'), form.indexOf('function agIniciarAlVer'));
+    ok(/st\.state==='granted'\) agUbicarme\(key, \{silencioso:true\}\)/.test(ini),
+       'solo se ubica solo si el permiso YA estaba dado');
+    ok((ini.match(/agUbicarme\(/g) || []).length === 1, 'y en ningún otro caso al llegar al paso');
+    ok(/\.catch\(function\(\)\{\}\)/.test(ini), 'si la API de permisos falla, no pasa nada (sigue el mapa)');
+    ok(/onclick="agUbicarme\('/.test(form), 'el botón «Usar mi ubicación» es quien pide el permiso');
+    const geo = form.slice(form.indexOf('function _obtenerUbicacion('), form.indexOf('function _gpsCopiarLink'));
+    ok(/opc && opc\.rapida[\s\S]{0,260}enableHighAccuracy:false, timeout:8000, maximumAge:300000/.test(geo),
+       'para la sede basta UNA petición rápida (wifi/antena, 8 s, vale 5 min)');
+    ok(/enableHighAccuracy:true, timeout:8000/.test(geo), 'el delivery sigue con el GPS fino de siempre');
+    ok(/\{rapida:true\}\)/.test(form.slice(form.indexOf('function agUbicarme('), form.indexOf('function agUbicarme(') + 2500)),
+       'agUbicarme usa la petición rápida');
+  }
+
+  bloque('El mapa: se mueve con el mouse y tocar un punto ordena la lista');
+
+  {
+    ok(/dragging:true/.test(form), 'se arrastra también en PC');
+    ok(/_mapa\.on\('click', function\(e\)\{ if\(e && e\.latlng\) agPuntoMapa\(_mapaKey/.test(form),
+       'tocar un punto vacío lista las sedes cerca de ese punto');
+    ok(/bubblingMouseEvents:false/.test(form), 'tocar un pin NO cuenta como tocar el mapa');
+    ok(/m\.on\('click', function\(\)\{ _agElegir\(key, g\.ag\); \}\)/.test(form), 'tocar un pin elige por la misma puerta');
+    const ver = form.slice(form.indexOf('function agIniciarAlVer'), form.indexOf('function agIniciarAlVer') + 1200);
+    ok(/new IntersectionObserver/.test(ver) && /typeof IntersectionObserver!=='function'\)\{ arrancar\(\); return; \}/.test(ver),
+       'el mapa se dibuja cuando el paso se VE (y sin IntersectionObserver, igual arranca)');
+    ok(/agIniciarAlVer\(agKey\)/.test(form), 'el paso lo usa');
+  }
+
+  bloque('⚠️ «Iniciando fábrica…» al abrir el formulario sin link');
+
+  {
+    ok(/\nvar _trackTokenActivo = '';/.test(form) && !/let _trackTokenActivo/.test(form),
+       'var y no let: init() lo toca antes de su declaración (TDZ colgaba el formulario)');
+  }
+};

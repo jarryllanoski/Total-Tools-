@@ -5,8 +5,8 @@
  * enseño. Lo que se prueba aqui es que el mapa NO se convierta en una
  * segunda forma de elegir.
  *
- * ⚠️ UNA PUERTA. Tocar un punto del mapa llama a `agSel(key, i)` — la misma
- * funcion, con el mismo indice sobre la misma lista— que tocar una fila. Dos
+ * ⚠️ UNA PUERTA. Tocar un pin llama a `_agElegir(key, ag)` — la MISMA funcion
+ * que tocar una fila (`agSel(key, i)` → `_agElegir`). Dos
  * caminos para elegir agencia serian dos caminos para perder el `ter_id`, y
  * sin ese id el pedido NO SE PUEDE REGISTRAR en Shalom: `POST
  * /account/register` lo exige, y despues solo queda el texto, que es
@@ -29,17 +29,19 @@ module.exports = async ({bloque, ok}) => {
     const i = form.indexOf('async function agMapaPintar');
     const fn = form.slice(i, form.indexOf('function agSel(key, i)', i));
     ok(i > 0 && fn.length > 500, 'existe el pintor del mapa');
-    ok(/m\.on\('click', function\(\)\{ agSel\(key, g\.i\); \}\)/.test(fn),
-       '⚠️ el marcador llama a `agSel(key, i)` — la MISMA funcion y el ' +
-       'MISMO indice que la fila de la lista. Un segundo camino para elegir ' +
-       'seria un segundo camino para perder el ter_id');
+    ok(/m\.on\('click', function\(\)\{ _agElegir\(key, g\.ag\); \}\)/.test(fn),
+       '⚠️ el pin llama a `_agElegir` con la SEDE (no un índice que cambia al ' +
+       'reordenar la lista) — la MISMA puerta que la fila. Un segundo camino ' +
+       'para elegir seria un segundo camino para perder el ter_id');
     ok(!/_agIdent\s*=/.test(fn),
        'y el mapa NO toca `_agIdent` por su cuenta: quien identifica la ' +
-       'agencia sigue siendo `agSel`, en un solo sitio');
+       'agencia es `_agElegir`, en un solo sitio');
+    const sel = form.slice(form.indexOf('function agSel(key, i)'), form.indexOf('function _agElegir(key, ag)'));
+    ok(/if\(ag\) _agElegir\(key, ag\);/.test(sel), 'y la fila de la lista entra por la misma puerta');
   }
   {
     // Se pinta con la lista que YA se mostro, no con otra consulta.
-    const i = form.indexOf('drop.style.display=\'block\';\n  agMapaPintar');
+    const i = form.indexOf('drop.style.display=\'block\';\n  agMapaPintar(key, lista, {});');
     ok(i > 0,
        'el mapa se pinta justo despues de la lista y con las MISMAS ' +
        'agencias: si enseñaran cosas distintas, el indice de un marcador ' +
@@ -52,15 +54,18 @@ module.exports = async ({bloque, ok}) => {
        controles. */
     const caja = form.slice(form.indexOf('agBox.innerHTML = `<div class="agc-box">'),
         form.indexOf('agPrecargar(agKey);'));
-    const pm = caja.indexOf('id="shalomMapaWrap"');
+    /* 31/10/2026: arriba la ACCIÓN principal (usar mi ubicación), luego el
+       mapa (contexto), y el buscador pegado a su lista. */
     const pt = caja.indexOf('Elige tu sede');
+    const pu = caja.indexOf('id="agUbicCaja"');
+    const pm = caja.indexOf('id="shalomMapaWrap"');
     const pb = caja.indexOf('id="shalomAgInput"');
     const pl = caja.indexOf('id="shalomDrop"');
-    ok(pm > 0 && pt > 0 && pb > 0 && pl > 0,
-       'estan los cuatro: mapa, titulo, buscador y lista');
-    ok(pm < pt && pt < pb && pb < pl,
-       '⚠️ en ese orden: mapa, «Elige tu sede», buscador, lista. El mapa ' +
-       'entre el buscador y la lista separaba una pregunta de su respuesta');
+    ok(pm > 0 && pt > 0 && pu > 0 && pb > 0 && pl > 0,
+       'estan los cinco: titulo, ubicacion, mapa, buscador y lista');
+    ok(pt < pu && pu < pm && pm < pb && pb < pl,
+       '⚠️ en ese orden: «Elige tu sede», usar mi ubicación, mapa, buscador, ' +
+       'lista. El buscador sigue pegado a sus resultados');
   }
 
   bloque('⚠️ La lista manda: sin mapa se puede pedir igual');
@@ -158,7 +163,7 @@ module.exports = async ({bloque, ok}) => {
        Se EJECUTA la funcion contra un DOM de mentira: lo que se comprueba
        es el texto que acaba en el boton, no el que esta en el fuente. */
     const src = form.slice(form.indexOf('function _cercaBtnBuscando'),
-        form.indexOf('async function agCerca'));
+        form.indexOf('function _agUbicFallo'));
     const txt = {textContent: ''};
     const btn = {style: {}, disabled: false,
       querySelector: () => txt};
@@ -173,7 +178,7 @@ module.exports = async ({bloque, ok}) => {
     ok(!/ubicaci/i.test(txt.textContent),
        'y la palabra «ubicacion» ya no sale en el boton');
     M(false);
-    ok(txt.textContent === 'cerca de mí', 'y al acabar vuelve a su sitio');
+    ok(txt.textContent === 'Usar mi ubicación', 'y al acabar vuelve a su sitio');
   }
   {
     /* ⚠️ UNO SOLO PARA LOS DOS COURIERS. Si hubiera dos botones o dos
@@ -220,10 +225,15 @@ module.exports = async ({bloque, ok}) => {
     ok(/invalidateSize/.test(fn),
        'y se remide al mostrarlo: Leaflet mide mal lo que nace oculto, y ' +
        'sale un mapa gris cortado');
-    const alto = (form.match(/id="shalomMapa"[^>]*height:(\d+)px/) || [])[1];
-    ok(Number(alto) > 100 && Number(alto) < 300,
-       'alto fijo y contenido (' + alto + 'px): un mapa a pantalla completa ' +
-       'en el paso 3 de 4 esconde el boton de continuar');
+    const alto = (form.match(/\.ag-mapa\{height:(\d+)px/) || [])[1];
+    const altoPc = (form.match(/@media\(min-width:700px\)\{\.ag-mapa\{height:(\d+)px\}\}/) || [])[1];
+    ok(Number(alto) > 100 && Number(alto) < 300 && Number(altoPc) > 100 && Number(altoPc) < 320,
+       'alto fijo y contenido (' + alto + 'px celular, ' + altoPc + 'px PC): un mapa a pantalla ' +
+       'completa en el paso 3 de 4 esconde el boton de continuar');
+    ok(/dragging:true/.test(fn), 'en la PC se arrastra con el mouse');
+    ok(/_mapa\.on\('click focus', function\(\)\{ try\{ _mapa\.scrollWheelZoom\.enable\(\); \}catch\(e\)\{\} \}\);/.test(fn) &&
+       /_mapa\.on\('mouseout blur', function\(\)\{ try\{ _mapa\.scrollWheelZoom\.disable\(\); \}catch\(e\)\{\} \}\);/.test(fn),
+       'y la rueda hace zoom SOLO tras hacer clic en el mapa; al salir se apaga');
   }
   {
     /* ⚠️ ESTA PRUEBA AFIRMABA LO CONTRARIO, Y ERA MIA.
@@ -241,10 +251,12 @@ module.exports = async ({bloque, ok}) => {
     ok(!/shalomMapaWrap/.test(fn),
        '⚠️ al elegir, el mapa SE QUEDA — con la elegida señalada es una ' +
        'confirmacion, no una invitacion');
+    /* 31/10/2026: y al borrar la eleccion TAMBIEN se queda. Antes se
+       escondia («no hay nada que confirmar»), pero ahora el mapa es lo que
+       ayuda a volver a elegir: tocar tu zona o un pin. */
     const r = form.indexOf('function agReset');
-    ok(/_mw\.style\.display='none'/.test(form.slice(r, r + 900)),
-       'pero al borrar la eleccion si se esconde: ahi no hay nada que ' +
-       'confirmar');
+    ok(!/_mw\.style\.display='none'/.test(form.slice(r, r + 900)) && /_agElegidaK = '';/.test(form.slice(r, r + 900)),
+       'al borrar la eleccion el mapa se queda (sirve para volver a elegir) y la marca se suelta');
   }
 
   bloque('⚠️ Al llegar NO se abre el teclado');
@@ -289,8 +301,8 @@ module.exports = async ({bloque, ok}) => {
        'un punto');
   }
   {
-    const i = form.indexOf('async function agCerca');
-    const fn = form.slice(i, i + 2200);
+    const i = form.indexOf('async function agUbicarme');
+    const fn = form.slice(i, form.indexOf('function agCerca(key)', i));
     ok(/_miUbic=\{la:la, lo:lo\}/.test(fn),
        'la ubicacion se guarda donde YA se tenia: se usaba para ordenar por ' +
        'distancia y se tiraba al salir de la funcion');
@@ -305,25 +317,22 @@ module.exports = async ({bloque, ok}) => {
        contrario y tiene razon: con la elegida marcada, el mapa deja de ser
        una invitacion y pasa a ser la confirmacion de adonde va el paquete.
        Y un toque de mas no es un problema — vuelve a pasar por `agSel`. */
-    const i = form.indexOf('function agSel(key, i)');
+    const i = form.indexOf('function _agElegir(key, ag)');
     const fn = form.slice(i, form.indexOf('function agManual', i));
-    ok(/agMapaMarcar\(i\)/.test(fn),
-       'al elegir se señala en el mapa, con el MISMO indice');
+    ok(/agMostrar\(key, lista, ''\);/.test(fn),
+       'al elegir se repinta la lista (la elegida ARRIBA) y con ella el mapa');
     ok(!/shalomMapaWrap[\s\S]{0,60}display='none'/.test(fn),
        '⚠️ y el mapa YA NO se esconde al elegir: es donde se ve adonde va ' +
        'tu paquete');
   }
   {
-    const i = form.indexOf('function agMapaMarcar');
-    const fn = form.slice(i, form.indexOf('function agMapaDesmarcar'));
-    ok(/setOpacity\(yo\?1:\.35\)/.test(fn), 'las demas se atenuan');
-    ok(/setZIndexOffset\(yo\?1000:0\)/.test(fn), 'la elegida se pone delante');
-    ok(/openPopup\(\)/.test(fn) && /setView\(/.test(fn),
-       'abre su nombre y el mapa se mueve hasta ella — el movimiento es la ' +
-       'señal que de verdad se nota');
-    ok(/catch\(e\)\{/.test(fn),
-       '⚠️ y todo va en try/catch: el mapa NUNCA puede romper la eleccion, ' +
-       'que es lo que de verdad importa de esta pantalla');
+    const i = form.indexOf('async function agMapaPintar');
+    const fn = form.slice(i, form.indexOf('function agMapaMarcar', i));
+    ok(/icon:_agIcono\(sel\), zIndexOffset: sel\?1000:0/.test(fn),
+       'la elegida: pin GRANDE y delante de las demás');
+    ok(/setView\(elegida\.m\.getLatLng\(\)/.test(fn), 'y el mapa se mueve hasta ella');
+    ok(/catch\(e\)\{[\s\S]{0,200}wrap\.style\.display='none';/.test(fn),
+       '⚠️ y todo va en try/catch: el mapa NUNCA puede romper la eleccion');
   }
   {
     const i = form.indexOf('function agReset');
@@ -335,9 +344,9 @@ module.exports = async ({bloque, ok}) => {
   {
     /* Tocar una FILA de la lista tambien marca el mapa, porque las dos
        pasan por `agSel` con el mismo indice. Una sola puerta, otra vez. */
-    const i = form.indexOf('function agSel(key, i)');
+    const i = form.indexOf('function _agElegir(key, ag)');
     const fn = form.slice(i, form.indexOf('function agManual', i));
-    const marca = fn.indexOf('agMapaMarcar');
+    const marca = fn.indexOf('agMostrar(key, lista');
     const guarda = fn.indexOf('window._agIdent');
     ok(marca > 0 && guarda > 0 && guarda < marca,
        'primero se guarda la eleccion y DESPUES se pinta: si el mapa ' +
