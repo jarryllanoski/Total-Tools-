@@ -304,29 +304,46 @@ body.wz-sede #tt-lbl{display:none!important}
 .ag-geo.dlv-geo{margin-bottom:8px}
 .dlv-msg{font-size:12.5px;color:var(--text2);line-height:1.5;margin-bottom:8px}
 .dlv-msg a{color:var(--blue);font-weight:700;cursor:pointer;text-decoration:underline;white-space:nowrap}
-.dlv-prev{height:150px;border-radius:12px;overflow:hidden;border:1.5px solid var(--bd);background:#0d1117;cursor:pointer;margin-bottom:8px}
+.dlv-pista{font-size:12px;color:#eab308;font-weight:700;margin-top:6px}
 .dlv-confirma{margin-bottom:8px}
 .dlv-q{font-size:13.5px;font-weight:800;color:var(--text);margin-bottom:8px}
 .dlv-aviso{font-size:12.5px;color:#eab308;line-height:1.45;margin-bottom:8px}
-.dlv-btns{display:flex;gap:8px}
+.dlv-btns{display:flex;gap:8px;margin-bottom:4px}
 .dlv-btns button{flex:1;min-height:44px;border-radius:10px;font-family:inherit;font-size:13.5px;font-weight:800;cursor:pointer}
 .dlv-si{background:var(--green);border:none;color:#04120a}
 .dlv-aj{background:none;border:1.5px solid var(--blue);color:var(--blue)}
 .dlv-link{background:none;border:none;color:var(--blue);font-weight:700;font-size:12.5px;cursor:pointer;font-family:inherit;padding:4px 0;text-decoration:underline}
-/* Ajuste a pantalla completa: aquí SÍ se arrastra con un dedo (no hay
-   página detrás que se atasque). El pin queda fijo en el centro. */
-#dlvAjuste{position:fixed;inset:0;z-index:99990;background:#0d1117;display:none;flex-direction:column}
-#dlvAjuste.on{display:flex}
-.dlv-aj-top{padding:14px 16px;font-size:14px;font-weight:800;color:var(--text);line-height:1.4;background:#0d1117;border-bottom:1px solid var(--bd)}
-.dlv-aj-top small{display:block;font-weight:600;color:#eab308;margin-top:4px}
-.dlv-aj-mapa{position:relative;flex:1}
-.dlv-aj-mapa .leaflet-container{height:100%}
-.dlv-aj-pin{position:absolute;left:50%;top:50%;z-index:1000;transform:translate(-50%,-100%);pointer-events:none;filter:drop-shadow(0 4px 6px rgba(0,0,0,.4))}
-.dlv-aj-bot{display:flex;gap:10px;padding:12px 16px calc(12px + env(safe-area-inset-bottom));background:#0d1117;border-top:1px solid var(--bd)}
-.dlv-aj-bot button{min-height:48px;border-radius:12px;font-family:inherit;font-size:15px;font-weight:800;cursor:pointer}
-.dlv-aj-no{flex:0 0 auto;padding:0 16px;background:#1c2333;border:1px solid #30363d;color:#c9d1d9}
+/* ★ UN mapa de delivery, DOS modos (30/10/2026):
+     · MIRAR: el pin queda fijo en el punto; mover la vista no lo mueve.
+       Mismo tamaño que el mapa de sedes. Celular: dos dedos (un dedo baja
+       la página). PC: mouse.
+     · AJUSTAR (solo con el botón «Ajustar punto»): pin fijo al centro y se
+       mueve el mapa. PC: en el MISMO recuadro, al mismo tamaño. Celular:
+       pantalla completa (ahí un dedo arrastra sin atascar la página). */
+.dlv-prev{position:relative;height:230px;border-radius:12px;overflow:hidden;border:1.5px solid var(--bd);background:#0d1117;margin-bottom:8px}
+@media(min-width:700px){.dlv-prev{height:280px}}
+.dlv-mapa{position:absolute;inset:0}
+.dlv-aj-top,.dlv-aj-pin,.dlv-aj-bot{display:none}
+.dlv-prev.ajustando{border-color:var(--blue)}
+.dlv-prev.ajustando .dlv-aj-top{display:block;position:absolute;top:0;left:0;right:0;z-index:1001;padding:9px 12px;font-size:13px;font-weight:800;color:#fff;background:rgba(13,17,23,.88);line-height:1.35}
+.dlv-aj-top small{display:block;font-weight:600;color:#eab308;margin-top:2px}
+.dlv-prev.ajustando .dlv-aj-pin{display:block;position:absolute;left:50%;top:50%;z-index:1000;transform:translate(-50%,-100%);pointer-events:none;filter:drop-shadow(0 4px 6px rgba(0,0,0,.4))}
+.dlv-prev.ajustando .dlv-aj-bot{display:flex;gap:8px;position:absolute;left:0;right:0;bottom:0;z-index:1001;padding:8px;background:rgba(13,17,23,.88)}
+.dlv-aj-bot button{min-height:42px;border-radius:10px;font-family:inherit;font-size:14px;font-weight:800;cursor:pointer}
+.dlv-aj-no{flex:0 0 auto;padding:0 14px;background:#1c2333;border:1px solid #30363d;color:#c9d1d9}
 .dlv-aj-ok{flex:1;background:var(--blue);border:none;color:#fff}
-body.dlv-ajustando{overflow:hidden}
+.dlv-prev.ajustando .leaflet-top{top:52px}
+.dlv-prev.ajustando .leaflet-bottom{bottom:58px}
+.dlv-volver{display:none;position:absolute;right:8px;bottom:24px;z-index:1000;background:#fff;color:#1f2937;border:none;border-radius:16px;padding:7px 11px;font-size:12px;font-weight:700;font-family:inherit;cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,.25)}
+.dlv-volver.on{display:block}
+.dlv-prev.ajustando .dlv-volver{display:none}
+@media(pointer:coarse){
+  .dlv-prev.ajustando{position:fixed;inset:0;height:auto;z-index:99990;border-radius:0;border:0;margin:0}
+  .dlv-prev.ajustando .dlv-aj-top{padding:14px 16px;font-size:14px}
+  .dlv-prev.ajustando .dlv-aj-bot{padding:12px 16px calc(12px + env(safe-area-inset-bottom))}
+  .dlv-aj-bot button{min-height:48px;font-size:15px}
+  body.dlv-ajustando{overflow:hidden}
+}
 body.dlv-ajustando #tt-narr{display:none!important}
 .addr-pin-chip button{margin-left:auto;background:none;border:none;color:var(--text2);font-size:15px;cursor:pointer;font-family:inherit;line-height:1;padding:0 2px}
 </style>
@@ -1279,12 +1296,12 @@ function renderForm(){
         <button type="button" id="addrGpsBtn" class="addr-gps-btn" onclick="usarMiUbicacion()">📍 Usar mi ubicación</button>
         </geolocation>
         <div id="addrGpsMsg" style="display:none;margin-bottom:8px"></div>
-        <div id="dlvPrev" class="dlv-prev" style="display:none" onclick="dlvAjustar()" role="button" aria-label="Ajustar el punto de entrega en el mapa"></div>
+        <div id="dlvPrev" class="dlv-prev" style="display:none"></div>
         <div id="dlvConfirma" class="dlv-confirma" style="display:none"></div>
         <textarea class="fi" id="addrManualInput" rows="2" data-wz-focus
-          placeholder="Escribe la dirección completa *" autocomplete="street-address"
+          placeholder="Calle y número, Mz/Lt o dpto *" autocomplete="street-address"
           oninput="onDireccionInput()"></textarea>
-        <div id="addrPinChip" style="display:none"></div>
+        <div id="dlvPista" class="dlv-pista" style="display:none">✏️ Agrega el número, Mz/Lt o dpto.</div>
         <div class="ferr" id="err_deliveryAddr" style="margin-top:4px">Ingresa la dirección de entrega</div>
         <div class="fg" id="refField" style="margin-top:10px;margin-bottom:0">
           <input class="fi" id="f_ref" type="text"
@@ -1898,24 +1915,13 @@ function resetAgency(){
      las coordenadas; el texto del cliente siempre manda.
    · Las coordenadas viven aparte y SOBREVIVEN a la edición del texto — antes
      se borraban al corregir, que es justo cuando el cliente está precisando
-     su dirección. Se muestran como un chip que él puede quitar.
+     su dirección. Se ven en el mapa de delivery, que él puede quitar.
    La usan submitOrder, el validador del asistente y la etiqueta viva. */
 function getDeliveryAddr(){
   return ($('addrManualInput')||{value:''}).value.trim();
 }
 window.getDeliveryAddr = getDeliveryAddr;
 
-/* Chip de coordenadas adjuntas (refleja _gpsLat/_gpsLon). */
-function _pinChip(){
-  const el=$('addrPinChip'); if(!el) return;
-  if(_gpsLat&&_gpsLon){
-    el.style.display='block';
-    el.innerHTML='<div class="addr-pin-chip"><span>📍 Ubicación exacta adjunta</span>'+
-      '<a href="'+esc(EnlaceMapa.de(_gpsLat+','+_gpsLon))+'" target="_blank" rel="noopener">Ver mapa</a>'+
-      '<button type="button" onclick="quitarPin()" title="Quitar ubicación">✕</button></div>';
-  } else { el.style.display='none'; el.innerHTML=''; }
-}
-function quitarPin(){ _gpsLat=null; _gpsLon=null; _pinChip(); _dlvReset(); }
 
 /* Al escribir: si ya hay texto, se limpia el error. Único punto de validación. */
 function onDireccionInput(){
@@ -1928,19 +1934,6 @@ function _gpsBtn(html, ocupado){
   b.disabled=!!ocupado; b.innerHTML=html; b.style.opacity=ocupado?'.75':'';
 }
 function _gpsMsg(html){ const e=$('addrGpsMsg'); if(e){ e.style.display=html?'block':'none'; e.innerHTML=html||''; } }
-
-function _parseNominatimAddr(d){
-  const a=d.address||{};
-  const parts=[];
-  const road=a.road||a.pedestrian||a.footway||a.path||'';
-  const num=a.house_number||'';
-  if(road) parts.push(road+(num?' '+num:''));
-  const neigh=a.suburb||a.neighbourhood||a.city_district||a.quarter||'';
-  if(neigh) parts.push(neigh);
-  const city=a.city||a.town||a.village||a.municipality||'';
-  if(city&&city!==neigh) parts.push(city);
-  return parts.join(', ')||d.display_name||'';
-}
 
 // Navegador in-app (webview) donde la geolocalización suele bloquearse.
 function _gpsWebviewInApp(){
@@ -2021,6 +2014,9 @@ function usarMiUbicacion(){
 function _dlvConectar(){
   var g=$('dlvGeoNativo'); if(!g || g._conectado) return;
   g._conectado=true;
+  // La pista «Agrega el número» se va cuando ESCRIBE el cliente (solo
+  // eventos reales: rellenar por código no dispara 'input').
+  var ta=$('addrManualInput'); if(ta) ta.addEventListener('input', function(){ _dlvPista(false); });
   var mio=0;
   _dlvNativo=_ubicNativo(g, {
     invalido: function(){ usarMiUbicacion(); },
@@ -2049,75 +2045,168 @@ function _dlvError(codigo, estado){
     if(ta){ try{ ta.focus({preventScroll:true}); ta.scrollIntoView({block:'center',behavior:'smooth'}); }catch(e){} }
   }
 }
+/* ═══ LOS DATOS DE DELIVERY: DOS COSAS, CADA UNA EN SU SITIO ════════════
+     · La DIRECCIÓN escrita (#addrManualInput) — obligatoria; es lo que van
+       a leer la etiqueta, el WhatsApp y el panel (order.address).
+     · El PUNTO en el mapa (_gpsLat/_gpsLon → order.gpsCoords) — opcional;
+       es el enlace de Google Maps del WhatsApp.
+   Se ayudan, nunca se pisan:
+     · el punto SUGIERE texto solo si el cuadro está vacío Y trae calle;
+       un barrio suelto («Zapallal, Puente Piedra») parece completo y no lo
+       es: queda como pista en el placeholder, no como dirección;
+     · si sugiere una calle sin número, se pide el número (pista amarilla);
+     · editar el texto no borra el punto; quitar el punto no borra el texto. */
+var _DLV_PLACEHOLDER='Calle y número, Mz/Lt o dpto *';
+var _dlvGeoMemo={};   // dirección ya consultada por punto (no repetir consultas)
+
 /* EL punto de entrega: una sola función lo pone, venga del GPS o del ajuste. */
 function _dlvPunto(la, lo, opc){
   opc=opc||{};
   _gpsLat=+Number(la).toFixed(6); _gpsLon=+Number(lo).toFixed(6);
   _dlvAcc=opc.acc||0; _dlvOk=!!opc.confirmado;
-  _pinChip();
   _dlvSugerirDireccion(_gpsLat, _gpsLon);
   _dlvPintar(!!opc.salta);
   _dlvEstado();
   _paso3Continuar();
 }
+function quitarPin(){ _gpsLat=null; _gpsLon=null; _dlvReset(); }
 function _dlvReset(){
   _dlvOk=false; _dlvAcc=0; _dlvFallos=0; _dlvToken++;
-  _pinChip();   // refleja _gpsLat/_gpsLon (ya en null): sin chip viejo
-  var p=$('dlvPrev'), c=$('dlvConfirma');
+  _dlvModo('mirar');
+  var p=$('dlvPrev'), c=$('dlvConfirma'), ta=$('addrManualInput');
   if(p) p.style.display='none';
   if(c){ c.style.display='none'; c.innerHTML=''; }
+  if(ta) ta.placeholder=_DLV_PLACEHOLDER;
+  _dlvPista(false);
 }
-/* Texto legible del punto, SOLO si el cuadro está vacío (lo que escribió el
-   cliente manda) y UNA consulta por punto: lo que pide el servicio gratuito
-   de OpenStreetMap (nada de consultas por cada tecla). */
+function _dlvPista(on){ var e=$('dlvPista'); if(e) e.style.display=on?'block':'none'; }
+
+/* La respuesta de OpenStreetMap → {calle, numero, zona}. */
+function _dirDeNominatim(d){
+  var a=(d&&d.address)||{};
+  var road=a.road||a.pedestrian||a.footway||a.path||'';
+  var num=a.house_number||'';
+  var neigh=a.suburb||a.neighbourhood||a.city_district||a.quarter||'';
+  var city=a.city||a.town||a.village||a.municipality||'';
+  return {calle: road ? road+(num?' '+num:'') : '', numero: !!num,
+    zona: [neigh, city!==neigh?city:''].filter(Boolean).join(', ')};
+}
+/* UNA consulta por punto (recordada), solo con el punto que sigue vigente:
+   lo que pide el servicio gratuito de OpenStreetMap. */
 function _dlvSugerirDireccion(la, lo){
-  var ta=$('addrManualInput'); if(!ta || ta.value.trim()) return;
+  var k=la+','+lo;
+  var usar=function(x){
+    if(_gpsLat!==la || _gpsLon!==lo) return;          // ya es otro punto
+    var ta=$('addrManualInput'); if(!ta || !x) return;
+    ta.placeholder=_DLV_PLACEHOLDER+(x.zona?' · cerca de '+x.zona:'');
+    if(ta.value.trim() || !x.calle) return;           // lo escrito manda; sin calle no se escribe
+    ta.value=[x.calle, x.zona].filter(Boolean).join(', ');
+    onDireccionInput();
+    _dlvPista(!x.numero);
+  };
+  if(_dlvGeoMemo[k]){ usar(_dlvGeoMemo[k]); return; }
   fetch('https://nominatim.openstreetmap.org/reverse?lat='+la+'&lon='+lo+'&format=json&accept-language=es')
     .then(function(r){ return r.json(); })
-    .then(function(d){
-      var t=_parseNominatimAddr(d)||'';
-      if(t && !ta.value.trim() && _gpsLat===la && _gpsLon===lo){ ta.value=t; onDireccionInput(); }
-    }).catch(function(){});
+    .then(function(d){ _dlvGeoMemo[k]=_dirDeNominatim(d); usar(_dlvGeoMemo[k]); })
+    .catch(function(){});
 }
-/* Vista previa QUIETA (no se arrastra: no atrapa la página). Tocarla abre
-   el ajuste a pantalla completa. Si el mapa no carga, todo lo demás sigue. */
-function _dlvPintar(salta){
-  var box=$('dlvPrev'); if(!box) return;
-  if(!(_gpsLat&&_gpsLon)){ box.style.display='none'; return; }
-  agMapaCargar().then(function(ok){
-    if(!ok || !window.L || !(_gpsLat&&_gpsLon)){ box.style.display='none'; return; }
+
+/* ── EL mapa de delivery: uno, creado una vez, con dos modos ── */
+var _dlvMarca=null, _dlvCirculo=null, _dlvModoAct='mirar';
+function _dlvTactil(){ return !!(window.matchMedia && matchMedia('(pointer:coarse)').matches); }
+function _dlvMapaListo(){
+  return agMapaCargar().then(function(ok){
+    var box=$('dlvPrev'); if(!ok || !window.L || !box) return null;
     try{
       box.style.display='block';
       if(!_dlvMapa || !box.contains(_dlvMapa.getContainer())){
         if(_dlvMapa){ try{ _dlvMapa.remove(); }catch(e){} }
-        var el=document.createElement('div'); el.style.height='100%'; box.innerHTML=''; box.appendChild(el);
-        _dlvMapa=L.map(el,{dragging:false, touchZoom:false, scrollWheelZoom:false, doubleClickZoom:false,
-          boxZoom:false, keyboard:false, zoomControl:false, attributionControl:true});
+        box.innerHTML='<div class="dlv-mapa" id="dlvMapaEl"></div>'
+          +'<div class="dlv-aj-top">Mueve el mapa hasta que el pin quede en tu puerta<small id="dlvAjAviso"></small></div>'
+          +'<div class="dlv-aj-pin">'+_agIcono(true).options.html+'</div>'
+          +'<div class="ag-mapa-dedos" id="dlvDedos" aria-hidden="true"></div>'
+          +'<button type="button" class="dlv-volver" id="dlvVolverBtn" onclick="dlvVolver()">◎ Volver a mi punto</button>'
+          +'<div class="dlv-aj-bot"><button type="button" class="dlv-aj-no" onclick="dlvAjusteCerrar()">Cancelar</button>'
+          +'<button type="button" class="dlv-aj-ok" onclick="dlvAjusteOk()">✓ Entregar aquí</button></div>';
+        _dlvMapa=L.map('dlvMapaEl',{dragging:!_dlvTactil(), touchZoom:true, scrollWheelZoom:false,
+          doubleClickZoom:true, zoomControl:true, attributionControl:true});
         _mapaCapa(_dlvMapa);
+        if(_dlvTactil()) _mapaDosDedos(_dlvMapa, $('dlvDedos'));
+        _dlvMapa.on('moveend', _dlvVolverVisible);
+        _dlvMarca=null;
       }
-      _dlvMapa.eachLayer(function(l){ if(!(l instanceof L.TileLayer)) _dlvMapa.removeLayer(l); });
-      var c=[_gpsLat,_gpsLon];
-      if(_dlvAcc>0 && !_dlvOk) L.circle(c,{radius:_dlvAcc, color:'#2d7ff9', weight:1, fillOpacity:.12, interactive:false}).addTo(_dlvMapa);
-      L.marker(c,{icon:_agIcono(true, salta), interactive:false, keyboard:false}).addTo(_dlvMapa);
-      _dlvMapa.setView(c, 17);
-      setTimeout(function(){ try{ _dlvMapa.invalidateSize(); _dlvMapa.setView(c, 17); }catch(e){} }, 60);
-    }catch(e){ box.style.display='none'; }
+      return _dlvMapa;
+    }catch(e){ box.style.display='none'; return null; }
   });
 }
+/* MIRAR: el pin fijo en el punto (no se toca). */
+function _dlvPintar(salta){
+  var box=$('dlvPrev'); if(!box) return;
+  if(!(_gpsLat&&_gpsLon)){ if(_dlvModoAct!=='ajustar') box.style.display='none'; return; }
+  _dlvMapaListo().then(function(m){
+    if(!m || !(_gpsLat&&_gpsLon)) return;
+    m.eachLayer(function(l){ if(!(l instanceof L.TileLayer)) m.removeLayer(l); });
+    var c=[_gpsLat,_gpsLon];
+    _dlvCirculo = (_dlvAcc>0 && !_dlvOk) ? L.circle(c,{radius:_dlvAcc, color:'#2d7ff9', weight:1, fillOpacity:.12, interactive:false}).addTo(m) : null;
+    _dlvMarca=L.marker(c,{icon:_agIcono(true, salta), interactive:false, keyboard:false}).addTo(m);
+    if(_dlvModoAct==='ajustar') _dlvMarcasVisibles(false);
+    m.setView(c, 17);
+    setTimeout(function(){ try{ m.invalidateSize(); if(_dlvModoAct!=='ajustar') m.setView(c, 17); }catch(e){} }, 60);
+  });
+}
+/* Cambiar de modo: lo único que cambia es quién manda sobre el mapa. */
+function _dlvModo(modo){
+  _dlvModoAct=modo;
+  var box=$('dlvPrev'), aj=(modo==='ajustar');
+  if(box) box.classList.toggle('ajustando', aj);
+  document.body.classList.toggle('dlv-ajustando', aj);
+  var c=$('dlvConfirma'); if(c && aj) c.style.display='none';
+  var dd=$('dlvDedos'); if(dd) dd.classList.remove('on');   // el aviso de «mirar» no sigue encima
+  if(_dlvMapa){
+    try{
+      if(aj || !_dlvTactil()) _dlvMapa.dragging.enable(); else _dlvMapa.dragging.disable();
+      _dlvMarcasVisibles(!aj);
+      setTimeout(function(){ try{ _dlvMapa.invalidateSize(); }catch(e){} }, 60);
+    }catch(e){}
+  }
+  _dlvVolverVisible();
+}
+/* En AJUSTAR solo se ve el pin del centro: el del punto y su círculo se ocultan. */
+function _dlvMarcasVisibles(si){
+  try{
+    if(_dlvMarca) _dlvMarca.setOpacity(si?1:0);
+    if(_dlvCirculo) _dlvCirculo.setStyle({opacity:si?1:0, fillOpacity:si?.12:0});
+  }catch(e){}
+}
+/* «◎ Volver a mi punto» aparece si la vista se alejó del punto. */
+function _dlvVolverVisible(){
+  var b=$('dlvVolverBtn'); if(!b) return;
+  var lejos=false;
+  try{
+    if(_dlvMapa && _gpsLat && _dlvModoAct==='mirar'){
+      var a=_dlvMapa.latLngToContainerPoint([_gpsLat,_gpsLon]), z=_dlvMapa.getSize();
+      lejos = a.x<20 || a.y<20 || a.x>z.x-20 || a.y>z.y-20 || _dlvMapa.getZoom()<14;
+    }
+  }catch(e){}
+  b.classList.toggle('on', lejos);
+}
+function dlvVolver(){ if(_dlvMapa && _gpsLat) _dlvMapa.setView([_gpsLat,_gpsLon], 17); }
+
 /* «¿Es aquí tu casa?» → [Sí] [Ajustar]; confirmado → «¡Listo!». */
 function _dlvEstado(){
   var c=$('dlvConfirma'); if(!c) return;
-  if(!(_gpsLat&&_gpsLon)){ c.style.display='none'; c.innerHTML=''; return; }
+  if(!(_gpsLat&&_gpsLon) || _dlvModoAct==='ajustar'){ c.style.display='none'; if(!(_gpsLat&&_gpsLon)) c.innerHTML=''; return; }
   c.style.display='block';
+  var quitar='<button type="button" class="dlv-link" onclick="quitarPin()">Quitar punto</button>';
   if(_dlvOk){
     c.innerHTML='<div class="tt-ok on">✓ ¡Listo! Te lo llevamos aquí</div>'
-      +'<button type="button" class="dlv-link" onclick="dlvAjustar()">Ajustar punto</button>';
+      +'<button type="button" class="dlv-link" onclick="dlvAjustar()">Ajustar punto</button> · '+quitar;
     return;
   }
   var aviso = _dlvAcc>100 ? '<div class="dlv-aviso">📍 Tu ubicación es aproximada (± '+_dlvAcc+' m): ajusta el punto.</div>' : '';
   c.innerHTML=aviso+'<div class="dlv-q">¿Es aquí tu casa?</div>'
     +'<div class="dlv-btns"><button type="button" class="dlv-si" onclick="dlvConfirmar()">✓ Sí, es aquí</button>'
-    +'<button type="button" class="dlv-aj" onclick="dlvAjustar()">Ajustar punto</button></div>';
+    +'<button type="button" class="dlv-aj" onclick="dlvAjustar()">Ajustar punto</button></div>'+quitar;
 }
 function dlvConfirmar(){
   if(!(_gpsLat&&_gpsLon)) return;
@@ -2127,48 +2216,35 @@ function dlvConfirmar(){
   _dlvEstado();
   _ttPop($('dlvPrev'));
 }
-/* AJUSTAR: mapa a pantalla completa, pin FIJO en el centro, se mueve el
-   mapa con un dedo. Sin punto previo, empieza en Lima. */
+/* AJUSTAR: SOLO desde su botón (o «marca tu casa» sin ubicación). Sin
+   punto previo, empieza en Lima. Cancelar deja todo como estaba. */
 function dlvAjustar(opc){
   opc=opc||{};
-  agMapaCargar().then(function(ok){
-    if(!ok || !window.L){
+  _dlvMapaListo().then(function(m){
+    if(!m){
       _gpsMsg('<div class="dlv-msg">No pudimos abrir el mapa. Escribe tu dirección abajo 👇</div>');
       var ta=$('addrManualInput'); if(ta){ try{ ta.focus(); }catch(e){} }
       return;
     }
-    var ov=$('dlvAjuste');
-    if(!ov){
-      ov=document.createElement('div'); ov.id='dlvAjuste';
-      ov.setAttribute('role','dialog'); ov.setAttribute('aria-modal','true'); ov.setAttribute('aria-label','Ajustar el punto de entrega');
-      ov.innerHTML='<div class="dlv-aj-top" id="dlvAjTop"></div>'
-        +'<div class="dlv-aj-mapa"><div id="dlvAjMapa" style="position:absolute;inset:0"></div>'
-        +'<div class="dlv-aj-pin">'+_agIcono(true).options.html+'</div></div>'
-        +'<div class="dlv-aj-bot"><button type="button" class="dlv-aj-no" onclick="dlvAjusteCerrar()">Cancelar</button>'
-        +'<button type="button" class="dlv-aj-ok" onclick="dlvAjusteOk()">Confirmar este punto</button></div>';
-      document.body.appendChild(ov);
-      document.addEventListener('keydown', function(e){ if(e.key==='Escape' && ov.classList.contains('on')) dlvAjusteCerrar(); });
-    }
-    var top=$('dlvAjTop');
-    if(top) top.innerHTML='Mueve el mapa hasta que el pin quede en tu puerta'
-      +(opc.aviso ? '<small>Tu ubicación es aproximada (± '+opc.aviso+' m)</small>' : '');
-    ov.classList.add('on'); document.body.classList.add('dlv-ajustando');
-    var m=dlvAjustar._m;
-    if(!m){ m=dlvAjustar._m=L.map('dlvAjMapa',{zoomControl:true, attributionControl:true}); _mapaCapa(m); }
-    var hay=!!(_gpsLat&&_gpsLon);
-    m.setView(hay?[_gpsLat,_gpsLon]:_DLV_LIMA, hay?18:12);
-    setTimeout(function(){ try{ m.invalidateSize(); m.setView(hay?[_gpsLat,_gpsLon]:_DLV_LIMA, hay?18:12); }catch(e){} }, 60);
+    var av=$('dlvAjAviso'); if(av) av.textContent = opc.aviso ? 'Tu ubicación es aproximada (± '+opc.aviso+' m)' : '';
+    _dlvModo('ajustar');
+    var hay=!!(_gpsLat&&_gpsLon), c=hay?[_gpsLat,_gpsLon]:_DLV_LIMA, z=hay?18:12;
+    m.setView(c, z);
+    setTimeout(function(){ try{ m.invalidateSize(); m.setView(c, z); }catch(e){} }, 60);
+    if(!_dlvTactil()){ try{ $('dlvPrev').scrollIntoView({block:'center',behavior:'smooth'}); }catch(e){} }
   });
 }
 function dlvAjusteCerrar(){
-  var ov=$('dlvAjuste'); if(ov) ov.classList.remove('on');
-  document.body.classList.remove('dlv-ajustando');
+  _dlvModo('mirar');
+  if(_gpsLat&&_gpsLon) _dlvPintar(false);
+  else { var b=$('dlvPrev'); if(b) b.style.display='none'; }
+  _dlvEstado();
 }
 function dlvAjusteOk(){
-  var m=dlvAjustar._m; if(!m) return dlvAjusteCerrar();
+  var m=_dlvMapa; if(!m) return dlvAjusteCerrar();
   var c=m.getCenter();
-  dlvAjusteCerrar();
-  if(!AgLista.coords({latitud:c.lat, longitud:c.lng})){ _dlvError('fuera',''); return; }
+  _dlvModo('mirar');
+  if(!AgLista.coords({latitud:c.lat, longitud:c.lng})){ dlvAjusteCerrar(); _dlvError('fuera',''); return; }
   _gpsMsg('');
   _dlvPunto(c.lat, c.lng, {confirmado:true, salta:true});
   _ttVibrar();
@@ -3643,6 +3719,18 @@ function _agCoords(ag){
   return [la,lo];
 }
 
+/* Celular: con UN dedo sobre un mapa que no se arrastra, se avisa «Usa dos
+   dedos» (dos dedos mueven y acercan; un dedo desplaza la página). */
+function _mapaDosDedos(m, aviso){
+  if(!aviso) return;
+  var t=0;
+  m.getContainer().addEventListener('touchmove', function(ev){
+    if(!ev.touches || ev.touches.length!==1 || m.dragging.enabled()) return;
+    aviso.textContent='Usa dos dedos para mover el mapa';
+    aviso.classList.add('on'); clearTimeout(t);
+    t=setTimeout(function(){ aviso.classList.remove('on'); }, 1400);
+  }, {passive:true});
+}
 /* Teselas de OpenStreetMap: UNA definición para todos los mapas. */
 function _mapaCapa(m){
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
@@ -3693,15 +3781,7 @@ async function agMapaPintar(key, agencias, opc){
         scrollWheelZoom:false,      // la rueda NO atrapa la página…
         tap:true, attributionControl:true
       });
-      if(_tactil){
-        var _dd=$('agMapaDedos'), _ddT=0;
-        _mapa.getContainer().addEventListener('touchmove', function(ev){
-          if(!_dd || !ev.touches || ev.touches.length!==1) return;
-          _dd.textContent='Usa dos dedos para mover el mapa';
-          _dd.classList.add('on'); clearTimeout(_ddT);
-          _ddT=setTimeout(function(){ _dd.classList.remove('on'); }, 1400);
-        }, {passive:true});
-      }
+      if(_tactil) _mapaDosDedos(_mapa, $('agMapaDedos'));
       _mapaCapa(_mapa);
       // …salvo después de hacer clic en el mapa; al salir se apaga.
       _mapa.on('click focus', function(){ try{ _mapa.scrollWheelZoom.enable(); }catch(e){} });

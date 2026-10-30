@@ -76,7 +76,7 @@ module.exports = async ({bloque, ok}) => {
   {
     ok(/dragging:!_tactil/.test(form) && /matchMedia\('\(pointer:coarse\)'\)/.test(form),
        'se arrastra con el mouse en PC; en celular con dos dedos (un dedo desplaza la página)');
-    ok(/ev\.touches\.length!==1\) return;/.test(form) && /Usa dos dedos para mover el mapa/.test(form),
+    ok(/ev\.touches\.length!==1 \|\| m\.dragging\.enabled\(\)\) return;/.test(form) && /Usa dos dedos para mover el mapa/.test(form),
        'con un dedo sobre el mapa avisa «Usa dos dedos»');
     ok(!/agPuntoMapa/.test(form) && /_mapa\.on\('click', function\(\)\{ if\(_mapaTodas\) _agMapaAviso\(\); \}\);/.test(form),
        '⚠️ tocar el mapa NO filtra ni mueve: sin filtro solo avisa «Usa tu ubicación o busca…»');
