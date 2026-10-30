@@ -287,7 +287,8 @@ module.exports = async ({bloque, ok}) => {
     ok(/value\.replace\(\/\\D\/g,''\)!==dni\) return/.test(fn),
        '⚠️ y si el DNI cambio MIENTRAS se consultaba, lo que vuelve se tira: ' +
        'es la respuesta de otro documento');
-    ok(/escribe tu nombre completo/i.test(fn),
+    ok(/_decir\(_dniMensajeFalla\(r && r\.motivo\)\)/.test(fn) &&
+       /escribe tu nombre completo/i.test(form.slice(form.indexOf('function _dniMensajeFalla('), form.indexOf('function dniReintentar('))),
        'si falla, se pide el nombre a mano — jamas se bloquea el pedido');
   }
 };

@@ -69,7 +69,10 @@
   global._appCheckToken = async function () {
     try {
       var ctx = await _init();
-      if (!ctx) return '';
+      /* Si falló (red lenta, script de reCAPTCHA que no cargó), la próxima
+         vez se VUELVE a intentar en vez de quedarse sin App Check hasta
+         recargar la página (30/10/2026). */
+      if (!ctx) { _appCheckPromise = null; return ''; }
       var r = await ctx.getToken(ctx.appCheck, /*forceRefresh*/ false);
       return (r && r.token) || '';
     } catch (e) {

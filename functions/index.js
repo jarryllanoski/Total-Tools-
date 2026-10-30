@@ -920,22 +920,39 @@ async function handleReniec(req, res) {
     console.warn("reniec: no se pudo contar:", e && e.message);
   }
 
-  let r = null;
-  try {
-    r = await shalomPuerta.llamar("dni", SHALOM_API_KEY.value(), {dni: dni});
-  } catch (e) {
-    console.error("reniec: llamada falló:", e && e.message);
-    return no("SIN_RED", "No se pudo consultar. Escribe tu nombre.");
+  /* UNA consulta → {ok, persona} | {ok:false, motivo} con la causa REAL
+     (ver reniecPublico.resultado: «no encontrado» solo si Shalom lo dice). */
+  const intentar = async () => {
+    try {
+      return reniecPublico.resultado(
+          await shalomPuerta.llamar("dni", SHALOM_API_KEY.value(), {dni: dni}),
+          (j) => shalomPuerta.traducir("dni", j));
+    } catch (e) {
+      console.error("reniec: llamada falló:", e && e.message);
+      return {ok: false, motivo: "SIN_RED"};
+    }
+  };
+  let x = await intentar();
+  /* ★ UN reintento en el servidor (30/10/2026), solo si la falla es
+     temporal (corte, 5xx, respuesta rara) y no es un «demasiadas»: lo que
+     Shalom tose un instante no debe llegarle al cliente como «no existe».
+     Se cuenta otra vez antes de llamar: el tope diario cubre también esto. */
+  if (!x.ok && reniecPublico.esTemporal(x.motivo) && x.motivo !== "LIMITE") {
+    await new Promise((z) => setTimeout(z, 600));
+    try {
+      await refDia.set({consultas: FieldValue.increment(1), dia: dia},
+          {merge: true});
+    } catch (e) {
+      console.warn("reniec: no se pudo contar el reintento:", e && e.message);
+    }
+    x = await intentar();
   }
-  if (!r || !r.ok) {
-    return no((r && r.motivo) || "SIN_RED",
-        "No se pudo consultar. Escribe tu nombre.");
+  if (!x.ok) {
+    return no(x.motivo, x.motivo === "NO_ENCONTRADO" ?
+      "No encontramos ese DNI. Revisa los 8 dígitos o escribe tu nombre." :
+      "No pudimos consultar ahora. Intenta de nuevo o escribe tu nombre.");
   }
-  const t = shalomPuerta.traducir("dni", r.json);
-  if (!t || !t.ok) {
-    return no("NO_ENCONTRADO", "No encontramos ese DNI. Escribe tu nombre.");
-  }
-  const guardar = reniecPublico.guardable(t.persona, ahora);
+  const guardar = reniecPublico.guardable(x.persona, ahora);
   if (!guardar) {
     return no("NO_ENCONTRADO", "No encontramos ese DNI. Escribe tu nombre.");
   }

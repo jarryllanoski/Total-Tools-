@@ -174,6 +174,39 @@
     };
   }
 
+  /* ★ LA CAUSA REAL, NO SIEMPRE «NO ENCONTRADO» (30/10/2026).
+     Antes cualquier falla —Shalom lento, una respuesta rara, App Check que
+     no llegó— le decía al cliente «No encontramos ese DNI», también con
+     DNIs reales. Ahora «no encontrado» es SOLO cuando Shalom lo dice claro;
+     lo demás es TEMPORAL y se puede reintentar. */
+  const TEMPORALES = ["SIN_RED", "ERROR_SHALOM", "FORMATO_DESCONOCIDO",
+    "SIN_RESPUESTA", "LIMITE", "MUCHAS_CONSULTAS", "SIN_APPCHECK"];
+  /**
+   * ¿Vale la pena reintentar?
+   * @param {string} motivo el de la falla
+   * @return {boolean} si es temporal
+   */
+  function esTemporal(motivo) {
+    return TEMPORALES.indexOf(String(motivo || "")) >= 0;
+  }
+  /**
+   * UNA consulta (respuesta de la puerta + su traductor) → resultado.
+   * @param {?Object} r lo que devolvió shalomPuerta.llamar
+   * @param {Function} traducir json → {ok, persona}
+   * @return {Object} {ok:true, persona} | {ok:false, motivo}
+   */
+  function resultado(r, traducir) {
+    if (!r || !r.ok) return {ok: false, motivo: (r && r.motivo) || "SIN_RED"};
+    const t = traducir(r.json);
+    if (t && t.ok && t.persona) return {ok: true, persona: t.persona};
+    // `success:false` u otra forma: «no encontrado» solo si lo DICE.
+    const msj = String((r.json && (r.json.message || r.json.error)) || "");
+    if (/no\s+(se\s+)?encontr|not\s+found|no\s+existe/i.test(msj)) {
+      return {ok: false, motivo: "NO_ENCONTRADO"};
+    }
+    return {ok: false, motivo: "SIN_RESPUESTA"};
+  }
+
   return {LIMITE_DIA, CACHE_DIAS, normalizar, diaDe, cacheVale, decidir,
-    guardable};
+    guardable, esTemporal, resultado};
 });

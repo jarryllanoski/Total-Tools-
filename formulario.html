@@ -43,6 +43,7 @@ body{background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,
 .dni-puntos::after{content:'';animation:dniPuntos 1.2s steps(4) infinite}
 @keyframes dniPuntos{0%{content:''}25%{content:'.'}50%{content:'..'}75%{content:'...'}}
 .dni-nada{font-size:12.5px;color:var(--text2)}
+.dni-nada .dni-reintentar{display:inline;padding:0 2px;margin:0;color:var(--blue);font-weight:800;font-size:12.5px}
 #f_name.nom-ok{border-color:var(--green);padding-right:42px;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M5 12.5l4.5 4.5L19 7.5' fill='none' stroke='%2322c55e' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center;background-size:22px}
 #f_name.nom-brilla{animation:nomBrilla 1s ease}
 @keyframes nomBrilla{0%{box-shadow:0 0 0 0 rgba(34,197,94,.6)}100%{box-shadow:0 0 0 12px rgba(34,197,94,0)}}
@@ -409,7 +410,7 @@ body.dlv-ajustando #tt-narr{display:none!important}
      en datos móviles). -->
 <link rel="preconnect" href="https://us-central1-total-tools-24ce8.cloudfunctions.net" crossorigin>
 <script src="firebase-config.js?v=4"></script>
-<script src="appcheck.js?v=1"></script>
+<script src="appcheck.js?v=2"></script>
 <script src="functions/agencias.js?v=1"></script>
 <script src="functions/dniPedido.js?v=1"></script>
 </head>
@@ -1425,6 +1426,34 @@ function _dniDing(){
   }catch(e){}
 }
 
+/* ★ REINTENTAR CON CABEZA (30/10/2026). Una falla TEMPORAL (Shalom lento,
+   App Check que no llegó, «demasiadas») ya no es «No encontramos ese DNI»:
+   se reintenta solo hasta 2 veces (~1,2 s y ~2,5 s, con algo de azar para no
+   chocar con otros). «No encontrado», el tope diario o un DNI inválido no se
+   insisten. Si el cliente cambia el DNI a mitad, se abandona. Mismo criterio
+   de «temporal» que el servidor (functions/reniecPublico.js). */
+var _DNI_TEMPORAL=/^(SIN_RED|ERROR_SHALOM|FORMATO_DESCONOCIDO|SIN_RESPUESTA|LIMITE|MUCHAS_CONSULTAS|SIN_APPCHECK)$/;
+async function _dniConsultar(dni, alReintentar){
+  var esperas=[0, 1200, 2500], r=null;
+  for(var i=0;i<esperas.length;i++){
+    if(i){ alReintentar(i+1, esperas.length); await new Promise(function(z){ setTimeout(z, esperas[i]+Math.random()*400); }); }
+    if(($('f_dni')||{value:''}).value.replace(/\D/g,'')!==dni) return null;   // cambió el DNI: se abandona
+    try{ r=await _api('reniec', {dni: dni}); }catch(e){ r={ok:false, motivo:'SIN_RED'}; }
+    if(r && r.ok) return r;
+    if(!_DNI_TEMPORAL.test(String((r && r.motivo) || 'SIN_RED'))) return r;   // no se insiste
+  }
+  return r;
+}
+/* Mensaje según la CAUSA, con [Reintentar] cuando tiene sentido. */
+function _dniMensajeFalla(motivo){
+  var re=' <button type="button" class="dni-link dni-reintentar" onclick="dniReintentar()">Reintentar</button>';
+  if(motivo==='NO_ENCONTRADO') return '<span class="dni-nada">No encontramos ese DNI. Revisa los 8 dígitos o escribe tu nombre completo.'+re+'</span>';
+  if(motivo==='TOPE_DIA')      return '<span class="dni-nada">Escribe tu nombre completo como figura en tu documento.</span>';
+  if(motivo==='DNI_NO_VALIDO') return '<span class="dni-nada">El DNI son 8 números.</span>';
+  return '<span class="dni-nada">No pudimos consultar RENIEC ahora.'+re+' o escribe tu nombre completo.</span>';
+}
+function dniReintentar(){ var d=$('f_dni'); if(d) onDniInput(d.value); }
+
 /* ★ EL DNI RELLENA EL NOMBRE — 15/10/2026 (animado el 30/10/2026).
    ⚠️ LO QUE ESCRIBIO EL CLIENTE NO SE PISA: se rellena solo si el campo
    esta vacio; si hay algo distinto, se SUGIERE (ver _dniMarca).
@@ -1449,13 +1478,15 @@ function onDniInput(val){
     const _callar=()=>{ if(badge){ badge.style.display='none'; badge.innerHTML=''; } };
     if(dniEl) dniEl.classList.add('dni-escanea');
     _decir('<span class="dni-buscando">🪪 Buscando en RENIEC<span class="dni-puntos"></span></span>');
-    let r=null;
-    try{ r = await _api('reniec', {dni: dni}); }catch(e){ r=null; }
+    const r = await _dniConsultar(dni, function(n, de){
+      _decir('<span class="dni-buscando">🪪 Buscando en RENIEC<span class="dni-puntos"></span> (reintentando '+n+'/'+de+')</span>');
+    });
     if(($('f_dni')||{value:''}).value.replace(/\D/g,'')!==dni) return;
     if(dniEl) dniEl.classList.remove('dni-escanea');
     if(!r || !r.ok || !r.persona || !r.persona.completo){
-      /* Nunca se bloquea el pedido: se dice y el cliente escribe. */
-      _decir('<span class="dni-nada">No encontramos ese DNI: escribe tu nombre completo como figura en tu documento.</span>');
+      /* Nunca se bloquea el pedido: se dice la causa y el cliente escribe
+         su nombre completo (o reintenta). */
+      _decir(_dniMensajeFalla(r && r.motivo));
       return;
     }
     const comp=r.persona.completo;
@@ -4047,6 +4078,7 @@ window.onDniInput           = onDniInput;
 window._dniMarca            = _dniMarca;
 window.usarNombreDni        = usarNombreDni;
 window.dniMantener          = dniMantener;
+window.dniReintentar        = dniReintentar;
 window.onNombreInput        = onNombreInput;
 window.loadCfg              = loadCfg;
 window.renderForm           = renderForm;
