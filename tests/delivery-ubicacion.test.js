@@ -87,13 +87,26 @@ module.exports = async ({bloque, ok}) => {
     ok(D({address: {road: 'Av. Los Álamos', house_number: '123'}}).numero === true, 'calle con número');
     ok(D(null).calle === '' && D({}).zona === '', 'respuesta vacía no revienta');
     const sg = trozo('function _dlvSugerirDireccion(', '/* ── EL mapa de delivery');
-    ok(/if\(ta\.value\.trim\(\) \|\| !x\.calle\) return;/.test(sg),
-       '⚠️ solo escribe si el cuadro está vacío Y hay calle: un barrio suelto no se escribe como dirección');
-    ok(/ta\.placeholder=_DLV_PLACEHOLDER\+\(x\.zona\?' · cerca de '\+x\.zona:''\)/.test(sg), 'el barrio queda como pista en el placeholder');
-    ok(/_dlvPista\(!x\.numero\);/.test(sg) && /✏️ Agrega el número, Mz\/Lt o dpto\./.test(form), 'calle sin número: pide el número');
+    ok(/var mio = !!ta\.value\.trim\(\) && ta\.value!==_dlvTextoAuto;\n    if\(mio\) return;/.test(sg),
+       '⚠️ lo escrito por el cliente manda; el texto que puso el punto sí se actualiza');
+    ok(/ta\.value=_dlvTextoAuto=_dlvTextoDe\(x\);/.test(sg), 'con punto, la dirección se llena sola');
+    const c3 = vm.createContext({});
+    vm.runInContext(trozo("var _DLV_SIN_TEXTO", 'function _dlvSugerirDireccion(') + ';this.T=_dlvTextoDe;', c3);
+    ok(c3.T({calle: 'Avenida Primavera', zona: 'Zapallal, Puente Piedra'}) === 'Avenida Primavera, Zapallal, Puente Piedra', 'calle + barrio');
+    ok(c3.T({calle: '', zona: 'Zapallal, Puente Piedra'}) === 'Zapallal, Puente Piedra', 'solo barrio también se escribe (el punto es exacto)');
+    ok(c3.T({fallo: true}) === 'Punto marcado en el mapa' && c3.T({calle: '', zona: ''}) === 'Punto marcado en el mapa',
+       'sin respuesta del servicio: nunca queda bloqueado');
+    ok(/\.catch\(function\(\)\{ usar\(\{fallo:true\}\); \}\)/.test(sg), 'si la consulta falla, igual se llena');
+    ok(/&zoom=17&/.test(sg), 'consulta a nivel de calle');
+    ok(/_dlvPista\(!\(x && x\.numero\)\);/.test(sg) && /Puedes agregar número, Mz\/Lt o dpto \(opcional\)/.test(form), 'número sugerido como opcional');
+    ok(/placeholder="Referencia \(opcional\)/.test(form), 'la referencia dice que es opcional');
     ok(/if\(_gpsLat!==la \|\| _gpsLon!==lo\) return;/.test(sg), 'una respuesta de otro punto se descarta');
     ok(/if\(_dlvGeoMemo\[k\]\)\{ usar\(_dlvGeoMemo\[k\]\); return; \}/.test(sg), 'UNA consulta por punto (recordada)');
-    ok(/ta\.addEventListener\('input', function\(\)\{ _dlvPista\(false\); \}\);/.test(form), 'al escribir el cliente, la pista se va');
+    ok(/ta\.addEventListener\('input', function\(\)\{ _dlvPista\(false\); _dlvTextoAuto=''; \}\);/.test(form),
+       'al escribir el cliente: la pista se va y el texto pasa a ser suyo');
+    const rs = trozo('function _dlvReset(', 'function _dlvPista(');
+    ok(/if\(t0 && _dlvTextoAuto && t0\.value===_dlvTextoAuto\)\{ t0\.value=''; onDireccionInput\(\); \}/.test(rs),
+       'quitar el punto borra el texto que él puso, nunca el del cliente');
     ok(!/addrPinChip/.test(form) && !/function _pinChip/.test(form), 'sin chip duplicado: el punto se ve en el mapa');
   }
 

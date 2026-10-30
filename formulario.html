@@ -304,7 +304,7 @@ body.wz-sede #tt-lbl{display:none!important}
 .ag-geo.dlv-geo{margin-bottom:8px}
 .dlv-msg{font-size:12.5px;color:var(--text2);line-height:1.5;margin-bottom:8px}
 .dlv-msg a{color:var(--blue);font-weight:700;cursor:pointer;text-decoration:underline;white-space:nowrap}
-.dlv-pista{font-size:12px;color:#eab308;font-weight:700;margin-top:6px}
+.dlv-pista{font-size:12px;color:var(--text2);font-weight:600;margin-top:6px}
 .dlv-confirma{margin-bottom:8px}
 .dlv-q{font-size:13.5px;font-weight:800;color:var(--text);margin-bottom:8px}
 .dlv-aviso{font-size:12.5px;color:#eab308;line-height:1.45;margin-bottom:8px}
@@ -1301,11 +1301,11 @@ function renderForm(){
         <textarea class="fi" id="addrManualInput" rows="2" data-wz-focus
           placeholder="Calle y número, Mz/Lt o dpto *" autocomplete="street-address"
           oninput="onDireccionInput()"></textarea>
-        <div id="dlvPista" class="dlv-pista" style="display:none">✏️ Agrega el número, Mz/Lt o dpto.</div>
+        <div id="dlvPista" class="dlv-pista" style="display:none">✏️ Puedes agregar número, Mz/Lt o dpto (opcional)</div>
         <div class="ferr" id="err_deliveryAddr" style="margin-top:4px">Ingresa la dirección de entrega</div>
         <div class="fg" id="refField" style="margin-top:10px;margin-bottom:0">
           <input class="fi" id="f_ref" type="text"
-            placeholder="Referencia (ej: frente al mercado, casa azul...)">
+            placeholder="Referencia (opcional): frente al mercado, casa azul…">
         </div>
       </div>
       <div class="wz-nav">
@@ -2016,7 +2016,7 @@ function _dlvConectar(){
   g._conectado=true;
   // La pista «Agrega el número» se va cuando ESCRIBE el cliente (solo
   // eventos reales: rellenar por código no dispara 'input').
-  var ta=$('addrManualInput'); if(ta) ta.addEventListener('input', function(){ _dlvPista(false); });
+  var ta=$('addrManualInput'); if(ta) ta.addEventListener('input', function(){ _dlvPista(false); _dlvTextoAuto=''; });
   var mio=0;
   _dlvNativo=_ubicNativo(g, {
     invalido: function(){ usarMiUbicacion(); },
@@ -2051,11 +2051,10 @@ function _dlvError(codigo, estado){
      · El PUNTO en el mapa (_gpsLat/_gpsLon → order.gpsCoords) — opcional;
        es el enlace de Google Maps del WhatsApp.
    Se ayudan, nunca se pisan:
-     · el punto SUGIERE texto solo si el cuadro está vacío Y trae calle;
-       un barrio suelto («Zapallal, Puente Piedra») parece completo y no lo
-       es: queda como pista en el placeholder, no como dirección;
-     · si sugiere una calle sin número, se pide el número (pista amarilla);
-     · editar el texto no borra el punto; quitar el punto no borra el texto. */
+     · con punto, la dirección se LLENA SOLA (ver _dlvSugerirDireccion) y
+       sigue al punto mientras el cliente no la toque;
+     · lo que escribe el cliente es suyo: el punto ya no lo cambia ni lo borra;
+     · número, Mz/Lt y referencia: opcionales, sugeridos en gris. */
 var _DLV_PLACEHOLDER='Calle y número, Mz/Lt o dpto *';
 var _dlvGeoMemo={};   // dirección ya consultada por punto (no repetir consultas)
 
@@ -2072,6 +2071,10 @@ function _dlvPunto(la, lo, opc){
 function quitarPin(){ _gpsLat=null; _gpsLon=null; _dlvReset(); }
 function _dlvReset(){
   _dlvOk=false; _dlvAcc=0; _dlvFallos=0; _dlvToken++;
+  // El texto que puso el punto se va con el punto; el del cliente se queda.
+  var t0=$('addrManualInput');
+  if(t0 && _dlvTextoAuto && t0.value===_dlvTextoAuto){ t0.value=''; onDireccionInput(); }
+  _dlvTextoAuto='';
   _dlvModo('mirar');
   var p=$('dlvPrev'), c=$('dlvConfirma'), ta=$('addrManualInput');
   if(p) p.style.display='none';
@@ -2093,22 +2096,35 @@ function _dirDeNominatim(d){
 }
 /* UNA consulta por punto (recordada), solo con el punto que sigue vigente:
    lo que pide el servicio gratuito de OpenStreetMap. */
+/* ★ CON PUNTO, LA DIRECCIÓN SE LLENA SOLA (30/10/2026). El punto ya es la
+   ubicación exacta (va en el enlace del WhatsApp): el texto es la ayuda
+   para leerla y NO debe frenar al cliente. Se escribe lo mejor que haya
+   —calle + barrio, o solo barrio, o «Punto marcado en el mapa» si el
+   servicio no responde— y ese texto SIGUE al punto mientras el cliente no
+   lo toque (_dlvTextoAuto). Apenas escribe algo, el texto es suyo. */
+var _dlvTextoAuto='';
+var _DLV_SIN_TEXTO='Punto marcado en el mapa';
+function _dlvTextoDe(x){
+  if(!x || x.fallo) return _DLV_SIN_TEXTO;
+  return [x.calle, x.zona].filter(Boolean).join(', ') || _DLV_SIN_TEXTO;
+}
 function _dlvSugerirDireccion(la, lo){
   var k=la+','+lo;
   var usar=function(x){
     if(_gpsLat!==la || _gpsLon!==lo) return;          // ya es otro punto
-    var ta=$('addrManualInput'); if(!ta || !x) return;
-    ta.placeholder=_DLV_PLACEHOLDER+(x.zona?' · cerca de '+x.zona:'');
-    if(ta.value.trim() || !x.calle) return;           // lo escrito manda; sin calle no se escribe
-    ta.value=[x.calle, x.zona].filter(Boolean).join(', ');
+    var ta=$('addrManualInput'); if(!ta) return;
+    var mio = !!ta.value.trim() && ta.value!==_dlvTextoAuto;
+    if(mio) return;                                   // lo escrito por el cliente manda
+    ta.value=_dlvTextoAuto=_dlvTextoDe(x);
     onDireccionInput();
-    _dlvPista(!x.numero);
+    _dlvPista(!(x && x.numero));
   };
   if(_dlvGeoMemo[k]){ usar(_dlvGeoMemo[k]); return; }
-  fetch('https://nominatim.openstreetmap.org/reverse?lat='+la+'&lon='+lo+'&format=json&accept-language=es')
+  // zoom=17: nivel de CALLE (trae la avenida más cercana, no solo el barrio).
+  fetch('https://nominatim.openstreetmap.org/reverse?lat='+la+'&lon='+lo+'&zoom=17&format=json&accept-language=es')
     .then(function(r){ return r.json(); })
     .then(function(d){ _dlvGeoMemo[k]=_dirDeNominatim(d); usar(_dlvGeoMemo[k]); })
-    .catch(function(){});
+    .catch(function(){ usar({fallo:true}); });       // el cliente nunca queda bloqueado
 }
 
 /* ── EL mapa de delivery: uno, creado una vez, con dos modos ── */
