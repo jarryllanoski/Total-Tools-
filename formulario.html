@@ -333,6 +333,8 @@ body.wz-sede #tt-lbl{display:none!important}
 .ag-geo.dlv-geo{margin-bottom:8px}
 .dlv-msg{font-size:12.5px;color:var(--text2);line-height:1.5;margin-bottom:8px}
 .dlv-msg a{color:var(--blue);font-weight:700;cursor:pointer;text-decoration:underline;white-space:nowrap}
+.tt-envio{display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:13px;color:var(--text2);background:var(--card);border:1px solid var(--bd);border-radius:10px;padding:9px 12px;margin:2px 0 12px}
+.tt-envio b{color:var(--text)}
 .dlv-pista{font-size:12px;color:var(--text2);font-weight:600;margin-top:6px}
 .dlv-confirma{margin-bottom:8px}
 .dlv-q{font-size:13.5px;font-weight:800;color:var(--text);margin-bottom:8px}
@@ -401,7 +403,7 @@ body.dlv-ajustando #tt-narr{display:none!important}
 <script src="functions/dniPedido.js?v=1"></script>
 </head>
 <body>
-<script src="narrador/loader.js?v=1"></script>
+<script src="narrador/loader.js?v=2"></script>
 <div class="container" id="app">
   <div class="loading-screen"><div class="spin"></div><div class="spin-lbl">Cargando...</div></div>
 </div>
@@ -732,6 +734,7 @@ function _ayudaFormContenido(e){
     {n:4, t:'Fecha y confirmar', d:'Elige la fecha de envío y toca <b>Confirmar pedido</b>. Tu pedido queda registrado al instante.'}
   ];
   if(retiro) pasos=pasos.filter(function(p){ return p.n!==3; });
+  if(e.unico) pasos=pasos.filter(function(p){ return p.n!==1; });
   var toby;
   if(e.confirmado) toby='¡Listo! 🎉 Tu pedido <b>ya está registrado</b>. Toca <b>Ir a WhatsApp</b> para recibir tu link de seguimiento.';
   else if(paso===1) toby='¡Hola! Soy Toby 🐢, tu guía. Pedir toma menos de un minuto: primero elige <b>cómo quieres recibir</b> tu pedido.';
@@ -770,7 +773,7 @@ function abrirAyudaForm(){
   }
   const seq = (typeof wzSeq==='function') ? wzSeq() : [1,2,3,4];
   const c = _ayudaFormContenido({
-    tipo: selCourierType, paso: _wzStep, confirmado: !!window._ttFrozen,
+    tipo: selCourierType, paso: _wzStep, confirmado: !!window._ttFrozen, unico: !!_wzUnico,
     mapa: selCourierType==='agencia' && !$('agcManualInput'),
     tiendaDir: String(((CFG && (CFG.config||CFG)) || {}).city || '').trim()
   });
@@ -971,6 +974,7 @@ function renderForm(){
     if(u.includes('DINSIDES'))  return 7;
     return 50; };
   active.sort((a,b)=>_prio(a)-_prio(b));
+  _wzUnico = active.length===1 ? active[0] : '';
 
   const extraHtml = extraF.map(f=>{
     const fname=typeof f==='string'?f:(f.name||'');
@@ -1054,6 +1058,7 @@ function renderForm(){
       </div>
 
       <div class="wz-step" data-step="2" hidden>
+      ${_wzUnico?'<div id="courierBadge" style="display:none"></div>':''}
       <!-- ★ «DATOS DE LA PERSONA QUE RECIBE», y no «tus datos».
            En un envío a agencia quien recoge puede NO ser quien pide: lo
            manda a su madre, a su socio, al vecino. El DNI que va en esta
@@ -1473,11 +1478,12 @@ function onCourierChange(name){
                     : selCourierType==='retiro'?'Retiro en tienda'
                     : selCourierType==='encomienda'?'Otras Agencias'
                     : 'Envío a domicilio';
+      // Una línea (solo existe con un único envío): cómo le llegará, sin preguntar.
       badge.style.display='block';
-      badge.innerHTML=`<div style="display:flex;align-items:center;gap:12px;background:var(--card);border:1.5px solid var(--blue);border-radius:12px;padding:12px 14px;margin-top:8px">
-        <div style="font-size:28px;flex-shrink:0">${ico}</div>
-        <div><div style="font-size:14px;font-weight:700;color:var(--text)">${esc(name)}</div><div style="font-size:11px;color:var(--text2)">${tipoTxt}</div></div>
-      </div>`;
+      const lbl=_courierLabel(name, selCourierType);
+      // Sin repetir: «RETIRO EN TIENDA · Retiro en tienda» dice lo mismo dos veces.
+      const extra=lbl.toUpperCase().indexOf(tipoTxt.toUpperCase())>=0 ? '' : ` · ${tipoTxt}`;
+      badge.innerHTML=`<div class="tt-envio">${ico} <b>Envío: ${esc(lbl)}</b>${extra}</div>`;
     } else {
       badge.style.display='none';
     }
@@ -3776,6 +3782,12 @@ window.agCerca   = agCerca;
    para no dejar avanzar con errores. Todo va en try/catch: si algo fallara,
    el formulario sigue funcionando. */
 var _wzStep=1;
+/* ★ UN SOLO ENVÍO CONFIGURADO (30/10/2026): preguntar «¿Cómo quieres
+   recibir tu pedido?» con una sola respuesta es un paso de más. Se elige
+   solo, se salta el paso 1 y arriba se dice cuál es. Con 2 o más, igual
+   que siempre. Lo decide renderForm con la lista ya filtrada por la
+   configuración (o por la «foto» del link personalizado). */
+var _wzUnico='';
 function _wzInjectCss(){
   if(document.getElementById('wzCss')) return;
   var s=document.createElement('style'); s.id='wzCss';
@@ -3803,7 +3815,7 @@ function _wzInjectCss(){
   document.head.appendChild(s);
 }
 function _wzNeedDest(){ return selCourierType!=='retiro'; }
-function wzSeq(){ return _wzNeedDest()?[1,2,3,4]:[1,2,4]; }
+function wzSeq(){ var s=_wzNeedDest()?[1,2,3,4]:[1,2,4]; return _wzUnico ? s.slice(1) : s; }
 function _wzErr(fid,eid,bad){
   var fe=$(fid),ee=$(eid);
   if(bad){ fe&&fe.classList.add('err'); ee&&ee.classList.add('show'); }
@@ -3891,6 +3903,11 @@ function wzFocusFirst(){
 }
 function wzShow(step, doFocus){
   _wzStep=step;
+  // «← Atrás» no aparece en el primer paso: no hay a dónde volver.
+  try{
+    var primero = wzSeq()[0]===step;
+    document.querySelectorAll('.wz-step[data-step="'+step+'"] .wz-back').forEach(function(b){ b.style.display=primero?'none':''; });
+  }catch(e){}
   // Paso de la sede CON mapa (no el manual de Olva): la etiqueta se oculta.
   try{ document.body.classList.toggle('wz-sede', step===3 && selCourierType==='agencia' && !$('agcManualInput')); }catch(e){}
   try{ _paso3Continuar(); }catch(e){}
@@ -3928,13 +3945,16 @@ function wzInit(){
     // al enfocar el primer campo del paso 3 el teclado abra también en iPhone.
     // onCourierChange (onchange inline) ya corrió antes y dejó visible el bloque
     // correcto (agencia/otras/delivery), así que wzFocusFirst enfoca el campo justo.
+    // Un solo envío: se elige ANTES de escuchar el cambio (sin auto-avance ni
+    // teclado al abrir) y se empieza en el paso 2.
+    if(_wzUnico) pickCourier(_wzUnico);
     var cs=$('f_courier');
     if(cs) cs.addEventListener('change',function(){
       // El courier es el paso 1 desde el 15/10/2026 (antes el 2).
       if(_wzStep!==1||!this.value) return;
       if(selCourierName) wzNext();
     });
-    wzShow(1);
+    wzShow(wzSeq()[0]);
   }catch(e){ /* nunca romper el formulario */ }
 }
 
