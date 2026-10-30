@@ -126,8 +126,6 @@ textarea.fi{resize:vertical;line-height:1.5}
 /* AGENCY CASCADE */
 .agc-box{padding:14px;background:var(--card2);border:1px solid var(--bd);border-radius:12px}
 .agc-lbl{font-size:11px;font-weight:700;color:var(--text2);letter-spacing:.6px;text-transform:uppercase;margin-bottom:10px;display:block}
-.cascade{display:flex;flex-direction:column;gap:10px}
-.agc-list{display:flex;flex-direction:column;gap:6px;margin-top:8px;max-height:180px;overflow-y:auto}
 .ag-ubic{background:rgba(79,142,247,.08);border:1.5px solid rgba(79,142,247,.35);border-radius:14px;padding:12px;margin:2px 0 12px}
 /* ★ El BOTÓN NATIVO <geolocation> (Chrome 144+). Chrome dibuja su texto e
    ícono y limita el estilo; IGNORA box-sizing y añade relleno lateral
@@ -196,9 +194,6 @@ body.wz-sede #tt-lbl{display:none!important}
 .ag-ubic.ag-guia{animation:agFoco 1s ease-in-out 2}
 .btn-main.wz-apagado{opacity:.55;filter:saturate(.5)}
 .ag-lista-cab{padding:8px 12px;background:rgba(79,142,247,.10);border-bottom:1px solid var(--bd);font-size:11.5px;font-weight:700;color:var(--blue)}
-.agc-item{background:var(--card);border:1px solid var(--bd);border-radius:10px;padding:10px 14px;cursor:pointer;font-size:13px;transition:border-color .15s,background .15s}
-.agc-item:hover{border-color:var(--blue)}
-.agc-item.active{border-color:var(--blue);background:#12203d}
 .sel-badge{display:inline-flex;align-items:center;gap:8px;background:#12203d;border:1px solid var(--blue);border-radius:10px;padding:8px 12px;font-size:13px;margin-top:8px;width:100%}
 .sel-badge .clr-btn{background:none;border:none;color:var(--text2);cursor:pointer;font-size:16px;padding:0;line-height:1;margin-left:auto}
 
@@ -208,6 +203,42 @@ body.wz-sede #tt-lbl{display:none!important}
 .btn-main:active{transform:scale(.98)}
 .btn-main:disabled{opacity:.5;cursor:not-allowed}
 .btn-sec{width:100%;background:var(--card);color:var(--text);border:1.5px solid var(--bd);border-radius:14px;font-family:inherit;font-size:15px;font-weight:500;padding:13px;cursor:pointer;margin-top:10px}
+/* ★ CONFIRMACIÓN (30/10/2026) */
+.btn-main.tt-registrando{position:relative;overflow:hidden;opacity:1}
+.tt-reg-bar{position:absolute;left:0;top:0;bottom:0;width:0;background:rgba(255,255,255,.18);animation:ttReg 1.6s ease-out forwards}
+@keyframes ttReg{to{width:88%}}
+.tt-reg-txt{position:relative}
+#tt-lbl .card{position:relative}
+#tt-lbl .card.tt-imprimiendo{overflow:hidden}
+#tt-lbl .card.tt-imprimiendo::after{content:"";position:absolute;left:0;right:0;top:-30%;height:30%;background:linear-gradient(180deg,rgba(79,142,247,0),rgba(79,142,247,.22),rgba(79,142,247,0));animation:ttImprime 1.1s linear infinite;pointer-events:none}
+@keyframes ttImprime{to{top:100%}}
+.tt-sello{position:absolute;right:14px;top:46%;transform:rotate(-10deg);border:3px solid #16a34a;color:#16a34a;border-radius:10px;padding:6px 12px;text-align:center;background:rgba(255,255,255,.88);font-family:inherit;line-height:1.1;animation:ttSello .45s cubic-bezier(.2,1.4,.5,1) both;pointer-events:none}
+.tt-sello b{display:block;font-size:17px;font-weight:900;letter-spacing:.06em}
+.tt-sello small{display:block;font-size:12px;font-weight:800;margin-top:3px;letter-spacing:.04em}
+@keyframes ttSello{0%{opacity:0;transform:rotate(-18deg) scale(2.4)}70%{opacity:1;transform:rotate(-9deg) scale(.94)}100%{opacity:1;transform:rotate(-10deg) scale(1)}}
+#tt-lbl .card.tt-tiembla{animation:ttTiembla .28s ease .32s}
+@keyframes ttTiembla{0%,100%{transform:none}30%{transform:translate(2px,1px)}60%{transform:translate(-2px,-1px)}}
+.tt-confeti{position:fixed;inset:0;pointer-events:none;z-index:99995;overflow:hidden}
+.tt-confeti i{position:absolute;top:-12px;width:8px;height:12px;border-radius:2px;animation:ttCae 1.4s cubic-bezier(.3,.6,.6,1) forwards}
+@keyframes ttCae{to{top:105%;opacity:.2;margin-left:40px}}
+.tt-meta{margin:14px 0 10px}
+.tt-meta-txt{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--text2);font-weight:700;margin-bottom:6px}
+.tt-meta-txt b{color:#22c55e}
+.tt-meta-bar{height:6px;background:#1c2333;border-radius:99px;overflow:hidden}
+.tt-meta-bar i{display:block;height:100%;width:90%;background:linear-gradient(90deg,#12a5b4,#22c55e);border-radius:99px;transition:width .5s ease}
+.tt-wa-ttl{font-size:18px;font-weight:900;color:var(--text);margin:4px 0 10px}
+.tt-burbuja{position:relative;background:#005c4b;color:#e9fdf4;border-radius:12px 12px 4px 12px;padding:10px 12px 18px;font-size:12.5px;line-height:1.45;margin:0 0 10px auto;max-width:88%;box-shadow:0 2px 6px rgba(0,0,0,.3)}
+.tt-burbuja-h{position:absolute;right:10px;bottom:4px;font-size:10px;color:#8fd3c0}
+.btn-wa.tt-wa-btn{font-size:18px;font-weight:800;padding:18px;animation:ttRespira 2.2s ease-in-out infinite}
+@keyframes ttRespira{0%,100%{box-shadow:0 0 0 0 rgba(37,211,102,.45)}50%{box-shadow:0 0 0 10px rgba(37,211,102,0)}}
+.btn-wa.tt-llama{animation:ttLlama .5s ease 2,ttRespira 2.2s ease-in-out 1s infinite}
+@keyframes ttLlama{0%,100%{transform:none}25%{transform:translateX(-6px)}75%{transform:translateX(6px)}}
+.tt-wa-sub{font-size:13px;color:var(--text2);text-align:center;margin-top:10px;line-height:1.5}
+.tt-wa-sub b{color:var(--text)}
+.tt-wa-vuelta{margin-top:12px;font-size:13.5px;color:#eab308;font-weight:700;text-align:center}
+.tt-wa-q{color:var(--text);font-size:15px;font-weight:800;margin-bottom:8px}
+.tt-wa-otra{display:flex;align-items:center;justify-content:center;text-decoration:none;border-radius:10px;min-height:44px;font-weight:800;font-size:13.5px}
+@media(prefers-reduced-motion:reduce){.tt-sello,#tt-lbl .card.tt-tiembla,.btn-wa.tt-wa-btn,.btn-wa.tt-llama,.tt-reg-bar{animation:none}#tt-lbl .card.tt-imprimiendo::after{display:none}.tt-reg-bar{width:88%}}
 .btn-wa{width:100%;background:linear-gradient(135deg,#128c7e,#25d366);color:#fff;border:none;border-radius:14px;font-family:inherit;font-size:16px;font-weight:600;padding:15px;cursor:pointer;margin-top:10px;text-decoration:none;display:flex;align-items:center;justify-content:center;gap:8px}
 .btn-purple{width:100%;background:linear-gradient(135deg,#3730a3,var(--purple));color:#fff;border:none;border-radius:14px;font-family:inherit;font-size:15px;font-weight:600;padding:13px;cursor:pointer;margin-top:10px}
 
@@ -248,8 +279,6 @@ body.wz-sede #tt-lbl{display:none!important}
 @media(prefers-reduced-motion:reduce){.geo-pin{animation:none}}
 .spin-lbl{color:var(--text2);font-size:14px}
 
-.loading-overlay{position:fixed;inset:0;background:rgba(8,8,16,.75);display:flex;align-items:center;justify-content:center;z-index:999;backdrop-filter:blur(4px)}
-.loading-overlay.hidden{display:none}
 
 /* ERROR */
 .error-box{background:rgba(248,113,113,.08);border:1px solid rgba(248,113,113,.3);border-radius:12px;padding:14px;font-size:13px;color:var(--red);margin-bottom:12px}
@@ -362,6 +391,10 @@ body.dlv-ajustando #tt-narr{display:none!important}
 
      `appcheck.js` falla en silencio por diseño: sin red o sin reCAPTCHA
      devuelve '' y el formulario sigue funcionando igual que sin este archivo. -->
+<!-- La primera consulta (configuración) va a este servidor: abrir la
+     conexión mientras carga la página ahorra el saludo TLS (cientos de ms
+     en datos móviles). -->
+<link rel="preconnect" href="https://us-central1-total-tools-24ce8.cloudfunctions.net" crossorigin>
 <script src="firebase-config.js?v=4"></script>
 <script src="appcheck.js?v=1"></script>
 <script src="functions/agencias.js?v=1"></script>
@@ -373,9 +406,6 @@ body.dlv-ajustando #tt-narr{display:none!important}
   <div class="loading-screen"><div class="spin"></div><div class="spin-lbl">Cargando...</div></div>
 </div>
 
-<div class="loading-overlay hidden" id="loadOverlay">
-  <div class="spin"></div>
-</div>
 
 <script>
 (function(){
@@ -455,195 +485,6 @@ function _isOtrasAg(name){
   return u.includes('ENCOMIENDA')||u.includes('OTRAS AGENCIA')||u.includes('OTRA AGENCIA');
 }
 
-/* ─── AGENCY DATA ───────────────────────────────────────────────── */
-const AD = {
-  SHALOM:{
-    Lima:{
-      Lima:['Independencia – Av. Túpac Amaru 2543','San Martín de Porres – Av. Perú 3215','Los Olivos – Av. Universitaria Norte 4520','Comas – Av. Belaúnde Oeste 124','Carabayllo – Av. Túpac Amaru km 22','Puente Piedra – Av. San Roque 120','Santa Rosa – Av. La Marina s/n'],
-      'El Agustino':['El Agustino – Av. Riva Agüero 1200','El Agustino – Av. César Vallejo 1120'],
-      'San Juan de Lurigancho':['SJL – Av. Gran Chimú 530','SJL – Av. Próceres de la Independencia 1244','SJL – Av. Los Jardines 204'],
-      'La Victoria':['La Victoria – Av. México 1238','La Victoria – Jr. Huánuco 1480'],
-      Chorrillos:['Chorrillos – Av. Defensores del Morro 1540'],
-      Surquillo:['Surquillo – Av. Angamos Oeste 530'],
-      Miraflores:['Miraflores – Av. José Larco 1150','Miraflores – Av. Ricardo Palma 280'],
-      'San Borja':['San Borja – Av. Javier Prado Este 2760'],
-      'San Isidro':['San Isidro – Av. República de Panamá 3620'],
-      Lince:['Lince – Av. Arequipa 2450'],
-      Breña:['Breña – Av. Arica 320'],
-      'Jesús María':['Jesús María – Av. Salaverry 1640'],
-      Magdalena:['Magdalena – Av. Brasil 2870'],
-      'Pueblo Libre':['Pueblo Libre – Av. Sucre 1580'],
-      'San Miguel':['San Miguel – Av. La Marina 2050'],
-      Surco:['Surco – Av. Caminos del Inca 1200','Surco – Av. Primavera 780'],
-      'La Molina':['La Molina – Av. La Molina 1490'],
-      'Villa El Salvador':['VES – Av. Separadora Industrial 1400'],
-      'Villa María del Triunfo':['VMT – Av. José Carlos Mariátegui 1310'],
-      'San Juan de Miraflores':['SJM – Av. San Juan 1090'],
-      Lurín:['Lurín – Av. Antigua Panamericana Sur km 38'],
-      Pachacámac:['Pachacámac – Carretera Antigua Panamericana Sur km 28'],
-      Cieneguilla:['Cieneguilla – Carretera a Cieneguilla 1204'],
-      Ate:['Ate – Av. Nicolás Ayllón 1520','Ate – Av. Separadora Industrial 400'],
-      'Santa Anita':['Santa Anita – Av. Los Frutales 650'],
-      Lurigancho:['Lurigancho – Av. Nicolás Ayllón 3500'],
-    },
-    Callao:{
-      Callao:['Callao – Av. Sáenz Peña 840','Callao – Av. Colonial 2120'],
-      Bellavista:['Bellavista – Av. Oscar R. Benavides 3240'],
-      'La Perla':['La Perla – Av. Guardia Chalaca 1580'],
-      'Mi Perú':['Mi Perú – Av. Los Dominicos s/n'],
-      Ventanilla:['Ventanilla – Av. Néstor Gambetta km 14'],
-    },
-  },
-  Arequipa:{
-    Arequipa:{
-      'Arequipa':['Cercado – Calle San Juan de Dios 216','Cayma – Av. Ejército 112','Cerro Colorado – Av. Aviación 100','Mariano Melgar – Av. Mariscal Castilla 400','Miraflores – Av. Los Arces 210','Paucarpata – Av. Víctor Andrés Belaúnde 310'],
-      'Camana':['Camana – Jr. Lima 420'],
-      'Mollendo':['Mollendo – Av. Comercio 250'],
-    },
-  },
-  Cusco:{
-    Cusco:{
-      'Cusco':['Wanchaq – Av. Pardo 1080','San Sebastián – Av. La Cultura 2300'],
-    },
-  },
-  'La Libertad':{
-    Trujillo:{
-      'Trujillo':['Trujillo Centro – Av. España 1680','El Porvenir – Av. Sánchez Carrión 2780','Florencia de Mora – Av. Manuel Cisneros 1460','La Esperanza – Av. Andrés Razuri 940','Víctor Larco Herrera – Av. América Sur 3205'],
-    },
-  },
-  Lambayeque:{
-    Chiclayo:{
-      'Chiclayo':['Chiclayo – Av. Salaverry 750','José Leonardo Ortiz – Av. Sesquicentenario 1180','La Victoria – Av. Progreso 550'],
-    },
-  },
-  Piura:{
-    Piura:{
-      'Piura':['Piura – Av. Loreto 450','Castilla – Av. Guardia Civil 310'],
-    },
-    Sullana:{
-      'Sullana':['Sullana – Av. José de Lama 602'],
-    },
-  },
-  Tumbes:{
-    Tumbes:{
-      'Tumbes':['Tumbes – Av. Tumbes Norte 450'],
-    },
-  },
-  Loreto:{
-    Maynas:{
-      'Iquitos':['Iquitos – Av. Abelardo Quiñones 2380','Iquitos – Jr. Próspero 740'],
-    },
-  },
-  Ucayali:{
-    Coronel_Portillo:{
-      'Pucallpa':['Pucallpa – Jr. Raymondi 510'],
-    },
-  },
-  'San Martin':{
-    San_Martin:{
-      'Tarapoto':['Tarapoto – Jr. Alfonso Ugarte 850'],
-    },
-    Moyobamba:{
-      'Moyobamba':['Moyobamba – Jr. San Martín 620'],
-    },
-  },
-  Cajamarca:{
-    Cajamarca:{
-      'Cajamarca':['Cajamarca – Jr. Del Comercio 1040'],
-    },
-  },
-  Ancash:{
-    Santa:{
-      'Chimbote':['Chimbote – Av. Víctor Raúl Haya de la Torre 542'],
-    },
-    Huaraz:{
-      'Huaraz':['Huaraz – Jr. Sucre 850'],
-    },
-  },
-  Junin:{
-    Huancayo:{
-      'Huancayo':['Huancayo – Av. Giráldez 582','El Tambo – Av. San Carlos 1120'],
-    },
-  },
-  Ica:{
-    Ica:{
-      'Ica':['Ica – Av. Municipalidad 320'],
-    },
-  },
-  Ayacucho:{
-    Huamanga:{
-      'Ayacucho':['Ayacucho – Jr. 9 de Diciembre 160'],
-    },
-  },
-  Apurimac:{
-    Abancay:{
-      'Abancay':['Abancay – Av. Arenas 210'],
-    },
-  },
-  Puno:{
-    Puno:{
-      'Puno':['Puno – Jr. Ilave 350'],
-    },
-    San_Roman:{
-      'Juliaca':['Juliaca – Jr. Dos de Mayo 520'],
-    },
-  },
-  Tacna:{
-    Tacna:{
-      'Tacna':['Tacna – Av. Bolognesi 1240'],
-    },
-  },
-  Huanuco:{
-    Huanuco:{
-      'Huanuco':['Huánuco – Jr. Dos de Mayo 410'],
-    },
-  },
-};
-
-const AD_OLVA = {
-  Lima:{
-    Lima:{
-      'Lima Centro':['Lima Centro – Jr. Andahuaylazo 174','Lima Centro – Jr. Puno 580'],
-      Miraflores:['Miraflores – Av. Benavides 1200'],
-      Surco:['Surco – Av. Caminos del Inca 1540'],
-      'San Isidro':['San Isidro – Av. Javier Prado Oeste 1540'],
-      'San Juan de Lurigancho':['SJL – Av. Próceres 560'],
-      'Los Olivos':['Los Olivos – Av. Carlos Izaguirre 890'],
-      Ate:['Ate – Av. Nicolás Ayllón 2100'],
-    },
-    Callao:{
-      Callao:['Callao – Av. Buenos Aires 1080'],
-    },
-  },
-  Arequipa:{
-    Arequipa:{
-      'Arequipa':['Arequipa – Av. Ejercito 510','Arequipa – Calle Palacio Viejo 210'],
-    },
-  },
-  Cajamarca:{
-    Cajamarca:{
-      'Cajamarca':['Cajamarca – Jr. Amalia Puga 740'],
-    },
-  },
-  'La Libertad':{
-    Trujillo:{
-      'Trujillo':['Trujillo – Jr. Grau 455'],
-    },
-  },
-  Lambayeque:{
-    Chiclayo:{
-      'Chiclayo':['Chiclayo – Av. Bolognesi 620'],
-    },
-  },
-  Cusco:{
-    Cusco:{
-      'Cusco':['Cusco – Av. El Sol 620'],
-    },
-  },
-};
-
-const AGENCY_DATA = { SHALOM: AD.SHALOM, OLVA: AD_OLVA };
-
 /* ─── GLOBAL STATE ──────────────────────────────────────────────── */
 let CFG            = null;
 let selCourierName = '';
@@ -674,17 +515,8 @@ let _gpsLon        = null;
 const app = document.getElementById('app');
 function $ (id){ return document.getElementById(id); }
 function setApp(html){ app.innerHTML = html; }
-function showOverlay(v){ $('loadOverlay').classList.toggle('hidden',!v); }
 function esc(s){ return s==null?'':String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
 function isoDate(d){ return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
-
-/* ─── AGENCY DATA LOOKUP ────────────────────────────────────────── */
-function getAgencyData(courierName){
-  const u=(courierName||'').toUpperCase();
-  if(u.includes('SHALOM')) return AD.SHALOM;
-  if(u.includes('OLVA'))   return AD_OLVA;
-  return null;
-}
 
 /* ─── INIT ──────────────────────────────────────────────────────────
    ⚠️ Se DECLARA aquí y se LLAMA al final del script (30/10/2026). Antes
@@ -1763,9 +1595,9 @@ function renderAgencyBox(courierName){
     agIniciarAlVer(agKey);
     return;
   }
-  // ★ Agencias sin catálogo propio: entrada manual
-  const data  = getAgencyData(courierName);
-  if(!data){
+  // ★ Agencias sin catálogo propio: entrada manual (el selector antiguo por
+  //   departamento se retiró el 30/10/2026: Shalom y Olva usan el buscador).
+  {
     agBox.innerHTML=`<div class="agc-box">
       <span class="agc-lbl">🏢 Escribe la agencia de ${esc(courierName)}</span>
       <div style="font-size:12px;color:var(--text2);margin-bottom:10px;line-height:1.5">
@@ -1781,39 +1613,6 @@ function renderAgencyBox(courierName){
     </div>`;
     return;
   }
-  const depts = Object.keys(data).sort();
-  const safeName = courierName.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
-  agBox.innerHTML=`<div class="agc-box">
-    <span class="agc-lbl">🏢 Selecciona la agencia</span>
-    <div class="cascade">
-      <select class="fi sel" id="agc_dept" onchange="onDept('${safeName}')">
-        <option value="">— Departamento —</option>
-        ${depts.map(d=>`<option value="${esc(d)}"${agState.dept===d?' selected':''}>${esc(d)}</option>`).join('')}
-      </select>
-      <div id="agc_prov_wrap" style="display:${agState.dept?'block':'none'}">
-        <select class="fi sel" id="agc_prov" onchange="onProv('${safeName}')">
-          <option value="">— Provincia —</option>
-          ${agState.dept&&data[agState.dept]?Object.keys(data[agState.dept]).sort().map(p=>`<option value="${esc(p)}"${agState.prov===p?' selected':''}>${esc(p)}</option>`).join(''):''}
-        </select>
-      </div>
-      <div id="agc_dist_wrap" style="display:${agState.prov?'block':'none'}">
-        <select class="fi sel" id="agc_dist" onchange="onDist('${safeName}')">
-          <option value="">— Distrito —</option>
-          ${agState.dept&&agState.prov&&data[agState.dept]&&data[agState.dept][agState.prov]?Object.keys(data[agState.dept][agState.prov]).sort().map(d=>`<option value="${esc(d)}"${agState.dist===d?' selected':''}>${esc(d)}</option>`).join(''):''}
-        </select>
-      </div>
-      <div id="agc_addr_wrap" style="display:${agState.dist?'block':'none'}">
-        <div class="agc-lbl" style="margin-top:4px">Agencia</div>
-        <div class="agc-list" id="agc_addr_list">
-          ${agState.dept&&agState.prov&&agState.dist&&data[agState.dept]&&data[agState.dept][agState.prov]&&data[agState.dept][agState.prov][agState.dist]
-            ? data[agState.dept][agState.prov][agState.dist].map(a=>`<div class="agc-item${agState.addr===a?' active':''}" onclick="selAgency(this,'${a.replace(/\\/g,'\\\\').replace(/'/g,"\\'")}')">${esc(a)}</div>`).join('')
-            : ''}
-        </div>
-      </div>
-      ${agState.addr?`<div class="sel-badge">🏢 <span>${esc(agState.addr)}</span><button class="clr-btn" onclick="resetAgencySelection()">✕</button></div>`:''}
-    </div>
-    <div class="ferr" id="err_agency" style="margin-top:6px">Selecciona una agencia</div>
-  </div>`;
 }
 
 // Entrada manual de agencia (OLVA y agencias sin base de datos)
@@ -1824,86 +1623,7 @@ function onAgencyManual(val){
   if(txt){ $('err_agency')&&$('err_agency').classList.remove('show'); }
 }
 
-function onDept(courier){
-  const data  = getAgencyData(courier);
-  const dept  = $('agc_dept')&&$('agc_dept').value;
-  agState = {dept:dept||'', prov:'', dist:'', addr:''};
-  if(!dept||!data||!data[dept]){
-    $('agc_prov_wrap')&&($('agc_prov_wrap').style.display='none');
-    $('agc_dist_wrap')&&($('agc_dist_wrap').style.display='none');
-    $('agc_addr_wrap')&&($('agc_addr_wrap').style.display='none');
-    return;
-  }
-  const provs = Object.keys(data[dept]).sort();
-  const ps = $('agc_prov');
-  if(ps){
-    ps.innerHTML='<option value="">— Provincia —</option>'+provs.map(p=>`<option value="${esc(p)}">${esc(p)}</option>`).join('');
-    $('agc_prov_wrap').style.display='block';
-  }
-  $('agc_dist_wrap')&&($('agc_dist_wrap').style.display='none');
-  $('agc_addr_wrap')&&($('agc_addr_wrap').style.display='none');
-}
 
-function onProv(courier){
-  const data  = getAgencyData(courier);
-  const dept  = agState.dept;
-  const prov  = $('agc_prov')&&$('agc_prov').value;
-  agState.prov = prov||''; agState.dist=''; agState.addr='';
-  if(!prov||!data||!data[dept]||!data[dept][prov]){
-    $('agc_dist_wrap')&&($('agc_dist_wrap').style.display='none');
-    $('agc_addr_wrap')&&($('agc_addr_wrap').style.display='none');
-    return;
-  }
-  const dists = Object.keys(data[dept][prov]).sort();
-  const ds = $('agc_dist');
-  if(ds){
-    ds.innerHTML='<option value="">— Distrito —</option>'+dists.map(d=>`<option value="${esc(d)}">${esc(d)}</option>`).join('');
-    $('agc_dist_wrap').style.display='block';
-  }
-  $('agc_addr_wrap')&&($('agc_addr_wrap').style.display='none');
-}
-
-function onDist(courier){
-  const data  = getAgencyData(courier);
-  const dept  = agState.dept;
-  const prov  = agState.prov;
-  const dist  = $('agc_dist')&&$('agc_dist').value;
-  agState.dist=dist||''; agState.addr='';
-  if(!dist||!data||!data[dept]||!data[dept][prov]||!data[dept][prov][dist]){
-    $('agc_addr_wrap')&&($('agc_addr_wrap').style.display='none');
-    return;
-  }
-  const addrs = data[dept][prov][dist];
-  const al = $('agc_addr_list');
-  if(al){
-    al.innerHTML=addrs.map(a=>`<div class="agc-item" onclick="selAgency(this,'${a.replace(/\\/g,'\\\\').replace(/'/g,"\\'")}')"> ${esc(a)}</div>`).join('');
-    $('agc_addr_wrap').style.display='block';
-  }
-}
-
-function selAgency(el, addr){
-  agState.addr=addr;
-  document.querySelectorAll('.agc-item').forEach(x=>x.classList.remove('active'));
-  if(el) el.classList.add('active');
-  /* show selected badge */
-  const existing = document.querySelector('.sel-badge');
-  if(existing) existing.remove();
-  const agcBox = document.querySelector('.cascade');
-  if(agcBox){
-    const badge = document.createElement('div');
-    badge.className='sel-badge';
-    badge.innerHTML=`🏢 <span>${esc(addr)}</span><button class="clr-btn" onclick="resetAgencySelection()">✕</button>`;
-    agcBox.appendChild(badge);
-  }
-  $('err_agency')&&$('err_agency').classList.remove('show');
-}
-
-function resetAgencySelection(){
-  agState.addr='';
-  const badge = document.querySelector('.sel-badge');
-  if(badge) badge.remove();
-  document.querySelectorAll('.agc-item').forEach(x=>x.classList.remove('active'));
-}
 
 function resetAgency(){
   agState={dept:'',prov:'',dist:'',addr:''};
@@ -2383,7 +2103,9 @@ function _construirWaMsg(order, trackCode, trackToken){
   const nroLine  = _nroTxt ? `\n🧾 *Factura/Boleta:* ${_nroTxt}` : '';
   const dirLabel = selCourierType==='agencia'
     ? `\n🏢 *Agencia:* ${order.address||'—'}`
-    : `\n🏠 *Dirección:* ${order.address||order.ciudadDestino||'—'}`;
+    : selCourierType==='retiro'
+      ? `\n🏪 *Retiro en tienda*`            // no hay dirección del cliente: decirlo, no «—»
+      : `\n🏠 *Dirección:* ${order.address||order.ciudadDestino||'—'}`;
 
   // Mensaje con formato mejorado (negritas de WhatsApp con *, secciones claras)
   return `🛒 *NUEVO PEDIDO* — ${bizName}\n`+
@@ -2543,9 +2265,8 @@ async function submitOrder(){
   };
 
   const btn=$('confirmBtn');
-  if(btn){ btn.disabled=true; btn.textContent='Registrando...'; }
   $('submitErrBox')&&($('submitErrBox').style.display='none');
-  showOverlay(true);
+  const t0=_confEmpezar(btn);   // sin telón: el botón avanza y la etiqueta «se imprime»
 
   try{
     // Crear el pedido vía Cloud Function (el público ya no escribe Firestore directo)
@@ -2559,45 +2280,128 @@ async function submitOrder(){
     }
     order.id = resp.orderId; // id real asignado por el servidor
     if(resp.nroComprobante) order.nroComprobante = String(resp.nroComprobante);
-    showOverlay(false);
     localStorage.setItem('dpanel_order_'+wsId, JSON.stringify({
       trackToken: resp.trackToken, orderId: resp.orderId, name: order.name
     }));
-    showInlineConfirmed(order, codigoSeg(order.id, order.createdAt), resp.trackToken);
+    // La «impresión» se ve al menos 0,9 s: si el servidor responde al
+    // instante, el sello no cae antes de que se entienda qué pasa.
+    const espera=Math.max(0, 900-(Date.now()-t0));
+    setTimeout(function(){ showInlineConfirmed(order, codigoSeg(order.id, order.createdAt), resp.trackToken); }, espera);
   }catch(e){
-    showOverlay(false);
-    if(btn){ btn.disabled=false; btn.textContent='Confirmar pedido →'; }
+    _confFallo(btn);
     const eb=$('submitErrBox');
     if(eb){ eb.style.display='block'; eb.textContent=`Error al registrar: ${e.message}`; }
   }
 }
 
-/* ─── CONFIRMACIÓN INLINE ───────────────────────────────────────────
-   El pedido YA se registró (fuente de verdad → ya llega al panel). No se
-   cambia de pantalla: se ocultan los pasos del formulario, la etiqueta con
-   los datos se queda arriba y CONGELADA, y aparece el botón "Ir a WhatsApp"
-   (ancla nativa = abre WhatsApp de forma 100% confiable, sin bloqueo de
-   pop-ups). El registro no depende de WhatsApp. */
+/* ─── CONFIRMACIÓN EN EL SITIO (30/10/2026) ───────────────────────────
+   Sin telón ni cambio de pantalla. El pedido YA se registró (llega al
+   panel); aquí se celebra y se lleva al cliente a WhatsApp:
+     1. mientras registra: el botón avanza y la etiqueta «se imprime»;
+     2. al responder: los pasos se recogen, cae el sello «✓ REGISTRADO»
+        con el código, confeti breve y vibración — el PICO (regla del pico
+        y el final: es lo que se recuerda);
+     3. abajo, WhatsApp con la verdad: barra «falta 1 toque», la burbuja
+        con lo que se va a enviar (sin sorpresas) y el beneficio real (el
+        link de seguimiento). Si vuelve sin enviarlo, se le recuerda; si lo
+        tocó, «¿Ya lo enviaste?».
+   ⚠️ Nada de mentir: el pedido está registrado aunque no envíe WhatsApp, y
+   no hay contadores falsos ni bloqueos. */
+function _confEmpezar(btn){
+  if(btn){
+    btn.disabled=true; btn.classList.add('tt-registrando');
+    btn.innerHTML='<span class="tt-reg-bar" aria-hidden="true"></span><span class="tt-reg-txt">Registrando tu pedido…</span>';
+  }
+  var card=document.querySelector('#tt-lbl .card');
+  if(card){ card.classList.add('tt-imprimiendo'); try{ card.scrollIntoView({behavior:'smooth',block:'start'}); }catch(e){} }
+  return Date.now();
+}
+function _confFallo(btn){
+  var card=document.querySelector('#tt-lbl .card'); if(card) card.classList.remove('tt-imprimiendo');
+  if(btn){ btn.disabled=false; btn.classList.remove('tt-registrando'); btn.textContent='Confirmar pedido →'; }
+}
+/* El sello y el confeti: el momento que se recuerda. */
+function _confSello(codigo){
+  var card=document.querySelector('#tt-lbl .card'); if(!card) return;
+  card.classList.remove('tt-imprimiendo');
+  var v=card.querySelector('.tt-sello'); if(v) v.remove();
+  var se=document.createElement('div'); se.className='tt-sello'; se.setAttribute('aria-hidden','true');
+  se.innerHTML='<b>✓ REGISTRADO</b>'+(codigo?'<small>'+esc(codigo)+'</small>':'');
+  card.appendChild(se);
+  card.classList.remove('tt-tiembla'); void card.offsetWidth; card.classList.add('tt-tiembla');
+  try{ if(navigator.vibrate && !(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches)) navigator.vibrate([15,40,15]); }catch(e){}
+  _confConfeti();
+}
+function _confConfeti(){
+  try{
+    if(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    var c=document.createElement('div'); c.className='tt-confeti'; c.setAttribute('aria-hidden','true');
+    var col=['#22c55e','#4f8ef7','#12a5b4','#f59e0b','#e11d2e','#a78bfa'], h='';
+    for(var i=0;i<26;i++){
+      h+='<i style="left:'+(Math.random()*100).toFixed(1)+'%;background:'+col[i%col.length]
+        +';animation-delay:'+(Math.random()*.25).toFixed(2)+'s;animation-duration:'+(1.1+Math.random()*.6).toFixed(2)+'s;transform:rotate('+Math.round(Math.random()*360)+'deg)"></i>';
+    }
+    c.innerHTML=h; document.body.appendChild(c);
+    setTimeout(function(){ c.remove(); }, 2200);
+  }catch(e){}
+}
+var _waToco=false, _waListo=false, _waRecordatorio=0;
 function showInlineConfirmed(order, trackCode, trackToken){
   const waHref = _construirWaHref(order, trackCode, trackToken);
   window._ttFrozen = true;                 // detiene la actualización de la etiqueta
   // Ocultar los inputs del formulario (todos los pasos + la barra de progreso)
   document.querySelectorAll('.wz-step').forEach(s=>{ s.hidden=true; });
   const prog=$('wzProgress'); if(prog) prog.style.display='none';
-  // Insertar el bloque confirmado debajo de la etiqueta (queda visible).
+  const codigo = order.nroComprobante ? String(order.nroComprobante) : '#'+trackCode;
+  _confSello(codigo);
+  // La burbuja: las primeras líneas REALES del mensaje (sin los * de WhatsApp).
+  const lineas = _construirWaMsg(order, trackCode, trackToken).replace(/\*/g,'').split('\n')
+    .filter(l=>l && !/^━/.test(l)).slice(0,4);
   const anyStep=document.querySelector('.wz-step');
   const cont=(anyStep&&anyStep.parentNode)||document.getElementById('app');
   let box=$('ttConfirmed');
   if(!box){ box=document.createElement('div'); box.id='ttConfirmed'; box.className='tt-confirmed'; cont.appendChild(box); }
-  box.innerHTML=`
-    <div style="text-align:center;padding:10px 0 4px">
-      <div style="font-size:17px;font-weight:800;color:#1eb954;letter-spacing:.3px">✅ Pedido registrado</div>
-      <div style="font-size:13.5px;color:var(--text2);margin-top:6px;line-height:1.5">Ya recibimos tu pedido. Toca el botón para <b style="color:var(--text)">enviarlo por WhatsApp</b> y recibir tu link de seguimiento.</div>
-      ${waHref?`<a class="btn-wa" href="${esc(waHref)}" target="_blank" rel="noopener" style="font-size:17px;padding:18px;margin-top:14px">💬 Ir a WhatsApp</a>
-      <div style="font-size:12px;color:var(--text2);margin-top:8px">📍 Al enviarlo recibes tu link de seguimiento</div>`
-              :'<div class="error-box" style="margin-top:12px">No se pudo generar el enlace de WhatsApp. Contáctanos directamente.</div>'}
-    </div>`;
-  try{ box.scrollIntoView({behavior:'smooth',block:'center'}); }catch(_){}
+  _waToco=false; _waListo=false;
+  box.innerHTML = waHref ? `
+    <div class="tt-meta"><div class="tt-meta-txt" id="ttMetaTxt">Tu pedido ●●●●○ · <b>falta 1 toque</b></div><div class="tt-meta-bar"><i id="ttMetaBar"></i></div></div>
+    <div class="tt-wa-ttl">Envíanos tu pedido por WhatsApp</div>
+    <div class="tt-burbuja"><div>${lineas.map(esc).join('<br>')}<br>…</div><span class="tt-burbuja-h">ahora ✓✓</span></div>
+    <a class="btn-wa tt-wa-btn" id="ttWaBtn" href="${esc(waHref)}" target="_blank" rel="noopener" onclick="_waAbierto()">
+      <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path fill="#fff" d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2zm0 18.2c-1.5 0-3-.4-4.3-1.2l-.3-.2-3 .8.8-2.9-.2-.3A8.2 8.2 0 1 1 12 20.2zm4.5-6.1c-.2-.1-1.5-.7-1.7-.8-.2-.1-.4-.1-.6.1l-.8 1c-.1.2-.3.2-.5.1a6.7 6.7 0 0 1-3.3-2.9c-.2-.4.2-.4.7-1.3.1-.2 0-.3 0-.4l-.8-1.8c-.2-.5-.4-.4-.6-.4h-.5a1 1 0 0 0-.7.3 3 3 0 0 0-.9 2.2 5.1 5.1 0 0 0 1.1 2.7 11.6 11.6 0 0 0 4.4 3.9c1.6.7 2.3.8 3.1.6.5-.1 1.5-.6 1.7-1.2.2-.6.2-1.1.2-1.2-.1-.1-.3-.2-.5-.3z"/></svg>
+      Enviar por WhatsApp</a>
+    <div class="tt-wa-sub">Al enviarlo recibes tu <b>link de seguimiento</b> y te avisamos cada avance.</div>
+    <div class="tt-wa-vuelta" id="ttWaVuelta" style="display:none"></div>`
+    : '<div class="error-box" style="margin-top:12px">No se pudo generar el enlace de WhatsApp. Contáctanos directamente.</div>';
+  // Si en 25 s no lo tocó, un recordatorio suave (una vez).
+  clearTimeout(_waRecordatorio);
+  _waRecordatorio=setTimeout(function(){ if(!_waToco) _waRecordar(); }, 25000);
+}
+/* Tocó «Enviar por WhatsApp». */
+function _waAbierto(){ _waToco=true; clearTimeout(_waRecordatorio); }
+/* Recordatorio honesto: sin enviarlo no le llega su link. */
+function _waRecordar(){
+  var b=$('ttWaBtn'), v=$('ttWaVuelta'); if(!b || _waListo) return;
+  b.classList.remove('tt-llama'); void b.offsetWidth; b.classList.add('tt-llama');
+  if(v){ v.style.display='block'; v.innerHTML='Te falta enviarlo para recibir tu link de seguimiento 👆'; }
+}
+/* Volvió de WhatsApp (o de otra app): si lo tocó, «¿Ya lo enviaste?»;
+   si no, el recordatorio. */
+try{ document.addEventListener('visibilitychange', function(){
+  if(document.hidden || !$('ttWaBtn') || _waListo) return;
+  if(!_waToco){ _waRecordar(); return; }
+  var v=$('ttWaVuelta'); if(!v) return;
+  v.style.display='block';
+  v.innerHTML='<div class="tt-wa-q">¿Ya lo enviaste?</div>'
+    +'<div class="dlv-btns"><button type="button" class="dlv-si" onclick="waYaEnviado()">✓ Sí, ya lo envié</button>'
+    +'<a class="dlv-aj tt-wa-otra" href="'+esc($('ttWaBtn').getAttribute('href'))+'" target="_blank" rel="noopener" onclick="_waAbierto()">Abrir otra vez</a></div>';
+}); }catch(e){}
+function waYaEnviado(){
+  _waListo=true;
+  var t=$('ttMetaTxt'), bar=$('ttMetaBar'), v=$('ttWaVuelta');
+  if(t) t.innerHTML='Tu pedido ●●●●● · <b>¡completo!</b>';
+  if(bar) bar.style.width='100%';
+  if(v) v.innerHTML='<div class="tt-ok on">¡Gracias! 🙌 Te avisaremos cada avance de tu pedido.</div>';
+  try{ if(navigator.vibrate) navigator.vibrate(12); }catch(e){}
 }
 
 /* ─── GO TO TRACKING ────────────────────────────────────────────── */
@@ -4146,13 +3950,7 @@ window.wzShow               = wzShow;
 window.onPhoneInput         = onPhoneInput;
 window.onCourierChange      = onCourierChange;
 window.pickCourier          = pickCourier;
-window.resetAgencySelection = resetAgencySelection;
 window.selDate              = selDate;
-window.onDept               = onDept;
-window.onProv               = onProv;
-window.onDist               = onDist;
-window.selAgency            = selAgency;
-window.resetAgencySelection = resetAgencySelection;
 window._gpsCopiarLink       = _gpsCopiarLink;
 // Dirección de entrega — una sola verdad (el textarea)
 window.usarMiUbicacion      = usarMiUbicacion;
@@ -4167,6 +3965,8 @@ window.nuevoRegistro        = nuevoRegistro;
 window.checkToken           = checkToken;
 // ★ Funciones que faltaban exponer (por eso sus onclick no funcionaban)
 window.abrirAyudaForm       = abrirAyudaForm;
+window._waAbierto           = _waAbierto;
+window.waYaEnviado          = waYaEnviado;
 window.cerrarAyudaForm      = cerrarAyudaForm;
 window.abrirAyudaTrack      = abrirAyudaTrack;
 window.onAgencyManual       = onAgencyManual;
@@ -4199,7 +3999,13 @@ init();
 
 })();
 </script>
-<script src="loading-screen.js?v=1"></script>
+<script>
+/* loading-screen.js es SOLO del seguimiento (?seg=): en el formulario no se
+   descarga (22 KB menos). Se escribe durante la carga para que siga siendo
+   síncrono, igual que antes: TTLoader existe antes de que el seguimiento
+   lo llame (cargarlo «después» abriría una carrera y el telón no se iría). */
+if(new URLSearchParams(location.search).has('seg')) document.write('<script src="loading-screen.js?v=1"><\/script>');
+</script>
 <script defer src="narrador/etiqueta.js?v=11"></script>
 <script defer src="narrador/narrador.js?v=5"></script>
 </body>
