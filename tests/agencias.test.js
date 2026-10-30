@@ -176,13 +176,13 @@ module.exports = async ({bloque, ok}) => {
   bloque('Contra el catálogo REAL del repositorio');
 
   {
-    /* No contra agencias inventadas: contra las 552 que el panel usa hoy. */
+    /* No contra agencias inventadas: contra TODAS las del catálogo que el panel usa hoy. */
     const cat = JSON.parse(E.leer('data/agencias-shalom.json')).agencias;
     ok(cat.every((a) => A.idValido(a.ter_id)),
-       'las 552 del catálogo tienen un ter_id que este módulo acepta');
+       'todas las del catálogo tienen un ter_id que este módulo acepta');
     ok(cat.every((a) => A.geoDe(a).split('|').length === 3 &&
         A.geoDe(a).split('|').every((x) => x.length > 0)),
-       'y las 552 dan una ubicación completa: si alguna viniera sin distrito, ' +
+       'y todas dan una ubicación completa: si alguna viniera sin distrito, ' +
        'su verificación no podría comparar nada');
     const real = cat[0];
     ok(A.verificar(A.elegida(real, 'SHALOM'), cat).ok === true,
@@ -390,5 +390,27 @@ module.exports = async ({bloque, ok}) => {
     ok(/id="fShalomClave"/.test(html) && /maxlength="4"/.test(html),
        'el campo existe y admite 4 dígitos');
     ok(/onclick="regenClaveRecojo\(\)"/.test(html), 'con su botón 🎲');
+  }
+
+  bloque('El catálogo de Shalom: versión, y nadie se queda con la lista vieja');
+  {
+    const j = JSON.parse(E.leer('data/agencias-shalom.json'));
+    const fecha = String(j.meta && j.meta.generado || '').slice(0, 10);
+    ok(j.meta.total === j.agencias.length, 'meta.total cuadra con la lista (' + j.agencias.length + ')');
+    const ids = j.agencias.map((a) => a.ter_id);
+    ok(new Set(ids).size === ids.length, 'ningún ter_id repetido');
+    const f = E.leer('formulario.html');
+    const c = E.leer('config.js');
+    const vf = (/version: '(\d{4}-\d{2}-\d{2})', \/\/ meta\.generado\n\s*jsonPath: '\.\/data\/agencias-shalom\.json'/.exec(f) || [])[1];
+    const vc = (/const SHALOM_CATALOGO_V='(\d{4}-\d{2}-\d{2})'/.exec(c) || [])[1];
+    ok(vf === fecha && vc === fecha,
+       '⚠️ la versión del catálogo (formulario ' + vf + ', panel ' + vc + ') = fecha del JSON (' + fecha + '): ' +
+       'al subir un JSON nuevo hay que cambiarla, o la caché de 24 h serviría la lista vieja');
+    ok(/const verOk = !cfg\.version \|\| localStorage\.getItem\(verK\) === cfg\.version;/.test(f) &&
+       /cfg\.jsonPath \+ \(cfg\.version \? '\?v=' \+ cfg\.version : ''\)/.test(f),
+       'el formulario solo usa la caché de la misma versión, y pide el archivo con ?v=');
+    ok(/v===SHALOM_CATALOGO_V && \(Date\.now\(\)-t\)<86400000/.test(c) &&
+       /fetch\('data\/agencias-shalom\.json\?v='\+SHALOM_CATALOGO_V\)/.test(c),
+       'y el panel también');
   }
 };

@@ -1,7 +1,7 @@
 {
   "meta": {
-    "total": 552,
-    "generado": "2026-09-24T03:18:02.970Z"
+    "total": 562,
+    "generado": "2026-10-30T04:28:13.037Z"
   },
   "agencias": [
     {
@@ -76,7 +76,7 @@
     },
     {
       "ter_id": "15",
-      "nombre": "APURIMAC / ABANCAY / ABANCAY / ABANCAY",
+      "nombre": "APURIMAC / ABANCAY / ABANCAY / ABANCAY CO",
       "departamento": "APURIMAC",
       "provincia": "ABANCAY",
       "distrito": "ABANCAY",
@@ -188,7 +188,7 @@
     },
     {
       "ter_id": "24",
-      "nombre": "JUNIN / HUANCAYO / EL TAMBO / AV MARISCAL CASTILLA CO PARQUE INDUSTRIAL",
+      "nombre": "JUNIN / HUANCAYO / EL TAMBO / AV MARISCAL CASTILLA  PARQ INDUSTRIAL",
       "departamento": "JUNIN",
       "provincia": "HUANCAYO",
       "distrito": "EL TAMBO",
@@ -216,7 +216,7 @@
     },
     {
       "ter_id": "27",
-      "nombre": "HUANUCO / HUANUCO / HUANUCO / JR AGUILAR",
+      "nombre": "HUANUCO / HUANUCO / HUANUCO / JR MAYRO",
       "departamento": "HUANUCO",
       "provincia": "HUANUCO",
       "distrito": "HUANUCO",
@@ -258,17 +258,17 @@
     },
     {
       "ter_id": "34",
-      "nombre": "CUSCO / CANCHIS / SICUANI / SICUANI CO OVALO SAN ANDRES",
+      "nombre": "CUSCO / CANCHIS / SICUANI / SICUANI AV CONFEDERACION CO",
       "departamento": "CUSCO",
       "provincia": "CANCHIS",
       "distrito": "SICUANI",
-      "direccion": "PROLONG. AV. AREQUIPA 1010  S/N, REF: AL COSTADO DEL GRIFO GUADALUPE EN EL ÓVALO SAN ANDRÉS",
+      "direccion": "AV. CONFEDERACION N° 659, REF. AL FRENTE DEL OVALO ENTRADA DE SICUANI / AL FRENTE DE LA COMISARIA DE TORCOMA",
       "referencia": "",
       "telefono": "015007878",
       "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
       "horarioDom": "",
-      "latitud": "-14.285420707913",
-      "longitud": "-71.225136970083"
+      "latitud": "-14.256253760015",
+      "longitud": "-71.229391837808"
     },
     {
       "ter_id": "36",
@@ -472,13 +472,13 @@
       "departamento": "LIMA",
       "provincia": "LIMA",
       "distrito": "ATE-VITARTE",
-      "direccion": "AV. ANDRÉS AVELINO CÁCERES MZ G LT. 14, 1ER PISO PROG DE VIV. PHILADELFIA DE ATE IV ETAPA, ATE VITARTE - LIMA - LIMA, REF. A UNA CDRA. DE LA CTRA. CENTRAL, PARADERO EL LAVADERO",
+      "direccion": "CTRA. CENTRAL KM. 17.5 MZ. I LT. 1 PRADERAS DE PARIACHI, REF. MISMA CTRA. CENTRAL A UNA CDRA. DEL PARADERO EL LAVADERO Y DOS CDRAS. DEL GRIFO EL NEGRO",
       "referencia": "",
       "telefono": "(01) 500 7878",
       "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
       "horarioDom": "",
-      "latitud": "-11.998277984658",
-      "longitud": "-76.834139993339"
+      "latitud": "-11.997750000001",
+      "longitud": "-76.836000000002"
     },
     {
       "ter_id": "72",
@@ -517,7 +517,7 @@
       "direccion": "Av la fontana 440 - La Molina (CC La Rotonda II local 1018)",
       "referencia": "",
       "telefono": "(01) 500 7878",
-      "horario": "LUNES A VIERNES - 8AM A 8PM",
+      "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
       "horarioDom": "",
       "latitud": "-12.072691",
       "longitud": "-76.9548488"
@@ -531,10 +531,10 @@
       "direccion": "AV. CESAR VALLEJO, MZ. F LT. 1 - SECT. 2, REFERENCIA: FRENTE A ESSALUD, AL COSTADO DEL MERCADO VILLA SUR",
       "referencia": "",
       "telefono": "(01) 500 7878",
-      "horario": "LUNES A VIERNES - 8AM A 8PM",
+      "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
       "horarioDom": "",
-      "latitud": "-12.210718983393406",
-      "longitud": "-76.9327330431671"
+      "latitud": "-12.210718983393",
+      "longitud": "-76.932733043167"
     },
     {
       "ter_id": "99",
@@ -636,7 +636,7 @@
     },
     {
       "ter_id": "125",
-      "nombre": "ANCASH / HUARAZ / HUARAZ / HUARAZ CO",
+      "nombre": "ANCASH / HUARAZ / HUARAZ / AV. 27 DE NOVIEMBRE CO",
       "departamento": "ANCASH",
       "provincia": "HUARAZ",
       "distrito": "HUARAZ",
@@ -1802,13 +1802,13 @@
       "departamento": "LAMBAYEQUE",
       "provincia": "LAMBAYEQUE",
       "distrito": "TUCUME",
-      "direccion": "AV. FEDERICO VILLARREAL N° 982 (CTRA. FERNANDO BELAUNDE TERRY), REFERENCIA: A MEDIA CDRA. DEL CEMENTERIO JARDINES DE LA PAZ",
+      "direccion": "CALLE FEDERICO VILLARREAL NRO. 1157, REF. FRENTE AL MOLINO SANTAMARÍA",
       "referencia": "",
       "telefono": "(01) 500 7878",
       "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
       "horarioDom": "",
-      "latitud": "-6.5041100012906",
-      "longitud": "-79.859217670553"
+      "latitud": "-6.5039437295491",
+      "longitud": "-79.858972889844"
     },
     {
       "ter_id": "290",
@@ -2239,10 +2239,10 @@
       "direccion": "Av. Pedro Ruíz Gallo Mz. H Lt. 3. Asoc. Viv. Villa San Luis, Santa Clara - Ate Vitarte - LimaRef: Entre el Real Plaza y la UTP Santa Clara",
       "referencia": "",
       "telefono": "(01) 500 7878",
-      "horario": "LUNES A VIERNES - 8AM A 8PM",
+      "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
       "horarioDom": "",
-      "latitud": "-12.013911972067262",
-      "longitud": "-76.88419892952268"
+      "latitud": "-12.013911972067",
+      "longitud": "-76.884198929523"
     },
     {
       "ter_id": "378",
@@ -2253,10 +2253,10 @@
       "direccion": "AV. PASTOR SEVILLA SECT. 6 - GP 7 - MZ. A - LOTE 05  - V.E.S., REF. A 2 CUADRAS DEL ÓVALO MARIÁTEGUI CON 3 DE OCTUBRE",
       "referencia": "",
       "telefono": "(01) 500 7878",
-      "horario": "LUNES A VIERNES - 8AM A 8PM",
+      "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
       "horarioDom": "",
-      "latitud": "-12.222771994775695",
-      "longitud": "-76.94317697476002"
+      "latitud": "-12.222771994776",
+      "longitud": "-76.94317697476"
     },
     {
       "ter_id": "379",
@@ -2687,10 +2687,10 @@
       "direccion": "AV. ALAMEDA SUR 5, CHORRILLOS 15067, REF. CRUCE DE AV. ALAMEDA SUR CONAV. ALAMEDA SAN MARCOS",
       "referencia": "",
       "telefono": "(01) 500 7878",
-      "horario": "LUNES A VIERNES - 10:00 AM A 7:00 PM",
+      "horario": "LUNES A VIERNES - 10:00 AM A 8:00 PM",
       "horarioDom": "",
-      "latitud": "-12.19672190971743",
-      "longitud": "-77.01160198642162"
+      "latitud": "-12.196721909717",
+      "longitud": "-77.011601986422"
     },
     {
       "ter_id": "451",
@@ -2852,7 +2852,7 @@
       "departamento": "AMAZONAS",
       "provincia": "LUYA",
       "distrito": "LUYA",
-      "direccion": "JR. RAMÓN CASTILLA S/N, LUYA - AMAZONAS, REF. ENTRE EL COLEGIO SECUNDARIO RAMÓN CASTILLA Y EL JR. JOSÉ GÁLVEZ, A MEDIA CDRA. DEL AGENTE DE VENTA DE PASAJES DE CIVA, MÓVIL Y TRANSPORTE CHICLAYO",
+      "direccion": "JR. RAMÓN CASTILLA 1247 LUYA - AMAZONAS, REF. ENTRE EL COLEGIO SECUNDARIO RAMÓN CASTILLA Y EL JR. JOSÉ GÁLVEZ, A MEDIA CDRA. DEL AGENTE DE VENTA DE PASAJES DE CIVA, MÓVIL Y TRANSPORTE CHICLAYO",
       "referencia": "",
       "telefono": "(01) 500 7878",
       "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
@@ -3765,7 +3765,7 @@
       "direccion": "JR. BOLOGNESI N° 717 – SAN MIGUEL – CAJAMARCA - CAJAMARCA, REF. AL COSTADO DEL COLISEO Y EL PARADERO DE LLAPA Y COCHÁN.",
       "referencia": "",
       "telefono": "(01) 500 7878",
-      "horario": "LUNES A VIERNES - 8:00 AM A 7:00 PM",
+      "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
       "horarioDom": "",
       "latitud": "-7.0007791311052",
       "longitud": "-78.849751341107"
@@ -4336,13 +4336,13 @@
       "departamento": "CUSCO",
       "provincia": "QUISPICANCHI",
       "distrito": "OCONGATE",
-      "direccion": "SECT. MAYO UCJO S/N, OCONGATE - QUISPICANCHI - CUSCO, REF. A LA ESPALDA DEL TERMINAL DE BUSES DE OCONGATE / A ORILLAS DE LA CARRETA A MAZUKO",
+      "direccion": "AV. AUSANGATE S/N, BARRIO TÚPAC AMARU. REF: AL COSTADO DE LA CARPINTERÍA EMMANUEL. A ORILLAS DE LA CARRETERA INTEROCEÁNICA A MAZUKO.",
       "referencia": "",
       "telefono": "(01) 500 7878",
-      "horario": "LUNES A VIERNES - 8:00 AM A 6:00 PM",
+      "horario": "LUNES A VIERNES - 8:00 AM A 7:00 PM",
       "horarioDom": "",
-      "latitud": "-13.627390139692",
-      "longitud": "-71.388750657298"
+      "latitud": "-13.6292063857",
+      "longitud": "-71.387583856822"
     },
     {
       "ter_id": "700",
@@ -4434,7 +4434,7 @@
       "departamento": "LIMA",
       "provincia": "LIMA",
       "distrito": "PACHACAMAC",
-      "direccion": "AV. VICTOR MALASQUEZ MZ. B LT. 16 – ASOCIACIÓN DE VIVIENDA “EL SOL DE SAN FERNANDO” ZONA 5 – QUEBRADA DE MANCHAY, PACHACÁMAC - LIMA - LIMA, REF. A 2 CDRAS. DEL CRUCE CON AV. UNIÓN",
+      "direccion": "AV. VICTOR MALASQUEZ MZ. B LT. 16 – ASOCIACIÓN DE VIVIENDA “EL SOL DE SAN FERNANDO” ZONA 5 – QUEBRADA DE MANCHAY, REF. A 2 CDRAS. DEL CRUCE CON AV. UNIÓN",
       "referencia": "",
       "telefono": "01 500 7878",
       "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
@@ -4504,7 +4504,7 @@
       "departamento": "JUNIN",
       "provincia": "HUANCAYO",
       "distrito": "SAPALLANGA",
-      "direccion": "CA. CORONEL CISNEROS 598, SAPALLANGA – HUANCAYO – JUNIN, REF. ESQUINA CON AV. MARISCAL CACERES",
+      "direccion": "CA. CORONEL CISNEROS 598, REF. ESQUINA CON AV. MARISCAL CACERES",
       "referencia": "",
       "telefono": "01 500 7878",
       "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
@@ -4546,13 +4546,153 @@
       "departamento": "LIMA",
       "provincia": "LIMA",
       "distrito": "SANTA ANITA",
-      "direccion": "AV. EL FERROCARRIL 530 COOPERATIVA. LOS CHANCAS DE ANDAHUAYLAS MZ. F1 LT. 06, REF. A 2 CDRAS. DEL INNOVA SCHOOLS DE ATE VITARTE",
+      "direccion": "AV. EL FERROCARRIL 530 COOPERATIVA. LOS CHANCAS DE ANDAHUAYLAS MZ. F1 LT. 06, REF. CRUCE CON AV. RUISEÑORES",
       "referencia": "",
       "telefono": "01 500 7878",
       "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
       "horarioDom": "",
       "latitud": "-12.038198554742",
       "longitud": "-76.971729239873"
+    },
+    {
+      "ter_id": "730",
+      "nombre": "LA LIBERTAD / TRUJILLO / LA ESPERANZA / URB MANUEL AREVALO",
+      "departamento": "LA LIBERTAD",
+      "provincia": "TRUJILLO",
+      "distrito": "LA ESPERANZA",
+      "direccion": "MZ. B21 LT. 05 URB MANUEL AREVALO III ETAPA B, REF. CRUCE CON AV. CAHUIDE A UNA CDRA. DEL COMPLEJO DEPORTIVO PAZ Y AMISTAD",
+      "referencia": "",
+      "telefono": "01 500 7878",
+      "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
+      "horarioDom": "",
+      "latitud": "-8.0728061014597",
+      "longitud": "-79.061048583903"
+    },
+    {
+      "ter_id": "732",
+      "nombre": "ANCASH / HUARAZ / INDEPENDENCIA / HUARAZ INDEPENDENCIA",
+      "departamento": "ANCASH",
+      "provincia": "HUARAZ",
+      "distrito": "INDEPENDENCIA",
+      "direccion": "JR. CANDELARIA VILLAR N. 631, REF. ESQUINA CON CON JR. HUAYLAS CASA DE 4 PISOS AMARILLO",
+      "referencia": "",
+      "telefono": "01 500 7878",
+      "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
+      "horarioDom": "",
+      "latitud": "-9.518168683963",
+      "longitud": "-77.53261042945"
+    },
+    {
+      "ter_id": "733",
+      "nombre": "LIMA / LIMA / LURIGANCHO / CARAPONGO - LURIGANCHO (POR DEFINIR)",
+      "departamento": "LIMA",
+      "provincia": "LIMA",
+      "distrito": "LURIGANCHO",
+      "direccion": "AV. 24 DE SETIEMBRE MZ. A SUB LT. 9-A2 ASOC. NUEVO HORIZONTE, REF. A MEDIA CDRA. DEL CENTRO COMERCIAL MANTARO, FRENTE AL GRIFO PETROAMERICA",
+      "referencia": "",
+      "telefono": "01 500 7878",
+      "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
+      "horarioDom": "",
+      "latitud": "-12.000475967694",
+      "longitud": "-76.853271341106"
+    },
+    {
+      "ter_id": "734",
+      "nombre": "APURIMAC / ABANCAY / CURAHUASI / CURAHUASI",
+      "departamento": "APURIMAC",
+      "provincia": "ABANCAY",
+      "distrito": "CURAHUASI",
+      "direccion": "AV. PANAMERICANA S/N",
+      "referencia": "",
+      "telefono": "(01) 500 7878",
+      "horario": "LUNES A VIERNES - 8:00 AM A 7:00 PM",
+      "horarioDom": "",
+      "latitud": "-13.539399177754",
+      "longitud": "-72.695055305966"
+    },
+    {
+      "ter_id": "735",
+      "nombre": "LAMBAYEQUE / CHICLAYO / LA VICTORIA / CHOSICA DEL NORTE CO (POR DEFINIR)",
+      "departamento": "LAMBAYEQUE",
+      "provincia": "CHICLAYO",
+      "distrito": "LA VICTORIA",
+      "direccion": "MZ. 1 LOTE 1C-2 URB. LOTIZACION CHOSICA DEL NORTE, REF. A MEDIA CDRA. DE LA INTERSECCIÓN CON CALLE SAN MARTIN / A UNOS MTS. DE ALBORADA EVENTOS Y RECEPCIONES",
+      "referencia": "",
+      "telefono": "",
+      "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
+      "horarioDom": "",
+      "latitud": "-6.8423616988988",
+      "longitud": "-79.829417401785"
+    },
+    {
+      "ter_id": "736",
+      "nombre": "CUSCO / CUSCO / WANCHAQ / AV. HUAYRUROPATA",
+      "departamento": "CUSCO",
+      "provincia": "CUSCO",
+      "distrito": "WANCHAQ",
+      "direccion": "AV. TOMASA TITO CONDEMAYTA N1706, REF. AL COSTADO DEL TERMINAL DE SICUANI DE BUSES RÁPIDOS POR LA VIA DEL IPD",
+      "referencia": "",
+      "telefono": "01 500 7878",
+      "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
+      "horarioDom": "",
+      "latitud": "-13.527112100001",
+      "longitud": "-71.957251041097"
+    },
+    {
+      "ter_id": "737",
+      "nombre": "LIMA / HUAURA / HUACHO / HUACHO SAN MARTÍN CO (POR DEFINIR)",
+      "departamento": "LIMA",
+      "provincia": "HUAURA",
+      "distrito": "HUACHO",
+      "direccion": "PROLONGACION SAN MARTIN 1087, REF.  AL FRENTE DE LA PAZULEA VICTOR RAUL HAYA DE LA TORRE",
+      "referencia": "",
+      "telefono": "01 500 7878",
+      "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
+      "horarioDom": "",
+      "latitud": "-11.105487470306",
+      "longitud": "-77.600223716439"
+    },
+    {
+      "ter_id": "739",
+      "nombre": "LAMBAYEQUE / CHICLAYO / PIMENTEL / PIMENTEL (POR DEFINIR)",
+      "departamento": "LAMBAYEQUE",
+      "provincia": "CHICLAYO",
+      "distrito": "PIMENTEL",
+      "direccion": "CALLE . JUAN VELASCO ALVARADO N° 472 , PIMENTEL - CHICLAYO - LAMBAYEQUE. REFERENCIAS: INTERSECCIÓN CON LA CALLE CIRO ALEGRIA. / A UNAS CUADRAS DEL CENTRO DE SALUD \"PIMENTEL\".",
+      "referencia": "",
+      "telefono": "(01) 500 7878",
+      "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
+      "horarioDom": "",
+      "latitud": "-6.8318627954458",
+      "longitud": "-79.930167543321"
+    },
+    {
+      "ter_id": "741",
+      "nombre": "CUSCO / CUSCO / CUSCO / COLLASUYO (POR DEFINIR)",
+      "departamento": "CUSCO",
+      "provincia": "CUSCO",
+      "distrito": "CUSCO",
+      "direccion": "URB. UCCHULLO O. 12 A, REF. POR DEFINIR",
+      "referencia": "",
+      "telefono": "01 500 7878",
+      "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
+      "horarioDom": "",
+      "latitud": "-13.519445084089",
+      "longitud": "-71.960971467422"
+    },
+    {
+      "ter_id": "742",
+      "nombre": "ANCASH / HUARI / HUARI / HUARI",
+      "departamento": "ANCASH",
+      "provincia": "HUARI",
+      "distrito": "HUARI",
+      "direccion": "AV. CIRCUNVALACIÓN BAJA N.° 865. REF: FRENTE A LA PLAZA DE TOROS.",
+      "referencia": "",
+      "telefono": "(01) 500 7878",
+      "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
+      "horarioDom": "",
+      "latitud": "-9.3467063197505",
+      "longitud": "-77.168945341141"
     },
     {
       "ter_id": "4",
@@ -4857,7 +4997,7 @@
       "direccion": "AV. ESPERANZA MZ. K LT. 06 LAS AMERICAS - ATE VITARTE - LIMA, REF. PASANDO MERCADO RAUCANA",
       "referencia": "",
       "telefono": "(01) 500 7878",
-      "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
+      "horario": "LUNES A VIERNES - 8:00 AM A 7:00 PM",
       "horarioDom": "",
       "latitud": "-12.031974898143",
       "longitud": "-76.904894767678"
@@ -5111,8 +5251,8 @@
       "telefono": "(01) 500 7878",
       "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
       "horarioDom": "",
-      "latitud": "-16.352289700015334",
-      "longitud": "-72.18092614106098"
+      "latitud": "-16.352289700015",
+      "longitud": "-72.180926141061"
     },
     {
       "ter_id": "484",
@@ -5627,10 +5767,10 @@
       "direccion": "AV. CORONEL JOSÉ LEAL 648, URB. FUNDO LOBATÓN, LINCE - LINCE, REF. PARALELA A LA CDRA. 6 DE LA AV. CANEVARO",
       "referencia": "",
       "telefono": "(01) 500 7878",
-      "horario": "LUNES A VIERNES - 8:00 A.M A 8:00 P.M",
+      "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
       "horarioDom": "",
-      "latitud": "-12.085366655704497",
-      "longitud": "-77.04022637039473"
+      "latitud": "-12.085366655704",
+      "longitud": "-77.040226370395"
     },
     {
       "ter_id": "465",
@@ -6145,7 +6285,7 @@
       "direccion": "BARRIO WICHAYPAMPA LT. 13 - 15 - 16, CHALLHUAHUACHO - COTABAMBAS - APURÍMAC, REF. A DOS CDRAS DEL TERMINAL TERRESTRE DE CHALLHUAHUACHO / A ESPALDAS DEL TALLER E&L",
       "referencia": "",
       "telefono": "(01) 500 7878",
-      "horario": "LUNES A VIERNES - 8:00 AM A 6:00 PM",
+      "horario": "LUNES A VIERNES - 8:00 AM A 7:00 PM",
       "horarioDom": "",
       "latitud": "-14.123588600655",
       "longitud": "-72.25614026073"
@@ -6180,7 +6320,7 @@
     },
     {
       "ter_id": "689",
-      "nombre": "JUNIN / HUANCAYO / CHILCA / CHILCA LEONCIO PRADO",
+      "nombre": "JUNIN / HUANCAYO / CHILCA / CHILCA CO LEONCIO PRADO",
       "departamento": "JUNIN",
       "provincia": "HUANCAYO",
       "distrito": "CHILCA",

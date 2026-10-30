@@ -820,23 +820,27 @@ function parseWAOrder(){
 /* ── BÚSQUEDA DE AGENCIAS SHALOM en el campo Dirección (courier SHALOM) ──
    Mismo JSON y misma calidad de búsqueda que el formulario público.       */
 let _shTimer=null;
+/* Versión del catálogo = fecha de `meta.generado` de data/agencias-shalom.json.
+   La MISMA que AGENCY_SOURCES.SHALOM.version en formulario.html (hay prueba). */
+const SHALOM_CATALOGO_V='2026-10-30';
 async function _panelShalomLoad(){
   if(window._shalomData && window._shalomData.length) return window._shalomData;
-  // 1) cache localStorage (misma clave que usa el formulario)
+  // 1) cache localStorage (24 h) — solo si es de ESTA versión del catálogo
   try{
     const c=localStorage.getItem('shalom_agencias_cache');
     const t=parseInt(localStorage.getItem('shalom_agencias_time')||'0');
-    if(c && (Date.now()-t)<86400000){ window._shalomData=JSON.parse(c); return window._shalomData; }
+    const v=localStorage.getItem('shalom_agencias_ver');
+    if(c && v===SHALOM_CATALOGO_V && (Date.now()-t)<86400000){ window._shalomData=JSON.parse(c); return window._shalomData; }
   }catch(e){}
-  // 2) JSON local
+  // 2) JSON local (con ?v= para que el navegador no sirva la copia vieja)
   try{
-    const r=await fetch('data/agencias-shalom.json');
+    const r=await fetch('data/agencias-shalom.json?v='+SHALOM_CATALOGO_V);
     if(r.ok){
       const j=await r.json();
       const lista=j.agencias||j.data||j||[];
       if(Array.isArray(lista)&&lista.length){
         window._shalomData=lista;
-        try{ localStorage.setItem('shalom_agencias_cache',JSON.stringify(lista)); localStorage.setItem('shalom_agencias_time',String(Date.now())); }catch(e){}
+        try{ localStorage.setItem('shalom_agencias_cache',JSON.stringify(lista)); localStorage.setItem('shalom_agencias_time',String(Date.now())); localStorage.setItem('shalom_agencias_ver',SHALOM_CATALOGO_V); }catch(e){}
         return lista;
       }
     }

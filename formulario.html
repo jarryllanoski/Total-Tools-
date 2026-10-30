@@ -2459,6 +2459,7 @@ function nuevoRegistro(){
 const AGENCY_SOURCES = {
   SHALOM: {
     label: 'Shalom',
+    version: '2026-10-30', // meta.generado
     jsonPath: './data/agencias-shalom.json',
     // Sin respaldo en vivo: la función agenciasShalom se retiró (el portal de
     // Shalom exige reCAPTCHA v3). El buscador usa solo el catálogo local, que
@@ -2489,18 +2490,25 @@ async function agPrecargar(key){
   if(window._agData[key] && window._agData[key].length) return;
   const cacheK = 'ag_agencias_cache_' + cfg.cacheKey;
   const timeK  = 'ag_agencias_time_'  + cfg.cacheKey;
-  // 1. Intentar cache localStorage (24h)
+  /* ★ VERSIÓN DEL CATÁLOGO (`cfg.version`) = fecha de `meta.generado` del
+     JSON. Al actualizar data/agencias-shalom.json se cambia allí y en
+     config.js (SHALOM_CATALOGO_V); una prueba exige que coincidan. Sin esto,
+     un navegador que ya tenía la lista la seguía usando hasta 24 h. */
+  const verK   = 'ag_agencias_ver_'   + cfg.cacheKey;
+  // 1. Intentar cache localStorage (24h) — y de la MISMA versión del catálogo.
   try{
     const cached = localStorage.getItem(cacheK);
     const cachedTime = parseInt(localStorage.getItem(timeK)||'0');
-    if(cached && (Date.now()-cachedTime) < 86400000){
+    const verOk = !cfg.version || localStorage.getItem(verK) === cfg.version;
+    if(cached && verOk && (Date.now()-cachedTime) < 86400000){
       window._agData[key] = JSON.parse(cached);
       return;
     }
   }catch(ce){}
   // 2. Intentar JSON local ./data/agencias-<courier>.json
   try{
-    const rLocal = await fetch(cfg.jsonPath);
+    // `?v=`: que el navegador no sirva la copia vieja del archivo.
+    const rLocal = await fetch(cfg.jsonPath + (cfg.version ? '?v=' + cfg.version : ''));
     if(rLocal.ok){
       const jLocal = await rLocal.json();
       const listaLocal = jLocal.agencias || jLocal.data || jLocal || [];
@@ -2509,6 +2517,7 @@ async function agPrecargar(key){
         try{
           localStorage.setItem(cacheK, JSON.stringify(listaLocal));
           localStorage.setItem(timeK, String(Date.now()));
+          if(cfg.version) localStorage.setItem(verK, cfg.version);
         }catch(se){}
         return;
       }
