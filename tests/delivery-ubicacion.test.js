@@ -67,7 +67,8 @@ module.exports = async ({bloque, ok}) => {
        'mismos mensajes por causa; la alternativa es marcar en el mapa');
     ok(/_ubicTrasFallo\(caso, function\(\)\{ if\(selCourierType==='delivery'/.test(er), 'y el mismo reintento al arreglarlo');
     const ex = trozo('function _dlvExito(', 'function _dlvError(');
-    ok(/if\(acc>100\) dlvAjustar\(\{aviso:acc\}\);/.test(ex), '⚠️ precisión mala (>100 m): se abre el ajuste');
+    ok(!/dlvAjustar/.test(ex) && !/dlv-aviso|ubicación es aproximada/.test(form),
+       '⚠️ nada se abre solo y no hay aviso por precisión: la MISMA pantalla en celular y PC');
     ok(/if\(!AgLista\.coords\(/.test(ex), 'fuera del Perú no se usa');
   }
 
@@ -156,7 +157,7 @@ module.exports = async ({bloque, ok}) => {
   bloque('Estilos de la tarjeta de confirmación presentes');
 
   {
-    ['.dlv-confirma{', '.dlv-q{', '.dlv-btns{', '.dlv-si{', '.dlv-aj{', '.dlv-link{', '.dlv-aviso{'].forEach((c) =>
+    ['.dlv-confirma{', '.dlv-q{', '.dlv-btns{', '.dlv-si{', '.dlv-aj{', '.dlv-link{'].forEach((c) =>
       ok(form.indexOf(c) > 0, 'existe ' + c));
   }
 

@@ -350,7 +350,6 @@ body.wz-sede #tt-lbl{display:none!important}
 .dlv-pista{font-size:12px;color:var(--text2);font-weight:600;margin-top:6px}
 .dlv-confirma{margin-bottom:8px}
 .dlv-q{font-size:13.5px;font-weight:800;color:var(--text);margin-bottom:8px}
-.dlv-aviso{font-size:12.5px;color:#eab308;line-height:1.45;margin-bottom:8px}
 .dlv-btns{display:flex;gap:8px;margin-bottom:4px}
 .dlv-btns button{flex:1;min-height:44px;border-radius:10px;font-family:inherit;font-size:13.5px;font-weight:800;cursor:pointer}
 .dlv-si{background:var(--green);border:none;color:#04120a}
@@ -1870,8 +1869,11 @@ function _dlvExito(pos){
   if(!AgLista.coords({latitud:la, longitud:lo})){ _dlvError('fuera', ''); return; }
   _dlvFallos=0; _ubicReintento=null; _ubicReintentoGps=false;
   _gpsMsg('');
+  /* MISMA pantalla en celular y PC (30/10/2026): nada se abre solo. Antes,
+     con más de 100 m de error (la PC por wifi da ±110) se abría el ajuste
+     y salía un aviso amarillo; en el celular (GPS) no — el mismo link se
+     veía distinto. Ajustar es siempre decisión del cliente. */
   _dlvPunto(la, lo, {acc:acc});
-  if(acc>100) dlvAjustar({aviso:acc});   // aproximada: que lo corrija él
 }
 function _dlvError(codigo, estado){
   _dlvFallos++;
@@ -1977,7 +1979,7 @@ function _dlvMapaListo(){
       if(!_dlvMapa || !box.contains(_dlvMapa.getContainer())){
         if(_dlvMapa){ try{ _dlvMapa.remove(); }catch(e){} }
         box.innerHTML='<div class="dlv-mapa" id="dlvMapaEl"></div>'
-          +'<div class="dlv-aj-top">Mueve el mapa hasta que el pin quede en tu puerta<small id="dlvAjAviso"></small></div>'
+          +'<div class="dlv-aj-top">Mueve el mapa hasta que el pin quede en tu puerta</div>'
           +'<div class="dlv-aj-pin">'+_agIcono(true).options.html+'</div>'
           +'<div class="ag-mapa-dedos" id="dlvDedos" aria-hidden="true"></div>'
           +'<button type="button" class="dlv-volver" id="dlvVolverBtn" onclick="dlvVolver()">◎ Volver a mi punto</button>'
@@ -2058,8 +2060,7 @@ function _dlvEstado(){
       +'<button type="button" class="dlv-link" onclick="dlvAjustar()">Ajustar punto</button> · '+quitar;
     return;
   }
-  var aviso = _dlvAcc>100 ? '<div class="dlv-aviso">📍 Tu ubicación es aproximada (± '+_dlvAcc+' m): ajusta el punto.</div>' : '';
-  c.innerHTML=aviso+'<div class="dlv-q">¿Es aquí tu casa?</div>'
+  c.innerHTML='<div class="dlv-q">¿Es aquí tu casa?</div>'
     +'<div class="dlv-btns"><button type="button" class="dlv-si" onclick="dlvConfirmar()">✓ Sí, es aquí</button>'
     +'<button type="button" class="dlv-aj" onclick="dlvAjustar()">Ajustar punto</button></div>'+quitar;
 }
@@ -2081,7 +2082,6 @@ function dlvAjustar(opc){
       var ta=$('addrManualInput'); if(ta){ try{ ta.focus(); }catch(e){} }
       return;
     }
-    var av=$('dlvAjAviso'); if(av) av.textContent = opc.aviso ? 'Tu ubicación es aproximada (± '+opc.aviso+' m)' : '';
     _dlvModo('ajustar');
     var hay=!!(_gpsLat&&_gpsLon), c=hay?[_gpsLat,_gpsLon]:_DLV_LIMA, z=hay?18:12;
     m.setView(c, z);
