@@ -192,14 +192,17 @@ module.exports = async ({bloque, ok}) => {
   bloque('Tocar y elegir se siente: respuesta al instante y un pequeño pico al elegir');
 
   {
-    ok(/var SEL='\.date-opt,\.cour-card,\.ag-item'/.test(form) && /Math\.abs\(ev\.clientX-x\)>10/.test(form),
-       'el dedo apoyado marca al instante; si se mueve (deslizar) se quita');
-    ok(/if\(ev\.pointerType!=='mouse' \|\| Date\.now\(\)-toque<800\) return;/.test(form) &&
-       /addEventListener\('pointerdown', function\(ev\)\{\n      if\(ev\.pointerType==='mouse'\) return;/.test(form),
-       '⚠️ la MISMA clase la pone el mouse (al pasar) y el dedo (al apoyarse): mismo efecto en PC y celular');
-    ok(/setTimeout\(function\(\)\{ t\.classList\.remove\('tocando'\); \}, 260\);/.test(form), 'al soltar el dedo se queda un instante para que se vea');
-    ok(/addEventListener\('pointercancel', function\(ev\)\{ if\(ev\.pointerType!=='mouse'\) limpiar\(\); \}/.test(form) && /querySelectorAll\('\.tocando'\)\.forEach/.test(form),
-       'si el navegador empieza a desplazar (cancelado), se quita al instante');
+    ok(/var SEL='\.date-opt,\.cour-card,\.ag-item'/.test(form), 'envíos, días y sedes');
+    ok(/document\.addEventListener\('touchmove', seguir, \{passive:true\}\);/.test(form) && /document\.elementFromPoint\(x, y\)/.test(form),
+       '⚠️ con el dedo, el efecto SIGUE al dedo (la tarjeta bajo él) aunque la pantalla se desplace');
+    ok(/raf=requestAnimationFrame\(/.test(form), 'una consulta por cuadro (no gasta batería)');
+    ok(/if\(ev\.pointerType!=='touch'\) entra\(ev\)/.test(form) && /Date\.now\(\)-toque<800\) return;/.test(form),
+       'mouse y lápiz al pasar; se ignora el «mouse fantasma» tras un toque');
+    ok(/document\.addEventListener\('mouseover', entra/.test(form), 'respaldo para navegadores sin PointerEvent');
+    ok(/setTimeout\(function\(\)\{ if\(t!==actual\) t\.classList\.remove\('tocando'\); \}, 260\);/.test(form),
+       'al soltar el dedo se queda un instante para que se vea');
+    ok(!/addEventListener\('click'/.test(form.slice(form.indexOf("var SEL='.date-opt"), form.indexOf("var SEL='.date-opt")+3000)),
+       'deslizar NO elige: elegir sigue siendo el toque (clic nativo)');
     const sd = form.slice(form.indexOf('function selDate('), form.indexOf('function _ttPop('));
     ok(/const nueva = iso!==selDateIso && !!\(ev && ev\.isTrusted\);/.test(sd),
        '⚠️ solo un toque REAL anima y vibra (la fecha preelegida por el programa no)');

@@ -4111,46 +4111,63 @@ window.onAgencyManual       = onAgencyManual;
 window.toggleShalomHelp     = toggleShalomHelp;
 window._notesCount          = _notesCount;
 
-/* ★ «ESTOY ENCIMA» (.tocando) — una sola lógica para todos los dispositivos:
-     · mouse: al entrar en la tarjeta se marca, al salir se quita;
-     · dedo / lápiz: se marca AL INSTANTE al apoyarse (el navegador demora
-       :active en filas que se deslizan) y se queda un instante al soltar
-       para que se vea; si el dedo se mueve más de 10 px es un deslizamiento:
-       se quita y no elige (el clic no llega). */
+/* ★ «ESTOY ENCIMA» (.tocando) — el efecto SIGUE al puntero en todos los
+   dispositivos (30/10/2026):
+     · mouse / lápiz: se marca la tarjeta por la que pasa y se quita al salir;
+     · dedo: se marca la tarjeta que está JUSTO DEBAJO del dedo y va
+       cambiando mientras se desliza (como el mouse en PC). Se usan los
+       eventos de toque (touchmove), que siguen llegando aunque la pantalla
+       se esté desplazando — los de puntero se cortan al empezar el scroll.
+       Una consulta por cuadro (requestAnimationFrame). Al soltar se queda
+       0,26 s para que se vea.
+   Deslizar ilumina pero NO elige: solo un toque genera el clic. */
 try{
   (function(){
-    var SEL='.date-opt,.cour-card,.ag-item', dedo=null, x=0, y=0, toque=0;
-    // Quitar de TODAS (si la lista se repinta a mitad del gesto, la tarjeta
-    // marcada puede no ser ya la misma referencia).
-    var limpiar=function(){ dedo=null; document.querySelectorAll('.tocando').forEach(function(e){ e.classList.remove('tocando'); }); };
-    var tarjeta=function(ev){ return ev.target && ev.target.closest ? ev.target.closest(SEL) : null; };
-    document.addEventListener('pointerover', function(ev){
+    var SEL='.date-opt,.cour-card,.ag-item', actual=null, toque=0, pend=null, raf=0;
+    var marcar=function(t){
+      if(t===actual) return;
+      if(actual) actual.classList.remove('tocando');
+      actual=t||null;
+      if(actual) actual.classList.add('tocando');
+    };
+    var bajo=function(x, y){ var e=document.elementFromPoint(x, y); return e && e.closest ? e.closest(SEL) : null; };
+    // ── Dedo
+    var seguir=function(ev){
+      var t=ev.touches && ev.touches[0]; if(!t) return;
+      toque=Date.now(); pend=t;
+      if(raf) return;
+      // En el hueco entre dos tarjetas no hay ninguna debajo: se queda la
+      // última (sin parpadeo) hasta que el dedo llegue a otra o se suelte.
+      raf=requestAnimationFrame(function(){ raf=0; var t=pend && bajo(pend.clientX, pend.clientY); if(t) marcar(t); });
+    };
+    var soltar=function(){
+      toque=Date.now(); pend=null;
+      var t=actual; actual=null;
+      if(t) setTimeout(function(){ if(t!==actual) t.classList.remove('tocando'); }, 260);
+    };
+    document.addEventListener('touchstart', seguir, {passive:true});
+    document.addEventListener('touchmove', seguir, {passive:true});
+    document.addEventListener('touchend', soltar, {passive:true});
+    document.addEventListener('touchcancel', soltar, {passive:true});
+    // ── Mouse y lápiz (con respaldo para navegadores sin PointerEvent)
+    var entra=function(ev){
       // Tras un toque, algunos equipos (laptops táctiles) emiten un «mouse»
       // fantasma en la misma posición: se ignora un instante.
-      if(ev.pointerType!=='mouse' || Date.now()-toque<800) return;
-      var t=tarjeta(ev); if(t) t.classList.add('tocando');
-    }, {passive:true});
-    document.addEventListener('pointerout', function(ev){
-      if(ev.pointerType!=='mouse') return;
-      var t=tarjeta(ev); if(t && !(ev.relatedTarget && t.contains(ev.relatedTarget))) t.classList.remove('tocando');
-    }, {passive:true});
-    document.addEventListener('pointerdown', function(ev){
-      if(ev.pointerType==='mouse') return;
-      toque=Date.now();
-      var t=tarjeta(ev); if(!t) return;
-      dedo=t; x=ev.clientX; y=ev.clientY; t.classList.add('tocando');
-    }, {passive:true});
-    document.addEventListener('pointermove', function(ev){
-      if(dedo && ev.pointerType!=='mouse' && (Math.abs(ev.clientX-x)>10 || Math.abs(ev.clientY-y)>10)) limpiar();
-    }, {passive:true});
-    var soltar=function(ev){
-      if(!dedo || ev.pointerType==='mouse') return;
-      var t=dedo; dedo=null;
-      setTimeout(function(){ t.classList.remove('tocando'); }, 260);
+      if(Date.now()-toque<800) return;
+      var t=ev.target && ev.target.closest ? ev.target.closest(SEL) : null;
+      if(t) marcar(t);
     };
-    document.addEventListener('pointerup', soltar, {passive:true});
-    // Cancelado = el navegador empezó a desplazar la página: se quita YA.
-    document.addEventListener('pointercancel', function(ev){ if(ev.pointerType!=='mouse') limpiar(); }, {passive:true});
+    var sale=function(ev){
+      var t=ev.target && ev.target.closest ? ev.target.closest(SEL) : null;
+      if(t && t===actual && !(ev.relatedTarget && t.contains(ev.relatedTarget))) marcar(null);
+    };
+    if(window.PointerEvent){
+      document.addEventListener('pointerover', function(ev){ if(ev.pointerType!=='touch') entra(ev); }, {passive:true});
+      document.addEventListener('pointerout', function(ev){ if(ev.pointerType!=='touch') sale(ev); }, {passive:true});
+    } else {
+      document.addEventListener('mouseover', entra, {passive:true});
+      document.addEventListener('mouseout', sale, {passive:true});
+    }
   })();
 }catch(e){}
 
