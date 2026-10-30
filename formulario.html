@@ -67,13 +67,8 @@ textarea.fi{resize:vertical;line-height:1.5}
    reales no se puede, harían falta medias columnas). */
 #courierCards{display:grid;grid-template-columns:repeat(6,1fr);gap:10px}
 .cour-card{grid-column:span 2;position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:7px;background:var(--card2);border:2px solid #626274;border-radius:14px;padding:16px 10px;min-height:106px;cursor:pointer;font-family:inherit;color:var(--text);transition:border-color .15s,background .15s,transform .05s}
-.cour-card:active{transform:scale(.98)}
 /* ★ «ESTOY ENCIMA» en las tarjetas de envío (30/10/2026): con mouse se
    elevan y se iluminan; con el dedo se hunden al presionar. */
-.cour-card{-webkit-tap-highlight-color:transparent}
-@media(hover:hover){.cour-card:hover{transform:translateY(-2px);border-color:#12a5b4;box-shadow:0 6px 18px rgba(18,165,180,.22);transition:border-color .15s,background .15s,transform .15s,box-shadow .15s}.cour-card:hover .cc-radio{border-color:#12a5b4}}
-.cour-card:active{transform:scale(.97);box-shadow:0 0 0 3px rgba(18,165,180,.25)}
-@media(prefers-reduced-motion:reduce){.cour-card:hover,.cour-card:active{transform:none}}
 .cour-card.sel{border-color:#12a5b4;background:rgba(18,165,180,.10)}
 /* Sobrantes de la última fila: CENTRADOS, del mismo tamaño que el resto.
    Estirar la última a todo el ancho (como se hacía con 2 columnas) miente
@@ -92,23 +87,24 @@ textarea.fi{resize:vertical;line-height:1.5}
 .ferr.show{display:block}
 
 /* COURIER GRID */
-.courier-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:6px}
-.c-opt{background:var(--card);border:1.5px solid var(--bd);border-radius:14px;padding:16px 10px;text-align:center;cursor:pointer;transition:border-color .15s,background .15s;user-select:none;min-height:72px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px}
-.c-opt:hover{border-color:var(--blue)}
-.c-opt,.date-opt{transition:border-color .15s,background .15s,transform .15s,box-shadow .15s;-webkit-tap-highlight-color:transparent}
-@media(hover:hover){.c-opt:hover,.date-opt:hover{transform:translateY(-2px);box-shadow:0 6px 18px rgba(91,155,255,.22)}}
-.c-opt:active,.date-opt:active{transform:scale(.97);box-shadow:0 0 0 3px rgba(91,155,255,.25)}
-@media(prefers-reduced-motion:reduce){.c-opt,.date-opt{transition:border-color .15s,background .15s}.c-opt:hover,.date-opt:hover,.c-opt:active,.date-opt:active{transform:none}}
-.c-opt.active{border-color:var(--blue);background:#12203d}
-.c-icon{font-size:32px;line-height:1}
-.c-name{font-size:12px;font-weight:600;color:var(--text2);line-height:1.3}
-.c-opt.active .c-name{color:var(--text)}
+
+/* ★ «ESTOY ENCIMA» — UN estilo, UNA clase (.tocando), para envíos, días y
+   sedes (30/10/2026). En PC la pone el mouse al pasar por encima; en celular
+   (no hay «pasar por encima») la pone el dedo al apoyarse. Mismo efecto en
+   todos los dispositivos, sin duplicar reglas por :hover / :active. */
+.cour-card,.date-opt{transition:border-color .15s,background .15s,transform .15s,box-shadow .15s;-webkit-tap-highlight-color:transparent}
+.ag-item{-webkit-tap-highlight-color:transparent}
+.cour-card.tocando{transform:translateY(-2px);border-color:#12a5b4;box-shadow:0 6px 18px rgba(18,165,180,.28)}
+.cour-card.tocando .cc-radio{border-color:#12a5b4}
+.date-opt.tocando{transform:translateY(-2px);border-color:var(--blue);box-shadow:0 6px 18px rgba(91,155,255,.28)}
+.ag-item.tocando:not(.ag-item-sel){background:rgba(91,155,255,.10);box-shadow:inset 3px 0 0 var(--blue)}
+.cour-card:focus-visible,.date-opt:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
+@media(prefers-reduced-motion:reduce){.cour-card.tocando,.date-opt.tocando{transform:none}}
 
 /* DATE CHIPS */
 .dates-scroll{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px;scrollbar-width:none;-ms-overflow-style:none}
 .dates-scroll::-webkit-scrollbar{display:none}
 .date-opt{background:var(--card);border:1.5px solid var(--bd);border-radius:12px;padding:10px 14px;text-align:center;cursor:pointer;transition:border-color .15s,background .15s;user-select:none;flex-shrink:0;min-width:60px}
-.date-opt:hover{border-color:var(--blue)}
 .date-opt.active{border-color:var(--blue);background:#1b3466}
 /* ★ TOCAR Y ELEGIR SE SIENTE (30/10/2026). Microinteracciones breves
    (≤0,3 s), UNA vez por elección; vibración solo al ELEGIR (Android). */
@@ -116,9 +112,6 @@ textarea.fi{resize:vertical;line-height:1.5}
 .date-opt.active::after{content:"✓";position:absolute;top:2px;right:2px;width:14px;height:14px;border-radius:50%;background:var(--blue);color:#fff;font-size:9px;font-weight:900;display:flex;align-items:center;justify-content:center}
 /* El dedo apoyó: respuesta AL INSTANTE (el navegador demora :active en
    filas que se deslizan). Si el dedo se mueve, se quita y no elige. */
-.date-opt.tocando{transform:scale(.95);border-color:var(--blue);box-shadow:0 0 0 4px rgba(79,142,247,.25);background:#162a52}
-.cour-card.tocando{transform:scale(.96);border-color:#12a5b4;box-shadow:0 0 0 4px rgba(18,165,180,.25)}
-.ag-item.tocando:not(.ag-item-sel){background:rgba(79,142,247,.16)}
 .tt-pop{animation:ttPop .3s cubic-bezier(.34,1.56,.64,1)}
 @keyframes ttPop{0%{transform:scale(.94)}60%{transform:scale(1.06)}100%{transform:scale(1)}}
 .dates-wrap{position:relative}
@@ -198,8 +191,6 @@ body.wz-sede #tt-lbl{display:none!important}
 /* ★ «ESTOY ENCIMA» (30/10/2026): con mouse se ilumina al pasar; con el
    dedo (no hay «pasar por encima») se hunde al presionar, como un botón
    físico. Cada toque responde en menos de 0,1 s: se siente instantáneo. */
-@media(hover:hover){.ag-item:hover:not(.ag-item-sel){background:rgba(91,155,255,.08);box-shadow:inset 3px 0 0 var(--blue)}}
-.ag-item:active:not(.ag-item-sel){background:rgba(91,155,255,.14)}
 .ag-item-sel{background:rgba(34,197,94,.08);box-shadow:inset 0 0 0 2px var(--green)}
 .ag-item-ic{font-size:16px;line-height:1.2;flex-shrink:0;color:var(--text2)}
 .ag-item-sel .ag-item-ic{color:var(--green)}
@@ -4066,20 +4057,46 @@ window.onAgencyManual       = onAgencyManual;
 window.toggleShalomHelp     = toggleShalomHelp;
 window._notesCount          = _notesCount;
 
-/* ★ EL DEDO APOYÓ: se marca al instante (.tocando). Si se mueve más de
-   10 px es un deslizamiento: se quita y no elige (el clic no llega). */
+/* ★ «ESTOY ENCIMA» (.tocando) — una sola lógica para todos los dispositivos:
+     · mouse: al entrar en la tarjeta se marca, al salir se quita;
+     · dedo / lápiz: se marca AL INSTANTE al apoyarse (el navegador demora
+       :active en filas que se deslizan) y se queda un instante al soltar
+       para que se vea; si el dedo se mueve más de 10 px es un deslizamiento:
+       se quita y no elige (el clic no llega). */
 try{
   (function(){
-    var el=null, x=0, y=0;
-    var fuera=function(){ if(el){ var e=el; setTimeout(function(){ e.classList.remove('tocando'); }, 110); el=null; } };
+    var SEL='.date-opt,.cour-card,.ag-item', dedo=null, x=0, y=0, toque=0;
+    // Quitar de TODAS (si la lista se repinta a mitad del gesto, la tarjeta
+    // marcada puede no ser ya la misma referencia).
+    var limpiar=function(){ dedo=null; document.querySelectorAll('.tocando').forEach(function(e){ e.classList.remove('tocando'); }); };
+    var tarjeta=function(ev){ return ev.target && ev.target.closest ? ev.target.closest(SEL) : null; };
+    document.addEventListener('pointerover', function(ev){
+      // Tras un toque, algunos equipos (laptops táctiles) emiten un «mouse»
+      // fantasma en la misma posición: se ignora un instante.
+      if(ev.pointerType!=='mouse' || Date.now()-toque<800) return;
+      var t=tarjeta(ev); if(t) t.classList.add('tocando');
+    }, {passive:true});
+    document.addEventListener('pointerout', function(ev){
+      if(ev.pointerType!=='mouse') return;
+      var t=tarjeta(ev); if(t && !(ev.relatedTarget && t.contains(ev.relatedTarget))) t.classList.remove('tocando');
+    }, {passive:true});
     document.addEventListener('pointerdown', function(ev){
-      var t=ev.target && ev.target.closest && ev.target.closest('.date-opt,.cour-card,.ag-item');
-      if(!t) return; el=t; x=ev.clientX; y=ev.clientY; t.classList.add('tocando');
+      if(ev.pointerType==='mouse') return;
+      toque=Date.now();
+      var t=tarjeta(ev); if(!t) return;
+      dedo=t; x=ev.clientX; y=ev.clientY; t.classList.add('tocando');
     }, {passive:true});
     document.addEventListener('pointermove', function(ev){
-      if(el && (Math.abs(ev.clientX-x)>10 || Math.abs(ev.clientY-y)>10)){ el.classList.remove('tocando'); el=null; }
+      if(dedo && ev.pointerType!=='mouse' && (Math.abs(ev.clientX-x)>10 || Math.abs(ev.clientY-y)>10)) limpiar();
     }, {passive:true});
-    ['pointerup','pointercancel'].forEach(function(n){ document.addEventListener(n, fuera, {passive:true}); });
+    var soltar=function(ev){
+      if(!dedo || ev.pointerType==='mouse') return;
+      var t=dedo; dedo=null;
+      setTimeout(function(){ t.classList.remove('tocando'); }, 260);
+    };
+    document.addEventListener('pointerup', soltar, {passive:true});
+    // Cancelado = el navegador empezó a desplazar la página: se quita YA.
+    document.addEventListener('pointercancel', function(ev){ if(ev.pointerType!=='mouse') limpiar(); }, {passive:true});
   })();
 }catch(e){}
 

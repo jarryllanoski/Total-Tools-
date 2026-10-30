@@ -110,12 +110,11 @@ module.exports = async ({bloque, ok}) => {
     ok(/class="ag-lupa"/.test(form) && /\.ag-buscar\.quieto \.ag-lupa\{animation:none/.test(form),
        'la lupa late y se queda quieta al buscar o elegir');
     ok(/_agLupa\(false\);/.test(form.slice(form.indexOf('function _agElegir('))), 'elegir la detiene');
-    ok(/@media\(hover:hover\)\{\.c-opt:hover,\.date-opt:hover\{transform:translateY\(-2px\)/.test(form),
-       'con mouse: couriers y días se elevan');
-    ok(/\.c-opt:active,\.date-opt:active\{transform:scale\(\.97\)/.test(form), 'con el dedo: se hunden al presionar');
-    ok(/\.ag-item:hover:not\(\.ag-item-sel\)/.test(form), 'las sedes también reaccionan');
-    ok(/@media\(hover:hover\)\{\.cour-card:hover\{transform:translateY\(-2px\)/.test(form) &&
-       /\.cour-card:active\{transform:scale\(\.97\)/.test(form), 'y las tarjetas de envío del paso 1 (las que ve el cliente)');
+    ok(/\.cour-card\.tocando\{transform:translateY\(-2px\)/.test(form) && /\.date-opt\.tocando\{transform:translateY\(-2px\)/.test(form),
+       'envíos y días se elevan («estoy encima»)');
+    ok(/\.ag-item\.tocando:not\(\.ag-item-sel\)\{background:/.test(form), 'las sedes también reaccionan');
+    ok(!/:hover\{transform/.test(form) && !/\.cour-card:active|\.date-opt:active|\.c-opt/.test(form),
+       'UN estilo: sin reglas duplicadas por :hover / :active (ni el CSS viejo de .c-opt)');
     ok(/prefers-reduced-motion:reduce\)\{\.ag-yo-halo,\.ag-lupa\{animation:none\}/.test(form),
        'quien pidió «reducir movimiento» no ve animaciones');
   }
