@@ -90,7 +90,7 @@ module.exports = async ({bloque, ok}) => {
   {
     ok(!/ag-mapa-ley/.test(form) && !/ag-dot-a/.test(form), 'sin leyenda en el mapa (pines y punto se entienden solos)');
     const f = form.slice(form.indexOf('function _agUbicFallo('), form.indexOf('function agIrALupa('));
-    ok(/Tu ubicación está desactivada/.test(f) && /Permisos › Ubicación/.test(f) && /onclick="agIrALupa\(\)"/.test(f),
+    ok(/Activa tu ubicación manualmente/.test(f) && /onclick="agIrALupa\(\)"/.test(f),
        'el mensaje dice cómo activarla a mano O lleva a la lupa');
     const u = form.slice(form.indexOf('async function agUbicarme('), form.indexOf('function agCerca('));
     ok(/_agFallosUbic>0 && _agPerm && _agPerm\.state==='denied'\)\{ agIrALupa\(\); return; \}/.test(u),
@@ -99,6 +99,11 @@ module.exports = async ({bloque, ok}) => {
     ok(/_agFallosUbic=0;/.test(u), 'si se activa y funciona, el contador vuelve a cero');
     const l = form.slice(form.indexOf('function agIrALupa('), form.indexOf('async function agUbicarme('));
     ok(/inp\.focus\(/.test(l) && /ag-buscar-foco/.test(l) && /agLupaHint/.test(l), 'la lupa se ilumina, con pista y cursor listo');
+    ok(/visualViewport/.test(l) && /setTimeout\(otra, 450\)/.test(l),
+       '⚠️ y se vuelve a subir cuando el teclado termina de abrirse (antes lo tapaba)');
+    ok(/<div id="agLupaHint"><span class="ag-lh-ic"><\/span>Busca tu provincia o distrito<\/div>/.test(form) &&
+       /placeholder="Busca provincia o distrito"/.test(form), 'encabezado y buscador dicen «provincia o distrito»');
+    ok(!/ag-opc/.test(form) && !/>Opcional</.test(form), 'sin la palabra «Opcional»');
   }
 
   bloque('En el paso de la sede la etiqueta no ocupa la pantalla');

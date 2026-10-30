@@ -5,7 +5,7 @@
  *   2. Sin fuga por celular, config en lista blanca, ids con forma.
  *   3. El freno del seguimiento ya no escribe en Firestore.
  *   4. `init()` corre al final: ninguna variable antes de existir.
- *   5. Pistas visuales (punto que late, lupa, «Opcional», efecto al tocar).
+ *   5. Pistas visuales (punto que late, lupa, efecto al tocar).
  * El alta en transacción se prueba contra Firestore en alta-emulador.test.js.
  */
 'use strict';
@@ -103,14 +103,13 @@ module.exports = async ({bloque, ok}) => {
     ok(/\ninit\(\);\n\n\}\)\(\);/.test(fin), 'y se llama al FINAL del script');
   }
 
-  bloque('Pistas visuales: punto que late, lupa, «Opcional», efecto al tocar');
+  bloque('Pistas visuales: punto que late, lupa, efecto al tocar');
 
   {
     ok(/className:'ag-yo-halo'/.test(form) && /@keyframes agHalo/.test(form), 'tu ubicación late (halo azul)');
     ok(/class="ag-lupa"/.test(form) && /\.ag-buscar\.quieto \.ag-lupa\{animation:none/.test(form),
        'la lupa late y se queda quieta al buscar o elegir');
     ok(/_agLupa\(false\);/.test(form.slice(form.indexOf('function _agElegir('))), 'elegir la detiene');
-    ok(/<span class="ag-opc">Opcional<\/span>/.test(form), 'el buscador dice «Opcional»');
     ok(/@media\(hover:hover\)\{\.c-opt:hover,\.date-opt:hover\{transform:translateY\(-2px\)/.test(form),
        'con mouse: couriers y días se elevan');
     ok(/\.c-opt:active,\.date-opt:active\{transform:scale\(\.97\)/.test(form), 'con el dedo: se hunden al presionar');

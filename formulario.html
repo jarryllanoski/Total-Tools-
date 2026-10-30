@@ -105,10 +105,15 @@ textarea.fi{resize:vertical;line-height:1.5}
 .ag-ubic-btn:disabled{opacity:.8;cursor:progress}
 .ag-ubic-sub{font-size:11.5px;color:var(--text2);line-height:1.45;margin-top:8px;text-align:center}
 .ag-ubic.ag-ubic-error{background:rgba(234,179,8,.08);border-color:rgba(234,179,8,.35)}
-.ag-ubic-sub a{color:var(--blue);font-weight:700;cursor:pointer;text-decoration:underline}
+.ag-ubic-sub a{color:var(--blue);font-weight:700;cursor:pointer;text-decoration:underline;white-space:nowrap}
 /* ★ «LLÉVAME A LA LUPA» (30/10/2026): si la ubicación sigue bloqueada, no
    se repite el error; el buscador se ilumina y queda listo para escribir. */
-#agLupaHint{display:none;font-size:12.5px;font-weight:700;color:var(--blue);margin:0 0 6px}
+/* El encabezado del buscador SIEMPRE dice qué buscar. Cuando el cliente
+   llega aquí porque la ubicación no se pudo, se enciende (azul + 👇). */
+#agLupaHint{font-size:12px;font-weight:700;color:var(--text2);margin:0 0 6px;letter-spacing:.02em}
+#agLupaHint .ag-lh-ic::before{content:"🔍 "}
+#agLupaHint.on{color:var(--blue);font-size:12.5px}
+#agLupaHint.on .ag-lh-ic::before{content:"👇 "}
 .ag-buscar-foco .fi{border-color:var(--blue);animation:agFoco 1s ease-in-out 2}
 @keyframes agFoco{0%,100%{box-shadow:0 0 0 0 rgba(91,155,255,0)}50%{box-shadow:0 0 0 6px rgba(91,155,255,.35)}}
 /* ★ En el paso de la sede la etiqueta de arriba no se ve (30/10/2026): una
@@ -129,8 +134,6 @@ body.wz-sede #tt-lbl{display:none!important}
 .ag-lupa{position:absolute;left:14px;top:50%;transform:translateY(-50%);font-size:15px;opacity:.75;pointer-events:none;animation:agLupa 1.8s ease-in-out infinite}
 .ag-buscar.quieto .ag-lupa{animation:none;opacity:.6}
 @keyframes agLupa{0%,100%{transform:translateY(-50%) scale(1)}50%{transform:translateY(-50%) scale(1.22)}}
-.ag-opc{position:absolute;right:12px;top:50%;transform:translateY(-50%);font-size:10px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--text2);background:rgba(255,255,255,.06);border:1px solid var(--bd);border-radius:8px;padding:2px 7px;pointer-events:none}
-.fi:not(:placeholder-shown) ~ .ag-opc{display:none}
 @media(prefers-reduced-motion:reduce){.ag-yo-halo,.ag-lupa{animation:none}}
 .ag-mapa-btns{position:absolute;left:8px;bottom:8px;z-index:1000;display:flex;gap:6px}
 .ag-mapa-btns button{background:#fff;color:#1f2937;border:none;border-radius:16px;padding:7px 11px;font-size:12px;font-weight:700;font-family:inherit;cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,.25)}
@@ -801,7 +804,7 @@ function _ayudaFormContenido(e){
   var tipo=e.tipo||'', paso=e.paso||1, retiro=tipo==='retiro';
   var dest={
     agencia: e.mapa
-      ? 'Toca <b>Usar mi ubicación</b> para ver las sedes más cerca, o toca un <b>pin rojo</b> en el mapa. La sede elegida sube arriba con ✓. También puedes escribir tu distrito.'
+      ? 'Toca <b>Usar mi ubicación</b> para ver las sedes más cerca, o toca un <b>pin rojo</b> en el mapa. La sede elegida sube arriba con ✓. También puedes buscar tu provincia o distrito con la 🔍 lupa.'
       : 'Escribe tu ciudad o distrito y toca la sede donde recogerás.',
     delivery: 'Escribe tu dirección de entrega o toca <b>📍 Usar mi ubicación</b> para que el motorizado llegue exacto. Agrega una referencia.',
     encomienda: 'Escribe la <b>ciudad de destino</b> y, si la sabes, la agencia.'
@@ -1628,16 +1631,15 @@ function renderAgencyBox(courierName){
         </div>
       </div>
       <div id="agMapaAyuda" class="ag-mapa-ayuda" style="display:none">Toca el mapa para ver las sedes cerca de ese punto. Elige un pin o una sede de la lista.</div>
-      <div id="agLupaHint">👇 Escribe tu distrito aquí</div>
+      <div id="agLupaHint"><span class="ag-lh-ic"></span>Busca tu provincia o distrito</div>
       <div class="ag-buscar" style="position:relative;margin-bottom:10px">
         <span class="ag-lupa" aria-hidden="true">🔍</span>
         <!-- SIN data-wz-focus, a proposito: al llegar al paso el teclado no
              debe abrirse encima del mapa y de la lista. -->
         <input class="fi" id="shalomAgInput" autocomplete="off"
-          style="padding-left:42px;padding-right:92px;text-overflow:ellipsis"
-          placeholder="O escribe tu distrito…"
+          style="padding-left:42px;padding-right:40px;text-overflow:ellipsis"
+          placeholder="Busca provincia o distrito"
           oninput="agOnInput('${agKey}', this.value)">
-        <span class="ag-opc">Opcional</span>
         <div id="shalomSpin" style="display:none;position:absolute;right:14px;top:50%;
           transform:translateY(-50%);width:16px;height:16px;border:2px solid #1e1e30;
           border-top-color:var(--blue);border-radius:50%;animation:spin .7s linear infinite"></div>
@@ -2737,7 +2739,7 @@ function _agLupa(late){
   var b=document.querySelector('.ag-buscar'); if(b) b.classList.toggle('quieto', !late);
   if(!late){
     if(b) b.classList.remove('ag-buscar-foco');
-    var h=$('agLupaHint'); if(h) h.style.display='none';
+    var h=$('agLupaHint'); if(h) h.classList.remove('on');
   }
 }
 function agOnInput(key, val){
@@ -2898,10 +2900,12 @@ var _agFallosUbic=0, _agPerm=null;
 function _agUbicFallo(codigo){
   var caja=$('agUbicCaja'), sub=$('agUbicSub'); if(!caja||!sub) return;
   caja.classList.add('ag-ubic-error');
-  var lupa='<a role="button" onclick="agIrALupa()">busca tu distrito con la 🔍 lupa</a>';
+  var lupa='<a role="button" onclick="agIrALupa()">busca con la 🔍 lupa</a>';
   var msg;
   if(codigo==='denegado'){
-    msg='<b>📍 Tu ubicación está desactivada.</b> Actívala tocando el 🔒 junto a la dirección web › Permisos › Ubicación, o '+lupa+'.';
+    // Corto y con la acción delante: activar a mano, o la lupa (un enlace).
+    // Un segundo toque al botón ya lleva solo a la lupa.
+    msg='<b>📍 Activa tu ubicación manualmente</b> o '+lupa+'.';
   } else if(codigo==='inseguro' || codigo==='no_soporta'){
     msg='Este navegador no permite usar tu ubicación aquí. '+lupa.charAt(0).toUpperCase()+lupa.slice(1)+'.';
   } else {
@@ -2927,10 +2931,19 @@ function _agUbicFallo(codigo){
 function agIrALupa(){
   var b=document.querySelector('.ag-buscar'), inp=$('shalomAgInput'), h=$('agLupaHint');
   if(!b||!inp) return;
-  if(h) h.style.display='block';
+  if(h) h.classList.add('on');
   b.classList.remove('ag-buscar-foco'); void b.offsetWidth; b.classList.add('ag-buscar-foco');
+  var subir=function(){ try{ (h||b).scrollIntoView({block:'start',behavior:'smooth'}); }catch(e){} };
   try{ inp.focus({preventScroll:true}); }catch(e){ try{ inp.focus(); }catch(_){} }
-  try{ (h||b).scrollIntoView({block:'center',behavior:'smooth'}); }catch(e){}
+  subir();
+  /* ⚠️ EL TECLADO TAPABA EL BUSCADOR (visto en un Android real): se subía
+     ANTES de que el teclado terminara de abrirse, y al abrirse lo tapaba.
+     Se vuelve a subir cuando la pantalla visible se encoge (teclado
+     abierto) y, por si el navegador no avisa, a los 450 ms. */
+  var vv=window.visualViewport, hecho=false;
+  var otra=function(){ if(hecho) return; hecho=true; if(vv) vv.removeEventListener('resize', otra); subir(); };
+  if(vv) vv.addEventListener('resize', otra);
+  setTimeout(otra, 450);
 }
 
 async function agUbicarme(key, opc){
