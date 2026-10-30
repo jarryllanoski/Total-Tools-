@@ -57,6 +57,8 @@ module.exports = async ({bloque, ok}) => {
        'usa lo que ya llegó al abrir el seguimiento (cero lecturas)');
     const ab = form.slice(form.indexOf('function abrirAyudaTrack('), form.indexOf('function _courierLabel('));
     ok(/_toby\(c\.toby, 'Guía de seguimiento'\)/.test(ab) && /ESTÁS AQUÍ/.test(ab), 'la ayuda del seguimiento lleva a Toby y marca el estado');
+    ok(/const est = c\.actual<0 \? '' : \(i===c\.actual \? 'on' : \(i<c\.actual \? 'ok' : ''\)\);/.test(ab),
+       'la fila actual se marca «on» y las anteriores con ✓');
   }
 
   bloque('Formulario: saluda por el nombre escrito');
