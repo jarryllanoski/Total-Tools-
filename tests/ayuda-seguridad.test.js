@@ -117,7 +117,7 @@ module.exports = async ({bloque, ok}) => {
     ok(/\.ag-item:hover:not\(\.ag-item-sel\)/.test(form), 'las sedes también reaccionan');
     ok(/@media\(hover:hover\)\{\.cour-card:hover\{transform:translateY\(-2px\)/.test(form) &&
        /\.cour-card:active\{transform:scale\(\.97\)/.test(form), 'y las tarjetas de envío del paso 1 (las que ve el cliente)');
-    ok(/prefers-reduced-motion:reduce\)\{\.ag-dot-a,\.ag-yo-halo,\.ag-lupa\{animation:none\}/.test(form),
+    ok(/prefers-reduced-motion:reduce\)\{\.ag-yo-halo,\.ag-lupa\{animation:none\}/.test(form),
        'quien pidió «reducir movimiento» no ve animaciones');
   }
 };

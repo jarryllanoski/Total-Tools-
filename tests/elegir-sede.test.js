@@ -85,6 +85,30 @@ module.exports = async ({bloque, ok}) => {
     ok(/agIniciarAlVer\(agKey\)/.test(form), 'el paso lo usa');
   }
 
+  bloque('Ubicación bloqueada: dos salidas, y al segundo intento, la lupa');
+
+  {
+    ok(!/ag-mapa-ley/.test(form) && !/ag-dot-a/.test(form), 'sin leyenda en el mapa (pines y punto se entienden solos)');
+    const f = form.slice(form.indexOf('function _agUbicFallo('), form.indexOf('function agIrALupa('));
+    ok(/Tu ubicación está desactivada/.test(f) && /Permisos › Ubicación/.test(f) && /onclick="agIrALupa\(\)"/.test(f),
+       'el mensaje dice cómo activarla a mano O lleva a la lupa');
+    const u = form.slice(form.indexOf('async function agUbicarme('), form.indexOf('function agCerca('));
+    ok(/_agFallosUbic>0 && _agPerm && _agPerm\.state==='denied'\)\{ agIrALupa\(\); return; \}/.test(u),
+       '⚠️ si sigue bloqueada, el toque va DIRECTO a la lupa (dentro del gesto: el teclado se abre)');
+    ok(/if\(_agFallosUbic>=2\) agIrALupa\(\);/.test(u), 'y sin API de permisos, al segundo fallo también');
+    ok(/_agFallosUbic=0;/.test(u), 'si se activa y funciona, el contador vuelve a cero');
+    const l = form.slice(form.indexOf('function agIrALupa('), form.indexOf('async function agUbicarme('));
+    ok(/inp\.focus\(/.test(l) && /ag-buscar-foco/.test(l) && /agLupaHint/.test(l), 'la lupa se ilumina, con pista y cursor listo');
+  }
+
+  bloque('En el paso de la sede la etiqueta no ocupa la pantalla');
+
+  {
+    ok(/body\.wz-sede #tt-lbl\{display:none!important\}/.test(form), 'la etiqueta se oculta en el paso de la sede');
+    ok(/classList\.toggle\('wz-sede', step===3 && selCourierType==='agencia' && !\$\('agcManualInput'\)\)/.test(form),
+       'solo en el paso 3 con mapa: en el paso 4 vuelve con la sede en DESTINO; delivery no cambia');
+  }
+
   bloque('⚠️ «Iniciando fábrica…» al abrir el formulario sin link');
 
   {

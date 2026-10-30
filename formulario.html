@@ -105,18 +105,23 @@ textarea.fi{resize:vertical;line-height:1.5}
 .ag-ubic-btn:disabled{opacity:.8;cursor:progress}
 .ag-ubic-sub{font-size:11.5px;color:var(--text2);line-height:1.45;margin-top:8px;text-align:center}
 .ag-ubic.ag-ubic-error{background:rgba(234,179,8,.08);border-color:rgba(234,179,8,.35)}
+.ag-ubic-sub a{color:var(--blue);font-weight:700;cursor:pointer;text-decoration:underline}
+/* ★ «LLÉVAME A LA LUPA» (30/10/2026): si la ubicación sigue bloqueada, no
+   se repite el error; el buscador se ilumina y queda listo para escribir. */
+#agLupaHint{display:none;font-size:12.5px;font-weight:700;color:var(--blue);margin:0 0 6px}
+.ag-buscar-foco .fi{border-color:var(--blue);animation:agFoco 1s ease-in-out 2}
+@keyframes agFoco{0%,100%{box-shadow:0 0 0 0 rgba(91,155,255,0)}50%{box-shadow:0 0 0 6px rgba(91,155,255,.35)}}
+/* ★ En el paso de la sede la etiqueta de arriba no se ve (30/10/2026): una
+   pantalla, una tarea. Vuelve en el paso 4 ya con la sede en DESTINO. */
+body.wz-sede #tt-lbl{display:none!important}
+@media(prefers-reduced-motion:reduce){.ag-buscar-foco .fi{animation:none}}
 .ag-mapa-wrap{position:relative;margin-bottom:6px}
 .ag-mapa{height:230px;border-radius:12px;overflow:hidden;border:1.5px solid var(--bd);background:#0d1117}
 @media(min-width:700px){.ag-mapa{height:280px}}
 .ag-mapa .leaflet-container,.ag-mapa.leaflet-container{cursor:grab}
-.ag-mapa-ley{position:absolute;top:8px;right:8px;z-index:1000;display:flex;gap:10px;background:rgba(255,255,255,.95);color:#1f2937;border-radius:16px;padding:5px 10px;font-size:11px;font-weight:700;box-shadow:0 1px 4px rgba(0,0,0,.2);pointer-events:none}
-.ag-mapa-ley span{display:flex;align-items:center;gap:5px}
-.ag-dot{display:inline-block;width:9px;height:9px;border-radius:50%}
-.ag-dot-r{background:#e11d2e}.ag-dot-a{background:#2d7ff9;animation:agLate 2s ease-out infinite}
 /* ★ «TÚ ESTÁS AQUÍ» QUE LATE (30/10/2026): el mismo punto azul con halo de
    Google Maps o Waze. El cliente ya lo conoce: se reconoce al instante y ve
    las sedes rojas a su alrededor. Solo CSS: ni batería ni red. */
-@keyframes agLate{0%{box-shadow:0 0 0 0 rgba(45,127,249,.55)}100%{box-shadow:0 0 0 7px rgba(45,127,249,0)}}
 .ag-yo-halo{animation:agHalo 2s ease-out infinite}
 @keyframes agHalo{0%{stroke-width:2;stroke-opacity:.7}100%{stroke-width:30;stroke-opacity:0}}
 /* La lupa late mientras no hay sede elegida: invita sin gritar. Al escribir
@@ -126,7 +131,7 @@ textarea.fi{resize:vertical;line-height:1.5}
 @keyframes agLupa{0%,100%{transform:translateY(-50%) scale(1)}50%{transform:translateY(-50%) scale(1.22)}}
 .ag-opc{position:absolute;right:12px;top:50%;transform:translateY(-50%);font-size:10px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--text2);background:rgba(255,255,255,.06);border:1px solid var(--bd);border-radius:8px;padding:2px 7px;pointer-events:none}
 .fi:not(:placeholder-shown) ~ .ag-opc{display:none}
-@media(prefers-reduced-motion:reduce){.ag-dot-a,.ag-yo-halo,.ag-lupa{animation:none}}
+@media(prefers-reduced-motion:reduce){.ag-yo-halo,.ag-lupa{animation:none}}
 .ag-mapa-btns{position:absolute;left:8px;bottom:8px;z-index:1000;display:flex;gap:6px}
 .ag-mapa-btns button{background:#fff;color:#1f2937;border:none;border-radius:16px;padding:7px 11px;font-size:12px;font-weight:700;font-family:inherit;cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,.25)}
 .ag-mapa-ayuda{font-size:11px;color:var(--text2);margin:0 0 10px;line-height:1.4}
@@ -1617,13 +1622,13 @@ function renderAgencyBox(courierName){
       </div>
       <div id="shalomMapaWrap" class="ag-mapa-wrap" style="display:none">
         <div id="shalomMapa" class="ag-mapa"></div>
-        <div class="ag-mapa-ley" aria-hidden="true"><span><i class="ag-dot ag-dot-r"></i>Agencia ${esc(cfg.label)}</span><span><i class="ag-dot ag-dot-a"></i>Tu ubicación</span></div>
         <div class="ag-mapa-btns">
           <button type="button" onclick="agVerTodos('${agKey}')">🗺️ Ver todos</button>
           <button type="button" onclick="agMiPosicion('${agKey}')">◎ Mi posición</button>
         </div>
       </div>
       <div id="agMapaAyuda" class="ag-mapa-ayuda" style="display:none">Toca el mapa para ver las sedes cerca de ese punto. Elige un pin o una sede de la lista.</div>
+      <div id="agLupaHint">👇 Escribe tu distrito aquí</div>
       <div class="ag-buscar" style="position:relative;margin-bottom:10px">
         <span class="ag-lupa" aria-hidden="true">🔍</span>
         <!-- SIN data-wz-focus, a proposito: al llegar al paso el teclado no
@@ -2730,6 +2735,10 @@ function toggleShalomHelp(){
 /* La lupa late solo mientras el cliente aún no busca ni elige. */
 function _agLupa(late){
   var b=document.querySelector('.ag-buscar'); if(b) b.classList.toggle('quieto', !late);
+  if(!late){
+    if(b) b.classList.remove('ag-buscar-foco');
+    var h=$('agLupaHint'); if(h) h.style.display='none';
+  }
 }
 function agOnInput(key, val){
   _agLupa(!String(val||'').trim());
@@ -2883,22 +2892,53 @@ function _cercaBtnBuscando(on){
   txt.textContent=on?'Buscando sedes cerca de ti…':'Usar mi ubicación';
 }
 // Si no se pudo ubicar: se dice QUÉ hacer, sin callejón sin salida.
+/* La ubicación no llegó. Mensaje amable y DOS salidas concretas: activarla
+   a mano, o la lupa. Sin culpar al cliente: «desactivada», no «bloqueaste». */
+var _agFallosUbic=0, _agPerm=null;
 function _agUbicFallo(codigo){
   var caja=$('agUbicCaja'), sub=$('agUbicSub'); if(!caja||!sub) return;
   caja.classList.add('ag-ubic-error');
-  var msg = codigo==='denegado'
-    ? 'Tu navegador tiene la ubicación bloqueada para esta página. Toca tu zona en el mapa o escribe tu distrito.'
-    : 'No pudimos ubicarte. Toca tu zona en el mapa o escribe tu distrito.';
+  var lupa='<a role="button" onclick="agIrALupa()">busca tu distrito con la 🔍 lupa</a>';
+  var msg;
+  if(codigo==='denegado'){
+    msg='<b>📍 Tu ubicación está desactivada.</b> Actívala tocando el 🔒 junto a la dirección web › Permisos › Ubicación, o '+lupa+'.';
+  } else if(codigo==='inseguro' || codigo==='no_soporta'){
+    msg='Este navegador no permite usar tu ubicación aquí. '+lupa.charAt(0).toUpperCase()+lupa.slice(1)+'.';
+  } else {
+    msg='No pudimos ubicarte. Enciende la ubicación (GPS) de tu celular o '+lupa+'.';
+  }
   if(_gpsWebviewInApp()){
     msg += ' Si lo abriste desde WhatsApp, ábrelo en Chrome para usar tu ubicación. '
       + '<button type="button" onclick="_gpsCopiarLink(this)" style="background:none;border:none;color:var(--blue);cursor:pointer;font-family:inherit;font-size:11.5px;text-decoration:underline;padding:0">Copiar enlace</button>';
   }
   sub.innerHTML=msg;
+  // El permiso VIVO: si el cliente lo activa a mano, `.state` cambia solo y
+  // el siguiente toque lo intenta de nuevo; si sigue bloqueado, va a la lupa
+  // DENTRO del toque (así el teclado sí se abre en iPhone).
+  try{
+    if(!_agPerm && navigator.permissions && navigator.permissions.query){
+      navigator.permissions.query({name:'geolocation'}).then(function(st){ _agPerm=st; }).catch(function(){});
+    }
+  }catch(e){}
+}
+/* Llevar al cliente a lo que SÍ funciona: el buscador, iluminado y con el
+   cursor listo. Repetir el mismo error frustra; esto convierte el fallo en
+   avance. */
+function agIrALupa(){
+  var b=document.querySelector('.ag-buscar'), inp=$('shalomAgInput'), h=$('agLupaHint');
+  if(!b||!inp) return;
+  if(h) h.style.display='block';
+  b.classList.remove('ag-buscar-foco'); void b.offsetWidth; b.classList.add('ag-buscar-foco');
+  try{ inp.focus({preventScroll:true}); }catch(e){ try{ inp.focus(); }catch(_){} }
+  try{ (h||b).scrollIntoView({block:'center',behavior:'smooth'}); }catch(e){}
 }
 
 async function agUbicarme(key, opc){
   opc=opc||{};
   if(_cercaEnCurso) return;
+  // Ya falló y el navegador SIGUE con la ubicación bloqueada: a la lupa,
+  // sin preguntar otra vez (la respuesta sería la misma).
+  if(!opc.silencioso && _agFallosUbic>0 && _agPerm && _agPerm.state==='denied'){ agIrALupa(); return; }
   _cercaEnCurso=true;
   var myToken=++_cercaToken;
   if(!opc.silencioso) _cercaBtnBuscando(true);
@@ -2911,6 +2951,7 @@ async function agUbicarme(key, opc){
     // Fuera de Perú (VPN, dato raro): no se ordena por algo que no sirve.
     if(!AgLista.coords({latitud:la, longitud:lo})){ if(!opc.silencioso) _agUbicFallo('fuera'); return; }
     // No sale del navegador: solo ordena la lista y pinta tu punto.
+    _agFallosUbic=0;
     _miUbic={la:la, lo:lo};
     _agRef={la:la, lo:lo, tipo:'tu'};
     var caja=$('agUbicCaja'); if(caja) caja.style.display='none';
@@ -2919,7 +2960,9 @@ async function agUbicarme(key, opc){
   }, function(codigo){
     _cercaEnCurso=false; _cercaBtnBuscando(false);
     if(myToken!==_cercaToken || opc.silencioso) return;
+    _agFallosUbic++;
     _agUbicFallo(codigo);
+    if(_agFallosUbic>=2) agIrALupa();   // segundo intento sin suerte: a la lupa
   }, {rapida:true});
 }
 // Compatibilidad: el nombre de antes sigue funcionando.
@@ -3301,6 +3344,7 @@ function agReset(key){
 
 window.agOnInput = agOnInput;
 window.agSel     = agSel;
+window.agIrALupa = agIrALupa;
 window.agUbicarme   = agUbicarme;
 window.agVerTodos   = agVerTodos;
 window.agMiPosicion = agMiPosicion;
@@ -3431,6 +3475,8 @@ function wzFocusFirst(){
 }
 function wzShow(step, doFocus){
   _wzStep=step;
+  // Paso de la sede CON mapa (no el manual de Olva): la etiqueta se oculta.
+  try{ document.body.classList.toggle('wz-sede', step===3 && selCourierType==='agencia' && !$('agcManualInput')); }catch(e){}
   var steps=document.querySelectorAll('.wz-step');
   for(var i=0;i<steps.length;i++){ steps[i].hidden=(+steps[i].getAttribute('data-step')!==step); }
   wzProgress();
