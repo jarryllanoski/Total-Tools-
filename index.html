@@ -3162,24 +3162,35 @@ function printGroup(courier){
   if(window.PrintModule) PrintModule.openList(sel.map(s=>s.id));
   else if(window.toast) toast('Impresión no disponible');
 }
-// Desplazar UNA tarjeta a la vez (▼ siguiente, ▲ anterior), alineándola justo
-// debajo del encabezado sticky. Usa la posición real de las cards y el alto real
-// del header (sin píxeles hardcodeados).
+/* ★ LO FIJO ARRIBA — UNA sola medida (30/10/2026): barra superior + pestañas
+   «Envíos · Compartir · Config» (fijas desde el 26/10) + el encabezado del
+   courier de esa tarjeta. Antes ▲▼ no contaba las pestañas y la tarjeta
+   quedaba ESCONDIDA debajo de ellas (se veía la dirección, no el nombre), y
+   al volver a tocar creía seguir en la misma. Medido en vivo, sin píxeles
+   fijos: rotar, teclado o una barra más alta no lo descuadran. */
+function _altoFijoArriba(card){
+  const alto=(e)=>e?e.getBoundingClientRect().height:0;
+  const grupo=card&&card.closest?card.closest('.cgroup'):null;
+  const ch=(grupo&&grupo.querySelector('.cgroup-hdr'))||document.querySelector('.cgroup-hdr');
+  // El encabezado del courier se pega en SU «top» del CSS (= barra + pestañas):
+  // su borde de abajo, ya pegado, es donde termina todo lo fijo. Así la cuenta
+  // es la misma que usa el navegador para pegarlo (una sola verdad).
+  if(ch){ const top=parseFloat(getComputedStyle(ch).top); if(isFinite(top)) return top+alto(ch); }
+  return alto(document.querySelector('.hdr'))+alto(document.querySelector('.tabs'))+(ch?alto(ch):44);
+}
+// Desplazar UNA tarjeta a la vez (▼ siguiente, ▲ anterior), dejándola justo
+// debajo de todo lo fijo (con su nombre visible).
 function scrollCard(dir){
   const cards=document.querySelectorAll('#cardsArea .card');
   if(!cards.length) return;
-  const appHdr=document.querySelector('.hdr');       // barra superior fija
-  const chdr=document.querySelector('.cgroup-hdr');  // encabezado de courier fijo
-  const off=(appHdr?appHdr.getBoundingClientRect().height:0)
-           +(chdr?chdr.getBoundingClientRect().height:44)+6; // debajo de AMBOS fijos
-  // "tarjeta actual arriba" = la de top más cercano a la línea de referencia
+  // «Tarjeta actual» = la de top más cercano a la línea bajo lo fijo.
   let cur=0, best=Infinity;
   for(let i=0;i<cards.length;i++){
-    const d=Math.abs(cards[i].getBoundingClientRect().top-off);
+    const d=Math.abs(cards[i].getBoundingClientRect().top-(_altoFijoArriba(cards[i])+6));
     if(d<best){ best=d; cur=i; }
   }
   const t=Math.max(0,Math.min(cards.length-1, cur+dir));
-  const y=window.scrollY + cards[t].getBoundingClientRect().top - off;
+  const y=window.scrollY + cards[t].getBoundingClientRect().top - (_altoFijoArriba(cards[t])+6);
   window.scrollTo({top:Math.max(0,y), behavior:'smooth'});
 }
 function escU(u){ u=String(u==null?'':u).trim(); return (/^https?:\/\//i.test(u)||/^data:image\//i.test(u))?escH(u):'#'; }
