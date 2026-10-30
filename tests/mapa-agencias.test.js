@@ -63,9 +63,12 @@ module.exports = async ({bloque, ok}) => {
     const pl = caja.indexOf('id="shalomDrop"');
     ok(pm > 0 && pt > 0 && pu > 0 && pb > 0 && pl > 0,
        'estan los cinco: titulo, ubicacion, mapa, buscador y lista');
-    ok(pt < pu && pu < pm && pm < pb && pb < pl,
-       '⚠️ en ese orden: «Elige tu sede», usar mi ubicación, mapa, buscador, ' +
-       'lista. El buscador sigue pegado a sus resultados');
+    /* 30/10/2026: los DOS caminos juntos arriba (ubicación y lupa), los
+       resultados justo debajo del buscador (con el teclado abierto se ven)
+       y el mapa al final, como apoyo. */
+    ok(pt < pu && pu < pb && pb < pl && pl < pm,
+       '⚠️ en ese orden: «Elige tu sede», usar mi ubicación, buscador, lista, mapa ' +
+       '(el buscador sigue pegado a sus resultados)');
   }
 
   bloque('⚠️ La lista manda: sin mapa se puede pedir igual');
@@ -230,7 +233,7 @@ module.exports = async ({bloque, ok}) => {
     ok(Number(alto) > 100 && Number(alto) < 300 && Number(altoPc) > 100 && Number(altoPc) < 320,
        'alto fijo y contenido (' + alto + 'px celular, ' + altoPc + 'px PC): un mapa a pantalla ' +
        'completa en el paso 3 de 4 esconde el boton de continuar');
-    ok(/dragging:true/.test(fn), 'en la PC se arrastra con el mouse');
+    ok(/dragging:!_tactil/.test(fn), 'en la PC se arrastra con el mouse (en celular, dos dedos)');
     ok(/_mapa\.on\('click focus', function\(\)\{ try\{ _mapa\.scrollWheelZoom\.enable\(\); \}catch\(e\)\{\} \}\);/.test(fn) &&
        /_mapa\.on\('mouseout blur', function\(\)\{ try\{ _mapa\.scrollWheelZoom\.disable\(\); \}catch\(e\)\{\} \}\);/.test(fn),
        'y la rueda hace zoom SOLO tras hacer clic en el mapa; al salir se apaga');

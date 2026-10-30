@@ -74,7 +74,10 @@ module.exports = async ({bloque, ok}) => {
   bloque('El mapa: se mueve con el mouse y tocar un punto ordena la lista');
 
   {
-    ok(/dragging:true/.test(form), 'se arrastra también en PC');
+    ok(/dragging:!_tactil/.test(form) && /matchMedia\('\(pointer:coarse\)'\)/.test(form),
+       'se arrastra con el mouse en PC; en celular con dos dedos (un dedo desplaza la página)');
+    ok(/ev\.touches\.length!==1\) return;/.test(form) && /Usa dos dedos para mover el mapa/.test(form),
+       'con un dedo sobre el mapa avisa «Usa dos dedos»');
     ok(/_mapa\.on\('click', function\(e\)\{ if\(e && e\.latlng\) agPuntoMapa\(_mapaKey/.test(form),
        'tocar un punto vacío lista las sedes cerca de ese punto');
     ok(/bubblingMouseEvents:false/.test(form), 'tocar un pin NO cuenta como tocar el mapa');
@@ -112,6 +115,52 @@ module.exports = async ({bloque, ok}) => {
     ok(/body\.wz-sede #tt-lbl\{display:none!important\}/.test(form), 'la etiqueta se oculta en el paso de la sede');
     ok(/classList\.toggle\('wz-sede', step===3 && selCourierType==='agencia' && !\$\('agcManualInput'\)\)/.test(form),
        'solo en el paso 3 con mapa: en el paso 4 vuelve con la sede en DESTINO; delivery no cambia');
+  }
+
+  bloque('Pines: en la vista de todo el Perú solo se ven; con filtro se tocan');
+
+  {
+    const fn = form.slice(form.indexOf('async function agMapaPintar'), form.indexOf('function agMapaMarcar'));
+    ok(/var tocables = !opc\.todas;/.test(fn), 'tocables solo fuera de la vista general');
+    ok(/interactive:tocables, keyboard:tocables/.test(fn), '⚠️ en la vista general un pin amontonado no se toca por error');
+    ok(/if\(tocables\)\{[\s\S]{0,260}m\.on\('click', function\(\)\{ _agElegir\(key, g\.ag\); \}\);/.test(fn),
+       'y el clic que elige solo existe en los tocables');
+    ok(/if\(!val\) agMapaPintar\(key, _agTodas\(key\), \{todas:true\}\);/.test(form),
+       'al vaciar la búsqueda (sin ubicación) vuelve la vista general');
+  }
+
+  bloque('Elegida: lista recogida, «Cambiar sede» y Continuar que dice el estado');
+
+  {
+    ok(/const recogida = !!el && !_agListaAbierta;/.test(form) && /class="ag-cambiar" onclick="agCambiar\(/.test(form),
+       'tras elegir queda «✓ Tu sede» y «Cambiar sede»');
+    ok(/_agElegidaK = AgLista\.clave\(ag\);\n  _agListaAbierta = false;/.test(form), 'elegir siempre la recoge');
+    const c = form.slice(form.indexOf('function _agContinuar('), form.indexOf('function _agGuiarEleccion('));
+    ok(/'Continuar con esta sede →' : 'Elige una sede para continuar'/.test(c) && /wz-apagado/.test(c),
+       'Continuar: apagado sin sede, «Continuar con esta sede →» con sede');
+    ok(/if\(!aplica\)\{ b\.textContent='Continuar →';/.test(c), 'delivery y Olva manual: el Continuar de siempre');
+    ok(/if\(\$\('shalomDrop'\)\) _agGuiarEleccion\(\); else/.test(form), 'sin sede: guía a los dos caminos, no error rojo');
+  }
+
+  bloque('Ubicación: un mensaje por causa, el toque se nota y se ubica sola al arreglarlo');
+
+  {
+    const i = form.indexOf('function _agCasoDe(');
+    const ctx = vm.createContext({});
+    vm.runInContext(form.slice(i, form.indexOf('function _agUbicFallo(', i)) + ';this.C=_agCasoDe;', ctx);
+    const C = ctx.C;
+    ok(C('denegado', 'denied') === 'sitio', 'sitio bloqueado en el navegador → «Activa tu ubicación manualmente»');
+    ok(C('fallo', 'granted') === 'gps' && C('denegado', 'granted') === 'gps', '⚠️ permiso dado sin posición → «Enciende la ubicación de tu celular»');
+    ok(C('denegado', 'prompt') === 'pregunta', 'cerró el aviso → «Toca Permitir»');
+    ok(C('denegado', '') === 'sitio', 'sin API de permisos → lo más probable');
+    ok(C('no_soporta', '') === 'navegador' && C('fuera', 'granted') === 'fuera', 'navegador sin soporte / fuera del Perú');
+    const u = form.slice(form.indexOf('async function agUbicarme('), form.indexOf('function agCerca('));
+    ok(/Math\.max\(0, 700-\(Date\.now\(\)-t0\)\)/.test(u), '«Buscando…» se ve al menos 0,7 s: el toque se nota');
+    ok(/_agUbicFallo\(codigo, estado\)/.test(u) && /_agPermiso\(\)\.then/.test(u), 'el mensaje sale de la causa real');
+    ok(/st\.state==='granted' && _agFallosUbic>0 && _agUbicKey && \$\('agUbicCaja'\)\) agUbicarme\(_agUbicKey\)/.test(form),
+       'si lo permite desde el 🔒, se ubica sola');
+    ok(/_agCaso!=='gps'[\s\S]{0,120}agUbicarme\(_agUbicKey\);/.test(form) && /_agReintentoVuelta=\(caso==='gps'\)/.test(form),
+       'si enciende el GPS y vuelve a la página, se reintenta UNA vez sola');
   }
 
   bloque('⚠️ «Iniciando fábrica…» al abrir el formulario sin link');
