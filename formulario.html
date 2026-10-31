@@ -1692,7 +1692,7 @@ function renderAgencyBox(courierName){
       <div id="shalomDrop" class="ag-lista" style="display:none"></div>
       <div id="shalomMapaWrap" class="ag-mapa-wrap" style="display:none">
         <div id="shalomMapa" class="ag-mapa"></div>
-        <div id="agMapaDedos" class="ag-mapa-dedos" aria-hidden="true">Usa dos dedos para mover el mapa</div>
+        <div id="agMapaDedos" class="ag-mapa-dedos" aria-hidden="true">Usa 2 dedos para mover el mapa</div>
         <div class="ag-mapa-btns">
           <button type="button" onclick="agVerTodos('${agKey}')">🗺️ Ver todos</button>
           <button type="button" onclick="agMiPosicion('${agKey}')">◎ Mi posición</button>
@@ -3667,7 +3667,7 @@ function _mapaDosDedos(m, aviso){
   var t=0;
   m.getContainer().addEventListener('touchmove', function(ev){
     if(!ev.touches || ev.touches.length!==1 || m.dragging.enabled()) return;
-    aviso.textContent='Usa dos dedos para mover el mapa';
+    aviso.textContent='Usa 2 dedos para mover el mapa';
     aviso.classList.add('on'); clearTimeout(t);
     t=setTimeout(function(){ aviso.classList.remove('on'); }, 1400);
   }, {passive:true});
@@ -3704,7 +3704,7 @@ async function agMapaPintar(key, agencias, opc){
   var ay=$('agMapaAyuda');
   if(ay){
     ay.style.display='block';
-    var dedos=(window.matchMedia && matchMedia('(pointer:coarse)').matches) ? ' Muévelo con dos dedos.' : '';
+    var dedos=(window.matchMedia && matchMedia('(pointer:coarse)').matches) ? ' Muévelo con 2 dedos.' : '';
     ay.textContent = opc.todas
       ? 'Usa tu ubicación o busca tu provincia o distrito para ver tus sedes aquí.'+dedos
       : 'Toca un pin rojo o una sede de la lista para elegirla.'+dedos;
