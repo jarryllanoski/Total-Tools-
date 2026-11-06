@@ -462,7 +462,15 @@ function openForm(id){
     const _isEncEdit=(s.courier||'').toUpperCase().includes('ENCOMIENDA');
     $('fAddr').value=_isEncEdit?(s.ciudadDestino||s.address||''):s.address;
     if($('fEncAgencia'))$('fEncAgencia').value=s.encAgencia||'';
-    $('fCourier').value=s.courier;$('fDate').value=s.date;$('fStatus').value=s.status;
+    $('fCourier').value=s.courier;$('fDate').value=s.date;
+    /* ★ Un pedido cuya etiqueta se borró: su estado no está en la lista, y
+       el <select> quedaba vacío — al guardar, el pedido perdía el estado sin
+       aviso. Se añade su estado actual para que se conserve tal cual. */
+    if(s.status && !S.labels.includes(s.status)){
+      const o=document.createElement('option'); o.value=s.status; o.textContent=s.status+' (sin etiqueta)';
+      $('fStatus').appendChild(o);
+    }
+    $('fStatus').value=s.status;
     $('fNotes').value=s.notes||'';_loadMontoFields(s);
     if($('fComprobante'))$('fComprobante').value=_nroDe(s);
     document.querySelectorAll('.xf').forEach(el=>{el.value=(s.extra&&s.extra[el.dataset.f])||''});
@@ -3158,16 +3166,27 @@ function saveLabelEdit(){
   S.msgTemplates[_editLabelSt][0]=msgA;
   S.msgTemplates[_editLabelSt][1]=msgB;
   // Rename label if custom
+  let movidos=[];
   if(_editLabelIdx!==null){
-    const newName=$('leNameInp').value.trim().toUpperCase();
+    const newName=nombreEtiqueta($('leNameInp').value);
     if(newName&&newName!==_editLabelSt){
+      /* Dos etiquetas con el mismo nombre compartían los mensajes y no se
+         podían distinguir en los filtros. */
+      if(S.labels.includes(newName)){ toast('⚠️ Ya existe la etiqueta «'+newName+'»'); return; }
       // Move messages to new name
       S.msgTemplates[newName]=S.msgTemplates[_editLabelSt];
       delete S.msgTemplates[_editLabelSt];
       S.labels[_editLabelIdx]=newName;
+      /* ★ Sus pedidos se van con ella. Antes se quedaban con el nombre
+         viejo y caían a «sin etiqueta» sin que nadie lo notara. */
+      movidos=S.shipments.filter(x=>x.status===_editLabelSt);
+      movidos.forEach(x=>{ x.status=newName; });
+      if(_filt===_editLabelSt) _filt=newName;
+      if(_chipSort[_editLabelSt]){ _chipSort[newName]=_chipSort[_editLabelSt]; delete _chipSort[_editLabelSt]; }
     }
   }
-  save('config'); renderChips(); loadCfgUI(); // solo config (labels/plantillas)
+  // Con pedidos movidos se suben SOLO esos (y la configuración, que cambió).
+  save(movidos.length ? movidos.map(x=>x.id) : 'config'); renderChips(); loadCfgUI(); if(movidos.length) render();
   closeOverlay('labelEditOverlay');
   toast('✅ Guardado');
 }
@@ -3231,7 +3250,10 @@ function dragEnd(){document.querySelectorAll('.label-drag-row').forEach(r=>{r.cl
 
 // Inline add functions
 function addLabelInline(){
-  S.labels.push('NUEVA ETIQUETA');
+  // Nunca dos iguales: «NUEVA ETIQUETA», «NUEVA ETIQUETA 2»…
+  let nombre='NUEVA ETIQUETA', n=2;
+  while(S.labels.includes(nombre)) nombre='NUEVA ETIQUETA '+(n++);
+  S.labels.push(nombre);
   save('config');renderChips();loadCfgUI(); // ★ solo config
   // Auto-open the last card
   const newIdx=S.labels.length-1;
@@ -3263,11 +3285,26 @@ function confirmDelItem(type,idx){
   /* Tenía el mismo fallo que el borrado de link: no reponía el texto ni el
      `disabled`, así que borrar una etiqueta o un courier también quedaba
      muerto si antes habías borrado un pedido. Eran dos pantallas, no una. */
+  const nSinEtq = type==='label' ? S.shipments.filter(x=>x.status===name).length : 0;
   confirmar({
-    texto:`¿Eliminar "${name}"? Esto no se puede deshacer.`,
+    texto: type==='label'
+      ? `¿Eliminar la etiqueta "${name}"?` + (nSinEtq
+          ? ` Sus ${nSinEtq} pedido(s) NO se borran: quedan en 🏷️ SIN ETIQUETA hasta que los muevas.`
+          : ' No tiene pedidos.')
+      : `¿Eliminar "${name}"? Esto no se puede deshacer.`,
     textoSi:'Sí, eliminar',
     alConfirmar: () => {
-      if(type==='label'){S.labels.splice(idx,1);renderChips()}
+      if(type==='label'){
+        /* Los pedidos NO se tocan: conservan su estado y aparecen en
+           «🏷️ SIN ETIQUETA» hasta que los muevas. Los mensajes A/B sí se
+           van con la etiqueta: si un día creas otra con el mismo nombre,
+           empieza limpia. */
+        S.labels.splice(idx,1);
+        if(S.msgTemplates) delete S.msgTemplates[name];
+        delete _chipSort[name];
+        if(_filt===name) _filt = nSinEtq ? SIN_ETIQUETA : '';
+        renderChips(); if(nSinEtq) render();
+      }
       else if(type==='courier') S.couriers.splice(idx,1);
       else S.extraFields.splice(idx,1);
       save('config');loadCfgUI();toast('🗑️ Eliminado'); // solo config

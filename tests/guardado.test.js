@@ -206,6 +206,7 @@ function montarMerge(op) {
   const ctx = {
     window: win, S,
     FIXED_LABELS: ['NUEVO PEDIDO', 'ENVIADO', 'FINALIZADO'],
+    _sinRepetir: (a) => Array.from(new Set(a || [])),
     _dirtyShips: op.ships || new Set(),
     _dirtySupps: op.supps || new Set(),
     _S_TS: 0,

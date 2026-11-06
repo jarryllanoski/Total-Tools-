@@ -74,7 +74,7 @@ module.exports = async ({bloque, ok}) => {
     const correr = (conModulo) => {
       // eslint-disable-next-line no-new-func
       return new Function('S', '$', '_dniDe', 'NroComprobante', '_adv', 'FechaPedido',
-          'let _filt="",_advActive=true;function _soloActivos(){return false}' + src +
+          'const SIN_ETIQUETA="__SIN_ETIQUETA__";let _filt="",_advActive=true;function _soloActivos(){return false}' + src +
           ';return visibleShipments;',
       )(S, () => ({value: ''}), DP.de, N, adv, conModulo ? F : undefined);
     };

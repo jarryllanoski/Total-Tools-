@@ -13,9 +13,10 @@
  * esa URL. Es la misma razón por la que `msgTemplates` y `labels` están fuera.
  *
  * QUÉ CUESTA
- * Nada extra. `S.recursos` viaja en el documento de configuración que el panel
+ * Casi nada. `S.recursos` viaja en el documento de configuración que el panel
  * ya lee al arrancar, y se guarda con `save('config')`, que sube ESE documento
- * y no los 1165 pedidos. Cero lecturas nuevas, cero escrituras nuevas.
+ * y no los 1165 pedidos. Al guardar se lee ese documento UNA vez para
+ * mezclar con lo que otro equipo cambió (mezclaConfig.js): nada se pisa.
  *
  * `publico` queda preparado desde el día uno aunque hoy no se use: cuando el
  * cliente deba ver avisos y promociones en su link de seguimiento, será añadir

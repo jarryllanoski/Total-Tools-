@@ -188,8 +188,9 @@ module.exports = async ({bloque, ok}) => {
        'interruptor "visible para el cliente"');
 
     const idx = E.leer('index.html');
-    const sube = idx.slice(idx.indexOf("clave: 'config', path: cfgPath()"),
-        idx.indexOf('for(const s of(data.shipments||[]))'));
+    // La lista de lo que viaja en el documento de configuración (una sola).
+    const sube = idx.slice(idx.indexOf('window._cfgProy = (data) => {'),
+        idx.indexOf('window._fbSave = async (data) => {'));
     ok(/recursos:\s*data\.recursos/.test(sube),
        'el panel los guarda como clave HERMANA de config, en el mismo ' +
        'documento — ni una lectura ni una escritura nuevas');

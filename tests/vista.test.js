@@ -35,7 +35,7 @@ module.exports = (t) => {
   const DP = require('../functions/dniPedido.js');
   const NC = require('../functions/nroComprobante.js');
   const api = new Function('S', '$', '_adv', '_dniDe', 'NroComprobante',
-      'let _filt="", _advActive=false;' + src +
+      'const SIN_ETIQUETA="__SIN_ETIQUETA__";let _filt="", _advActive=false;' + src +
       ';return {vis:visibleShipments, set:(f,a)=>{_filt=f;_advActive=a;}};'
   )(S, (id) => (id === 'fSearch' ? {value: busqueda} : null),
       // Los filtros avanzados vacíos: la búsqueda avanzada se activa por el

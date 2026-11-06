@@ -122,7 +122,7 @@ module.exports = async ({bloque, ok}) => {
     let q = '';
     // eslint-disable-next-line no-new-func
     const vis = new Function('S', '$', '_dniDe', 'NroComprobante',
-        'let _filt="",_advActive=false;const _adv={};' +
+        'const SIN_ETIQUETA="__SIN_ETIQUETA__";let _filt="",_advActive=false;const _adv={};' +
         'function _soloActivos(){return true}' + src +
         ';return visibleShipments;',
     )(S, () => ({value: q}), DP.de, N);
