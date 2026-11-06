@@ -44,13 +44,14 @@ module.exports = async ({bloque, ok}) => {
     ok(/className='tt-confirmed'/.test(sc), 'conserva la marca que lee el narrador (despedida de Heavy)');
   }
 
-  bloque('WhatsApp con la verdad: meta, burbuja real, recordatorio honesto');
+  bloque('WhatsApp con la verdad: meta, sin burbuja, el dedo al instante');
 
   {
     const sc = trozo('function showInlineConfirmed(', 'function _waAbierto(');
     ok(/falta 1 toque/.test(sc) && /Envíanos tu pedido por WhatsApp/.test(sc), 'barra de meta «falta 1 toque»');
-    ok(/_construirWaMsg\(order, trackCode, trackToken\)\.replace\(\/\\\*\/g,''\)/.test(sc), 'la burbuja son las líneas REALES del mensaje');
-    ok(/lineas\.map\(esc\)/.test(sc), 'y escapadas');
+    ok(!/tt-burbuja/.test(sc) && !/\.tt-burbuja\{/.test(form), 'sin la burbuja: repetía lo que ya dice la etiqueta');
+    ok(/if\(waHref\) setTimeout\(function\(\)\{ if\(!_waToco\) _waRecordar\(\); \}, 500\);/.test(sc),
+       'el dedo «👆» y el llamado del botón salen apenas cae el sello');
     ok(/Al enviarlo recibes tu <b>link de seguimiento<\/b>/.test(sc), 'beneficio verdadero');
     ok(!/no podremos procesarlo/i.test(form) && !/se cancelar/i.test(sc), '⚠️ sin mentir: el pedido ya está registrado');
     ok(/onclick="_waAbierto\(\)"/.test(sc), 'se sabe si tocó el botón (solo en este navegador)');
