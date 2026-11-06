@@ -38,7 +38,7 @@ module.exports = async ({bloque, ok}) => {
     const cf = trozo('function _confConfeti(', 'var _waToco');
     ok(/prefers-reduced-motion: reduce\)'\)\.matches\) return;/.test(cf), 'con «reducir movimiento» no hay confeti');
     ok(/setTimeout\(function\(\)\{ c\.remove\(\); \}, 2200\)/.test(cf), 'el confeti se limpia solo');
-    ok(/@media\(prefers-reduced-motion:reduce\)\{\.tt-sello,#tt-lbl \.card\.tt-tiembla/.test(form), 'sin animaciones si lo pidió');
+    ok(/@media\(prefers-reduced-motion:reduce\)\{\.tt-wa-vuelta\.tt-asoma,\.tt-dedo,\.tt-sello,#tt-lbl \.card\.tt-tiembla/.test(form), 'sin animaciones si lo pidió');
     const sc = trozo('function showInlineConfirmed(', 'function _waAbierto(');
     ok(/order\.nroComprobante \? String\(order\.nroComprobante\) : '#'\+trackCode/.test(sc), 'con factura, el código es la factura');
     ok(/className='tt-confirmed'/.test(sc), 'conserva la marca que lee el narrador (despedida de Heavy)');
@@ -50,8 +50,13 @@ module.exports = async ({bloque, ok}) => {
     const sc = trozo('function showInlineConfirmed(', 'function _waAbierto(');
     ok(/falta 1 toque/.test(sc) && /Envíanos tu pedido por WhatsApp/.test(sc), 'barra de meta «falta 1 toque»');
     ok(!/tt-burbuja/.test(sc) && !/\.tt-burbuja\{/.test(form), 'sin la burbuja: repetía lo que ya dice la etiqueta');
-    ok(/if\(waHref\) setTimeout\(function\(\)\{ if\(!_waToco\) _waRecordar\(\); \}, 500\);/.test(sc),
-       'el dedo «👆» y el llamado del botón salen apenas cae el sello');
+    ok(/if\(waHref\) setTimeout\(function\(\)\{ if\(!_waToco\) _waRecordar\(true\); \}, 1000\);/.test(sc),
+       'lo amarillo entra 1 s después que lo demás');
+    const rc = trozo('function _waRecordar(', '/* Volvió de WhatsApp');
+    ok(/Solo falta este paso/.test(rc) && /Te falta enviarlo/.test(rc), 'primero meta cercana; el recordatorio, pérdida');
+    ok(/class="tt-dedo"/.test(rc) && /@keyframes ttDedo/.test(form) && /classList\.add\('tt-asoma'\)/.test(rc),
+       'entra con animación y la mano 👆 señala el botón');
+    ok(/reduce\)\{\.tt-wa-vuelta\.tt-asoma,\.tt-dedo,/.test(form), 'sin animación si pidió reducir movimiento');
     ok(/Al enviarlo recibes tu <b>link de seguimiento<\/b>/.test(sc), 'beneficio verdadero');
     ok(!/no podremos procesarlo/i.test(form) && !/se cancelar/i.test(sc), '⚠️ sin mentir: el pedido ya está registrado');
     ok(/onclick="_waAbierto\(\)"/.test(sc), 'se sabe si tocó el botón (solo en este navegador)');
