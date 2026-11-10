@@ -14,7 +14,7 @@ const E = require('./_entorno.js');
 const vm = require('vm');
 
 module.exports = async ({bloque, ok}) => {
-  const form = E.leer('formulario.html');
+  const form = E.cliente();
 
   /* El código que se despliega, no una copia: se corta del formulario. */
   const hav = form.slice(form.indexOf('function _haversineKm('), form.indexOf('\n}\n', form.indexOf('function _haversineKm(')) + 3);

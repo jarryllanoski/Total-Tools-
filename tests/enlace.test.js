@@ -387,7 +387,7 @@ module.exports = async ({bloque, ok}) => {
 
        Parar con la pestaña escondida y actualizar al volver da EL MISMO
        servicio: cuando el cliente mira, el dato esta fresco. */
-    const f = E.leer('formulario.html');
+    const f = E.cliente();
     ok(/visibilitychange/.test(f),
        'la pagina escucha cuando la pestaña se esconde o vuelve');
     ok(/document\.hidden/.test(f),
@@ -422,7 +422,7 @@ module.exports = async ({bloque, ok}) => {
 
        Esta prueba recorre las declaraciones de nivel superior y exige que
        NADA las mencione antes de su linea. */
-    const f = E.leer('formulario.html');
+    const f = E.cliente();
     const lineas = f.split('\n');
     const fallos = [];
     lineas.forEach((l, i) => {
@@ -479,7 +479,7 @@ module.exports = async ({bloque, ok}) => {
     /* MUTACION QUE SOBREVIVIO: cambiar la condicion por `if(false)` y la
        prueba seguia verde, porque `rate_limited` aparecia igual en `_api` y
        en un comentario. Hay que exigir LA RAMA, no la palabra. */
-    const f = E.leer('formulario.html');
+    const f = E.cliente();
     ok(/if\s*\(\s*r\.status\s*===\s*429\s*\)/.test(f),
        '`_api` no revienta con un 429: el cuerpo trae el motivo en palabras');
     ok(/resp\s*&&\s*resp\.status\s*===\s*['"`]rate_limited['"`]/.test(f),

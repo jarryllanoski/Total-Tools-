@@ -24,10 +24,10 @@ const esc = (s) => s == null ? '' : String(s).replace(/&/g, '&amp;').replace(/</
 
 /* Las funciones reales de formulario.html, en un ámbito con CFG a elección. */
 function formulario(CFG) {
-  const src = E.trozo('formulario.html', 'function _isOtrasAg(name){', '\n}\n') + '\n}\n' +
-    E.trozo('formulario.html', 'function _tipoEnvioDe(name){', 'function onCourierChange(name){') +
-    E.trozo('formulario.html', '/* Deriva la fase del recorrido', 'function renderTrackResult(ship, code){') +
-    E.trozo('formulario.html', 'function _ayudaTrackContenido(', 'function abrirAyudaTrack(){');
+  const src = E.trozoCliente('function _isOtrasAg(name){', '\n}\n') + '\n}\n' +
+    E.trozoCliente('function _tipoEnvioDe(name){', '\n}\n') + '\n}\n' +
+    E.trozoCliente('/* Deriva la fase del recorrido', 'function renderTrackResult(ship, code){') +
+    E.trozoCliente('function _ayudaTrackContenido(', 'function abrirAyudaTrack(){');
   // eslint-disable-next-line no-new-func
   return new Function('CFG', 'esc', 'window', 'DniPedido',
       src + ';return {_tipoEnvioDe, _datosNarrador, _shalomTrackingBlock, _ayudaTrackContenido};',
@@ -74,7 +74,7 @@ module.exports = async ({bloque, ok}) => {
     ok(F._tipoEnvioDe('ENCOMIENDA') === 'encomienda', 'encomienda (otra agencia)');
     ok(F._tipoEnvioDe('DELIVERY') === 'delivery', 'delivery');
     ok(F._tipoEnvioDe('OLVA COURIER') === 'agencia', 'Olva → agencia');
-    const oc = E.trozo('formulario.html', 'function onCourierChange(name){', '$(\'err_courier\')');
+    const oc = E.trozoCliente('function onCourierChange(name){', '$(\'err_courier\')');
     ok(/selCourierType = _tipoEnvioDe\(name\);/.test(oc),
        'el formulario elige con la MISMA función (no una copia)');
   }
@@ -96,7 +96,7 @@ module.exports = async ({bloque, ok}) => {
        'retiro: la dirección de la tienda sale de Config');
     ok(F._datosNarrador({courier: 'DELIVERY'}).tiendaDir === '', 'y solo para retiro');
 
-    const r = E.trozo('formulario.html', 'function renderTrackResult(ship, code){', 'function clearOrderAndReset');
+    const r = E.trozoCliente('function renderTrackResult(ship, code){', '\n/* ─── ARRANQUE');
     ok(/<div class="track-card" data-tipo="\$\{esc\(narr\.tipo\)\}"/.test(r) &&
        /data-shalom-st="\$\{narr\.shalomSt\}"/.test(r) && /data-tienda-dir="\$\{esc\(narr\.tiendaDir\)\}"/.test(r),
        'la tarjeta publica tipo, etapa de Shalom y dirección (escapados)');
@@ -151,7 +151,7 @@ module.exports = async ({bloque, ok}) => {
   bloque('«Copiar»: guía + código, y de verdad');
 
   {
-    const src = E.trozo('formulario.html', '/* ★ COPIAR, DE VERDAD.', '/* Deriva la fase del recorrido');
+    const src = E.trozoCliente('/* ★ COPIAR, DE VERDAD.', '/* Deriva la fase del recorrido');
     const correr = (clipboard, execOk) => {
       const r = {copiado: null, prompt: null, btn: {textContent: 'Copiar', _a: {},
         getAttribute(k) { return this._a[k] === undefined ? null : this._a[k]; },

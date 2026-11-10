@@ -13,14 +13,14 @@ const E = require('./_entorno.js');
 const vm = require('vm');
 
 module.exports = async ({bloque, ok}) => {
-  const form = E.leer('formulario.html');
+  const form = E.cliente();
   const srv = E.leer('functions/index.js');
 
   bloque('La Ayuda: Toby dice lo que el formulario hace de verdad');
 
   {
     const i = form.indexOf('function _ayudaFormContenido(');
-    const fn = form.slice(i, form.indexOf('function cerrarAyudaForm', i));
+    const fn = form.slice(i, form.indexOf('function abrirAyudaForm', i));
     const ctx = vm.createContext({});
     vm.runInContext('function esc(t){return String(t).replace(/</g,"&lt;")}' + fn +
         ';this.C=_ayudaFormContenido;', ctx);

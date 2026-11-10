@@ -1,0 +1,389 @@
+/* cliente/cliente.css — estilos del formulario y del seguimiento (Fase 2,
+   10/11/2026). Antes iban dentro de formulario.html; ahora las dos páginas
+   comparten este archivo, y el navegador lo guarda una sola vez. */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{--bg:#080810;--card:#0f0f1a;--card2:#13131f;--bd:#1e1e30;--blue:#4f8ef7;--green:#22c55e;--red:#f87171;--purple:#a78bfa;--text:#f0f0f8;--text2:#6b7280}
+body{background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,sans-serif;min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:0 0 40px}
+.container{width:100%;max-width:460px;padding:0 16px}
+
+/* HEADER */
+.biz-header{padding:20px 0 12px;text-align:center}
+.biz-name{font-size:22px;font-weight:700;margin-bottom:2px}
+.biz-city{font-size:13px;color:var(--text2)}
+
+/* PROGRESS DOTS */
+.prog-dots{display:flex;gap:8px;justify-content:center;padding:12px 0 20px}
+.pdot{width:10px;height:10px;border-radius:50%;background:var(--bd);transition:background .25s,transform .25s}
+.pdot.active{background:var(--blue);transform:scale(1.2)}
+.pdot.done{background:var(--blue);opacity:.5}
+
+/* WIZARD CONTAINER */
+.wizard{position:relative;overflow:hidden}
+.wstep{display:none;animation:slideIn .25s ease}
+.wstep.active{display:block}
+@keyframes slideIn{from{opacity:0;transform:translateX(24px)}to{opacity:1;transform:translateX(0)}}
+@keyframes slideBack{from{opacity:0;transform:translateX(-24px)}to{opacity:1;transform:translateX(0)}}
+.wstep.back{animation:slideBack .25s ease}
+
+/* STEP HEADER */
+.step-head{margin-bottom:20px}
+.step-ttl{font-size:20px;font-weight:700;margin-bottom:4px}
+.step-sub{font-size:13px;color:var(--text2)}
+
+/* FIELDS */
+.fg{margin-bottom:14px}
+/* ★ DNI Y NOMBRE (30/10/2026): escanear, aparecer, iluminarse. */
+#f_dni.dni-escanea{background-image:linear-gradient(90deg,transparent,rgba(79,142,247,.28),transparent);background-size:40% 100%;background-repeat:no-repeat;animation:dniEscanea 1s linear infinite}
+@keyframes dniEscanea{from{background-position:-60% 0}to{background-position:160% 0}}
+.dni-buscando{font-size:12.5px;color:var(--blue);font-weight:700}
+.dni-puntos::after{content:'';animation:dniPuntos 1.2s steps(4) infinite}
+@keyframes dniPuntos{0%{content:''}25%{content:'.'}50%{content:'..'}75%{content:'...'}}
+.dni-nada{font-size:12.5px;color:var(--text2)}
+.dni-nada .dni-reintentar{display:inline;padding:0 2px;margin:0;color:var(--blue);font-weight:800;font-size:12.5px}
+#f_name.nom-ok{border-color:var(--green);padding-right:42px;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M5 12.5l4.5 4.5L19 7.5' fill='none' stroke='%2322c55e' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center;background-size:22px}
+#f_name.nom-brilla{animation:nomBrilla 1s ease}
+@keyframes nomBrilla{0%{box-shadow:0 0 0 0 rgba(34,197,94,.6)}100%{box-shadow:0 0 0 12px rgba(34,197,94,0)}}
+.dni-ok{color:var(--green);font-weight:800;font-size:12.5px}
+.dni-sug{background:rgba(79,142,247,.08);border:1px solid rgba(79,142,247,.35);border-radius:12px;padding:12px;margin-top:8px;animation:ttIn .3s ease}
+.dni-sug-t{font-size:12.5px;color:var(--text2);font-weight:700}
+.dni-sug-n{font-size:16px;font-weight:900;color:var(--text);margin:4px 0 10px;letter-spacing:.02em}
+.dni-sug-si{width:100%;min-height:44px;border:none;border-radius:10px;background:var(--green);color:#04120a;font-weight:800;font-size:14px;font-family:inherit;cursor:pointer}
+.dni-link{background:none;border:none;color:var(--text2);text-decoration:underline;font-size:12px;cursor:pointer;font-family:inherit;padding:8px 0 0;display:block;margin:0 auto}
+.dni-sug-p{font-size:11.5px;color:var(--text2);text-align:center;margin-top:4px}
+.dni-mant{font-size:12px;color:var(--text2)}
+.dni-mant .dni-link{display:inline;padding:0;margin:0;color:var(--blue)}
+@media(prefers-reduced-motion:reduce){#f_dni.dni-escanea,#f_name.nom-brilla,.dni-sug,.dni-puntos::after{animation:none}}
+.fi{width:100%;background:var(--card);border:1.5px solid var(--bd);border-radius:12px;color:var(--text);font-family:inherit;font-size:16px;padding:14px 16px;outline:none;transition:border-color .15s;appearance:none;-webkit-appearance:none}
+.fi:focus{border-color:var(--blue)}
+.fi::placeholder{color:var(--text2)}
+textarea.fi{resize:vertical;line-height:1.5}
+.fi.err{border-color:var(--red)}
+.fi.sel{background:var(--card);background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%236b7280' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 16px center;padding-right:40px;padding-top:16px;padding-bottom:16px;cursor:pointer;font-weight:600}
+/* 3 opciones por fila. La rejilla es de 6 columnas y cada tarjeta ocupa 2:
+   así las que sobran en la última fila se pueden CENTRAR (con 3 columnas
+   reales no se puede, harían falta medias columnas). */
+#courierCards{display:grid;grid-template-columns:repeat(6,1fr);gap:10px}
+.cour-card{grid-column:span 2;position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:7px;background:var(--card2);border:2px solid #626274;border-radius:14px;padding:16px 10px;min-height:106px;cursor:pointer;font-family:inherit;color:var(--text);transition:border-color .15s,background .15s,transform .05s}
+/* ★ «ESTOY ENCIMA» en las tarjetas de envío (30/10/2026): con mouse se
+   elevan y se iluminan; con el dedo se hunden al presionar. */
+.cour-card.sel{border-color:#12a5b4;background:rgba(18,165,180,.10)}
+/* Sobrantes de la última fila: CENTRADOS, del mismo tamaño que el resto.
+   Estirar la última a todo el ancho (como se hacía con 2 columnas) miente
+   sobre la jerarquía: parecería la opción importante. Funciona con cualquier
+   número de couriers, que el operador activa y desactiva desde el panel. */
+.cour-card:last-child:nth-child(3n+1){grid-column:3 / span 2}      /* sobra 1 */
+.cour-card:nth-last-child(2):nth-child(3n+1){grid-column:2 / span 2} /* sobran 2 */
+.cour-card .cc-ic{display:flex;align-items:center;justify-content:center}
+.cour-card .cc-ic svg{width:30px;height:30px;display:block}
+.cour-card .cc-body{display:flex;flex-direction:column;gap:2px;min-width:0;width:100%}
+.cour-card .cc-name{font-size:12px;font-weight:700;line-height:1.15}
+.cour-card .cc-radio{position:absolute;top:8px;right:8px;width:18px;height:18px;border-radius:50%;border:2px solid #626274;transition:border-color .15s}
+.cour-card.sel .cc-radio{border-color:#12a5b4}
+.cour-card.sel .cc-radio:after{content:"";position:absolute;inset:2px;border-radius:50%;background:#12a5b4}
+.ferr{font-size:12px;color:var(--red);margin-top:5px;display:none}
+.ferr.show{display:block}
+
+/* COURIER GRID */
+
+/* ★ «ESTOY ENCIMA» — UN estilo, UNA clase (.tocando), para envíos, días y
+   sedes (30/10/2026). En PC la pone el mouse al pasar por encima; en celular
+   (no hay «pasar por encima») la pone el dedo al apoyarse. Mismo efecto en
+   todos los dispositivos, sin duplicar reglas por :hover / :active. */
+.cour-card,.date-opt{transition:border-color .15s,background .15s,transform .15s,box-shadow .15s;-webkit-tap-highlight-color:transparent}
+.ag-item{-webkit-tap-highlight-color:transparent}
+.cour-card.tocando{transform:translateY(-2px);border-color:#12a5b4;box-shadow:0 6px 18px rgba(18,165,180,.28)}
+.cour-card.tocando .cc-radio{border-color:#12a5b4}
+.date-opt.tocando{transform:translateY(-2px);border-color:var(--blue);box-shadow:0 6px 18px rgba(91,155,255,.28)}
+.ag-item.tocando:not(.ag-item-sel){background:rgba(91,155,255,.10);box-shadow:inset 3px 0 0 var(--blue)}
+.cour-card:focus-visible,.date-opt:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
+@media(prefers-reduced-motion:reduce){.cour-card.tocando,.date-opt.tocando{transform:none}}
+
+/* DATE CHIPS */
+.dates-scroll{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px;scrollbar-width:none;-ms-overflow-style:none}
+.dates-scroll::-webkit-scrollbar{display:none}
+.date-opt{background:var(--card);border:1.5px solid var(--bd);border-radius:12px;padding:10px 14px;text-align:center;cursor:pointer;transition:border-color .15s,background .15s;user-select:none;flex-shrink:0;min-width:60px}
+.date-opt.active{border-color:var(--blue);background:#1b3466}
+/* ★ TOCAR Y ELEGIR SE SIENTE (30/10/2026). Microinteracciones breves
+   (≤0,3 s), UNA vez por elección; vibración solo al ELEGIR (Android). */
+.date-opt{position:relative}
+.date-opt.active::after{content:"✓";position:absolute;top:2px;right:2px;width:14px;height:14px;border-radius:50%;background:var(--blue);color:#fff;font-size:9px;font-weight:900;display:flex;align-items:center;justify-content:center}
+/* El dedo apoyó: respuesta AL INSTANTE (el navegador demora :active en
+   filas que se deslizan). Si el dedo se mueve, se quita y no elige. */
+.tt-pop{animation:ttPop .3s cubic-bezier(.34,1.56,.64,1)}
+@keyframes ttPop{0%{transform:scale(.94)}60%{transform:scale(1.06)}100%{transform:scale(1)}}
+.dates-wrap{position:relative}
+.dates-wrap::after{content:"";position:absolute;right:0;top:0;bottom:4px;width:30px;background:linear-gradient(90deg,rgba(8,8,16,0),var(--bg));pointer-events:none}
+.tt-ok{display:none;margin-top:10px;font-size:13.5px;font-weight:700;color:var(--green);line-height:1.4}
+.tt-ok.on{display:block;animation:ttIn .3s ease}
+@keyframes ttIn{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
+.btn-main.tt-brillo{position:relative;overflow:hidden}
+.btn-main.tt-brillo::after{content:"";position:absolute;top:0;bottom:0;left:-60%;width:45%;background:linear-gradient(100deg,transparent,rgba(255,255,255,.45),transparent);animation:ttBrillo .9s ease-out 1 forwards;pointer-events:none}
+@keyframes ttBrillo{to{left:130%}}
+.ag-chk{width:18px;height:18px;fill:none;stroke:var(--green);stroke-width:3;stroke-linecap:round;stroke-linejoin:round}
+.ag-recien .ag-chk path{stroke-dasharray:24;stroke-dashoffset:24;animation:ttTrazo .35s ease-out .05s forwards}
+@keyframes ttTrazo{to{stroke-dashoffset:0}}
+.ag-recien .ag-item-sel{animation:ttPop .3s cubic-bezier(.34,1.56,.64,1)}
+.ag-recien{animation:ttIn .3s ease}
+.ag-pin-salta svg{animation:ttSalta .5s cubic-bezier(.34,1.56,.64,1);transform-origin:50% 100%}
+@keyframes ttSalta{0%{transform:translateY(0) scale(.8)}40%{transform:translateY(-14px) scale(1.05)}100%{transform:none}}
+.wz-pbar i.tt-casi{box-shadow:0 0 10px rgba(91,155,255,.8)}
+@media(prefers-reduced-motion:reduce){.tt-pop,.ag-recien,.ag-recien .ag-item-sel,.ag-pin-salta svg,.tt-ok.on{animation:none}.btn-main.tt-brillo::after{display:none}.ag-recien .ag-chk path{animation:none;stroke-dashoffset:0}.date-opt.tocando,.cour-card.tocando{transform:none}}
+.d-day{font-size:11px;color:var(--text2);text-transform:uppercase;font-weight:600}
+.d-num{font-size:20px;font-weight:700;line-height:1.2}
+.d-mon{font-size:10px;color:var(--text2)}
+.date-opt.active .d-day,.date-opt.active .d-mon{color:var(--blue)}
+
+/* AGENCY CASCADE */
+.agc-box{padding:14px;background:var(--card2);border:1px solid var(--bd);border-radius:12px}
+.agc-lbl{font-size:11px;font-weight:700;color:var(--text2);letter-spacing:.6px;text-transform:uppercase;margin-bottom:10px;display:block}
+.ag-ubic{background:rgba(79,142,247,.08);border:1.5px solid rgba(79,142,247,.35);border-radius:14px;padding:12px;margin:2px 0 12px}
+/* ★ El BOTÓN NATIVO <geolocation> (Chrome 144+). Chrome dibuja su texto e
+   ícono y limita el estilo; IGNORA box-sizing y añade relleno lateral
+   propio: con width:100% + ese relleno se sale de la pantalla y Chrome lo
+   declara inválido («intersection_out_of_viewport_or_clipped») y NO
+   responde al toque. Por eso relleno lateral 0. Medido en Chromium 153. */
+.ag-geo{display:block;width:100%;padding:16px 0;border:0;border-radius:12px;background:var(--blue);color:#fff;font-size:16px;font-weight:800;font-family:inherit}
+.ag-ubic-btn{width:100%;min-height:52px;border:none;border-radius:12px;background:var(--blue);color:#fff;font-size:15.5px;font-weight:800;font-family:inherit;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px}
+.ag-ubic-btn:disabled{opacity:.8;cursor:progress}
+.ag-ubic-sub{font-size:11.5px;color:var(--text2);line-height:1.45;margin-top:8px;text-align:center}
+.ag-ubic.ag-ubic-error{background:rgba(234,179,8,.08);border-color:rgba(234,179,8,.35)}
+.ag-ubic-sub a{color:var(--blue);font-weight:700;cursor:pointer;text-decoration:underline;white-space:nowrap}
+/* ★ «LLÉVAME A LA LUPA» (30/10/2026): si la ubicación sigue bloqueada, no
+   se repite el error; el buscador se ilumina y queda listo para escribir. */
+/* El encabezado del buscador SIEMPRE dice qué buscar. Cuando el cliente
+   llega aquí porque la ubicación no se pudo, se enciende (azul + 👇). */
+#agLupaHint{font-size:12px;font-weight:700;color:var(--text2);margin:0 0 6px;letter-spacing:.02em}
+#agLupaHint .ag-lh-ic::before{content:"🔍 "}
+#agLupaHint.on{color:var(--blue);font-size:12.5px}
+#agLupaHint.on .ag-lh-ic::before{content:"👇 "}
+.ag-buscar-foco .fi{border-color:var(--blue);animation:agFoco 1s ease-in-out 2}
+@keyframes agFoco{0%,100%{box-shadow:0 0 0 0 rgba(91,155,255,0)}50%{box-shadow:0 0 0 6px rgba(91,155,255,.35)}}
+/* ★ En el paso de la sede la etiqueta de arriba no se ve (30/10/2026): una
+   pantalla, una tarea. Vuelve en el paso 4 ya con la sede en DESTINO. */
+body.wz-sede #tt-lbl{display:none!important}
+@media(prefers-reduced-motion:reduce){.ag-buscar-foco .fi{animation:none}}
+.ag-mapa-wrap{position:relative;margin-bottom:6px}
+.ag-mapa{height:230px;border-radius:12px;overflow:hidden;border:1.5px solid var(--bd);background:#0d1117}
+@media(min-width:700px){.ag-mapa{height:280px}}
+.ag-mapa .leaflet-container,.ag-mapa.leaflet-container{cursor:grab}
+/* ★ «TÚ ESTÁS AQUÍ» QUE LATE (30/10/2026): el mismo punto azul con halo de
+   Google Maps o Waze. El cliente ya lo conoce: se reconoce al instante y ve
+   las sedes rojas a su alrededor. Solo CSS: ni batería ni red. */
+.ag-yo-halo{animation:agHalo 2s ease-out infinite}
+@keyframes agHalo{0%{stroke-width:2;stroke-opacity:.7}100%{stroke-width:30;stroke-opacity:0}}
+/* La lupa late mientras no hay sede elegida: invita sin gritar. Al escribir
+   o elegir se queda quieta (lo que late siempre se termina ignorando). */
+.ag-lupa{position:absolute;left:14px;top:50%;transform:translateY(-50%);font-size:15px;opacity:.75;pointer-events:none;animation:agLupa 1.8s ease-in-out infinite}
+.ag-buscar.quieto .ag-lupa{animation:none;opacity:.6}
+@keyframes agLupa{0%,100%{transform:translateY(-50%) scale(1)}50%{transform:translateY(-50%) scale(1.22)}}
+@media(prefers-reduced-motion:reduce){.ag-yo-halo,.ag-lupa{animation:none}}
+.ag-mapa-btns{position:absolute;left:8px;bottom:8px;z-index:1000;display:flex;gap:6px}
+.ag-mapa-btns button{background:#fff;color:#1f2937;border:none;border-radius:16px;padding:7px 11px;font-size:12px;font-weight:700;font-family:inherit;cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,.25)}
+.ag-mapa-ayuda{font-size:11px;color:var(--text2);margin:0 0 10px;line-height:1.4}
+.ag-pin{background:none;border:none}
+.ag-lista{background:var(--card);border:1.5px solid var(--bd);border-radius:12px;overflow:hidden;max-height:320px;overflow-y:auto;margin-bottom:8px}
+.ag-item{display:flex;align-items:flex-start;gap:10px;padding:12px;border-bottom:1px solid var(--bd);cursor:pointer}
+.ag-item:last-child{border-bottom:none}
+.ag-item{transition:background .15s,box-shadow .15s}
+/* ★ «ESTOY ENCIMA» (30/10/2026): con mouse se ilumina al pasar; con el
+   dedo (no hay «pasar por encima») se hunde al presionar, como un botón
+   físico. Cada toque responde en menos de 0,1 s: se siente instantáneo. */
+.ag-item-sel{background:rgba(34,197,94,.08);box-shadow:inset 0 0 0 2px var(--green)}
+.ag-item-ic{font-size:16px;line-height:1.2;flex-shrink:0;color:var(--text2)}
+.ag-item-sel .ag-item-ic{color:var(--green)}
+.ag-item-t{font-weight:800;font-size:13.5px;color:var(--text)}
+.ag-item-d{font-size:11.5px;color:var(--text2);margin-top:3px;line-height:1.4}
+.ag-item-p{font-size:11px;color:var(--text2);margin-top:4px;display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.ag-item-km{color:var(--blue);font-weight:700}
+.ag-chip{background:rgba(34,197,94,.15);color:var(--green);border-radius:10px;padding:1px 8px;font-weight:800}
+.ag-mapa-dedos{position:absolute;inset:0;z-index:1001;display:flex;align-items:center;justify-content:center;text-align:center;padding:16px;background:rgba(0,0,0,.55);color:#fff;font-size:14px;font-weight:800;border-radius:12px;opacity:0;pointer-events:none;transition:opacity .25s}
+.ag-mapa-dedos.on{opacity:1}
+.ag-cambiar{display:block;width:100%;background:none;border:none;border-top:1px solid var(--bd);color:var(--blue);font-weight:800;font-size:13px;padding:11px;cursor:pointer;font-family:inherit}
+.ag-ubic.ag-guia{animation:agFoco 1s ease-in-out 2}
+.btn-main.wz-apagado{opacity:.55;filter:saturate(.5)}
+.ag-lista-cab{padding:8px 12px;background:rgba(79,142,247,.10);border-bottom:1px solid var(--bd);font-size:11.5px;font-weight:700;color:var(--blue)}
+.sel-badge{display:inline-flex;align-items:center;gap:8px;background:#12203d;border:1px solid var(--blue);border-radius:10px;padding:8px 12px;font-size:13px;margin-top:8px;width:100%}
+.sel-badge .clr-btn{background:none;border:none;color:var(--text2);cursor:pointer;font-size:16px;padding:0;line-height:1;margin-left:auto}
+
+/* BUTTONS */
+.btn-main{width:100%;background:linear-gradient(135deg,#1d4ed8,var(--blue));color:#fff;border:none;border-radius:14px;font-family:inherit;font-size:16px;font-weight:600;padding:15px;cursor:pointer;transition:opacity .15s,transform .1s;margin-top:4px}
+.btn-main:hover{opacity:.9}
+.btn-main:active{transform:scale(.98)}
+.btn-main:disabled{opacity:.5;cursor:not-allowed}
+.btn-sec{width:100%;background:var(--card);color:var(--text);border:1.5px solid var(--bd);border-radius:14px;font-family:inherit;font-size:15px;font-weight:500;padding:13px;cursor:pointer;margin-top:10px}
+/* ★ CONFIRMACIÓN (30/10/2026) */
+.btn-main.tt-registrando{position:relative;overflow:hidden;opacity:1}
+.tt-reg-bar{position:absolute;left:0;top:0;bottom:0;width:0;background:rgba(255,255,255,.18);animation:ttReg 1.6s ease-out forwards}
+@keyframes ttReg{to{width:88%}}
+.tt-reg-txt{position:relative}
+#tt-lbl .card{position:relative}
+#tt-lbl .card.tt-imprimiendo{overflow:hidden}
+#tt-lbl .card.tt-imprimiendo::after{content:"";position:absolute;left:0;right:0;top:-30%;height:30%;background:linear-gradient(180deg,rgba(79,142,247,0),rgba(79,142,247,.22),rgba(79,142,247,0));animation:ttImprime 1.1s linear infinite;pointer-events:none}
+@keyframes ttImprime{to{top:100%}}
+.tt-sello{position:absolute;right:14px;top:46%;transform:rotate(-10deg);border:3px solid #16a34a;color:#16a34a;border-radius:10px;padding:6px 12px;text-align:center;background:rgba(255,255,255,.88);font-family:inherit;line-height:1.1;animation:ttSello .45s cubic-bezier(.2,1.4,.5,1) both;pointer-events:none}
+.tt-sello b{display:block;font-size:17px;font-weight:900;letter-spacing:.06em}
+.tt-sello small{display:block;font-size:12px;font-weight:800;margin-top:3px;letter-spacing:.04em}
+@keyframes ttSello{0%{opacity:0;transform:rotate(-18deg) scale(2.4)}70%{opacity:1;transform:rotate(-9deg) scale(.94)}100%{opacity:1;transform:rotate(-10deg) scale(1)}}
+#tt-lbl .card.tt-tiembla{animation:ttTiembla .28s ease .32s}
+@keyframes ttTiembla{0%,100%{transform:none}30%{transform:translate(2px,1px)}60%{transform:translate(-2px,-1px)}}
+.tt-confeti{position:fixed;inset:0;pointer-events:none;z-index:99995;overflow:hidden}
+.tt-confeti i{position:absolute;top:-12px;width:8px;height:12px;border-radius:2px;animation:ttCae 1.4s cubic-bezier(.3,.6,.6,1) forwards}
+@keyframes ttCae{to{top:105%;opacity:.2;margin-left:40px}}
+.tt-meta{margin:14px 0 10px}
+.tt-meta-txt{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--text2);font-weight:700;margin-bottom:6px}
+.tt-meta-txt b{color:#22c55e}
+.tt-meta-bar{height:6px;background:#1c2333;border-radius:99px;overflow:hidden}
+.tt-meta-bar i{display:block;height:100%;width:90%;background:linear-gradient(90deg,#12a5b4,#22c55e);border-radius:99px;transition:width .5s ease}
+.tt-wa-ttl{font-size:18px;font-weight:900;color:var(--text);margin:4px 0 10px}
+.btn-wa.tt-wa-btn{font-size:18px;font-weight:800;padding:18px;animation:ttRespira 2.2s ease-in-out infinite}
+@keyframes ttRespira{0%,100%{box-shadow:0 0 0 0 rgba(37,211,102,.45)}50%{box-shadow:0 0 0 10px rgba(37,211,102,0)}}
+.btn-wa.tt-llama{animation:ttLlama .5s ease 2,ttRespira 2.2s ease-in-out 1s infinite}
+@keyframes ttLlama{0%,100%{transform:none}25%{transform:translateX(-6px)}75%{transform:translateX(6px)}}
+.tt-wa-sub{font-size:13px;color:var(--text2);text-align:center;margin-top:10px;line-height:1.5}
+.tt-wa-sub b{color:var(--text)}
+.tt-wa-vuelta{margin-top:12px;font-size:13.5px;color:#eab308;font-weight:700;text-align:center}
+/* Lo amarillo ENTRA (no aparece de golpe) y la mano señala el botón sin parar. */
+.tt-wa-vuelta.tt-asoma{animation:ttAsoma .45s cubic-bezier(.2,1.2,.5,1) both}
+@keyframes ttAsoma{from{opacity:0;transform:translateY(8px) scale(.96)}to{opacity:1;transform:none}}
+.tt-dedo{display:inline-block;animation:ttDedo 1.1s ease-in-out infinite}
+@keyframes ttDedo{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
+.tt-wa-q{color:var(--text);font-size:15px;font-weight:800;margin-bottom:8px}
+.tt-wa-otra{display:flex;align-items:center;justify-content:center;text-decoration:none;border-radius:10px;min-height:44px;font-weight:800;font-size:13.5px}
+@media(prefers-reduced-motion:reduce){.tt-wa-vuelta.tt-asoma,.tt-dedo,.tt-sello,#tt-lbl .card.tt-tiembla,.btn-wa.tt-wa-btn,.btn-wa.tt-llama,.tt-reg-bar{animation:none}#tt-lbl .card.tt-imprimiendo::after{display:none}.tt-reg-bar{width:88%}}
+.btn-wa{width:100%;background:linear-gradient(135deg,#128c7e,#25d366);color:#fff;border:none;border-radius:14px;font-family:inherit;font-size:16px;font-weight:600;padding:15px;cursor:pointer;margin-top:10px;text-decoration:none;display:flex;align-items:center;justify-content:center;gap:8px}
+.btn-purple{width:100%;background:linear-gradient(135deg,#3730a3,var(--purple));color:#fff;border:none;border-radius:14px;font-family:inherit;font-size:15px;font-weight:600;padding:13px;cursor:pointer;margin-top:10px}
+
+/* SUCCESS */
+.success{text-align:center;padding:8px 0}
+.success-icon{font-size:64px;margin-bottom:12px}
+.success-ttl{font-size:24px;font-weight:700;margin-bottom:6px}
+.success-sub{font-size:14px;color:var(--text2);margin-bottom:16px;line-height:1.6}
+.track-code{display:inline-block;background:var(--card2);border:1px solid var(--bd);border-radius:10px;padding:10px 24px;font-size:28px;font-weight:700;letter-spacing:4px;margin-bottom:16px;color:var(--purple)}
+.summary-rows{background:var(--card2);border:1px solid var(--bd);border-radius:12px;padding:14px;text-align:left;margin-bottom:14px}
+.sum-row{display:flex;gap:8px;margin-bottom:8px;font-size:13px}
+.sum-row:last-child{margin-bottom:0}
+.sum-lbl{color:var(--text2);min-width:72px;font-size:11px;font-weight:700;text-transform:uppercase;padding-top:1px;letter-spacing:.4px}
+.sum-val{color:var(--text);flex:1;line-height:1.5}
+
+/* TRACKING PAGE */
+.track-back{font-size:13px;color:var(--text2);padding:12px 0;cursor:pointer;background:none;border:none;font-family:inherit;display:flex;align-items:center;gap:6px}
+.track-card{background:var(--card);border:1px solid var(--bd);border-radius:14px;padding:18px;margin-bottom:12px}
+.tk-section{margin-bottom:18px}
+.tk-section:last-child{margin-bottom:0}
+.tk-lbl{font-size:11px;font-weight:700;color:var(--text2);letter-spacing:.6px;text-transform:uppercase;margin-bottom:8px}
+.status-badge{display:inline-flex;align-items:center;gap:6px;border-radius:10px;padding:8px 14px;font-size:14px;font-weight:600}
+
+
+/* TRACK ROWS */
+.tk-row{display:flex;gap:8px;align-items:flex-start;margin-bottom:7px;font-size:13px}
+.tk-row:last-child{margin-bottom:0}
+.tk-row-lbl{color:var(--text2);font-size:11px;font-weight:700;text-transform:uppercase;min-width:72px;padding-top:1px;letter-spacing:.4px}
+.tk-row-val{color:var(--text);flex:1;line-height:1.5}
+
+/* SPINNERS / LOADING */
+.loading-screen{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:60vh;gap:16px}
+.spin{width:44px;height:44px;border:3px solid var(--bd);border-top-color:var(--blue);border-radius:50%;animation:spin .7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+/* Pin "buscando ubicación": late/rebota mientras geolocaliza (feedback en el botón, no abajo) */
+.geo-pin{display:inline-block;animation:geoPulse 1s ease-in-out infinite}
+@keyframes geoPulse{0%,100%{transform:translateY(0) scale(1);opacity:1}50%{transform:translateY(-3px) scale(1.25);opacity:.55}}
+@media(prefers-reduced-motion:reduce){.geo-pin{animation:none}}
+.spin-lbl{color:var(--text2);font-size:14px}
+
+
+/* ERROR */
+.error-box{background:rgba(248,113,113,.08);border:1px solid rgba(248,113,113,.3);border-radius:12px;padding:14px;font-size:13px;color:var(--red);margin-bottom:12px}
+
+/* UNCONFIGURED */
+.unconf{text-align:center;padding:60px 20px}
+.unconf-icon{font-size:48px;margin-bottom:12px}
+.unconf-ttl{font-size:18px;font-weight:700;margin-bottom:8px;color:var(--text2)}
+.unconf-sub{font-size:13px;color:var(--text2);line-height:1.6}
+
+/* REFRESH ROW */
+.refresh-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+.refresh-lbl{font-size:12px;color:var(--text2)}
+.refresh-btn{background:var(--card2);border:1px solid var(--bd);border-radius:8px;padding:6px 12px;font-size:12px;color:var(--text2);cursor:pointer;font-family:inherit}
+
+/* SMALL LINK */
+.small-link{background:none;border:none;font-family:inherit;font-size:12px;color:var(--text2);cursor:pointer;text-align:center;display:block;margin:16px auto 0;opacity:.6;text-decoration:underline}
+.small-link:hover{opacity:1}
+
+.footer{text-align:center;font-size:11px;color:var(--text2);padding:24px 0 8px;opacity:.35}
+.brand-foot{margin-top:10px;padding:12px 8px 12px;border-top:1px solid var(--bd);text-align:center}
+.brand-foot .bf-row{display:flex;flex-wrap:wrap;justify-content:center;align-items:center;gap:5px 12px}
+.brand-foot .bf-row+.bf-row{margin-top:7px}
+.brand-foot .bf-item{font-size:12px;color:var(--text2);white-space:nowrap;display:inline-flex;align-items:center;gap:5px}
+.brand-foot .bf-ic{width:13px;height:13px;flex:none}
+.brand-foot .bf-web{color:#12a5b4;text-decoration:none;font-weight:600}
+.brand-foot .bf-dot{color:var(--text2);opacity:.4}
+.brand-foot .bf-soc .bf-item{font-size:11px;opacity:.85}
+.used-note{text-align:center;font-size:12px;color:var(--text2);margin-top:14px;padding:10px 14px;background:rgba(107,114,128,.06);border:1px solid var(--bd);border-radius:10px;line-height:1.5}
+
+/* Section divider */
+.section-ttl{font-size:11px;font-weight:700;color:var(--text2);letter-spacing:.7px;text-transform:uppercase;margin-bottom:10px}
+
+/* DELIVERY ADDRESS OPTIONS */
+.addr-opts{display:flex;flex-direction:column;gap:8px;margin-bottom:10px}
+.addr-opt{display:flex;align-items:center;gap:12px;background:var(--card);border:1.5px solid var(--bd);border-radius:12px;padding:14px;text-align:left;cursor:pointer;transition:border-color .15s,background .15s;user-select:none}
+.addr-opt.active{border-color:var(--blue);background:#12203d}
+.addr-opt-icon{font-size:24px;flex-shrink:0}
+.addr-opt-body{flex:1}
+.addr-opt-lbl{font-size:14px;font-weight:700;color:var(--text);margin-bottom:2px}
+.addr-opt-desc{font-size:11px;color:var(--text2);line-height:1.4}
+.addr-opt.active .addr-opt-lbl{color:var(--blue)}
+.addr-result{background:var(--card2);border:1px solid var(--blue);border-radius:10px;padding:10px 12px;font-size:13px;color:var(--text);margin-bottom:8px;display:none;line-height:1.5}
+.addr-result.show{display:block}
+/* Botón de ayuda: rellena el cuadro de dirección, no lo reemplaza */
+.addr-gps-btn{width:100%;display:flex;align-items:center;justify-content:center;gap:8px;background:rgba(79,142,247,.12);border:1px solid rgba(79,142,247,.3);border-radius:10px;color:var(--blue);padding:11px;font-size:13.5px;font-weight:700;cursor:pointer;font-family:inherit;margin-bottom:8px}
+.addr-gps-btn:disabled{cursor:progress}
+/* Chip: coordenadas adjuntas, quitables por el cliente */
+.addr-pin-chip{display:flex;align-items:center;gap:8px;background:rgba(34,197,94,.10);border:1px solid rgba(34,197,94,.3);border-radius:9px;padding:8px 10px;margin-top:8px;font-size:12px;color:var(--green);font-weight:600}
+.addr-pin-chip a{color:var(--blue);text-decoration:none;font-weight:700}
+/* ★ DELIVERY CON MAPA (30/10/2026): el punto se VE y se puede corregir. */
+.ag-geo.dlv-geo{margin-bottom:8px}
+.dlv-msg{font-size:12.5px;color:var(--text2);line-height:1.5;margin-bottom:8px}
+.dlv-msg a{color:var(--blue);font-weight:700;cursor:pointer;text-decoration:underline;white-space:nowrap}
+.tt-envio{display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:13px;color:var(--text2);background:var(--card);border:1px solid var(--bd);border-radius:10px;padding:9px 12px;margin:2px 0 12px}
+.tt-envio b{color:var(--text)}
+.dlv-pista{font-size:12px;color:var(--text2);font-weight:600;margin-top:6px}
+.dlv-confirma{margin-bottom:8px}
+.dlv-q{font-size:13.5px;font-weight:800;color:var(--text);margin-bottom:8px}
+.dlv-btns{display:flex;gap:8px;margin-bottom:4px}
+.dlv-btns button{flex:1;min-height:44px;border-radius:10px;font-family:inherit;font-size:13.5px;font-weight:800;cursor:pointer}
+.dlv-si{background:var(--green);border:none;color:#04120a}
+.dlv-aj{background:none;border:1.5px solid var(--blue);color:var(--blue)}
+.dlv-link{background:none;border:none;color:var(--blue);font-weight:700;font-size:12.5px;cursor:pointer;font-family:inherit;padding:4px 0;text-decoration:underline}
+/* ★ UN mapa de delivery, DOS modos (30/10/2026):
+     · MIRAR: el pin queda fijo en el punto; mover la vista no lo mueve.
+       Mismo tamaño que el mapa de sedes. Celular: dos dedos (un dedo baja
+       la página). PC: mouse.
+     · AJUSTAR (solo con el botón «Ajustar punto»): pin fijo al centro y se
+       mueve el mapa. PC: en el MISMO recuadro, al mismo tamaño. Celular:
+       pantalla completa (ahí un dedo arrastra sin atascar la página). */
+.dlv-prev{position:relative;height:230px;border-radius:12px;overflow:hidden;border:1.5px solid var(--bd);background:#0d1117;margin-bottom:8px}
+@media(min-width:700px){.dlv-prev{height:280px}}
+.dlv-mapa{position:absolute;inset:0}
+.dlv-aj-top,.dlv-aj-pin,.dlv-aj-bot{display:none}
+.dlv-prev.ajustando{border-color:var(--blue)}
+.dlv-prev.ajustando .dlv-aj-top{display:block;position:absolute;top:0;left:0;right:0;z-index:1001;padding:9px 12px;font-size:13px;font-weight:800;color:#fff;background:rgba(13,17,23,.88);line-height:1.35}
+.dlv-aj-top small{display:block;font-weight:600;color:#eab308;margin-top:2px}
+.dlv-prev.ajustando .dlv-aj-pin{display:block;position:absolute;left:50%;top:50%;z-index:1000;transform:translate(-50%,-100%);pointer-events:none;filter:drop-shadow(0 4px 6px rgba(0,0,0,.4))}
+.dlv-prev.ajustando .dlv-aj-bot{display:flex;gap:8px;position:absolute;left:0;right:0;bottom:0;z-index:1001;padding:8px;background:rgba(13,17,23,.88)}
+.dlv-aj-bot button{min-height:42px;border-radius:10px;font-family:inherit;font-size:14px;font-weight:800;cursor:pointer}
+.dlv-aj-no{flex:0 0 auto;padding:0 14px;background:#1c2333;border:1px solid #30363d;color:#c9d1d9}
+.dlv-aj-ok{flex:1;background:var(--blue);border:none;color:#fff}
+.dlv-prev.ajustando .leaflet-top{top:52px}
+.dlv-prev.ajustando .leaflet-bottom{bottom:58px}
+.dlv-volver{display:none;position:absolute;right:8px;bottom:24px;z-index:1000;background:#fff;color:#1f2937;border:none;border-radius:16px;padding:7px 11px;font-size:12px;font-weight:700;font-family:inherit;cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,.25)}
+.dlv-volver.on{display:block}
+.dlv-prev.ajustando .dlv-volver{display:none}
+@media(pointer:coarse){
+  .dlv-prev.ajustando{position:fixed;inset:0;height:auto;z-index:99990;border-radius:0;border:0;margin:0}
+  .dlv-prev.ajustando .dlv-aj-top{padding:14px 16px;font-size:14px}
+  .dlv-prev.ajustando .dlv-aj-bot{padding:12px 16px calc(12px + env(safe-area-inset-bottom))}
+  .dlv-aj-bot button{min-height:48px;font-size:15px}
+  body.dlv-ajustando{overflow:hidden}
+}
+body.dlv-ajustando #tt-narr{display:none!important}
+.addr-pin-chip button{margin-left:auto;background:none;border:none;color:var(--text2);font-size:15px;cursor:pointer;font-family:inherit;line-height:1;padding:0 2px}

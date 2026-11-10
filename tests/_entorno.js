@@ -117,6 +117,29 @@ function trozo(rel, desde, hasta) {
   return t.slice(i, hasta ? j : undefined);
 }
 
+/* ★ TODO EL CÓDIGO DEL CLIENTE (Fase 2, 10/11/2026). El formulario y el
+   seguimiento se separaron en formulario.html, seguimiento.html y cliente/*
+   (CSS y JS compartidos). Las pruebas que miran «lo que corre en la página
+   del cliente» leen esto: el texto de todos, uno detrás de otro. */
+// En el orden en que el navegador los ejecuta: comun.js va antes que el
+// código de cada página (lo usan las dos).
+const CLIENTE = ['cliente/comun.js', 'formulario.html', 'seguimiento.html',
+  'cliente/seguimiento.js', 'cliente/cliente.css'];
+function cliente() {
+  return CLIENTE.map((f) => '\n/* ==== ' + f + ' ==== */\n' + leer(f)).join('\n');
+}
+function trozoCliente(desde, hasta) {
+  for (const f of CLIENTE) {
+    const t = leer(f);
+    const i = t.indexOf(desde);
+    if (i < 0) continue;
+    const j = hasta ? t.indexOf(hasta, i) : t.length;
+    if (hasta && j < 0) throw new Error('no se encontró el final "' + hasta + '" en ' + f);
+    return t.slice(i, hasta ? j : undefined);
+  }
+  throw new Error('no se encontró el inicio "' + desde + '" en el código del cliente');
+}
+
 /* Los bloques <script> sin src de un .html, concatenados. */
 function scriptsEnLinea(rel) {
   const re = /<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/g;
@@ -126,4 +149,4 @@ function scriptsEnLinea(rel) {
   return out;
 }
 
-module.exports = { RAIZ, leer, existe, cargar, trozo, scriptsEnLinea, domFalso };
+module.exports = {cliente, trozoCliente, CLIENTE, RAIZ, leer, existe, cargar, trozo, scriptsEnLinea, domFalso };

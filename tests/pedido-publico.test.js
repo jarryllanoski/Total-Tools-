@@ -86,7 +86,7 @@ module.exports = async ({bloque, ok}) => {
        campos que `formulario.html` usa DE VERDAD y se exige que estén
        permitidos. Si mañana la página lee uno nuevo y nadie lo añade aquí,
        esto falla — en vez de que el cliente vea un hueco en blanco. */
-    const pub = E.leer('formulario.html');
+    const pub = E.cliente();
     const leidos = [...new Set((pub.match(/\bship\.[a-zA-Z_]+/g) || [])
         .map((x) => x.slice(5)))];
     ok(leidos.length > 10, 'se encontraron los campos que lee la página (' +

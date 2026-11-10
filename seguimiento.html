@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Seguimiento de tu pedido</title>
+<!-- ★ SEGUIMIENTO DEL CLIENTE, EN SU PROPIA PÁGINA (Fase 2, 10/11/2026).
+     Antes vivía dentro de formulario.html y quien solo quería ver su pedido
+     descargaba el formulario entero. Esta página carga solo lo suyo:
+       · cliente/cliente.css y cliente/comun.js (compartidos con el formulario);
+       · cliente/seguimiento.js (lo propio);
+       · el telón de carga, y el narrador y Toby en diferido.
+     Sin App Check a propósito: pesa cientos de KB (reCAPTCHA) y retrasaba la
+     primera consulta, y el servidor no lo exige para el seguimiento (sí para
+     el DNI). Lo que protege el link es su token al azar y el freno por IP. -->
+<link rel="stylesheet" href="cliente/cliente.css?v=1">
+<link rel="preconnect" href="https://us-central1-total-tools-24ce8.cloudfunctions.net" crossorigin>
+<script src="functions/dniPedido.js?v=1"></script>
+</head>
+<body>
+<!-- El telón de carga, síncrono: TTLoader existe antes de la primera consulta. -->
+<script src="loading-screen.js?v=1"></script>
+<div class="container" id="app">
+  <div class="loading-screen"><div class="spin"></div><div class="spin-lbl">Cargando...</div></div>
+</div>
+
+<script src="cliente/comun.js?v=1"></script>
+<script src="cliente/seguimiento.js?v=1"></script>
+<script defer src="narrador/narrador.js?v=5"></script>
+<script defer src="narrador/toby.js?v=1"></script>
+</body>
+</html>

@@ -10,7 +10,7 @@ const E = require('./_entorno.js');
 const vm = require('vm');
 
 module.exports = async ({bloque, ok}) => {
-  const form = E.leer('formulario.html');
+  const form = E.cliente();
   const panel = E.leer('index.html');
   const tb = E.leer('narrador/toby.js');
   const ay = E.leer('ayuda.js');
@@ -55,7 +55,7 @@ module.exports = async ({bloque, ok}) => {
     ok(!/clave de recojo|shalomClave/i.test(todo.replace(/LA CLAVE DE RECOJO NO SE MENCIONA/g, '')), '⚠️ nunca menciona la clave de recojo');
     ok(/window\._trackEstado = ship\.status\|\|'';/.test(form) && /window\._trackNombre = ship\.name\|\|'';/.test(form),
        'usa lo que ya llegó al abrir el seguimiento (cero lecturas)');
-    const ab = form.slice(form.indexOf('function abrirAyudaTrack('), form.indexOf('function _courierLabel('));
+    const ab = form.slice(form.indexOf('function abrirAyudaTrack('), form.indexOf('function renderTracking('));
     ok(/_toby\(c\.toby, 'Guía de seguimiento'\)/.test(ab) && /ESTÁS AQUÍ/.test(ab), 'la ayuda del seguimiento lleva a Toby y marca el estado');
     ok(/const est = c\.actual<0 \? '' : \(i===c\.actual \? 'on' : \(i<c\.actual \? 'ok' : ''\)\);/.test(ab),
        'la fila actual se marca «on» y las anteriores con ✓');

@@ -222,7 +222,7 @@ module.exports = async ({bloque, ok}) => {
   bloque('Seguimiento del cliente: ya en Shalom, solo Shalom');
 
   {
-    const form = E.leer('formulario.html');
+    const form = E.cliente();
     ok(/const _enShalom = narr\.esShalom && !!\(ship\.shalomGuia \|\| ship\.trackingOrderNumber\);/.test(form),
        'con guía de Shalom se reconoce «ya en Shalom»');
     ok(/\$\{_enShalom \? '' : `<div class="tk-section">\s*<div class="tk-lbl">Estado actual<\/div>/.test(form),
@@ -235,8 +235,14 @@ module.exports = async ({bloque, ok}) => {
     const ctx = vm.createContext({esc: (x) => String(x).replace(/</g, '&lt;')});
     vm.runInContext(hn + src + ';this.C=_ayudaTrackContenido;', ctx);
     const r1 = ctx.C('agencia', true, '', 'ALISTADO', 'ANA', {estado: 'En tránsito'});
-    ok(/ya está en <b>Shalom<\/b>/.test(r1.toby) && /Shalom dice: <b>En tránsito<\/b>/.test(r1.toby) && r1.actual === -1,
-       'Toby dice el estado de Shalom y no marca la etiqueta del panel');
+    ok(/ya está en <b>Shalom<\/b>/.test(r1.toby) && /Shalom dice: <b>En tránsito<\/b>/.test(r1.toby),
+       'Toby dice el estado de Shalom');
+    ok(r1.estados.map((e) => e.t).join() === 'En origen,En camino,En destino,Entregado' &&
+       !r1.estados.some((e) => /ALISTADO/.test(e.t)), 'y la lista explica las etapas de Shalom, no las etiquetas del panel');
+    // Con la regla real de las fases, marca dónde va.
+    const fx = E.trozoCliente('function _shalomFase(estado){', 'function _shalomTrackingBlock(');
+    vm.runInContext(fx, ctx);
+    ok(ctx.C('agencia', true, '', 'ALISTADO', '', {estado: 'En tránsito'}).actual === 1, '«En tránsito» → marca «En camino»');
     const r2 = ctx.C('agencia', true, '', 'ALISTADO', '', null);
     ok(/ALISTADO/.test(r2.toby), 'sin guía, como siempre');
     ok(/Por tu privacidad, los datos de un pedido entregado hace tiempo/.test(form), 'el link viejo explica por qué ve poco');

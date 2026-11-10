@@ -18,7 +18,7 @@ const fs = require('fs');
 const path = require('path');
 
 module.exports = async ({bloque, ok}) => {
-  const form = E.leer('formulario.html');
+  const form = E.cliente();
 
   bloque('⚠️ El mapa elige por la MISMA puerta que la lista');
 

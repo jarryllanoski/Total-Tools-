@@ -12,7 +12,7 @@ const E = require('./_entorno.js');
 const vm = require('vm');
 
 module.exports = async ({bloque, ok}) => {
-  const form = E.leer('formulario.html');
+  const form = E.cliente();
   const trozo = (desde, hasta) => form.slice(form.indexOf(desde), form.indexOf(hasta, form.indexOf(desde)));
 
   bloque('Confirmar sin telón: el botón avanza y la etiqueta «se imprime»');
@@ -87,7 +87,9 @@ module.exports = async ({bloque, ok}) => {
   bloque('Carga más liviana');
 
   {
-    ok(!/\n<script src="loading-screen\.js/.test(form) && /has\('seg'\)\) document\.write\('<script src="loading-screen\.js\?v=1">/.test(form),
+    // Fase 2: el seguimiento tiene su propia página; el formulario no lo carga.
+    const fo = E.leer('formulario.html'), se = E.leer('seguimiento.html');
+    ok(!/loading-screen\.js/.test(fo) && /<script src="loading-screen\.js\?v=1"><\/script>/.test(se),
        'loading-screen.js solo en el seguimiento (y síncrono, sin carrera con TTLoader)');
     ok(/<link rel="preconnect" href="https:\/\/us-central1-total-tools-24ce8\.cloudfunctions\.net" crossorigin>/.test(form),
        'preconnect al servidor de pedidos');

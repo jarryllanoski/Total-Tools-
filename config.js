@@ -2548,6 +2548,11 @@ function getFormLink(){
   const base = window.location.origin + window.location.pathname.replace('index.html','').replace(/\/$/, '');
   return `${base}/formulario.html`;
 }
+/* El seguimiento vive en su propia página desde la Fase 2 (10/11/2026). Los
+   links viejos (formulario.html?seg=) siguen abriendo: se redirigen. */
+function getSeguimientoLink(){
+  return getFormLink().replace(/formulario\.html$/, 'seguimiento.html');
+}
 function updateShareLink(){
   const link = getFormLink();
   const el = document.getElementById('shareUrl');

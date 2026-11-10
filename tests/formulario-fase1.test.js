@@ -29,7 +29,7 @@ module.exports = async ({bloque, ok}) => {
 
        Por eso esto no compara textos sueltos: saca las cabeceras que la
        pagina manda DE VERDAD y las busca en la lista del servidor. */
-    const form = E.leer('formulario.html');
+    const form = E.cliente();
     const srv = E.leer('functions/index.js');
     const lista = (srv.match(
         /Access-Control-Allow-Headers",\s*\n?\s*"([^"]+)"/) || [])[1] || '';
@@ -55,7 +55,7 @@ module.exports = async ({bloque, ok}) => {
   bloque('App Check tambien en la pagina del cliente');
 
   {
-    const form = E.leer('formulario.html');
+    const form = E.cliente();
     ok(/<script src="appcheck\.js/.test(form), 'se carga appcheck.js');
     /* ⚠️ SE COMPARAN LAS ETIQUETAS <script>, NO EL TEXTO. Mi primera
        version uso `indexOf('appcheck.js')` y fallo: el comentario de
@@ -75,7 +75,7 @@ module.exports = async ({bloque, ok}) => {
     /* ⚠️ SIN TOKEN SE MANDA IGUAL. Hoy el servidor no lo exige: esto es una
        capa de MEDICION, y un cliente sin reCAPTCHA o sin red no puede
        quedarse sin pedir por ella. */
-    const form = E.leer('formulario.html');
+    const form = E.cliente();
     const i = form.indexOf('async function _api(');
     const fn = form.slice(i, i + 1400);
     ok(/if\(t\)\{/.test(fn) || /if\s*\(t\)/.test(fn),
@@ -97,7 +97,7 @@ module.exports = async ({bloque, ok}) => {
        aunque el orden de los campos, que es lo que comprueba, no habia
        cambiado nada. Una prueba que se rompe cuando algo que no mira se
        mueve es ruido: la proxima vez se arregla sin leerla. */
-    const form = E.leer('formulario.html');
+    const form = E.cliente();
     const trozos = form.split(/<div class="wz-step" data-step="/);
     const paso = trozos.find((t) => t.indexOf('id="f_dni"') > 0) || '';
     ok(!!paso, 'los tres campos viven en algun paso del asistente');
@@ -114,7 +114,7 @@ module.exports = async ({bloque, ok}) => {
     /* Los ids, los mensajes y las reglas son los de antes. Si un id
        cambiara, `submitOrder` leeria undefined y el pedido saldria sin ese
        dato — en silencio. */
-    const form = E.leer('formulario.html');
+    const form = E.cliente();
     ['f_dni', 'f_name', 'f_phone', 'err_dni', 'err_name', 'err_phone']
         .forEach((id) => {
           ok(form.indexOf('id="' + id + '"') > 0,
@@ -125,7 +125,7 @@ module.exports = async ({bloque, ok}) => {
   }
   {
     // Igual aqui: el bloque que valida el DNI, sea el numero que sea.
-    const form = E.leer('formulario.html');
+    const form = E.cliente();
     const todo = form.slice(form.indexOf('function wzValidate'),
         form.indexOf('} else if(step===3)'));
     const bloques = todo.split(/if\(step===\d\)\{/);
@@ -173,7 +173,7 @@ module.exports = async ({bloque, ok}) => {
        tercio del movil y tres campos debajo. Elegir como quiere recibir el
        pedido es la decision de la que cuelga todo lo demas: que se pregunta
        en el paso 3, y si hay paso 3 siquiera. */
-    const form = E.leer('formulario.html');
+    const form = E.cliente();
     const trozos = form.split(/<div class="wz-step" data-step="/);
     const nDe = (marca) => {
       const t = trozos.find((x) => x.indexOf(marca) > 0) || '';
@@ -190,7 +190,7 @@ module.exports = async ({bloque, ok}) => {
     /* ⚠️ LA VALIDACION SE MOVIO CON LA PANTALLA. Si no, el asistente
        validaria el paso equivocado y dejaria pasar un formulario vacio sin
        decir nada — el peor fallo posible aqui, porque no se ve. */
-    const form = E.leer('formulario.html');
+    const form = E.cliente();
     const todo = form.slice(form.indexOf('function wzValidate'),
         form.indexOf('} else if(step===3)'));
     const num = (marca) => {
@@ -207,7 +207,7 @@ module.exports = async ({bloque, ok}) => {
        'y el paso 2 valida los datos');
   }
   {
-    const form = E.leer('formulario.html');
+    const form = E.cliente();
     const i = form.indexOf('cs.addEventListener');
     const fn = form.slice(i, i + 300);
     ok(/_wzStep!==1/.test(fn),
@@ -216,7 +216,7 @@ module.exports = async ({bloque, ok}) => {
        'una pantalla que ya respondio');
   }
   {
-    const form = E.leer('formulario.html');
+    const form = E.cliente();
     const trozos = form.split(/<div class="wz-step" data-step="/);
     const p1 = trozos.find((x) => x.indexOf('id="courierCards"') > 0) || '';
     ok(p1.indexOf('wzBack()') < 0,
@@ -235,7 +235,7 @@ module.exports = async ({bloque, ok}) => {
   {
     /* Ninguna tarjeta nace elegida: con 1 courier o con 7, el cliente toca
        y avanza. Era la unica duda real del cambio de orden. */
-    const form = E.leer('formulario.html');
+    const form = E.cliente();
     ok(/role="radio" aria-checked="false"/.test(form),
        'ninguna tarjeta viene preseleccionada — no hay salto automatico ni ' +
        'pantalla trabada cuando solo hay un courier');

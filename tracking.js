@@ -1034,8 +1034,8 @@ Tracking.abrirManual = function() {
 
 /* ── copiarLink ──────────────────────────────────────────────────── */
 Tracking.copiarLink = function(id) {
-  var base = typeof getFormLink === 'function' ? getFormLink()
-    : window.location.origin + window.location.pathname.replace(/\/[^\/]*$/, '/formulario.html');
+  var base = typeof getSeguimientoLink === 'function' ? getSeguimientoLink()
+    : window.location.origin + window.location.pathname.replace(/\/[^\/]*$/, '/seguimiento.html');
   /* El token, no el id — ver functions/enlaceSeguimiento.js. Un pedido de
      ayer no tiene token y se cae a su id, que es justo lo que queremos: su
      link ya enviado sigue abriendo. */

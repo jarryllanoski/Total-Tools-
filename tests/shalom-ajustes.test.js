@@ -151,7 +151,7 @@ module.exports = async ({bloque, ok}) => {
   bloque('Con factura/boleta, el cliente ve ESE número en vez del código');
 
   {
-    const src = E.trozo('formulario.html', 'function _construirWaMsg(',
+    const src = E.trozoCliente('function _construirWaMsg(',
         'function _construirWaHref(');
     // eslint-disable-next-line no-new-func
     const msg = new Function('CFG', 'selDateLbl', 'selCourierType', 'location',
@@ -172,7 +172,7 @@ module.exports = async ({bloque, ok}) => {
     const raro = msg(Object.assign({nroComprobante: 'b<x>'}, base), '1', 't');
     ok(raro.indexOf('<x>') < 0, 'un número raro se filtra antes de escribirlo');
 
-    const trk = E.trozo('formulario.html', 'const _nroTk', 'Estado actual');
+    const trk = E.trozoCliente('const _nroTk', 'Estado actual');
     ok(/const tc\s*=\s*_nroTk \|\| codigoSeg/.test(trk),
        'la página de seguimiento usa el mismo número');
     ok(/_nroTk \? 'Factura \/ Boleta' : 'Código de seguimiento'/.test(trk),
