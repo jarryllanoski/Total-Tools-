@@ -454,14 +454,17 @@ function _shalomTrackingBlock(ship){
 function _datosNarrador(ship){
   const esShalom = !!(ship && /SHALOM/i.test(String(ship.courier||'')));
   const tipo = _tipoEnvioDe(ship && ship.courier);
-  let shalomSt = null;
+  let shalomSt = null, shalomFase = null;
   if(esShalom){
     const f = _shalomFase((ship.trackingStatus||'').trim());
-    if(f.idx >= 0 && (ship.trackingStatus||'').trim()) shalomSt = [2,2,3,4][f.idx];
+    if(f.idx >= 0 && (ship.trackingStatus||'').trim()){ shalomSt = [2,2,3,4][f.idx]; shalomFase = f.idx; }
   }
+  /* Ya en Shalom (con guía): la etiqueta del panel no se muestra, así que
+     el narrador necesita saberlo por aquí (11/11/2026: Delfi se callaba). */
+  const enShalom = esShalom && !!(ship && (ship.shalomGuia || ship.trackingOrderNumber));
   const cc = (CFG && (CFG.config || CFG)) || {};
   const tiendaDir = tipo==='retiro' ? String(cc.city||'').trim() : '';
-  return {tipo, esShalom, shalomSt, tiendaDir};
+  return {tipo, esShalom, enShalom, shalomSt, shalomFase, tiendaDir};
 }
 
 function renderTrackResult(ship, code){
@@ -516,7 +519,7 @@ function renderTrackResult(ship, code){
     <div id="refreshRow" class="refresh-row">
       <span class="refresh-lbl">🔄 Se actualiza automáticamente</span>
     </div>
-    <div class="track-card" data-tipo="${esc(narr.tipo)}"${narr.shalomSt!==null?` data-shalom-st="${narr.shalomSt}"`:''}${narr.tiendaDir?` data-tienda-dir="${esc(narr.tiendaDir)}"`:''}>
+    <div class="track-card" data-tipo="${esc(narr.tipo)}"${narr.enShalom?' data-en-shalom="1"':''}${narr.shalomFase!==null?` data-shalom-fase="${narr.shalomFase}"`:''}${narr.shalomSt!==null?` data-shalom-st="${narr.shalomSt}"`:''}${narr.tiendaDir?` data-tienda-dir="${esc(narr.tiendaDir)}"`:''}>
       <div class="tk-section">
         <div class="tk-lbl">${_nroTk ? 'Factura / Boleta' : 'Código de seguimiento'}</div>
         <div style="font-size:22px;font-weight:700;color:var(--purple);letter-spacing:${_nroTk ? '1px' : '3px'};word-break:break-all">${_nroTk ? '' : '#'}${esc(tc)}</div>

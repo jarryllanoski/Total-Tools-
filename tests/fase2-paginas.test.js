@@ -100,4 +100,34 @@ module.exports = async ({bloque, ok}) => {
     ok(/if\(segTok\)\{ loadCfgThenTrack\(segTok\); return; \}\s*location\.replace\('formulario\.html' \+ location\.hash\);/.test(sj),
        'seguimiento.html sin ?seg= → formulario.html');
   }
+
+  bloque('Delfi habla cuando el pedido ya está en Shalom (11/11/2026)');
+
+  {
+    // El narrador real, con una página mínima: la tarjeta del seguimiento.
+    const card = {attrs: {}, getAttribute(k) { return this.attrs[k] == null ? null : String(this.attrs[k]); }};
+    const app = {textContent: '', querySelector: (sel) => {
+      if (sel === '.status-badge') return null;   // ya en Shalom: sin etiqueta del panel
+      const m = sel.match(/^\.track-card\[(data-[\w-]+)\]$/);
+      return m && card.attrs[m[1]] != null ? card : null;
+    }, querySelectorAll: () => []};
+    const win = {addEventListener() {}};
+    const ctx = vm.createContext({window: win, navigator: {}, MutationObserver: function() { this.observe = () => {}; },
+      document: {getElementById: (id) => (id === 'app' ? app : null), currentScript: null, readyState: 'loading',
+        addEventListener() {}}, setTimeout: () => 0, clearTimeout() {}});
+    vm.runInContext(E.leer('narrador/narrador.js'), ctx);
+    const N = win.__ttNarrador;
+    card.attrs = {'data-en-shalom': '1'};
+    const e1 = N.estadoATexto();
+    ok(e1 && e1.registrado && /registrado en Shalom/.test(N.mensajeDelfi(e1, 'agencia', {})),
+       'con guía y sin estado de Shalom aún: «Tu envío ya está registrado en Shalom»');
+    card.attrs = {'data-en-shalom': '1', 'data-shalom-st': '2', 'data-shalom-fase': '0'};
+    ok(/agencia de salida/.test(N.mensajeDelfi(N.estadoATexto(), 'agencia', {shalom: true})), '«En origen»: lo recibieron en la agencia de salida');
+    card.attrs = {'data-en-shalom': '1', 'data-shalom-st': '3', 'data-shalom-fase': '2'};
+    ok(/llegó a la agencia/.test(N.mensajeDelfi(N.estadoATexto(), 'agencia', {shalom: true})), '«En destino»: acércate a recogerlo');
+    card.attrs = {};
+    ok(N.estadoATexto() === null, 'sin etiqueta y sin Shalom: no inventa nada');
+    ok(/data-en-shalom="1"/.test(sj) && /data-shalom-fase=/.test(sj), 'el seguimiento le publica a Delfi que ya está en Shalom');
+  }
 };
+

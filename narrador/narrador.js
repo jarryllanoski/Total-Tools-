@@ -66,6 +66,10 @@
        otra agencia no tienen rastreo en vivo. */
     s2:'¡Ya salió de nuestra tienda! 🚚 Tu pedido viaja hacia la agencia de destino.',
     s2_shalom:'¡Ya salió de nuestra tienda! 🚚 Tu pedido viaja con Shalom; mira su recorrido en el bloque de Shalom.',
+    /* Ya en Shalom (11/11/2026). Sin estos, Delfi se callaba: la etiqueta
+       del panel ya no se muestra cuando el envío está en Shalom. */
+    s_shalom_registrado:'Tu envío ya está registrado en Shalom. 📦 En cuanto lo reciban en la agencia, aquí verás cada avance.',
+    s_shalom_origen:'¡Tu pedido ya está en Shalom! 📦 Lo recibieron en la agencia de salida y pronto viaja hacia tu ciudad.',
     s2_delivery:'¡Ya salió! 🛵 Nuestro motorizado lleva tu pedido hacia tu dirección.',
     s2_encomienda:function(ci){ return 'Dejamos tu pedido en la agencia; ya viaja'+(ci?' a '+ci:'')+'. 📦'; },
     /* Retiro en tienda: ALISTADO ya significa «pasa a recoger». La dirección
@@ -188,7 +192,14 @@
   function estadoATexto(){
     // status-badge muestra el estado; lo mapeo a las 5 etapas reales
     var badge = txt('.status-badge').toUpperCase();
-    if(!badge) return null;
+    /* Ya en Shalom: no hay etiqueta del panel; manda la etapa de Shalom. */
+    if(!badge){
+      var cs = app.querySelector('.track-card[data-en-shalom]');
+      if(!cs) return null;
+      var s2 = parseInt(cs.getAttribute('data-shalom-st'), 10);
+      if(isNaN(s2)) return {st:1, registrado:true, shalom:true};
+      return {st:s2, shalom:true, origen: cs.getAttribute('data-shalom-fase') === '0'};
+    }
     var base;
     if(/FINALIZADO|ENTREGADO/.test(badge)) base={st:4};
     else if(/PENDIENTE DE PAGO/.test(badge)) base={st:3, pago:true};
@@ -267,6 +278,8 @@
      las pruebas. ⚠️ Nunca menciona la clave de recojo. */
   function mensajeDelfi(e, t, d){
     d = d || {};
+    if(e.registrado) return DELFI.s_shalom_registrado;
+    if(e.origen && e.st===2) return DELFI.s_shalom_origen;
     if(e.st===0) return DELFI.welcome+' '+DELFI.s0;
     if(t==='retiro' && (e.alistado || e.st===2 || (e.st===3 && !e.pago))) return DELFI.s_retiro_listo(d.tiendaDir);
     if(e.st===1) return DELFI.s1;
