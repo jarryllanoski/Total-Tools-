@@ -229,18 +229,12 @@ function brandFooterHtml(){
     </div>`;
 }
 
-/* Código de seguimiento — MISMA fórmula que la etiqueta (print.js _codigoEnvio):
-   pedidos de 2026-08-08 en adelante → 6 dígitos; antiguos → 4 dígitos. Así el
-   código del WhatsApp, del seguimiento y de la etiqueta son idénticos. Un pedido
-   recién creado (sin createdAt aún) se trata como nuevo (es de hoy). */
-var _CODIGO_CUTOFF='2026-08-08';
-
+/* Código de seguimiento — la regla vive en functions/codigoSeguimiento.js, la
+   MISMA que usa la etiqueta impresa (Fase 6, 11/11/2026): el código del
+   WhatsApp, del seguimiento y de la etiqueta salen de un solo sitio. */
 function codigoSeg(id, createdAt){
-  var idNum=String(id||'').replace(/\D/g,'');
-  var fecha=(createdAt||'').slice(0,10);
-  var nuevo=fecha ? (fecha>=_CODIGO_CUTOFF) : true;
-  if(nuevo && idNum) return idNum.slice(-6);          // 6 dígitos
-  return String(id||'').slice(-4).toUpperCase();       // antiguos: 4 dígitos
+  return window.CodigoSeguimiento ? window.CodigoSeguimiento.de(id, createdAt)
+    : String(id||'').slice(-4).toUpperCase();
 }
 
 /* El TIPO de envío de un courier: agencia · encomienda · retiro · delivery.

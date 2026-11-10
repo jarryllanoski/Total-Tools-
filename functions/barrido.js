@@ -47,6 +47,8 @@ const GUIA_OK = /^(?:[0-9]{8}|1[0-9]{8})$/;
 
 // La formula de las etiquetas. La MISMA que usa el panel.
 const etiquetas = require("./etiquetas");
+// Qué significa lo que dice Shalom: la MISMA regla en todos lados (Fase 6).
+const shalomEstado = require("./shalomEstado");
 
 /**
  * Ajusta una hora a la ranura de 30 minutos más cercana.
@@ -145,7 +147,7 @@ function aConsultar(pedidos, ahora) {
     if (String(p.status || "").trim().toUpperCase() === "FINALIZADO") {
       saltados.finalizados++; return;
     }
-    if (/ENTREGAD/i.test(String(p.trackingStatus || ""))) {
+    if (shalomEstado.rango(p.trackingStatus) === 3) {
       saltados.yaEntregados++; return;
     }
     /* ⏰ GUÍA MUERTA (11/11/2026). Registrada por Shalom Pro hace más de

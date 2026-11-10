@@ -319,31 +319,34 @@ function _copyGuia(btn){
 
 /* Deriva la fase del recorrido a partir del estado LITERAL de Shalom.
    El estado se muestra tal cual (exacto); la fase solo define color, icono,
-   posicion en el stepper y si corresponde una pildora de indicacion. */
+   posicion en el stepper y si corresponde una pildora de indicacion.
+   ★ Fase 6 (11/11/2026): QUÉ etapa es lo decide functions/shalomEstado.js,
+   la MISMA regla con la que el panel mueve las etiquetas. Aquí solo queda
+   cómo se VE cada etapa. Antes había dos reglas y «En reparto» salía aquí
+   como «en camino» con el panel ya en LLEGÓ A DESTINO. */
+var _FASE_VISTA = [
+  {color:'var(--blue)', bg:'rgba(79,142,247,.08)', bd:'rgba(79,142,247,.22)',
+    ic:'\ud83d\udce6', sub:'Tu paquete fue recibido por Shalom y ser\u00e1 enviado pronto.', pill:null},
+  {color:'var(--blue)', bg:'rgba(79,142,247,.10)', bd:'rgba(79,142,247,.26)',
+    ic:'\ud83d\ude9a', sub:'Tu paquete ya sali\u00f3 y viaja hacia la agencia de destino.', pill:null},
+  {color:'var(--purple)', bg:'rgba(167,139,250,.12)', bd:'rgba(167,139,250,.32)',
+    ic:'\ud83d\udce6', sub:'Tu paquete ya est\u00e1 en la agencia Shalom de destino.', pill:'destino'},
+  {color:'var(--green)', bg:'rgba(34,197,94,.10)', bd:'rgba(34,197,94,.28)',
+    ic:'\u2705', sub:'Tu paquete fue recogido. \u00a1Gracias por tu compra!', pill:null}
+];
 function _shalomFase(estado){
-  var s = (estado||'').toString().toUpperCase();
-  if(/ENTREG|RECOGID|(RECEP|RECIB).+DESTINAT|CULMIN/.test(s)){
-    return {idx:3, color:'var(--green)', bg:'rgba(34,197,94,.10)', bd:'rgba(34,197,94,.28)',
-      ic:'\u2705', sub:'Tu paquete fue recogido. \u00a1Gracias por tu compra!', pill:null};
+  var f = window.ShalomEstado ? window.ShalomEstado.fase(estado) : {idx:-1, demora:false};
+  if(f.idx < 0){
+    return {idx:-1, color:'var(--text2)', bg:'rgba(107,114,128,.08)', bd:'var(--bd)',
+      ic:'\ud83d\udce6', sub:'', pill:null};
   }
-  if(/DEMOR|RETRAS/.test(s)){
-    return {idx:1, color:'var(--blue)', bg:'rgba(79,142,247,.10)', bd:'rgba(79,142,247,.26)',
-      ic:'\ud83d\ude9a', sub:'Tu paquete tuvo una demora, pero sigue en camino a destino.', pill:null};
+  var v = Object.assign({idx:f.idx}, _FASE_VISTA[f.idx]);
+  if(f.demora) v.sub = 'Tu paquete tuvo una demora, pero sigue en camino a destino.';
+  /* «En reparto»: ya salió de la agencia de destino hacia el cliente. */
+  if(f.reparto){
+    v.sub = 'Tu paquete sali\u00f3 de la agencia de destino y va en reparto.'; v.pill = null;
   }
-  if(/TRANSIT|TR\u00c1NSIT|CAMINO|RUTA|TRASLAD|VIAJ|HACIA|REPARTO|DESPACH/.test(s)){
-    return {idx:1, color:'var(--blue)', bg:'rgba(79,142,247,.10)', bd:'rgba(79,142,247,.26)',
-      ic:'\ud83d\ude9a', sub:'Tu paquete ya sali\u00f3 y viaja hacia la agencia de destino.', pill:null};
-  }
-  if(/DESTINO|DISPONIBLE|RECOJO|LLEG/.test(s)){
-    return {idx:2, color:'var(--purple)', bg:'rgba(167,139,250,.12)', bd:'rgba(167,139,250,.32)',
-      ic:'\ud83d\udce6', sub:'Tu paquete ya est\u00e1 en la agencia Shalom de destino.', pill:'destino'};
-  }
-  if(/ORIGEN|REGISTR|RECEP|RECIB|ADMITID|EMITID/.test(s)){
-    return {idx:0, color:'var(--blue)', bg:'rgba(79,142,247,.08)', bd:'rgba(79,142,247,.22)',
-      ic:'\ud83d\udce6', sub:'Tu paquete fue recibido por Shalom y ser\u00e1 enviado pronto.', pill:null};
-  }
-  return {idx:-1, color:'var(--text2)', bg:'rgba(107,114,128,.08)', bd:'var(--bd)',
-    ic:'\ud83d\udce6', sub:'', pill:null};
+  return v;
 }
 
 function _shalomTrackingBlock(ship){

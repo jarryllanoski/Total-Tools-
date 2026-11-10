@@ -21,8 +21,9 @@ const E = require('./_entorno.js');
 
 /* La etiqueta: el trozo real de print.js, del código al pie, más `esc`. */
 function cargarEtiqueta() {
-  const win = {PrintModule: {}, NroComprobante: N, DniPedido: DP};
-  const src = E.trozo('print.js', 'var _CODIGO_CUTOFF', '/* ── FORMATO 2') +
+  const win = {PrintModule: {}, NroComprobante: N, DniPedido: DP,
+    CodigoSeguimiento: require('../functions/codigoSeguimiento.js')};
+  const src = E.trozo('print.js', '/* Código de envío para la etiqueta.', '/* ── FORMATO 2') +
     E.trozo('print.js', 'function esc(s){', 'window.esc = esc;');
   // eslint-disable-next-line no-new-func
   return new Function('window', 'NroComprobante', 'DniPedido',
@@ -250,8 +251,9 @@ module.exports = async ({bloque, ok}) => {
       // Segunda defensa: aunque el módulo un día dejara pasar algo, la
       // etiqueta escapa por su cuenta.
       const crudo = Object.assign({}, N, {de: () => '<b>X</b>'});
-      const win = {PrintModule: {}, NroComprobante: crudo, DniPedido: DP};
-      const src = E.trozo('print.js', 'var _CODIGO_CUTOFF', '/* ── FORMATO 2') +
+      const win = {PrintModule: {}, NroComprobante: crudo, DniPedido: DP,
+        CodigoSeguimiento: require('../functions/codigoSeguimiento.js')};
+      const src = E.trozo('print.js', '/* Código de envío para la etiqueta.', '/* ── FORMATO 2') +
         E.trozo('print.js', 'function esc(s){', 'window.esc = esc;');
       // eslint-disable-next-line no-new-func
       const pie = new Function('window', 'NroComprobante', 'DniPedido',

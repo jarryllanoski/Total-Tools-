@@ -31,7 +31,8 @@ function formulario(CFG) {
   // eslint-disable-next-line no-new-func
   return new Function('CFG', 'esc', 'window', 'DniPedido',
       src + ';return {_tipoEnvioDe, _datosNarrador, _shalomTrackingBlock, _ayudaTrackContenido};',
-  )(CFG, esc, {DniPedido: require('../functions/dniPedido.js')},
+  )(CFG, esc, {DniPedido: require('../functions/dniPedido.js'),
+    ShalomEstado: require('../functions/shalomEstado.js')},
       require('../functions/dniPedido.js'));
 }
 

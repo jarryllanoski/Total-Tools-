@@ -232,7 +232,8 @@ module.exports = async ({bloque, ok}) => {
     const i = form.indexOf('function _ayudaTrackContenido(');
     const src = form.slice(i, form.indexOf('function abrirAyudaTrack(', i));
     const hn = form.slice(form.indexOf('function _holaNombre('), form.indexOf('/* La hoja de ayuda'));
-    const ctx = vm.createContext({esc: (x) => String(x).replace(/</g, '&lt;')});
+    const ctx = vm.createContext({esc: (x) => String(x).replace(/</g, '&lt;'),
+      window: {ShalomEstado: require('../functions/shalomEstado.js')}});
     vm.runInContext(hn + src + ';this.C=_ayudaTrackContenido;', ctx);
     const r1 = ctx.C('agencia', true, '', 'ALISTADO', 'ANA', {estado: 'En tránsito'});
     ok(/ya está en <b>Shalom<\/b>/.test(r1.toby) && /Shalom dice: <b>En tránsito<\/b>/.test(r1.toby),
@@ -240,7 +241,7 @@ module.exports = async ({bloque, ok}) => {
     ok(r1.estados.map((e) => e.t).join() === 'En origen,En camino,En destino,Entregado' &&
        !r1.estados.some((e) => /ALISTADO/.test(e.t)), 'y la lista explica las etapas de Shalom, no las etiquetas del panel');
     // Con la regla real de las fases, marca dónde va.
-    const fx = E.trozoCliente('function _shalomFase(estado){', 'function _shalomTrackingBlock(');
+    const fx = E.trozoCliente('var _FASE_VISTA = [', 'function _shalomTrackingBlock(');
     vm.runInContext(fx, ctx);
     ok(ctx.C('agencia', true, '', 'ALISTADO', '', {estado: 'En tránsito'}).actual === 1, '«En tránsito» → marca «En camino»');
     const r2 = ctx.C('agencia', true, '', 'ALISTADO', '', null);

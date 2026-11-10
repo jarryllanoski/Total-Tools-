@@ -77,6 +77,18 @@ con el servidor siguen en `functions/*.js` (capa 1 de § 5).
    línea y `E.leer('config.js')` sus diez módulos: lo que ejecuta el
    navegador. `E.leerReal()` lee el archivo tal cual.
 
+### Reglas que viven en UN solo archivo (Fase 6, 11/11/2026)
+
+| Regla | Archivo | La usan |
+|---|---|---|
+| Qué etapa es cada texto de Shalom (origen · camino · destino · entregado; la demora es bandera) | `functions/shalomEstado.js` | etiquetas automáticas (panel y barrido), seguimiento del cliente, Delfi |
+| El código corto del pedido (#123456 / 4 caracteres en los antiguos) | `functions/codigoSeguimiento.js` | WhatsApp de confirmación, link de seguimiento, etiqueta impresa |
+
+`tests/fase6-reglas.test.js` comprueba que panel y cliente den lo mismo para
+cada texto, y **falla si alguien escribe otra copia** en cualquier archivo.
+Divergencias que había: «En reparto» (panel: destino · cliente: «en
+camino») y el código de un pedido antiguo sin fecha (etiqueta 4 · link 6).
+
 ### Lo que sigue (etapas siguientes)
 
 Llevar cada módulo a su capa de § 5: `nube.js` → `datos/`; las reglas que hoy

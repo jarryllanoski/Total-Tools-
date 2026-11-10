@@ -350,7 +350,6 @@ window.PrintModule = {
    · Pedidos de 2026-08-08 en adelante: 6 dígitos (más únicos que 4 y más legibles
      que un alfanumérico). Determinístico: mismo pedido → mismo código (reimprimir
      da igual), sin guardar nada nuevo en la base. */
-var _CODIGO_CUTOFF = '2026-08-08';
 /* ★ Desde el 26/10/2026: si el pedido tiene N° de factura/boleta, ESE es su
    código (etiqueta, QR, escáner). Sin número, el de siempre. La regla del
    número vive en functions/nroComprobante.js. */
@@ -362,12 +361,10 @@ function _codigoEnvio(s){
 // etiqueta impresa antes de poner la factura tiene que seguir sirviendo.
 function _codigoBase(s){
   if(!s || !s.id) return '???';
-  var esNuevo = ((s.createdAt||'').slice(0,10) >= _CODIGO_CUTOFF);
-  var idNum = String(s.id).replace(/\D/g,'');
-  if(esNuevo && idNum){
-    return idNum.slice(-6);                       // 6 dígitos (desde el corte)
-  }
-  return String(s.id).slice(-4).toUpperCase();    // antiguos: 4 dígitos
+  /* Fase 6 (11/11/2026): la regla vive en functions/codigoSeguimiento.js,
+     la MISMA del WhatsApp y del link de seguimiento. */
+  return window.CodigoSeguimiento ? window.CodigoSeguimiento.de(s.id, s.createdAt)
+    : String(s.id).slice(-4).toUpperCase();
 }
 /* ★ ¿SE IMPRIMIÓ? UNA SOLA RESPUESTA. `printed` lo pone print() al generar
    la etiqueta y viaja a la nube; es lo que contaba «Nuevos» y la campana

@@ -28,11 +28,12 @@
 /* global globalThis, window */
 (function(raiz, fabrica) {
   if (typeof module === "object" && module.exports) {
-    module.exports = fabrica();
+    module.exports = fabrica(require("./shalomEstado"));
   } else {
-    raiz.Etiquetas = fabrica();
+    // En el navegador, functions/shalomEstado.js se carga ANTES.
+    raiz.Etiquetas = fabrica(raiz.ShalomEstado);
   }
-})(typeof globalThis !== "undefined" ? globalThis : window, () => {
+})(typeof globalThis !== "undefined" ? globalThis : window, (ShalomEstado) => {
   /** El orden del recorrido. Su ÍNDICE es lo que define "avanzar". */
   const ESCALERA = ["NUEVO PEDIDO", "EN PROCESO", "POR ALISTAR", "ALISTADO",
     "ENVIADO", "LLEGÓ A DESTINO", "PENDIENTE DE PAGO", "FINALIZADO"];
@@ -59,19 +60,13 @@
    * @return {?number} 0..3 o null
    */
   function rangoDeTexto(texto) {
-    const u = String(texto || "").toUpperCase()
-        .normalize("NFD").replace(/[̀-ͯ]/g, "");
-    if (!u.trim()) return null;
-    if (u.indexOf("DEMORA") >= 0 || u.indexOf("RETRAS") >= 0) return null;
-    if (u.indexOf("ENTREGAD") >= 0) return 3;
-    if (u.indexOf("REPART") >= 0) return 2;
-    if (u.indexOf("DESTINO") >= 0 || u.indexOf("AGENCIA") >= 0 ||
-        u.indexOf("RECOJO") >= 0 || u.indexOf("RECOGER") >= 0) return 2;
-    if (u.indexOf("TRANSITO") >= 0 || u.indexOf("CAMINO") >= 0 ||
-        u.indexOf("RUTA") >= 0) return 1;
-    if (u.indexOf("ORIGEN") >= 0 || u.indexOf("REGISTRAD") >= 0) return 0;
-    return null;
+    /* Fase 6 (11/11/2026): la regla vive en functions/shalomEstado.js, la
+       MISMA que usa el seguimiento del cliente. Antes había dos, y «En
+       reparto» movía la etiqueta a destino mientras al cliente le decía
+       «en camino». */
+    return ShalomEstado.rango(texto);
   }
+
 
   /**
    * ¿Le queda saldo por cobrar? `cost` es lo que ya calcula el formulario

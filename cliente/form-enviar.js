@@ -223,7 +223,7 @@ async function submitOrder(){
     // La «impresión» se ve al menos 0,9 s: si el servidor responde al
     // instante, el sello no cae antes de que se entienda qué pasa.
     const espera=Math.max(0, 900-(Date.now()-t0));
-    setTimeout(function(){ showInlineConfirmed(order, codigoSeg(order.id, order.createdAt), resp.trackToken); }, espera);
+    setTimeout(function(){ showInlineConfirmed(order, codigoSeg(order.id, order.createdAt || new Date().toISOString()), resp.trackToken); }, espera);
   }catch(e){
     _confFallo(btn);
     const eb=$('submitErrBox');
