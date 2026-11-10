@@ -1,4 +1,8 @@
 /**
+ * panel/pantalla/seleccion.js — qué pedidos están marcados en ESTE dispositivo
+ * Fase 7 (11/11/2026): movido de la raíz a su capa, sin cambiar una línea.
+ */
+/**
  * seleccion.js — Qué pedidos están marcados, en ESTE dispositivo
  * ==============================================================
  * Un solo dueño de la selección, igual que shalom.js lo es del rastreo.

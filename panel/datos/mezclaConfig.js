@@ -1,3 +1,7 @@
+/**
+ * panel/datos/mezclaConfig.js — mezclar la configuración entre equipos
+ * Fase 7 (11/11/2026): movido de la raíz a su capa, sin cambiar una línea.
+ */
 "use strict";
 
 /**

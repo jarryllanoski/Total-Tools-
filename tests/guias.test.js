@@ -191,5 +191,5 @@ module.exports = async ({bloque, ok}) => {
      'en el formulario del pedido');
   ok(/Guias\.vigilar\('trkOrdNum'/.test(trk),
      'y en el modal de seguimiento — si solo estuviera en uno, se colaría por el otro');
-  ok(E.leer('index.html').indexOf('guias.js?v=') > 0, 'y el archivo se carga');
+  ok(E.leerReal('index.html').indexOf('panel/shalom/guias.js?v=') > 0, 'y el archivo se carga');
 };

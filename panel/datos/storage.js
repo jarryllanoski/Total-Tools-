@@ -1,4 +1,8 @@
 /**
+ * panel/datos/storage.js — subir archivos a Firebase Storage
+ * Fase 7 (11/11/2026): movido de la raíz a su capa, sin cambiar una línea.
+ */
+/**
  * storage.js — Firebase Storage para Total Tools
  * ================================================
  * Sube documentos (guía, embalado, ticket) a Firebase Storage

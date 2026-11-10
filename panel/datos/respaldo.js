@@ -1,4 +1,8 @@
 /**
+ * panel/datos/respaldo.js — respaldo y restauración
+ * Fase 7 (11/11/2026): movido de la raíz a su capa, sin cambiar una línea.
+ */
+/**
  * respaldo.js — Módulo de Respaldo y Restauración para Total Tools
  *
  * OBJETIVO: respaldar y restaurar TODO el estado de la app (S) en un archivo

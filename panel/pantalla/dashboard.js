@@ -1,4 +1,8 @@
 /**
+ * panel/pantalla/dashboard.js — métricas del negocio
+ * Fase 7 (11/11/2026): movido de la raíz a su capa, sin cambiar una línea.
+ */
+/**
  * dashboard.js — Panel de métricas Total Tools
  * Activación: doble-tap en el nombre del negocio (hdrName)
  * Lee S.shipments desde memoria — cero llamadas a Firebase

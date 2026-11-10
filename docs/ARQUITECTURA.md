@@ -33,9 +33,21 @@ Capas: `datos/` (lo único que habla con Firestore, y el estado) ·
 `pedidos/` · `shalom/` · `compartir/` · `config/` (el negocio) ·
 `pantalla/` (pintar y navegar). **Datos no llama hacia arriba:** cuando
 algo cambia, avisa con un evento (`tt:config-cambiada`) y la pantalla
-repinta. Pendiente conocido: `datos/estado.js` todavía llama a `render()` y
-`toast()` en algunos puntos; moverlos a eventos es tocar lógica y se hará
-aparte, con su prueba.
+repinta. Lo mismo `datos/estado.js` (11/11/2026): ya no pinta ni muestra
+mensajes; avisa con `tt:nube-sincronizada`, `tt:nube-lista` y `tt:aviso`, y
+`pantalla/inicio.js` los atiende. Lo que se avisa antes de que la pantalla
+escuche queda en cola y se entrega después: no se pierde ningún aviso.
+
+**Los .js que estaban sueltos en la raíz** también están en su capa:
+`datos/` storage · fotos · respaldo · mezclaConfig · errores ·
+`pantalla/` floatpanel · seleccion · voz · dashboard · ayuda · whatsapp ·
+`pedidos/` print · notify · delivery · `shalom/` shalom · tracking ·
+qrtracking · ticket · guias · agencias-extractor · `config/` recursos ·
+cotizacion. En la raíz quedan solo los compartidos con las páginas del
+cliente o de infraestructura: `firebase-config.js`, `appcheck.js`, `auth.js`,
+`loading-screen.js` (y `medir-registro.js`, herramienta que no se carga).
+Las pruebas los siguen nombrando por su nombre corto: `tests/_entorno.js`
+traduce (`MOVIDOS`).
 
 | Módulo | Qué hace | Venía de |
 |---|---|---|

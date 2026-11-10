@@ -7,7 +7,7 @@
 <script src="firebase-config.js?v=4"></script>
 <!-- errores.js va PRONTO: engancha window.onerror, así que cuanto antes
      cargue, más fallos atrapa. No depende de nada. -->
-<script src="errores.js?v=1"></script>
+<script src="panel/datos/errores.js?v=1"></script>
 <!-- seleccion.js TAMBIÉN va pronto, y no por gusto: el script en línea de
      más abajo llama a Seleccion._pintarBoton() en cada repintado. Cargándolo
      al final del body había una ventana real —un repintado en el primer
@@ -15,11 +15,11 @@
      ReferenceError y ABORTABA EL RENDER ENTERO: cero tarjetas. Pasó en una
      recarga forzada, con todo bajando de red a la vez.
      No depende de nada al cargar: solo define window.Seleccion. -->
-<script src="seleccion.js?v=1"></script>
+<script src="panel/pantalla/seleccion.js?v=1"></script>
 <!-- guias.js: avisos del número de guía. Lógica pura + un pintor; no
      depende de nada al cargar. Lo usan config.js (formulario) y tracking.js
      (modal de seguimiento). -->
-<script src="guias.js?v=2"></script>
+<script src="panel/shalom/guias.js?v=2"></script>
 <!-- ⚠️ SÍ, ESTE ARCHIVO ESTÁ EN functions/ Y NO ES UN ERROR.
      Es la fórmula de qué etiqueta le toca a un pedido, y la usan LOS DOS: este
      panel y el barrido programado del servidor. Una copia en cada lado
@@ -34,13 +34,13 @@
 <script src="functions/registroShalom.js?v=5"></script>
 <script src="functions/dniPedido.js?v=1"></script>
 <script src="functions/sincro.js?v=1"></script>
-<script src="mezclaConfig.js?v=1"></script>
+<script src="panel/datos/mezclaConfig.js?v=1"></script>
 <script src="functions/nroComprobante.js?v=2"></script>
 <script src="functions/montoPedido.js?v=1"></script>
 <script src="functions/fechaPedido.js?v=1"></script>
 <script src="appcheck.js?v=2"></script>
 <!-- FIREBASE via REST API — sin SDK, funciona en Brave/Chrome/Firefox/Safari -->
-<script src="panel/datos/nube.js?v=2"></script>
+<script src="panel/datos/nube.js?v=3"></script>
 <link rel="stylesheet" href="panel.css?v=11">
 </head>
 <body>
@@ -1060,7 +1060,8 @@
 <script src="auth.js?v=10"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
-<script src="panel/datos/estado.js?v=2"></script>
+<script src="panel/datos/estado.js?v=3"></script>
+<script src="panel/pantalla/whatsapp.js?v=1"></script>
 <script src="panel/pantalla/navegacion.js?v=1"></script>
 <script src="panel/pantalla/lista.js?v=1"></script>
 <script src="panel/shalom/shalom-ajustes.js?v=2"></script>
@@ -1069,10 +1070,10 @@
 <script src="panel/config/proveedores.js?v=1"></script>
 <script src="panel/pedidos/estados-papelera.js?v=1"></script>
 <script src="panel/pantalla/escaner.js?v=1"></script>
-<script src="panel/pantalla/inicio.js?v=2"></script>
+<script src="panel/pantalla/inicio.js?v=3"></script>
 <!-- ★ SHALOM tracking — cargado al final -->
-<script src="storage.js?v=6"></script>
-<script src="fotos.js?v=1"></script>
+<script src="panel/datos/storage.js?v=6"></script>
+<script src="panel/datos/fotos.js?v=1"></script>
 <!-- seleccion.js ya se cargó en la cabecera, ANTES del script en línea que
      lo usa. config.js, print.js y voz.js preguntan por los pedidos marcados,
      así que siguen yendo detrás. El orden de carga es un contrato
@@ -1087,22 +1088,22 @@
 <script src="panel/compartir/excel.js?v=1"></script>
 <script src="panel/compartir/links-tokens.js?v=1"></script>
 <script src="panel/config/configuracion.js?v=1"></script>
-<script src="print.js?v=21"></script>
-<script src="notify.js?v=7"></script>
-<script src="shalom.js?v=35"></script>
-<script src="tracking.js?v=25"></script>
-<script src="floatpanel.js?v=4"></script>
-<script src="delivery.js?v=9"></script>
-<script src="qrtracking.js?v=3"></script>
-<script src="ticket.js?v=8"></script>
-<script src="agencias-extractor.js?v=11"></script>
-<script src="respaldo.js?v=2"></script>
+<script src="panel/pedidos/print.js?v=21"></script>
+<script src="panel/pedidos/notify.js?v=7"></script>
+<script src="panel/shalom/shalom.js?v=35"></script>
+<script src="panel/shalom/tracking.js?v=25"></script>
+<script src="panel/pantalla/floatpanel.js?v=4"></script>
+<script src="panel/pedidos/delivery.js?v=9"></script>
+<script src="panel/shalom/qrtracking.js?v=3"></script>
+<script src="panel/shalom/ticket.js?v=8"></script>
+<script src="panel/shalom/agencias-extractor.js?v=11"></script>
+<script src="panel/datos/respaldo.js?v=2"></script>
 <script src="narrador/toby.js?v=1"></script>
-<script src="ayuda.js?v=12"></script>
-<script src="recursos.js?v=2"></script>
-<script src="dashboard.js?v=2"></script>
-<script src="voz.js?v=3"></script>
-<script src="cotizacion.js?v=3"></script>
+<script src="panel/pantalla/ayuda.js?v=12"></script>
+<script src="panel/config/recursos.js?v=2"></script>
+<script src="panel/pantalla/dashboard.js?v=2"></script>
+<script src="panel/pantalla/voz.js?v=3"></script>
+<script src="panel/config/cotizacion.js?v=3"></script>
 <script src="panel/pedidos/pedido-ui.js?v=2"></script>
 </body>
 </html>

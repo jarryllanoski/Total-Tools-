@@ -111,7 +111,7 @@ module.exports = async ({bloque, ok}) => {
     const i = (h, f) => h.indexOf('<script src="' + f);
     ok(i(ix, 'functions/shalomEstado.js') > 0 && i(ix, 'functions/shalomEstado.js') < i(ix, 'functions/etiquetas.js'),
        'panel: shalomEstado.js antes que etiquetas.js (que la usa)');
-    ok(i(ix, 'functions/codigoSeguimiento.js') > 0 && i(ix, 'functions/codigoSeguimiento.js') < i(ix, 'print.js'), 'panel: el código antes que print.js');
+    ok(i(ix, 'functions/codigoSeguimiento.js') > 0 && i(ix, 'functions/codigoSeguimiento.js') < i(ix, 'panel/pedidos/print.js'), 'panel: el código antes que print.js');
     ['formulario.html', 'seguimiento.html'].forEach((h) => {
       const t = E.leerReal(h);
       ok(i(t, 'functions/codigoSeguimiento.js') > 0 && i(t, 'functions/codigoSeguimiento.js') < i(t, 'cliente/comun.js'),

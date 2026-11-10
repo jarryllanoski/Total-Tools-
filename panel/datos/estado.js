@@ -9,58 +9,19 @@
 const cap=s=>s.charAt(0).toUpperCase()+s.slice(1);
 const $=id=>document.getElementById(id);
 
-// ★ El campo teléfono admite DOS formas: número peruano (lo de siempre) o
-// usuario de WhatsApp (@nombre), que desde 2026 permite escribirle a alguien
-// sin conocer su número. Este predicado es el ÚNICO dueño de esa distinción:
-// cada sitio que usa el teléfono pregunta aquí en vez de repetir la regla.
-// Reglas de WhatsApp: 3-35 caracteres entre letras, números, puntos y guiones bajos.
-function esUsuarioWA(v){
-  return /^@[A-Za-z0-9._]{3,35}$/.test(String(v==null?'':v).trim());
-}
-window.esUsuarioWA = esUsuarioWA;
-
-// ★ WhatsApp centralizado: el prefijo de país vive en UN solo lugar.
-// waLink(phone,msg) → devuelve la URL. waOpen(phone,msg) → la abre.
-const WA_PREFIX = '51'; // código de país (Perú). Cambiar aquí si se necesita.
-window.waLink = function(phone, msg){
-  // Usuario (@nombre): WhatsApp NO publica un enlace de chat por usuario — su
-  // formato click-to-chat sigue aceptando solo números. Devolvemos null a
-  // propósito, para que quien llame decida qué hacer, en vez de fabricar una
-  // URL inventada que al abrirse daría error y parecería un fallo de la app.
-  if(esUsuarioWA(phone)) return null;
-  var p = String(phone||'').replace(/[^0-9]/g,''); // limpiar espacios, guiones, etc.
-  if(!p) return null;
-  var url = 'https://wa.me/' + WA_PREFIX + p;
-  if(msg) url += '?text=' + encodeURIComponent(msg);
-  return url;
-};
-// Con usuario: SOLO se copia al portapapeles y se avisa. No se abre WhatsApp
-// a propósito: no existe forma de llegar al chat de alguien solo con su
-// usuario. Se probó abrir wa.me sin número y WhatsApp responde con un error
-// ("no se encontró el número de teléfono … es demasiado corto"), que parece un
-// fallo de esta app. Mejor un paso honesto que uno que aparenta funcionar.
-// Si algún día WhatsApp publica el enlace por usuario, entra en waLink y ya.
-function _waUsuario(u){
-  var usr = String(u||'').trim();
-  var ok = function(){
-    if(typeof toast==='function') toast('📋 '+usr+' copiado — búscalo en WhatsApp');
-  };
-  if(navigator.clipboard&&navigator.clipboard.writeText){
-    navigator.clipboard.writeText(usr).then(ok).catch(function(){ if(typeof toast==='function') toast('📋 '+usr); });
-  } else {
-    var t=document.createElement('textarea'); t.value=usr; t.style.cssText='position:fixed;top:-9999px';
-    document.body.appendChild(t); t.select();
-    try{ document.execCommand('copy'); ok(); }catch(e){ if(typeof toast==='function') toast('📋 '+usr); }
-    t.remove();
+/* ★ DATOS AVISA, PANTALLA PINTA (Fase 7, 11/11/2026). Este módulo es
+   estado y sincronización: no pinta ni muestra mensajes. Cuando pasa algo,
+   AVISA con un evento y pantalla/inicio.js hace lo de siempre (repintar,
+   mostrar el aviso). dispatchEvent es inmediato: el orden de lo que se ve no
+   cambia. Si algo se avisa antes de que la pantalla esté escuchando, queda
+   en cola y se entrega en cuanto escucha — no se pierde ningún aviso. */
+function _avisar(nombre, detalle){
+  if(!window._pantallaLista){
+    (window._avisosPendientes = window._avisosPendientes || []).push([nombre, detalle]);
+    return;
   }
+  try{ window.dispatchEvent(new CustomEvent(nombre, {detail: detalle})); }catch(_){}
 }
-window._waUsuario = _waUsuario;
-window.waOpen = function(phone, msg){
-  if(esUsuarioWA(phone)){ _waUsuario(phone); return null; }
-  var url = window.waLink(phone, msg);
-  if(url) window.open(url, '_blank');
-  return url;
-};
 
 /* STATE */
 let _mem={};
@@ -258,9 +219,7 @@ async function _fbSaveWithRetry(data, attempt){
     if(e && e.bloqueadoPorDefecto){
       lsSet('dpanel_pending', '1');
       window._fbStatus && window._fbStatus('err');
-      if(typeof toast === 'function'){
-        toast('⛔ No se guardó: el panel tiene los datos vacíos. Recarga la página.');
-      }
+      _avisar('tt:aviso', '⛔ No se guardó: el panel tiene los datos vacíos. Recarga la página.');
       console.error('[guarda] escritura bloqueada: la memoria tiene los ' +
         'valores por defecto y la nube un negocio real');
       return;
@@ -463,11 +422,9 @@ window._mergeRemote = (remote) => {
   lsSet('dpanel', JSON.stringify(window._slimStateForLocal ? window._slimStateForLocal(S) : S)); // ★ Mejora 3: local sin base64 pesadas
   // El nombre y el teléfono del negocio también vienen de la nube: sin esto se
   // quedaban en los valores por defecto hasta la siguiente recarga.
-  if(window.pintarEncabezado) pintarEncabezado();
-  render();
-  renderChips();
-  if(typeof _liberarPantallasNube === 'function') _liberarPantallasNube();
-  toast('☁️ Datos sincronizados');
+  // La pantalla repinta encabezado, lista y chips, libera Config/Recursos
+  // y dice «☁️ Datos sincronizados» (pantalla/inicio.js).
+  _avisar('tt:nube-sincronizada');
 };
 
 // On Firebase ready: load remote data if available
@@ -494,7 +451,7 @@ const _initFirebase = async (intento) => {
       /* La nube CONFIRMÓ que está vacía: eso también es una respuesta, y la
          única en la que subir lo local es correcto. */
       window._nubeLista = true;
-      if(typeof _liberarPantallasNube === 'function') _liberarPantallasNube();
+      _avisar('tt:nube-lista');
       const tieneLocal = S.shipments.length > 0 || S.suppliers.length > 0 ||
                          (S.config && S.config.name && S.config.name !== 'Mi Negocio');
       // Primer arranque real: la nube está vacía y todo lo local es nuevo para
@@ -537,7 +494,7 @@ const _initFirebase = async (intento) => {
       setTimeout(() => _initFirebase(intento+1), delay);
       return; // no arrancar el listener todavía; lo hará el reintento exitoso
     }
-    toast('⚠️ Sin conexión a Firebase. Reintentando en segundo plano.');
+    _avisar('tt:aviso', '⚠️ Sin conexión a Firebase. Reintentando en segundo plano.');
   }
   if(window._fbListen) window._fbListen();
 };

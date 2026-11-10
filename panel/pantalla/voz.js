@@ -1,3 +1,7 @@
+/**
+ * panel/pantalla/voz.js — comandos por voz
+ * Fase 7 (11/11/2026): movido de la raíz a su capa, sin cambiar una línea.
+ */
 /* voz.js — Asistente de voz "Jarvy" (Fase 1: push-to-talk)
    ────────────────────────────────────────────────────────────────────────
    AISLADO: no toca Shalom, delivery, tracking ni la lógica del panel.

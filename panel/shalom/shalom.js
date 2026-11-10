@@ -1,4 +1,8 @@
 /**
+ * panel/shalom/shalom.js — el cliente de la API de Shalom (por la Cloud Function)
+ * Fase 7 (11/11/2026): movido de la raíz a su capa, sin cambiar una línea.
+ */
+/**
  * shalom.js — Puerta única a Shalom
  * ==================================
  * TODO lo que habla con Shalom pasa por aquí: consultar una guía, jalar el

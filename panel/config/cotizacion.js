@@ -1,3 +1,7 @@
+/**
+ * panel/config/cotizacion.js — cotizaciones de proveedores
+ * Fase 7 (11/11/2026): movido de la raíz a su capa, sin cambiar una línea.
+ */
 /* ═══════════════════════════════════════════════════════════════════════
    COTIZACIÓN — módulo aislado (Fase 1)
    ---------------------------------------------------------------------------

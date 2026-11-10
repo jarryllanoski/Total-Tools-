@@ -90,7 +90,8 @@
     // Las palabras viven en auth.js, que es quien conoce los motivos.
     const txt = (window._authTextoMotivo && window._authTextoMotivo({auth: motivo}))
       || '🔒 Tu sesión venció — ingresa de nuevo';
-    try{ window.toast && window.toast(txt); }catch(e){}
+    // Datos avisa; la pantalla lo muestra (Fase 7). Sin estado.js, como antes.
+    try{ window._avisar ? window._avisar('tt:aviso', txt) : (window.toast && window.toast(txt)); }catch(e){}
   }
 
   function _errorAuth(motivo){

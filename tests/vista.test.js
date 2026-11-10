@@ -130,11 +130,15 @@ module.exports = (t) => {
        archivo llegara— en la que eso lanzaba ReferenceError y abortaba el
        render entero: cero tarjetas. Pasó en una recarga forzada. */
     const html = E.leer('index.html');
-    const posArchivo = html.indexOf('src="seleccion.js');
+    /* Fase 7: seleccion.js es un módulo del panel (panel/pantalla/). Su
+       contenido entra en línea en su sitio; el primer USO es el primer
+       script que llama a `Seleccion.` y no es seleccion.js mismo. */
+    const posArchivo = html.indexOf(' * panel/pantalla/seleccion.js — ');
     let posUso = -1;
     const re = /<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/g;
     let m;
     while ((m = re.exec(html))) {
+      if (m[1].indexOf(' * panel/pantalla/seleccion.js — ') >= 0) continue;
       const i = m[1].indexOf('Seleccion.');
       if (i >= 0) { posUso = m.index + i; break; }
     }

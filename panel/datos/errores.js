@@ -1,4 +1,8 @@
 /**
+ * panel/datos/errores.js — registro de errores de los teléfonos
+ * Fase 7 (11/11/2026): movido de la raíz a su capa, sin cambiar una línea.
+ */
+/**
  * errores.js — saber qué se rompe en los teléfonos de los demás
  * =============================================================
  * Varios vendedores usan este panel desde equipos distintos. Hoy, si a uno se

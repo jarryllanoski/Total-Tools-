@@ -1,4 +1,8 @@
 /**
+ * panel/pedidos/notify.js — la campana de avisos
+ * Fase 7 (11/11/2026): movido de la raíz a su capa, sin cambiar una línea.
+ */
+/**
  * notify.js — Campana de notificaciones para Total Tools v2
  * ==========================================================
  * - Notifica pedidos nuevos del formulario (últimas 2h)

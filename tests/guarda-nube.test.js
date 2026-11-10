@@ -37,6 +37,9 @@ function montar(op) {
     console: {warn: () => {}, error: () => {}},
     setTimeout: () => {},
     toast: (t) => toasts.push(t),
+    // Fase 7: estado.js AVISA (la pantalla muestra el aviso). Aquí se recoge
+    // igual que un toast, para comprobar que el mensaje se dice.
+    _avisar: (nombre, txt) => { if (nombre === 'tt:aviso') toasts.push(txt); },
     salida: {},
   };
   const n = Object.keys(ctx);

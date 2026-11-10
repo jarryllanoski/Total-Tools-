@@ -100,10 +100,22 @@ module.exports = async ({bloque, ok}) => {
 
   {
     // Todos los scripts clásicos que comparten el ámbito global del panel.
+    /* Un archivo ENCAPSULADO —todo su código dentro de `(function(){ … })()`—
+       no define nombres globales: lo de dentro es privado y no choca con
+       nadie (dashboard.js y delivery.js pueden tener cada uno su `_esc`).
+       Solo cuentan los módulos de nivel superior. */
+    const encapsulado = (t) => {
+      const codigo = t.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
+          .replace(/^\s*['"]use strict['"];?\s*$/m, '').trim();
+      return /^;?\s*\(\s*function\s*\(/.test(codigo) && /\}\s*\)\s*\([^)]*\)\s*;?\s*$/.test(codigo);
+    };
     const archivos = mods.map((f) => 'panel/' + f);
     const def = {};
     const dup = [];
-    archivos.forEach((f) => {
+    const enc = archivos.filter((f) => encapsulado(E.leerReal(f)));
+    ok(enc.indexOf('panel/pedidos/print.js') >= 0 && enc.indexOf('panel/datos/estado.js') < 0,
+       'reconoce cuáles van encapsulados (print.js sí, estado.js no)');
+    archivos.filter((f) => enc.indexOf(f) < 0).forEach((f) => {
       const t = E.leerReal(f);
       const re = /^(?:async function|function|let|const|var|class)\s+([A-Za-z_$][\w$]*)/gm;
       let m;
@@ -121,13 +133,18 @@ module.exports = async ({bloque, ok}) => {
   bloque('Fase 7: el panel en carpetas por capa');
 
   {
-    const CAPAS = {datos: ['nube.js', 'estado.js'],
-      pantalla: ['navegacion.js', 'lista.js', 'acciones.js', 'escaner.js', 'inicio.js'],
+    const CAPAS = {datos: ['nube.js', 'estado.js', 'storage.js', 'fotos.js', 'respaldo.js', 'mezclaConfig.js', 'errores.js'],
+      pantalla: ['navegacion.js', 'lista.js', 'acciones.js', 'escaner.js', 'inicio.js', 'whatsapp.js',
+        'floatpanel.js', 'seleccion.js', 'voz.js', 'dashboard.js', 'ayuda.js'],
       pedidos: ['pedido-form.js', 'pedido-docs.js', 'pedido-reniec.js', 'pedido-guardar.js', 'pedido-ui.js',
-        'estados-papelera.js', 'pin-papelera.js'],
-      shalom: ['shalom-registro.js', 'shalom-origen.js', 'shalom-ajustes.js'],
+        'estados-papelera.js', 'pin-papelera.js', 'print.js', 'notify.js', 'delivery.js'],
+      shalom: ['shalom-registro.js', 'shalom-origen.js', 'shalom-ajustes.js', 'shalom.js', 'tracking.js',
+        'qrtracking.js', 'ticket.js', 'guias.js', 'agencias-extractor.js'],
       compartir: ['links-tokens.js', 'excel.js'],
-      config: ['configuracion.js', 'recursos-ui.js', 'proveedores.js']};
+      config: ['configuracion.js', 'recursos-ui.js', 'proveedores.js', 'recursos.js', 'cotizacion.js']};
+    ok(fs.readdirSync(E.RAIZ).filter((f) => /\.js$/.test(f)).sort().join() ===
+       'appcheck.js,auth.js,firebase-config.js,loading-screen.js,medir-registro.js',
+       'en la raíz solo quedan los compartidos con las páginas del cliente y la infraestructura');
     ok(fs.readdirSync(path.join(E.RAIZ, 'panel')).every((f) => fs.statSync(path.join(E.RAIZ, 'panel', f)).isDirectory()),
        'ningún módulo suelto en panel/: cada uno en su carpeta');
     const esperado = Object.keys(CAPAS).flatMap((c) => CAPAS[c].map((f) => c + '/' + f)).sort();
@@ -141,6 +158,25 @@ module.exports = async ({bloque, ok}) => {
     ok(/dispatchEvent\(new Event\('tt:config-cambiada'\)\)/.test(nube) &&
        /addEventListener\('tt:config-cambiada'/.test(E.leerReal('panel/pantalla/inicio.js')),
        'avisa «configuración cambiada» y pantalla/inicio.js repinta');
+    // estado.js tampoco pinta (Fase 7, punto 1): avisa y la pantalla pinta.
+    const est = E.leerReal('panel/datos/estado.js').replace(/\/\*[\s\S]*?\*\/|\/\/.*$/gm, '');
+    ok(!/\b(render|renderChips|toast|loadCfgUI|recRender|pintarEncabezado|_liberarPantallasNube)\(/.test(est),
+       'datos/estado.js no llama a la pantalla (ni render, ni toast, ni encabezado…)');
+    const ini = E.leerReal('panel/pantalla/inicio.js');
+    ['tt:aviso', 'tt:nube-sincronizada', 'tt:nube-lista'].forEach((ev) =>
+      ok(ini.indexOf("addEventListener('" + ev + "'") >= 0 && ini.indexOf("addEventListener('" + ev + "'") < ini.indexOf('_initFirebase();'),
+         'pantalla escucha «' + ev + '» ANTES de arrancar la nube'));
+    // La cola: lo avisado antes de que la pantalla escuche no se pierde.
+    const src = est.slice(est.indexOf('function _avisar('), est.indexOf('\n}\n', est.indexOf('function _avisar(')) + 3);
+    const win = {recibidos: [], dispatchEvent(e) { this.recibidos.push(e.type + ':' + (e.detail || '')); }};
+    // eslint-disable-next-line no-new-func
+    const av = new Function('window', 'CustomEvent', src + ';return _avisar;')(win,
+        function(t, o) { this.type = t; this.detail = o && o.detail; });
+    av('tt:aviso', 'antes');
+    ok(win.recibidos.length === 0 && win._avisosPendientes.length === 1, 'antes de que la pantalla escuche: queda en cola');
+    win._pantallaLista = true; av('tt:aviso', 'después');
+    ok(win.recibidos.join() === 'tt:aviso:después', 'después: se entrega al instante');
+    ok(/\(window\._avisosPendientes \|\| \[\]\)\.splice\(0\)\.forEach/.test(ini), 'y la pantalla entrega lo que estaba en cola al empezar a escuchar');
   }
 };
 

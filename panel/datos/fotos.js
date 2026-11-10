@@ -1,4 +1,8 @@
 /**
+ * panel/datos/fotos.js — la cola de fotos pendientes
+ * Fase 7 (11/11/2026): movido de la raíz a su capa, sin cambiar una línea.
+ */
+/**
  * fotos.js — los documentos de los pedidos: comprimir, subir, y NO PERDER.
  * ========================================================================
  * ⚠️ EL FALLO QUE CIERRA. Si subir a Storage fallaba (sin internet, sesión

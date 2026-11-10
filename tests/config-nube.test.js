@@ -15,7 +15,7 @@
  */
 'use strict';
 const E = require('./_entorno.js');
-const M = require('../mezclaConfig.js');
+const M = require('../panel/datos/mezclaConfig.js');
 
 function bloqueCon(marca) {
   const re = /<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/g;
@@ -96,6 +96,7 @@ function equipo(n) {
     _sinRepetir: (a) => Array.from(new Set(a || [])),
     _dirtyShips: dirty.ships, _dirtySupps: dirty.supps, _S_TS: 0,
     lsSet: () => {}, render: () => {}, renderChips: () => {}, toast: () => {}, salida: {},
+    _avisar: () => {},
     save: (k) => { if (k === 'config') win._pidioGuardarCfg = true; }};
   const kM = Object.keys(ctxM);
   new Function(...kM, MERGE + '\nsalida.merge = window._mergeRemote;')(...kM.map((k) => ctxM[k]));
@@ -256,6 +257,6 @@ module.exports = async ({bloque, ok}) => {
       ok(new RegExp(k + ':data\\.' + k).test(proy), k + ' viaja al documento de configuración'));
     ok(/const _PANTALLAS_NUBE = \['configurar', 'recursos'\];/.test(panel),
        'Config y Recursos no se pueden editar hasta que llega la nube (la copia local no manda)');
-    ok(/<script src="mezclaConfig\.js\?v=1"><\/script>/.test(panel), 'el panel carga la mezcla');
+    ok(/<script src="panel\/datos\/mezclaConfig\.js\?v=1"><\/script>/.test(E.leerReal('index.html')), 'el panel carga la mezcla');
   }
 };

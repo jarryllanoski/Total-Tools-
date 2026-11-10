@@ -1,4 +1,8 @@
 /**
+ * panel/shalom/tracking.js — el seguimiento de Shalom en el panel
+ * Fase 7 (11/11/2026): movido de la raíz a su capa, sin cambiar una línea.
+ */
+/**
  * tracking.js — UI de tracking Shalom en el panel
  * ================================================
  * Tarjeta de tracking, modal de edición de guía, historial, manual, y el

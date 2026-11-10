@@ -1,4 +1,8 @@
 /**
+ * panel/shalom/qrtracking.js — el QR para el seguimiento manual
+ * Fase 7 (11/11/2026): movido de la raíz a su capa, sin cambiar una línea.
+ */
+/**
  * qrtracking.js — Módulo QR para tracking manual Shalom v2
  * =========================================================
  * - Botón QR en header del bloque tracking (junto a Ayuda)

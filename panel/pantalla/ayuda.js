@@ -1,4 +1,8 @@
 /**
+ * panel/pantalla/ayuda.js — el contenido de la ayuda (📖) y Toby
+ * Fase 7 (11/11/2026): movido de la raíz a su capa, sin cambiar una línea.
+ */
+/**
  * ayuda.js — Módulo de Ayuda y Documentación centralizada para Total Tools
  *
  * OBJETIVO: que cualquier usuario entienda cómo funciona cada módulo sin

@@ -28,7 +28,7 @@ module.exports = async ({bloque, ok}) => {
     ok(/src="https:\/\/x\/narrador\/toby\.webp\?v=1"/.test(h), 'la imagen sale junto al script (sirve en el formulario y en el panel)');
     T.globo('otra vez');
     ok(estilos.length === 1, 'el CSS se pone UNA vez');
-    ok(/narrador\/toby\.js/.test(form) && /<script src="narrador\/toby\.js\?v=1"><\/script>\n<script src="ayuda\.js/.test(panel),
+    ok(/narrador\/toby\.js/.test(form) && /<script src="narrador\/toby\.js\?v=1"><\/script>\n<script src="panel\/pantalla\/ayuda\.js/.test(E.leerReal('index.html')),
        'lo cargan el formulario y el panel (antes de ayuda.js)');
     ok(!/class="tb-av"/.test(form) && !/#ayudaFormOv \.tb\{/.test(form), 'sin la copia vieja de Toby dentro del formulario');
     ok(!/new Image|fetch\(/.test(tb), 'no pide nada por su cuenta: la imagen solo al pintar el globo (al abrir una ayuda)');
@@ -97,6 +97,6 @@ module.exports = async ({bloque, ok}) => {
        'Configuración Shalom: Puerta, Seguimiento automático y Mover etiquetas (ya no «en reconstrucción»)');
     const tr = ay.slice(ay.indexOf('    tracking: {'), ay.indexOf('    nuevoPedido: {'));
     ok(!/cada <b>12 horas<\/b>/.test(tr) && /08:00, 11:30, 16:30 y 19:00/.test(tr), 'Tracking: horarios del seguimiento automático');
-    ok(/var ACTUALIZADO = '2026-11-10';/.test(ay) && /ayuda\.js\?v=12/.test(panel), 'fecha y versión nuevas');
+    ok(/var ACTUALIZADO = '2026-11-10';/.test(ay) && /panel\/pantalla\/ayuda\.js\?v=12/.test(E.leerReal('index.html')), 'fecha y versión nuevas');
   }
 };

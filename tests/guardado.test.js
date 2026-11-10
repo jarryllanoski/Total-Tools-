@@ -212,6 +212,7 @@ function montarMerge(op) {
     _S_TS: 0,
     lsSet: (k, v) => { almacen[k] = String(v); },
     render: () => {}, renderChips: () => {}, toast: () => {},
+    _avisar: (nombre) => { (win._avisos = win._avisos || []).push(nombre); },
     salida: {}
   };
   const codigo = MERGE + '\nsalida.merge = window._mergeRemote;';
@@ -253,6 +254,7 @@ function montarInit(op) {
     _huboSuciosGuardados: !!op.recuperoSucios,
     console: { warn: () => {} },
     toast: () => {},
+    _avisar: (nombre) => { (win._avisos = win._avisos || []).push(nombre); },
     setTimeout: (fn, ms) => { reintentos.push(ms); },
     salida: {}
   };
@@ -422,6 +424,8 @@ module.exports = async function ({ bloque, ok }) {
 
   const i4 = montarInit({ remoto: null, locales: [ped('p1')] });
   await i4.api.init();
+  ok((i4.win._avisos || []).indexOf('tt:nube-lista') >= 0,
+     'nube vacía: avisa «nube lista» y la pantalla libera Config/Recursos (Fase 7)');
   ok(i4.subidas.length === 1 && i4.api.dirtyAll() === true,
      'nube vacía con datos locales: primer arranque real, ahí sí se enciende _dirtyAll a mano');
 

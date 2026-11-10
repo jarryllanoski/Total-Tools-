@@ -1,4 +1,8 @@
 /**
+ * panel/pedidos/print.js — imprimir etiquetas
+ * Fase 7 (11/11/2026): movido de la raíz a su capa, sin cambiar una línea.
+ */
+/**
  * print.js — Módulo de impresión para Total Tools
  * Formatos: Etiqueta (pegar en paquete) · Lista (registro interno)
  * Integración: reemplaza doPrint() en index.html

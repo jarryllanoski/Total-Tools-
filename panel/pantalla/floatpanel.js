@@ -1,4 +1,8 @@
 /**
+ * panel/pantalla/floatpanel.js — la barra flotante y el carrusel de etiquetas
+ * Fase 7 (11/11/2026): movido de la raíz a su capa, sin cambiar una línea.
+ */
+/**
  * floatpanel.js — Mini paneles flotantes para Total Tools (solo PC)
  * Al hacer clic largo (500ms) en una etiqueta de estado o en el header de courier,
  * se abre un panel flotante de solo lectura con esa vista filtrada.

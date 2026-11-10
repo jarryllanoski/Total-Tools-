@@ -1,4 +1,8 @@
 /**
+ * panel/shalom/agencias-extractor.js — el extractor de agencias (Config)
+ * Fase 7 (11/11/2026): movido de la raíz a su capa, sin cambiar una línea.
+ */
+/**
  * agencias-extractor.js — Extractor de agencias (sección Config)
  * =====================================================================
  * Agrega en Config (#page-configurar) un bloque POR CADA courier con

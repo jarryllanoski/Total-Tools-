@@ -1,4 +1,8 @@
 /**
+ * panel/pedidos/delivery.js — la ruta de delivery
+ * Fase 7 (11/11/2026): movido de la raíz a su capa, sin cambiar una línea.
+ */
+/**
  * delivery.js — Módulo de Rutas DELIVERY v3
  * ==========================================
  * - Sin MutationObserver (causa congelamiento)

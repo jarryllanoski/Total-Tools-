@@ -18,6 +18,27 @@ function pintarEncabezado(){
 }
 window.pintarEncabezado = pintarEncabezado;
 
+/* ★ LA PANTALLA ESCUCHA A LA CAPA DE DATOS (Fase 7). datos/estado.js ya no
+   pinta: avisa, y aquí se hace exactamente lo que antes hacía allí. Se
+   registra ANTES del arranque de la nube, y lo que se avisó antes de este
+   punto (estaba en cola) se entrega ahora. */
+window.addEventListener('tt:aviso', function(e){ if(e && e.detail) toast(e.detail); });
+window.addEventListener('tt:nube-sincronizada', function(){
+  // El nombre y el teléfono del negocio también vienen de la nube.
+  if(window.pintarEncabezado) pintarEncabezado();
+  render();
+  renderChips();
+  if(typeof _liberarPantallasNube === 'function') _liberarPantallasNube();
+  toast('☁️ Datos sincronizados');
+});
+window.addEventListener('tt:nube-lista', function(){
+  if(typeof _liberarPantallasNube === 'function') _liberarPantallasNube();
+});
+window._pantallaLista = true;
+(window._avisosPendientes || []).splice(0).forEach(function(a){
+  try{ window.dispatchEvent(new CustomEvent(a[0], {detail: a[1]})); }catch(_){}
+});
+
 /* ★ ARRANQUE DE LA NUBE — aquí y no en estado.js (Fase 3). Arranca una
    carga asíncrona que, al volver, pinta con la lista, las pestañas y el
    estado: cuando todo eso vivía en UN script, existía desde el primer

@@ -118,7 +118,7 @@ module.exports = (t) => {
   bloque('Está enganchado en el panel');
   {
     const idx = E.leer('index.html');
-    ok(/<script src="errores\.js\?v=\d+"><\/script>/.test(idx), 'se carga');
+    ok(/<script src="panel\/datos\/errores\.js\?v=\d+"><\/script>/.test(E.leerReal('index.html')), 'se carga');
     ok(idx.indexOf('errores.js') < idx.indexOf('auth.js'),
         'y PRONTO: cuanto antes cargue, más fallos atrapa');
     ok(/window\._fbEscribirError = \(id, doc\) => \{\s*\n\s*fsPatch\(erroresPath\(id\), doc\)\.catch\(\(\) => \{\}\);/.test(idx),

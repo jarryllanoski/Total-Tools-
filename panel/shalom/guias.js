@@ -1,4 +1,8 @@
 /**
+ * panel/shalom/guias.js — avisos sobre el número de guía
+ * Fase 7 (11/11/2026): movido de la raíz a su capa, sin cambiar una línea.
+ */
+/**
  * guias.js — avisos sobre el número de guía de Shalom
  * ====================================================
  * Dos avisos, y los dos salieron de mirar los 971 pedidos reales:

@@ -453,10 +453,11 @@ module.exports = async ({bloque, ok}) => {
        prueba se lo recuerda. */
     const idx = E.leerReal('index.html');
     // Fase 3: config.js ya no existe; vive en panel/*.js (ver más abajo).
-    [['tracking.js', 22], ['notify.js', 5], ['shalom.js', 31],
+    // Fase 7: estos viven en panel/capa/ — se busca su etiqueta con la ruta nueva.
+    [['panel/shalom/tracking.js', 22], ['panel/pedidos/notify.js', 5], ['panel/shalom/shalom.js', 31],
       ['functions/enlaceSeguimiento.js', 1],
       ['functions/registroShalom.js', 3],
-      ['ayuda.js', 6]].forEach((par) => {
+      ['panel/pantalla/ayuda.js', 6]].forEach((par) => {
       /* `src="` delante a proposito: sin eso, `config.js` casa dentro de
          `firebase-config.js` y la prueba lee la version del archivo
          equivocado. Me acaba de pasar. */

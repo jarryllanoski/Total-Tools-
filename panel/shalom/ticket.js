@@ -1,4 +1,8 @@
 /**
+ * panel/shalom/ticket.js — jalar el ticket de Shalom
+ * Fase 7 (11/11/2026): movido de la raíz a su capa, sin cambiar una línea.
+ */
+/**
  * ticket.js — Jalar ticket de Shalom (PNG) v1
  * ============================================
  * Pide el ticket por la puerta única (shalom.js) con orderNumber + orderCode

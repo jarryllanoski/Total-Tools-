@@ -16,9 +16,38 @@ const path = require('path');
 
 const RAIZ = path.join(__dirname, '..');
 
+/* ★ NOMBRES DE ANTES (Fase 7, 11/11/2026). Los .js del panel que vivían en
+   la raíz pasaron a su carpeta por capa (panel/capa/x.js). Las pruebas los
+   siguen nombrando por su nombre corto de siempre —'print.js', 'shalom.js'—
+   y aquí se traduce a la ruta nueva: una sola tabla, no cien cambios. */
+const MOVIDOS = {
+  'storage.js': 'panel/datos/storage.js',
+  'fotos.js': 'panel/datos/fotos.js',
+  'respaldo.js': 'panel/datos/respaldo.js',
+  'mezclaConfig.js': 'panel/datos/mezclaConfig.js',
+  'errores.js': 'panel/datos/errores.js',
+  'floatpanel.js': 'panel/pantalla/floatpanel.js',
+  'seleccion.js': 'panel/pantalla/seleccion.js',
+  'voz.js': 'panel/pantalla/voz.js',
+  'dashboard.js': 'panel/pantalla/dashboard.js',
+  'ayuda.js': 'panel/pantalla/ayuda.js',
+  'print.js': 'panel/pedidos/print.js',
+  'notify.js': 'panel/pedidos/notify.js',
+  'delivery.js': 'panel/pedidos/delivery.js',
+  'shalom.js': 'panel/shalom/shalom.js',
+  'tracking.js': 'panel/shalom/tracking.js',
+  'qrtracking.js': 'panel/shalom/qrtracking.js',
+  'ticket.js': 'panel/shalom/ticket.js',
+  'guias.js': 'panel/shalom/guias.js',
+  'agencias-extractor.js': 'panel/shalom/agencias-extractor.js',
+  'recursos.js': 'panel/config/recursos.js',
+  'cotizacion.js': 'panel/config/cotizacion.js',
+};
+const ruta = (rel) => MOVIDOS[rel] || rel;
+
 /** Lee un archivo del proyecto, tal cual está en disco. */
 function leerReal(rel) {
-  return fs.readFileSync(path.join(RAIZ, rel), 'utf8');
+  return fs.readFileSync(path.join(RAIZ, ruta(rel)), 'utf8');
 }
 
 /* ★ EL PANEL EN MÓDULOS (Fase 3, 10/11/2026). El código que vivía dentro de
@@ -60,7 +89,7 @@ function leer(rel) {
 
 /** ¿Existe? */
 function existe(rel) {
-  return fs.existsSync(path.join(RAIZ, rel));
+  return fs.existsSync(path.join(RAIZ, ruta(rel)));
 }
 
 /* Un DOM mínimo: solo lo que el panel toca de verdad. No es jsdom —es medio
@@ -186,4 +215,4 @@ function scriptsEnLinea(rel) {
   return out;
 }
 
-module.exports = {cliente, trozoCliente, CLIENTE, leerReal, CONFIG_JS, modulosPanel, RAIZ, leer, existe, cargar, trozo, scriptsEnLinea, domFalso };
+module.exports = {cliente, trozoCliente, CLIENTE, leerReal, CONFIG_JS, modulosPanel, MOVIDOS, ruta, RAIZ, leer, existe, cargar, trozo, scriptsEnLinea, domFalso };

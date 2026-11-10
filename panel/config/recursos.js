@@ -1,4 +1,8 @@
 /**
+ * panel/config/recursos.js — el centro de recursos (lógica)
+ * Fase 7 (11/11/2026): movido de la raíz a su capa, sin cambiar una línea.
+ */
+/**
  * recursos.js — Centro de recursos v1
  * ====================================
  * Los enlaces que el negocio necesita a mano: manuales de herramientas,
