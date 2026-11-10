@@ -35,11 +35,27 @@ module.exports = async ({bloque, ok}) => {
     const enLinea = fo.match(/<script>[\s\S]*?<\/script>/g) || [];
     ok(enLinea.length === 1 && /location\.replace\('seguimiento\.html'/.test(enLinea[0]),
        'su único script en línea es la redirección de los links viejos (tiene que ir primero en el <head>)');
-    const i = fo.indexOf('<script src="cliente/comun.js?v=');
-    ok(i > 0 && i < fo.indexOf('<script src="cliente/formulario.js?v='), 'comun.js antes que formulario.js');
-    ok(/^\/\*\*\n \* cliente\/formulario\.js — /.test(E.leerReal('cliente/formulario.js')) &&
-       /\(function\(\)\{\n'use strict';/.test(E.leerReal('cliente/formulario.js')),
-       'formulario.js conserva su envoltura: sus variables siguen siendo privadas');
+    // Fase 5: el formulario en módulos cliente/form-*.js, en este orden.
+    const ORDEN = ['comun', 'form-base', 'form-datos', 'form-courier', 'form-delivery', 'form-fecha', 'form-enviar',
+      'form-agencias', 'form-ubicacion', 'form-sedes-mapa', 'form-asistente', 'form-arranque'];
+    const p = ORDEN.map((n) => fo.indexOf('<script src="cliente/' + n + '.js?v='));
+    ok(p.every((x, k) => x > 0 && (k === 0 || x > p[k - 1])), 'los módulos del formulario se cargan todos y en orden (comun.js primero)');
+    const fm = fs.readdirSync(path.join(E.RAIZ, 'cliente')).filter((f) => /^form-.*\.js$/.test(f));
+    ok(fm.length === ORDEN.length - 1, 'no sobra ni falta ningún módulo form-*.js (' + fm.length + ')');
+    fm.forEach((f) => ok(new RegExp('^/\\*\\*\\n \\* cliente/' + f.replace('.', '\\.') + ' — ').test(E.leerReal('cliente/' + f)),
+      f + ' dice qué es en su cabecera'));
+    const arr = E.leerReal('cliente/form-arranque.js');
+    ok(/\ninit\(\);\s*$/.test(arr), 'init() corre al final del último módulo, cuando ya existe todo');
+    ok(fm.filter((f) => f !== 'form-arranque.js').every((f) => !/^window\.[\w$]+\s*=\s*[\w$]+;/m.test(E.leerReal('cliente/' + f))),
+       'los window.X = X (los botones) se asignan todos en form-arranque.js, cuando ya existen las funciones');
+    // Ningún nombre global repetido entre comun.js y los módulos del formulario.
+    const def = {}; const dup = [];
+    ['comun.js'].concat(fm).forEach((f) => {
+      const re = /^(?:async function|function|let|const|var|class)\s+([A-Za-z_$][\w$]*)/gm; let m;
+      const t = E.leerReal('cliente/' + f);
+      while ((m = re.exec(t))) { if (def[m[1]] && def[m[1]] !== f) dup.push(m[1]); def[m[1]] = def[m[1]] || f; }
+    });
+    ok(dup.length === 0, 'formulario: ningún nombre global repetido' + (dup.length ? ': ' + dup : ''));
   }
 
   bloque('Cada módulo: cargado, con cabecera, y en su orden');

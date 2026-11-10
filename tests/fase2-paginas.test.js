@@ -50,7 +50,7 @@ module.exports = async ({bloque, ok}) => {
     const orden = ['cliente/comun.js', 'cliente/seguimiento.js'].map((f) => se.indexOf('<script src="' + f));
     ok(orden[0] > se.indexOf('id="app"') && orden[0] < orden[1], 'comun.js después de #app y antes de seguimiento.js');
     const cf = fo.indexOf('<script src="cliente/comun.js');
-    ok(cf > fo.indexOf('id="app"') && cf < fo.indexOf("(function(){\n'use strict';"),
+    ok(cf > fo.indexOf('id="app"') && cf < fo.indexOf('cliente/form-base.js'),
        'en el formulario, comun.js también antes de su script');
     ok(/<link rel="stylesheet" href="cliente\/cliente\.css\?v=1">/.test(fo) && /<link rel="stylesheet" href="cliente\/cliente\.css\?v=1">/.test(se),
        'el CSS es el mismo archivo (el navegador lo guarda una vez)');

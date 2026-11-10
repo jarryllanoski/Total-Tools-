@@ -36,9 +36,9 @@ const CONFIG_JS = ['pin-papelera', 'pedido-docs', 'pedido-form', 'shalom-registr
 function leer(rel) {
   if (rel === 'config.js') return CONFIG_JS.map(leerReal).join('\n');
   const t = leerReal(rel);
-  // formulario.html: su script (cliente/formulario.js) vuelve a su sitio.
+  // formulario.html: sus módulos (cliente/form-*.js, Fase 5) vuelven a su sitio.
   if (rel === 'formulario.html') {
-    return t.replace(/<script src="(cliente\/formulario\.js)\?v=\d+"><\/script>/,
+    return t.replace(/<script src="(cliente\/form-[\w-]+\.js)\?v=\d+"><\/script>/g,
         (m, f) => '<script>\n' + leerReal(f) + '\n</script>');
   }
   if (rel !== 'index.html') return t;

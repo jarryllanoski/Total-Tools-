@@ -21,7 +21,7 @@ un `<script>` clásico y el orden de las etiquetas es el orden de ejecución.
 | Página | Carga | Para qué |
 |---|---|---|
 | `index.html` | solo HTML (0 scripts en línea) + `panel/*.js` | el panel del negocio |
-| `formulario.html` | `cliente/comun.js` + su script | el cliente pide |
+| `formulario.html` | `cliente/comun.js` + 11 módulos `cliente/form-*.js` | el cliente pide |
 | `seguimiento.html` | `cliente/comun.js` + `cliente/seguimiento.js` | el cliente sigue su pedido (131 KB, sin App Check) |
 
 Los links viejos `formulario.html?seg=…` se redirigen a `seguimiento.html`
@@ -55,7 +55,13 @@ en el `<head>`, antes de descargar nada.
 | `pedido-ui.js` | acordeones, cajas de Shalom, medidas | index.html (final) |
 
 `cliente/`: `comun.js` (API, `CFG`, cabecera, pie, Toby, código de
-seguimiento), `seguimiento.js`, `cliente.css`. Las reglas puras compartidas
+seguimiento), `seguimiento.js`, `cliente.css`, y el formulario en módulos
+(Fase 5, 11/11/2026), en su orden: `form-base` (estado, link de registro,
+configuración, ayuda, pantalla) · `form-datos` (teléfono, DNI, nombre) ·
+`form-courier` · `form-delivery` · `form-fecha` · `form-enviar` (confirmar,
+WhatsApp) · `form-agencias` · `form-ubicacion` · `form-sedes-mapa` ·
+`form-asistente` · `form-arranque` (los `window.X` de los botones e `init()`,
+al final, cuando ya existe todo). Las reglas puras compartidas
 con el servidor siguen en `functions/*.js` (capa 1 de § 5).
 
 ### Las reglas (las cuida `tests/fase3-modulos.test.js` y el CI)
