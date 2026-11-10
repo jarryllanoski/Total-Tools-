@@ -422,6 +422,18 @@ window._mergeRemote = (remote) => {
     Object.keys(_cfgMia || {}).forEach(k => { if(k in remote) _vista[k] = S[k]; });
     if('labels' in remote) _vista.labels = S.labels;
     window._cfgBase = window._cfgProy(_vista);
+    /* ★ ETIQUETAS REPETIDAS EN LA NUBE (11/11/2026). Aquí se muestran sin
+       repetir, pero la copia guardada seguía con la «AVISAR CUANDO LLEGUE»
+       doble para siempre: la base decía «limpio» y nada la reescribía. Si
+       la nube trae repetidas (o alias viejos), la base toma lo que la nube
+       tiene DE VERDAD y se guarda una vez: la mezcla sube la lista limpia.
+       Al quedar limpia, la próxima carga ya no lo dispara. */
+    const _crudas = Array.isArray(remote.labels) ? remote.labels : null;
+    if(_crudas && (_crudas.length !== new Set(_crudas).size ||
+                   _crudas.some(l => _ALIASES.includes(l)))){
+      window._cfgBase.labels = JSON.parse(JSON.stringify(_crudas));
+      setTimeout(() => { if(window._nubeLista) save('config'); }, 0);
+    }
     if(_cfgPend){
       const m = MezclaConfig.mezclar(_cfgBaseVieja, _cfgMia, window._cfgBase);
       Object.keys(m).forEach(k => { S[k] = m[k]; });

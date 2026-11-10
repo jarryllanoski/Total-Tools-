@@ -115,11 +115,28 @@ function _regBorrador(ped){
   // Una guía escrita a mano en pantalla también cuenta: ese ya no se registra.
   const g = ($('fShalomGuia')||{value:''}).value.trim();
   if(g) b.shalomGuia = g;
+  /* ★ LO QUE EL GUARDADO TAMBIÉN DECIDE (11/11/2026). Sin esto, el DNI recién
+     escrito, su nombre de RENIEC o la agencia recién elegida solo contaban
+     después de guardar, cerrar y volver a abrir: «Falta el nombre partido
+     por RENIEC» con el nombre a la vista. Se calculan con las MISMAS reglas
+     que saveShipment (pedido-guardar.js). */
+  const d = $('fDni'); if(d) b.dni = String(d.value||'').trim();
+  const ph = $('fPhone'); if(ph) b.phone = String(ph.value||'').trim();
+  const co = $('fCourier'); if(co && co.value) b.courier = co.value;
+  if(window.Agencias && typeof _agVigente === 'function'){
+    const ag = _agVigente();
+    Object.assign(b, ag || window.Agencias.limpiar(ped));
+  }
+  const rn = (window.RegistroShalom && window._dniUltima) ?
+    window.RegistroShalom.reniecDe(window._dniUltima, b.dni) : null;
+  if(rn) b.reniec = rn;
   return b;
 }
+const _REG_DIFIERE = Object.keys(_REG_CAMPOS).concat(['shalomGuia', 'dni', 'phone',
+  'courier', 'agenciaId', 'agenciaCourier']);
 function _regDifiere(a, b){
-  return Object.keys(_REG_CAMPOS).concat(['shalomGuia'])
-    .some(k => String(a[k]||'') !== String(b[k]||''));
+  return _REG_DIFIERE.some(k => String(a[k]||'') !== String(b[k]||'')) ||
+    JSON.stringify(a.reniec||null) !== JSON.stringify(b.reniec||null);
 }
 
 /* La confirmación ANTES de guardar: cuesta dinero y no se deshace. */
@@ -183,7 +200,7 @@ async function _registrarTrasGuardar(id){
   let r = null;
   try{ r = await window.Shalom.registrarEnvio(id); }catch(e){ r = null; }
   if(r && r.ok && r.campos && !r.simulacro){
-    Object.assign(ped, r.campos);
+    _regAplicarCampos(ped, r.campos);
     save(ped.id);
     if(typeof render==='function') render();
     toast('✅ Registrado en Shalom — guía '+(r.campos.shalomGuia||'')+' · pasó a ALISTADO');
@@ -313,7 +330,7 @@ function _pintarResumenPaquete(ped, faltan, registrado){
   const p = ped || {};
   const R = window.RegistroShalom;
   const elegida = (R && R.tipoElegido) ? R.tipoElegido(p) : '';
-  const caja = elegida ? {etiqueta: 'Paquete ' + elegida} : ((R && R.clasificar) ?
+  const caja = elegida ? {etiqueta: elegida === 'SOBRE' ? 'Sobre' : 'Paquete ' + elegida} : ((R && R.clasificar) ?
     R.clasificar(p.pkgLargo, p.pkgAncho, p.pkgAlto, p.pkgPeso) : null);
   /* La clave en la cabecera: mientras se prepara el registro (para
      dictársela al cliente) y cuando lo registró Shalom Pro. Con una guía
@@ -927,7 +944,7 @@ function _aplicarRegistroShalom(ped, r){
   }
 
   if(r && r.ok && r.campos){
-    Object.assign(ped, r.campos);
+    _regAplicarCampos(ped, r.campos);
     save(ped.id);
     if(typeof _congelarSiRegistrado==='function') _congelarSiRegistrado(ped);
     if(typeof render==='function') render();
@@ -956,12 +973,40 @@ function _aplicarRegistroShalom(ped, r){
 
   /* FALLO: Shalom dijo que no. Se dice UNA vez, con sus palabras, y sin
      ningún botón que invite a volver a intentarlo a ciegas. */
-  _regSalida('<span style="color:var(--red)">❌ '+escH(txt)+'</span>'+
+  _regSalida(_regServidorViejo(ped, r)+'<span style="color:var(--red)">❌ '+escH(txt)+'</span>'+
     (r && r.detalle ? '<div style="color:var(--text2);margin-top:3px">'+escH(r.detalle)+'</div>' : '')+
     (r && r.faltan && r.faltan.length ?
       '<ul style="margin:5px 0 0;padding-left:16px;color:var(--text2)">'+
       r.faltan.map(f=>'<li>'+escH(f)+'</li>').join('')+'</ul>' : ''));
   toast('❌ No se registró');
+}
+
+/* ★ LO QUE TRAE EL SERVIDOR, AL PEDIDO (11/11/2026). El servidor de la
+   Fase 1 ya trae la marca de Shalom Pro y la nota privada con la clave. Uno
+   SIN DESPLEGAR no: entonces el panel la completa él mismo —la clave y la
+   guía las tiene a mano— y avisa, para que no quede en silencio que el
+   servidor está atrasado. Pasó de verdad: la nota quedó vacía. */
+function _regAplicarCampos(ped, campos){
+  Object.assign(ped, campos);
+  if(campos.shalomPor === 'pro') return;
+  ped.shalomPor = 'pro';
+  if(window.RegistroShalom && window.RegistroShalom.notaConClave && ped.shalomGuia && ped.shalomClave){
+    ped.privateNote = window.RegistroShalom.notaConClave(ped.privateNote, ped.shalomClave, ped.shalomGuia);
+  }
+  toast('⚠️ El servidor no está actualizado — corre «firebase deploy --only functions». La clave se anotó desde el panel.');
+}
+
+/* Un servidor sin la Fase 1 rechaza lo que el panel ya permite (caja sin
+   medidas, ALISTADO). Si el rechazo es ESE, se dice qué hacer. */
+function _regServidorViejo(ped, r){
+  const f = (r && r.motivo === 'SIN_DATO' && Array.isArray(r.faltan)) ? r.faltan.join(' ') : '';
+  if(!f) return '';
+  const viejo = (ped && ped.pkgCaja && /medidas|peso/i.test(f)) ||
+    /Solo se registra lo que está en POR ALISTAR \(/.test(f);
+  return viejo ? '<div style="background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.35);'+
+    'border-radius:9px;padding:9px 11px;margin-bottom:8px;color:#f59e0b;font-weight:700">'+
+    '⚠️ El servidor todavía no tiene la versión nueva. Corre <code>firebase deploy --only functions</code> '+
+    'y vuelve a intentarlo: no se registró nada.</div>' : '';
 }
 
 /* SOLO LEE: busca el envío entre los pendientes de Shalom por clave y destino
@@ -973,7 +1018,7 @@ async function recuperarEnvioPanel(){
   let r = null;
   try{ r = await window.Shalom.recuperarEnvio(ped.id); }catch(e){ r = null; }
   if(r && r.ok && r.campos){
-    Object.assign(ped, r.campos);
+    _regAplicarCampos(ped, r.campos);
     save(ped.id);
     if(typeof _congelarSiRegistrado==='function') _congelarSiRegistrado(ped);
     if(typeof render==='function') render();

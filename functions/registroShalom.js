@@ -100,6 +100,7 @@
     /* La caja elegida a mano (los botones XXS…L, como en Shalom Pro) manda
        sobre las medidas: quien la elige dice dónde entra el paquete. */
     const elegida = tipoElegido(p);
+    if (elegida === "SOBRE") return "SOBRE";
     if (elegida) {
       return "PAQUETE " + (elegida === "XXS" ? "XS" : elegida);
     }
@@ -118,6 +119,8 @@
    */
   function tipoElegido(pedido) {
     const t = _txt(pedido && pedido.pkgCaja).toUpperCase();
+    // SOBRE (documentos, A4): lo ofrece Shalom Pro y el registro lo acepta.
+    if (t === "SOBRE") return t;
     return CAJAS.some((c) => c.tipo === t) ? t : "";
   }
 

@@ -490,11 +490,11 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);max
 
 /* ★ CAJAS DE SHALOM (10/11/2026): elegir el tamaño de un toque, como en
    Shalom Pro. 📏 abre las medidas. */
-.pkg-cajas{display:grid;grid-template-columns:repeat(6,1fr);gap:6px;margin-top:4px}
+.pkg-cajas{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;margin-top:4px}
 .pkg-caja{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;min-height:52px;padding:6px 2px;border-radius:10px;border:1px solid var(--bd);background:var(--bg2);color:var(--text);font-family:inherit;cursor:pointer;transition:transform .12s,border-color .12s}
 .pkg-caja b{font-size:13px;font-weight:800}
 .pkg-caja small{font-size:9.5px;color:var(--text2)}
 .pkg-caja.on{border:2px solid #f85149;background:rgba(248,81,73,.08)}
 .pkg-caja.on b{color:#f85149}
 .pkg-caja:active{transform:scale(.96)}
-@media(max-width:380px){.pkg-cajas{grid-template-columns:repeat(3,1fr)}}
+@media(max-width:480px){.pkg-cajas{grid-template-columns:repeat(4,1fr)}}

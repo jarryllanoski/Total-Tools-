@@ -65,6 +65,9 @@ async function _dniReniec(valor){
   try{ r = await Shalom.dni(n); }catch(e){ r = null; }
   // Si mientras consultaba cambiaste el DNI, este resultado ya no corresponde.
   if(($('fDni')||{value:''}).value.replace(/\D/g,'') !== n) return;
+  // El bloque de registro depende de esta respuesta: que se entere ya.
+  if(r && r.ok) window._dniUltima = r.persona;
+  if(typeof _pintarRegistroShalom==='function') _pintarRegistroShalom();
   if(!r || !r.ok){
     const m = (r&&r.motivo)||'';
     /* ★ NINGÚN MOTIVO SE CALLA.
@@ -157,6 +160,7 @@ function _agPintar(){
     return;
   }
   ponMarca('', '');
+  if(typeof _pintarRegistroShalom==='function') _pintarRegistroShalom();
   {
     const c = window.Agencias ? Agencias.courierDe(($('fCourier')||{value:''}).value) : '';
     // Sin catálogo (DELIVERY, ENCOMIENDA…) no hay nada que identificar: el

@@ -277,13 +277,15 @@ module.exports = async ({bloque, ok}) => {
       saveShipment: (c) => { v.guardo++; return op.guardaMal ? undefined : 'ok'; },
       openForm: (id) => { v.abierto = id; }, togglePkgAccordion: () => {}, salida: {},
     };
+    Object.assign(ctx, op.ctx || {});
+    Object.assign(ctx.window, op.win || {});
     const n = Object.keys(ctx);
     // eslint-disable-next-line no-new-func
     new Function(...n, FUENTE + '\nsalida.pintar=_pintarRegistroShalom; salida.preparar=_regPrepararForm;' +
       'salida.toggle=regAlGuardarToggle; salida.confirmarGuardar=_confirmarGuardarYRegistrar;' +
       'salida.renovar=renovarEnvioPanel; salida.alGuardar=()=>_regAlGuardar;')(...n.map((k) => ctx[k]));
     ctx.salida.preparar();
-    return {api: ctx.salida, v, dom, ped, html: () => dom.porId.shalomRegBlock.innerHTML,
+    return {api: ctx.salida, v, dom, ped, win: ctx.window, html: () => dom.porId.shalomRegBlock.innerHTML,
       resumen: () => dom.porId.pkgResumen.innerHTML, boton: () => dom.porId.btnGuardarEnvio.textContent};
   }
   const tick = async () => { for (let i = 0; i < 20; i++) await Promise.resolve(); };
@@ -368,5 +370,88 @@ module.exports = async ({bloque, ok}) => {
        'está adentro, como en Documentos del envío');
     const c = E.leer('config.js');
     ok(/data\.pkgCaja=\(\$\('fPkgCaja'\)\|\|\{value:''\}\)\.value\|\|'';/.test(c), 'la caja elegida se guarda con el pedido');
+  }
+
+  bloque('Escenarios del registro (11/11/2026): lo de pantalla cuenta sin guardar');
+
+  {
+    // DNI recién escrito, RENIEC ya respondió: el nombre partido cuenta YA.
+    const sinRn = Object.assign(PEDIDO_OK(), {status: 'POR ALISTAR', reniec: null, dni: ''});
+    const persona = {nombres: 'ANA', apePaterno: 'PEREZ', apeMaterno: 'GOMEZ', completo: 'ANA PEREZ GOMEZ', dni: '73483547'};
+    const m = montar({pedido: sinRn, pantalla: {fDni: '73483547', fPkgCaja: 'S'},
+      win: {_dniUltima: persona}});
+    m.api.pintar();
+    ok(!/RENIEC/.test(m.html()) && /btnRegAlGuardar/.test(m.html()),
+       '⚠️ DNI + RENIEC en pantalla: ya no pide «guardar y volver a abrir»');
+    const m2 = montar({pedido: sinRn, pantalla: {fDni: '11111111', fPkgCaja: 'S'},
+      win: {_dniUltima: persona}});
+    m2.api.pintar();
+    ok(/RENIEC/.test(m2.html()), 'pero si el nombre de RENIEC es de OTRO DNI, no se usa (sería registrar a otra persona)');
+  }
+  {
+    // La agencia recién elegida cuenta (la MISMA regla que al guardar).
+    const sinAg = Object.assign(PEDIDO_OK(), {agenciaId: '', agenciaCourier: ''});
+    const ag = {agenciaId: '499', agenciaCourier: 'SHALOM', agenciaNombre: 'Lima Centro', agenciaGeo: ''};
+    const m = montar({pedido: sinAg, pantalla: {fStatus: 'POR ALISTAR', fPkgCaja: 'S'},
+      ctx: {_agVigente: () => ag}, win: {Agencias: {limpiar: () => ({})}}});
+    m.api.pintar();
+    ok(!/agencia de destino/i.test(m.html()) && /btnRegAlGuardar/.test(m.html()), 'agencia recién elegida: lista para registrar');
+    const m2 = montar({pedido: PEDIDO_OK(), pantalla: {fStatus: 'POR ALISTAR', fPkgCaja: 'S'},
+      ctx: {_agVigente: () => null},
+      win: {Agencias: {limpiar: () => ({agenciaId: null, agenciaNombre: null, agenciaGeo: null, agenciaCourier: null})}}});
+    m2.api.pintar();
+    ok(/agencia de destino/i.test(m2.html()), 'dirección cambiada a mano (la agencia ya no vale): se dice, igual que al guardar');
+  }
+  {
+    // Servidor SIN la Fase 1: no trae marca ni nota → el panel la anota y avisa.
+    const viejo = {ok: true, estado: 'exito', campos: {shalomGuia: '103307318', shalomCodigo: '9NPC', status: 'ALISTADO'}};
+    const m = montar({respuesta: viejo, pantalla: {fStatus: 'POR ALISTAR', fPkgCaja: 'S'}});
+    m.ped.privateNote = 'Llamar antes';
+    m.api.pintar(); m.api.toggle(); m.api.confirmarGuardar();
+    await m.v.confirmado.alConfirmar(); await tick(); await tick();
+    ok(m.ped.privateNote === 'Llamar antes\n🔑 Clave Shalom: 5773 · guía 103307318',
+       '⚠️ la clave queda en la nota privada aunque el servidor esté atrasado');
+    ok(m.ped.shalomPor === 'pro' && m.v.toasts.some((t) => /firebase deploy/.test(t)),
+       'y se avisa que hay que desplegar el servidor');
+    const nuevo = {ok: true, estado: 'exito', campos: {shalomGuia: '1', status: 'ALISTADO', shalomPor: 'pro', privateNote: 'X'}};
+    const m2 = montar({respuesta: nuevo, pantalla: {fStatus: 'POR ALISTAR', fPkgCaja: 'S'}});
+    m2.api.pintar(); m2.api.toggle(); m2.api.confirmarGuardar();
+    await m2.v.confirmado.alConfirmar(); await tick(); await tick();
+    ok(m2.ped.privateNote === 'X' && !m2.v.toasts.some((t) => /firebase deploy/.test(t)), 'con el servidor al día, manda lo del servidor y no hay aviso');
+  }
+  {
+    // Servidor viejo que pide medidas con una caja elegida: se dice qué hacer.
+    const r = {ok: false, motivo: 'SIN_DATO', faltan: ['Faltan las medidas del paquete (largo, ancho y alto).']};
+    const m = montar({respuesta: r, pantalla: {fStatus: 'POR ALISTAR', fPkgCaja: 'M'}});
+    m.ped.pkgCaja = 'M'; // lo que el guardado real (saveShipment) deja en el pedido
+    m.api.pintar(); m.api.toggle(); m.api.confirmarGuardar();
+    await m.v.confirmado.alConfirmar(); for (let i = 0; i < 50 && m.v.abierto === null; i++) await tick();
+    ok(/El servidor todavía no tiene la versión nueva/.test(m.dom.porId.regShalomSalida.innerHTML) &&
+       /no se registró nada/.test(m.dom.porId.regShalomSalida.innerHTML), 'medidas pedidas con caja elegida → «despliega el servidor»');
+  }
+
+  bloque('Sobre (documentos A4), como en Shalom Pro');
+
+  {
+    const sobre = Object.assign(PEDIDO_OK(), {pkgCaja: 'SOBRE', pkgLargo: '', pkgAncho: '', pkgAlto: '', pkgPeso: ''});
+    ok(R.faltantes(sobre, CFG_OK).length === 0 && R.contenidoDe(sobre) === 'SOBRE', 'el sobre no pide medidas y va como SOBRE');
+    ok(R.cuerpo(sobre, CFG_OK).content === 'SOBRE' && R.CONTENIDOS.indexOf('SOBRE') >= 0, 'y es un contenido que el registro acepta');
+    ok(/data-caja="SOBRE" onclick="pkgElegirCaja\('SOBRE'\)"/.test(E.leer('index.html')), 'tiene su botón ✉️');
+  }
+
+  bloque('El seguimiento automático ya no consulta guías muertas');
+
+  {
+    const B = require('../functions/barrido.js');
+    const base = {courier: 'SHALOM', status: 'ALISTADO', shalomGuia: '103307318'};
+    const r = B.aConsultar([
+      Object.assign({id: 'a', shalomRegistradoEn: HACE(80)}, base),
+      Object.assign({id: 'b', shalomRegistradoEn: HACE(30)}, base),
+      Object.assign({id: 'c', shalomRegistradoEn: HACE(80), trackingStatus: 'En origen'}, base),
+      Object.assign({id: 'd'}, base),
+    ], AHORA);
+    ok(r.saltados.vencidas === 1 && r.consultar.map((x) => x.id).join() === 'b,c,d',
+       'registrada hace +72 h sin movimiento: no se consulta; recientes, movidas o puestas a mano, sí');
+    ok(B.VENCIDA_H === 72, '72 h: ni dos días de cortes la dejan fuera por error');
   }
 };

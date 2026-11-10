@@ -351,7 +351,7 @@
       actualizado: '2026-11-10',
       pasos: [
         '<b>🔑 Clave de recojo</b>: los 4 dígitos que tu cliente necesita para retirar el paquete en la agencia. Se genera sola al abrir un pedido nuevo de Shalom y se le manda a Shalom al registrar el envío. <b>Díctasela al cliente</b> — sin ella no se lo entregan.',
-        '<b>📦 Tamaño de la caja</b>: tócala (XXS, XS, S, M o L), como en Shalom Pro. No hace falta medir ni pesar. Si no sabes cuál, toca <b>📏 Medidas</b>: con largo, ancho, alto y peso se calcula sola (el peso cuenta: 20×15×12 con 3 kg no entra en XS, se va a M).',
+        '<b>📦 Tamaño de la caja</b>: tócala (✉️ Sobre, XXS, XS, S, M o L), como en Shalom Pro. No hace falta medir ni pesar. Si no sabes cuál, toca <b>📏 Medidas</b>: con largo, ancho, alto y peso se calcula sola (el peso cuenta: 20×15×12 con 3 kg no entra en XS, se va a M).',
         '<b>🔌 Cuenta de Shalom Pro</b>: la instancia que el panel usa para registrar. Se comprueba sola —al abrir Config y al abrir el pedido— porque comprobarla no gasta cuota.',
         '<b>Conectar</b> (⚙️ Config → Shalom): un solo botón. Si escribes correo y contraseña, los guarda <b>y</b> entra; si los dejas vacíos, entra con los que ya estaban guardados. Crea la instancia solo si no existe, así que pulsarlo dos veces no crea dos cuentas.',
         '<b>Tus credenciales</b> se guardan cifradas en Secret Manager y <b>no se pueden volver a leer desde el panel</b> — ni por ti. Por eso los campos salen siempre vacíos: no es que se olviden, es que no hay forma de pedirlas de vuelta.',

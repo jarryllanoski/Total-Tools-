@@ -24,6 +24,11 @@ const HORAS_POR_DEFECTO = ["08:00", "11:30", "16:30", "19:00"];
 /** Zona del negocio. Fija: "8am" es 8am en Perú, sin cuentas con UTC. */
 const ZONA = "America/Lima";
 
+/** Horas sin ningún movimiento en Shalom tras las que una guía registrada
+    se da por muerta. 72 y no 24: una guía viva se mueve en horas, y así ni
+    dos días de cortes de red la dejan fuera por error. */
+const VENCIDA_H = 72;
+
 /** Minutos que tienen que pasar para volver a consultar la misma guía.
     No es un intervalo: es la defensa contra que el Scheduler dispare dos
     veces la misma ranura (reintentos) y se consulte todo por duplicado. */
@@ -124,7 +129,7 @@ function aConsultar(pedidos, ahora) {
   const consultar = [];
   const guiasMalas = [];
   const saltados = {noShalom: 0, sinGuia: 0, finalizados: 0,
-    yaEntregados: 0, recien: 0};
+    yaEntregados: 0, recien: 0, vencidas: 0};
   const t = Number(ahora) || Date.now();
 
   (pedidos || []).forEach((p) => {
@@ -142,6 +147,16 @@ function aConsultar(pedidos, ahora) {
     }
     if (/ENTREGAD/i.test(String(p.trackingStatus || ""))) {
       saltados.yaEntregados++; return;
+    }
+    /* ⏰ GUÍA MUERTA (11/11/2026). Registrada por Shalom Pro hace más de
+       VENCIDA_H horas y Shalom nunca la movió: no se dejó en la agencia y
+       Shalom la da por vencida. Consultarla 4 veces al día para siempre
+       gastaba cuota en nada. Al registrarla de nuevo cambia la hora y
+       vuelve a entrar. Las guías puestas a mano (sin hora) no se tocan. */
+    const reg = Date.parse(String(p.shalomRegistradoEn || ""));
+    if (isFinite(reg) && !String(p.trackingStatus || "").trim() &&
+        t - reg > VENCIDA_H * 3600000) {
+      saltados.vencidas++; return;
     }
     if (!GUIA_OK.test(guia)) {
       guiasMalas.push({id: p.id, nombre: p.name || "", guia: guia});
@@ -217,6 +232,7 @@ module.exports = {
   HORAS_POR_DEFECTO,
   ZONA,
   GRACIA_MIN,
+  VENCIDA_H,
   GUIA_OK,
   aSlot,
   parseHoras,

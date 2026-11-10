@@ -41,7 +41,7 @@ function _pkgClasificar(){
   if(typeof _pintarRegistroShalom === 'function') _pintarRegistroShalom();
   if(caja){
     el.style.background = 'rgba(46,160,67,.15)'; el.style.color = 'var(--green,#2ea043)';
-    el.textContent = '📦 Paquete ' + caja; el.style.display = 'block';
+    el.textContent = caja === 'SOBRE' ? '✉️ Sobre (documentos, A4)' : '📦 Paquete ' + caja; el.style.display = 'block';
     return;
   }
   if(window._pkgMedir !== true){ el.style.display='none'; el.textContent=''; return; }

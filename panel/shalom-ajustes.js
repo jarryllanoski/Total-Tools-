@@ -87,6 +87,7 @@ async function _pintarUltimoBarrido(){
     (u.fallidas ? ' · <b style="color:#d29922">' + u.fallidas + ' fallaron</b>' +
       _motivosBarrido(u.motivos) : '') +
     '<br>No preguntó a ' + ahorro + ' (ya entregados o finalizados)' +
+    (s2.vencidas ? ' · ' + s2.vencidas + ' guía(s) vencida(s) sin dejarse en la agencia' : '') +
     ((u.guiasMalas||[]).length ? ' · ' + u.guiasMalas.length +
       ' guía(s) con formato raro: ' + u.guiasMalas.map(g=>g.guia).join(', ') : '') +
     (u.cortado ? '<br><b style="color:#d29922">Se cortó: ' + u.cortado + '</b>' : '');

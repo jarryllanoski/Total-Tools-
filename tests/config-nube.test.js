@@ -95,7 +95,8 @@ function equipo(n) {
   const ctxM = {window: win, S, MezclaConfig: M, FIXED_LABELS: FIJAS,
     _sinRepetir: (a) => Array.from(new Set(a || [])),
     _dirtyShips: dirty.ships, _dirtySupps: dirty.supps, _S_TS: 0,
-    lsSet: () => {}, render: () => {}, renderChips: () => {}, toast: () => {}, salida: {}};
+    lsSet: () => {}, render: () => {}, renderChips: () => {}, toast: () => {}, salida: {},
+    save: (k) => { if (k === 'config') win._pidioGuardarCfg = true; }};
   const kM = Object.keys(ctxM);
   new Function(...kM, MERGE + '\nsalida.merge = window._mergeRemote;')(...kM.map((k) => ctxM[k]));
   return {
@@ -177,6 +178,24 @@ module.exports = async ({bloque, ok}) => {
     await pc.guardar();
     ok(n.cfg().labels.join() === FIJAS.concat(['RECLAMOS', 'RETORNO']).join(), 'y luego sube');
     ok(n.cfg().config.name === 'Total Tools', 'los datos del negocio intactos');
+  }
+
+  bloque('Etiquetas repetidas en la nube: se limpian una vez');
+
+  {
+    const n = nube({labels: FIJAS.concat(['AVISAR', 'AVISAR', 'Enviado', 'RECLAMOS']), msgTemplates: {}, ts: 1,
+      config: {name: 'Total Tools'}});
+    const pc = equipo(n);
+    pc.cargar();
+    ok(pc.S.labels.join() === FIJAS.concat(['AVISAR', 'RECLAMOS']).join(), 'en pantalla ya salen sin repetir (como antes)');
+    await new Promise((r) => setTimeout(r, 5));
+    ok(pc.win._pidioGuardarCfg === true, 'y como la nube las tiene repetidas, se pide guardar la configuración');
+    await pc.guardar();
+    ok(n.cfg().labels.join() === FIJAS.concat(['AVISAR', 'RECLAMOS']).join(), '⚠️ la nube queda limpia (sin la doble ni el alias viejo)');
+    const pc2 = equipo(n);
+    pc2.cargar();
+    await new Promise((r) => setTimeout(r, 5));
+    ok(!pc2.win._pidioGuardarCfg, 'ya limpia, la próxima carga no vuelve a guardar');
   }
 
   bloque('Nube vacía (primer arranque): se sube todo, como siempre');
