@@ -156,7 +156,8 @@ module.exports = async ({bloque, ok}) => {
        propósito, porque el criterio nunca fue "borrar" sino "no se puede
        deshacer" — y un envío creado en Shalom no se anula ni se devuelve el
        dinero, así que merece la misma puerta que la papelera. */
-    const todo = E.leer('index.html') + E.leer('config.js');
+    // index.html ya trae sus módulos panel/* (los que eran config.js incluidos).
+    const todo = E.leer('index.html');
     const usos = (todo.match(/confirmar\(\{/g) || []).length;
     // 10/11/2026: +2, «guardar y registrar» y «registrar de nuevo» (cuestan).
     ok(usos === 10,

@@ -16,9 +16,34 @@ const path = require('path');
 
 const RAIZ = path.join(__dirname, '..');
 
-/** Lee un archivo del proyecto. */
-function leer(rel) {
+/** Lee un archivo del proyecto, tal cual está en disco. */
+function leerReal(rel) {
   return fs.readFileSync(path.join(RAIZ, rel), 'utf8');
+}
+
+/* ★ EL PANEL EN MÓDULOS (Fase 3, 10/11/2026). El código que vivía dentro de
+   index.html y en config.js pasó a panel/*.js, SIN cambiar una línea. Para
+   las pruebas, esos dos nombres siguen significando lo que ejecuta el
+   navegador:
+     · index.html → el HTML con cada <script src="panel/…"> puesto EN LÍNEA,
+       en su sitio (el mismo orden de ejecución);
+     · config.js  → sus diez módulos, uno detrás de otro.
+   Así las pruebas siguen apuntando al código de verdad, y una prueba que
+   quiera el HTML real usa `leerReal('index.html')`. */
+const CONFIG_JS = ['pin-papelera', 'pedido-docs', 'pedido-form', 'shalom-registro',
+  'shalom-origen', 'pedido-reniec', 'pedido-guardar', 'excel', 'links-tokens',
+  'configuracion'].map((n) => 'panel/' + n + '.js');
+function leer(rel) {
+  if (rel === 'config.js') return CONFIG_JS.map(leerReal).join('\n');
+  const t = leerReal(rel);
+  // formulario.html: su script (cliente/formulario.js) vuelve a su sitio.
+  if (rel === 'formulario.html') {
+    return t.replace(/<script src="(cliente\/formulario\.js)\?v=\d+"><\/script>/,
+        (m, f) => '<script>\n' + leerReal(f) + '\n</script>');
+  }
+  if (rel !== 'index.html') return t;
+  return t.replace(/<script src="(panel\/[\w-]+\.js)\?v=\d+"><\/script>/g,
+      (m, f) => '<script>\n' + leerReal(f) + '\n</script>');
 }
 
 /** ¿Existe? */
@@ -149,4 +174,4 @@ function scriptsEnLinea(rel) {
   return out;
 }
 
-module.exports = {cliente, trozoCliente, CLIENTE, RAIZ, leer, existe, cargar, trozo, scriptsEnLinea, domFalso };
+module.exports = {cliente, trozoCliente, CLIENTE, leerReal, CONFIG_JS, RAIZ, leer, existe, cargar, trozo, scriptsEnLinea, domFalso };

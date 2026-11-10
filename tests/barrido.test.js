@@ -249,8 +249,8 @@ module.exports = async ({bloque, ok}) => {
     ok(/motivos\[m\] = \(motivos\[m\] \|\| 0\) \+ 1;/.test(idx),
        'el barrido cuenta los fallos POR MOTIVO');
     ok(/motivos: motivos,/.test(idx), 'y los guarda en el informe');
-    const html = require('fs').readFileSync(
-        require('path').join(__dirname, '..', 'index.html'), 'utf8');
+    // index.html con sus módulos panel/* (Fase 3): lo que ejecuta el navegador.
+    const html = require('./_entorno.js').leer('index.html');
     ok(/_MOTIVO_HUMANO/.test(html),
        'y el panel los traduce: "LIMITE" no le dice nada a nadie');
     ok(/SIN_RED: 'sin conexión'/.test(html) && /LIMITE: 'cuota agotada'/.test(html),

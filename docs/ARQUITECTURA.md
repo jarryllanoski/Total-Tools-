@@ -5,7 +5,79 @@
 > de seis meses, empieza por aquí.
 >
 > Estado a 15 de agosto de 2026. Las cifras están **medidas sobre el código**,
-> no estimadas.
+> no estimadas. **Actualizado el 10/11/2026** con la separación en módulos:
+> ver § 0, que manda sobre el inventario viejo de § 3.
+
+---
+
+## 0. Hoy: el monolito modular, primera etapa (10/11/2026)
+
+Un solo despliegue (GitHub Pages + Cloud Functions), partido por dentro en
+módulos **por lo que hacen**. Sin herramientas de compilación: cada módulo es
+un `<script>` clásico y el orden de las etiquetas es el orden de ejecución.
+
+### Las tres páginas
+
+| Página | Carga | Para qué |
+|---|---|---|
+| `index.html` | solo HTML (0 scripts en línea) + `panel/*.js` | el panel del negocio |
+| `formulario.html` | `cliente/comun.js` + su script | el cliente pide |
+| `seguimiento.html` | `cliente/comun.js` + `cliente/seguimiento.js` | el cliente sigue su pedido (131 KB, sin App Check) |
+
+Los links viejos `formulario.html?seg=…` se redirigen a `seguimiento.html`
+en el `<head>`, antes de descargar nada.
+
+### `panel/` — en el orden en que se cargan
+
+| Módulo | Qué hace | Venía de |
+|---|---|---|
+| `nube.js` | **la única capa que habla con Firestore** (leer, escribir, sincronizar) | index.html |
+| `estado.js` | `S`, guardar, sucios, mezcla con la nube, `_initFirebase` | index.html |
+| `navegacion.js` | avisos, velo «sincronizando», pestañas, ventanas | index.html |
+| `lista.js` | estadísticas, búsqueda, chips, tarjetas, selección | index.html |
+| `shalom-ajustes.js` | Shalom en Config: barrido, puerta, seguimiento, cuentas | index.html |
+| `recursos-ui.js` | pantalla del centro de recursos | index.html |
+| `acciones.js` | resaltar, pegar, copiar, dictado, mensajes rápidos | index.html |
+| `proveedores.js` | proveedores y su stock | index.html |
+| `estados-papelera.js` | cambiar estado, `confirmar()`, papelera | index.html |
+| `escaner.js` | QR y lectura del ticket por foto | index.html |
+| `inicio.js` | encabezado del negocio y **el arranque** (nube + primer pintado) | index.html |
+| `pin-papelera.js` | PIN y papelera | config.js |
+| `pedido-docs.js` | WhatsApp, documentos, visor, links, monto | config.js |
+| `pedido-form.js` | abrir el pedido, cliente recurrente, pegar WhatsApp | config.js |
+| `shalom-registro.js` | clave de recojo y registro en Shalom | config.js |
+| `shalom-origen.js` | agencia de origen y cuenta Shalom Pro | config.js |
+| `pedido-reniec.js` | DNI → RENIEC, agencia identificada | config.js |
+| `pedido-guardar.js` | `saveShipment()` — guardar el pedido | config.js |
+| `excel.js` | exportar / importar | config.js |
+| `links-tokens.js` | links de pedido y tokens de un solo uso | config.js |
+| `configuracion.js` | la pantalla de Config, etiquetas, couriers | config.js |
+| `pedido-ui.js` | acordeones, cajas de Shalom, medidas | index.html (final) |
+
+`cliente/`: `comun.js` (API, `CFG`, cabecera, pie, Toby, código de
+seguimiento), `seguimiento.js`, `cliente.css`. Las reglas puras compartidas
+con el servidor siguen en `functions/*.js` (capa 1 de § 5).
+
+### Las reglas (las cuida `tests/fase3-modulos.test.js` y el CI)
+
+1. **Un nombre global, un módulo.** Con scripts clásicos, un segundo
+   `function toast()` pisa al primero **sin error**. La prueba lo prohíbe.
+2. **Cada módulo con su `?v=`**, y se sube al cambiarlo (lo exige el CI).
+3. **Nada corre al cargar si depende de un módulo de más abajo.** Por eso el
+   arranque de la nube está en `inicio.js` y no en `estado.js`.
+4. **Código nuevo, al módulo de su tema.** Si no encaja en ninguno, es un
+   módulo nuevo (con cabecera que diga qué es), no un rincón de otro.
+5. Para las pruebas, `E.leer('index.html')` es el HTML con sus módulos en
+   línea y `E.leer('config.js')` sus diez módulos: lo que ejecuta el
+   navegador. `E.leerReal()` lee el archivo tal cual.
+
+### Lo que sigue (etapas siguientes)
+
+Llevar cada módulo a su capa de § 5: `nube.js` → `datos/`; las reglas que hoy
+viven repetidas en el panel → `functions/*.js` (dominio); y el resto agrupado
+por negocio. Cada paso igual que este: **sin cambiar una línea de lógica**,
+con la prueba de línea por línea y el panel cargado en un navegador antes y
+después.
 
 ---
 
@@ -369,6 +441,9 @@ Dos reglas que no se rompen:
    fila entera y la izquierda tapaba los ~25 px iniciales del chip `TODOS`, que
    ahí dejaba de responder al toque.
 
+> ✅ **Resuelto el 10/11/2026:** `config.js` se partió en diez módulos de
+> `panel/` (ver § 0). Lo de abajo queda como historia.
+>
 > ⚠️ **`config.js` no es configuración.** Dentro conviven: PIN de seguridad,
 > papelera, WhatsApp, documentos adjuntos, enlaces y deuda, reconocimiento de
 > cliente, Excel/CSV, links compartidos… y **`openForm()` + `saveShipment()`**,

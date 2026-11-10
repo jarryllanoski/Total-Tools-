@@ -31,7 +31,7 @@ const REINTENTO = E.trozo('index.html', 'async function _fbSaveWithRetry(data, a
 const MERGE = E.trozo('index.html', 'window._mergeRemote = (remote) => {',
                                     '// On Firebase ready');
 const INIT  = E.trozo('index.html', 'const _initFirebase = async (intento) => {',
-                                    'if(window._fbReady) {');
+                                    '/* ★ AL ENTRAR, CARGAR.');
 
 /* ── Un Firestore de mentira ──────────────────────────────────────────────
    Cuenta peticiones, guarda los cuerpos y puede fallar a voluntad: por

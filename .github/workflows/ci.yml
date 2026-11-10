@@ -81,7 +81,7 @@ jobs:
           python3 - <<'PY'
           import re, pathlib
           total = 0
-          for html in ['index.html', 'formulario.html']:
+          for html in ['index.html', 'formulario.html', 'seguimiento.html']:
               p = pathlib.Path(html)
               if not p.exists():
                   continue
@@ -111,7 +111,7 @@ jobs:
         run: |
           set -e
           fallos=0
-          for html in index.html formulario.html; do
+          for html in index.html formulario.html seguimiento.html; do
             [ -f "$html" ] || continue
             for ref in $(grep -o 'src="[^"]*\.js[^"]*"' "$html" \
                          | sed 's/src="//; s/"$//; s/?.*//'); do
@@ -141,8 +141,13 @@ jobs:
           # (restaurar un respaldo no persistía), print.js, notify.js y el ciclo
           # de auto-tracking. Esto lo hace imposible de repetir.
 
-          fuentes = sorted(pathlib.Path('.').glob('*.js')) + [
-              pathlib.Path('index.html'), pathlib.Path('formulario.html')]
+          # Fase 2 y 3: el código del cliente y del panel vive en cliente/ y
+          # panel/. Sin ellos aquí, esta red dejaría de mirar casi todo.
+          fuentes = (sorted(pathlib.Path('.').glob('*.js')) +
+                     sorted(pathlib.Path('panel').glob('*.js')) +
+                     sorted(pathlib.Path('cliente').glob('*.js')) + [
+              pathlib.Path('index.html'), pathlib.Path('formulario.html'),
+              pathlib.Path('seguimiento.html')])
           declarado_const, es_funcion, exportado, usos = {}, set(), set(), {}
           for p in fuentes:
               if not p.exists():
@@ -202,7 +207,7 @@ jobs:
             [ -f "$f" ] || continue          # borrado: no aplica
             esc=$(printf '%s' "$f" | sed 's/\./\\./g')
             referenciado=0
-            for html in index.html formulario.html; do
+            for html in index.html formulario.html seguimiento.html; do
               [ -f "$html" ] || continue
               # El ancla src=" evita que tracking.js case dentro de
               # qrtracking.js — ese error ya se cometió a mano una vez.

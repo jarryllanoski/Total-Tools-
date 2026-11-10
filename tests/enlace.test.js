@@ -451,8 +451,9 @@ module.exports = async ({bloque, ok}) => {
        Aqui se fija el numero que corresponde a la version actual del
        codigo. Si alguien vuelve a tocar estos archivos sin subirlo, esta
        prueba se lo recuerda. */
-    const idx = E.leer('index.html');
-    [['config.js', 49], ['tracking.js', 22], ['notify.js', 5], ['shalom.js', 31],
+    const idx = E.leerReal('index.html');
+    // Fase 3: config.js ya no existe; vive en panel/*.js (ver más abajo).
+    [['tracking.js', 22], ['notify.js', 5], ['shalom.js', 31],
       ['functions/enlaceSeguimiento.js', 1],
       ['functions/registroShalom.js', 3],
       ['ayuda.js', 6]].forEach((par) => {
@@ -466,6 +467,13 @@ module.exports = async ({bloque, ok}) => {
          par[0] + ' va con su numero de version al dia (v' + par[1] + ')' +
          (m3 ? ' — esta en v' + m3[1] : ' — NO LO CARGA'));
     });
+    /* Fase 3: CADA módulo del panel se carga con su `?v=`. Sin número, el
+       navegador serviría uno viejo de caché junto a otros nuevos. */
+    const mods = require('fs').readdirSync(require('path').join(E.RAIZ, 'panel'))
+        .filter((f) => /\.js$/.test(f));
+    const sinV = mods.filter((f) => !new RegExp('src="panel/' + f.replace('.', '\\.') + '\\?v=\\d+"').test(idx));
+    ok(mods.length >= 22 && sinV.length === 0,
+       'los ' + mods.length + ' módulos de panel/ se cargan con número de versión' + (sinV.length ? ' — faltan: ' + sinV : ''));
   }
 
   bloque('Si el freno actua, se dice la verdad');
