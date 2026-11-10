@@ -1,5 +1,5 @@
 /**
- * panel/shalom-registro.js — clave de recojo y registro en Shalom (desde el pedido y en Config)
+ * panel/shalom/shalom-registro.js — clave de recojo y registro en Shalom (desde el pedido y en Config)
  * =============================================================================================
  * Fase 3 (10/11/2026): el panel en módulos. Antes vivía en config.js.
  * Script CLÁSICO a propósito: sus funciones y variables son globales, igual

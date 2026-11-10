@@ -1,5 +1,5 @@
 /**
- * panel/lista.js — la lista de envíos: estadísticas, búsqueda, chips, tarjetas y selección
+ * panel/pantalla/lista.js — la lista de envíos: estadísticas, búsqueda, chips, tarjetas y selección
  * ========================================================================================
  * Fase 3 (10/11/2026): el panel en módulos. Antes vivía en index.html.
  * Script CLÁSICO a propósito: sus funciones y variables son globales, igual

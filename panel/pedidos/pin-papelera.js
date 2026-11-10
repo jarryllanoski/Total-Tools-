@@ -1,5 +1,5 @@
 /**
- * panel/pin-papelera.js — PIN de la clave y papelera
+ * panel/pedidos/pin-papelera.js — PIN de la clave y papelera
  * ==================================================
  * Fase 3 (10/11/2026): el panel en módulos. Antes vivía en config.js.
  * Script CLÁSICO a propósito: sus funciones y variables son globales, igual

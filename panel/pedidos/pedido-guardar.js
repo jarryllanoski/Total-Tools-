@@ -1,5 +1,5 @@
 /**
- * panel/pedido-guardar.js — guardar el pedido (saveShipment)
+ * panel/pedidos/pedido-guardar.js — guardar el pedido (saveShipment)
  * ==========================================================
  * Fase 3 (10/11/2026): el panel en módulos. Antes vivía en config.js.
  * Script CLÁSICO a propósito: sus funciones y variables son globales, igual

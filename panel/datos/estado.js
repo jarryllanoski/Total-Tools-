@@ -1,5 +1,5 @@
 /**
- * panel/estado.js — estado, guardado, sucios, mezcla con la nube y arranque
+ * panel/datos/estado.js — estado, guardado, sucios, mezcla con la nube y arranque
  * =========================================================================
  * Fase 3 (10/11/2026): el panel en módulos. Antes vivía en index.html.
  * Script CLÁSICO a propósito: sus funciones y variables son globales, igual

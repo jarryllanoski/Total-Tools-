@@ -1,5 +1,5 @@
 /**
- * panel/excel.js — exportar e importar Excel / CSV
+ * panel/compartir/excel.js — exportar e importar Excel / CSV
  * ================================================
  * Fase 3 (10/11/2026): el panel en módulos. Antes vivía en config.js.
  * Script CLÁSICO a propósito: sus funciones y variables son globales, igual

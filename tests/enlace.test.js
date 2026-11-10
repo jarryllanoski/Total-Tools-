@@ -469,9 +469,8 @@ module.exports = async ({bloque, ok}) => {
     });
     /* Fase 3: CADA módulo del panel se carga con su `?v=`. Sin número, el
        navegador serviría uno viejo de caché junto a otros nuevos. */
-    const mods = require('fs').readdirSync(require('path').join(E.RAIZ, 'panel'))
-        .filter((f) => /\.js$/.test(f));
-    const sinV = mods.filter((f) => !new RegExp('src="panel/' + f.replace('.', '\\.') + '\\?v=\\d+"').test(idx));
+    const mods = E.modulosPanel();   // 'panel/capa/x.js' (Fase 7)
+    const sinV = mods.filter((f) => !new RegExp('src="' + f.replace(/\./g, '\\.') + '\\?v=\\d+"').test(idx));
     ok(mods.length >= 22 && sinV.length === 0,
        'los ' + mods.length + ' módulos de panel/ se cargan con número de versión' + (sinV.length ? ' — faltan: ' + sinV : ''));
   }

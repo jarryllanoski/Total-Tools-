@@ -30,9 +30,21 @@ function leerReal(rel) {
      · config.js  → sus diez módulos, uno detrás de otro.
    Así las pruebas siguen apuntando al código de verdad, y una prueba que
    quiera el HTML real usa `leerReal('index.html')`. */
-const CONFIG_JS = ['pin-papelera', 'pedido-docs', 'pedido-form', 'shalom-registro',
-  'shalom-origen', 'pedido-reniec', 'pedido-guardar', 'excel', 'links-tokens',
-  'configuracion'].map((n) => 'panel/' + n + '.js');
+// Fase 7 (11/11/2026): los módulos del panel van en carpetas por capa.
+const CONFIG_JS = ['pedidos/pin-papelera', 'pedidos/pedido-docs', 'pedidos/pedido-form',
+  'shalom/shalom-registro', 'shalom/shalom-origen', 'pedidos/pedido-reniec',
+  'pedidos/pedido-guardar', 'compartir/excel', 'compartir/links-tokens',
+  'config/configuracion'].map((n) => 'panel/' + n + '.js');
+/** Todos los módulos del panel ('panel/capa/x.js'), en cualquier carpeta. */
+function modulosPanel() {
+  const out = [];
+  const ir = (d) => fs.readdirSync(path.join(RAIZ, d), {withFileTypes: true}).forEach((x) => {
+    if (x.isDirectory()) ir(d + '/' + x.name);
+    else if (/\.js$/.test(x.name)) out.push(d + '/' + x.name);
+  });
+  ir('panel');
+  return out.sort();
+}
 function leer(rel) {
   if (rel === 'config.js') return CONFIG_JS.map(leerReal).join('\n');
   const t = leerReal(rel);
@@ -42,7 +54,7 @@ function leer(rel) {
         (m, f) => '<script>\n' + leerReal(f) + '\n</script>');
   }
   if (rel !== 'index.html') return t;
-  return t.replace(/<script src="(panel\/[\w-]+\.js)\?v=\d+"><\/script>/g,
+  return t.replace(/<script src="(panel\/[\w/-]+\.js)\?v=\d+"><\/script>/g,
       (m, f) => '<script>\n' + leerReal(f) + '\n</script>');
 }
 
@@ -174,4 +186,4 @@ function scriptsEnLinea(rel) {
   return out;
 }
 
-module.exports = {cliente, trozoCliente, CLIENTE, leerReal, CONFIG_JS, RAIZ, leer, existe, cargar, trozo, scriptsEnLinea, domFalso };
+module.exports = {cliente, trozoCliente, CLIENTE, leerReal, CONFIG_JS, modulosPanel, RAIZ, leer, existe, cargar, trozo, scriptsEnLinea, domFalso };

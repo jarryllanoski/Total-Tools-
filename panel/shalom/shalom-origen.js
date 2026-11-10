@@ -1,5 +1,5 @@
 /**
- * panel/shalom-origen.js — agencia de origen y cuenta de Shalom Pro
+ * panel/shalom/shalom-origen.js — agencia de origen y cuenta de Shalom Pro
  * =================================================================
  * Fase 3 (10/11/2026): el panel en módulos. Antes vivía en config.js.
  * Script CLÁSICO a propósito: sus funciones y variables son globales, igual

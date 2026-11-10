@@ -1,5 +1,5 @@
 /**
- * panel/configuracion.js — la pantalla de Config: negocio, etiquetas, couriers, campos
+ * panel/config/configuracion.js — la pantalla de Config: negocio, etiquetas, couriers, campos
  * ====================================================================================
  * Fase 3 (10/11/2026): el panel en módulos. Antes vivía en config.js.
  * Script CLÁSICO a propósito: sus funciones y variables son globales, igual

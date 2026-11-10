@@ -1,5 +1,5 @@
 /**
- * panel/pedido-form.js — abrir el formulario del pedido, cliente recurrente, pegar de WhatsApp
+ * panel/pedidos/pedido-form.js — abrir el formulario del pedido, cliente recurrente, pegar de WhatsApp
  * ============================================================================================
  * Fase 3 (10/11/2026): el panel en módulos. Antes vivía en config.js.
  * Script CLÁSICO a propósito: sus funciones y variables son globales, igual

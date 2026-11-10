@@ -1,5 +1,5 @@
 /**
- * panel/pedido-docs.js — WhatsApp, documentos, visor, links y monto del pedido
+ * panel/pedidos/pedido-docs.js — WhatsApp, documentos, visor, links y monto del pedido
  * ============================================================================
  * Fase 3 (10/11/2026): el panel en módulos. Antes vivía en config.js.
  * Script CLÁSICO a propósito: sus funciones y variables son globales, igual

@@ -27,32 +27,40 @@ un `<script>` clásico y el orden de las etiquetas es el orden de ejecución.
 Los links viejos `formulario.html?seg=…` se redirigen a `seguimiento.html`
 en el `<head>`, antes de descargar nada.
 
-### `panel/` — en el orden en que se cargan
+### `panel/` — en carpetas por capa (Fase 7), en el orden en que se cargan
+
+Capas: `datos/` (lo único que habla con Firestore, y el estado) ·
+`pedidos/` · `shalom/` · `compartir/` · `config/` (el negocio) ·
+`pantalla/` (pintar y navegar). **Datos no llama hacia arriba:** cuando
+algo cambia, avisa con un evento (`tt:config-cambiada`) y la pantalla
+repinta. Pendiente conocido: `datos/estado.js` todavía llama a `render()` y
+`toast()` en algunos puntos; moverlos a eventos es tocar lógica y se hará
+aparte, con su prueba.
 
 | Módulo | Qué hace | Venía de |
 |---|---|---|
-| `nube.js` | **la única capa que habla con Firestore** (leer, escribir, sincronizar) | index.html |
-| `estado.js` | `S`, guardar, sucios, mezcla con la nube, `_initFirebase` | index.html |
-| `navegacion.js` | avisos, velo «sincronizando», pestañas, ventanas | index.html |
-| `lista.js` | estadísticas, búsqueda, chips, tarjetas, selección | index.html |
-| `shalom-ajustes.js` | Shalom en Config: barrido, puerta, seguimiento, cuentas | index.html |
-| `recursos-ui.js` | pantalla del centro de recursos | index.html |
-| `acciones.js` | resaltar, pegar, copiar, dictado, mensajes rápidos | index.html |
-| `proveedores.js` | proveedores y su stock | index.html |
-| `estados-papelera.js` | cambiar estado, `confirmar()`, papelera | index.html |
-| `escaner.js` | QR y lectura del ticket por foto | index.html |
-| `inicio.js` | encabezado del negocio y **el arranque** (nube + primer pintado) | index.html |
-| `pin-papelera.js` | PIN y papelera | config.js |
-| `pedido-docs.js` | WhatsApp, documentos, visor, links, monto | config.js |
-| `pedido-form.js` | abrir el pedido, cliente recurrente, pegar WhatsApp | config.js |
-| `shalom-registro.js` | clave de recojo y registro en Shalom | config.js |
-| `shalom-origen.js` | agencia de origen y cuenta Shalom Pro | config.js |
-| `pedido-reniec.js` | DNI → RENIEC, agencia identificada | config.js |
-| `pedido-guardar.js` | `saveShipment()` — guardar el pedido | config.js |
-| `excel.js` | exportar / importar | config.js |
-| `links-tokens.js` | links de pedido y tokens de un solo uso | config.js |
-| `configuracion.js` | la pantalla de Config, etiquetas, couriers | config.js |
-| `pedido-ui.js` | acordeones, cajas de Shalom, medidas | index.html (final) |
+| `datos/nube.js` | **la única capa que habla con Firestore** (leer, escribir, sincronizar) | index.html |
+| `datos/estado.js` | `S`, guardar, sucios, mezcla con la nube, `_initFirebase` | index.html |
+| `pantalla/navegacion.js` | avisos, velo «sincronizando», pestañas, ventanas | index.html |
+| `pantalla/lista.js` | estadísticas, búsqueda, chips, tarjetas, selección | index.html |
+| `shalom/shalom-ajustes.js` | Shalom en Config: barrido, puerta, seguimiento, cuentas | index.html |
+| `config/recursos-ui.js` | pantalla del centro de recursos | index.html |
+| `pantalla/acciones.js` | resaltar, pegar, copiar, dictado, mensajes rápidos | index.html |
+| `config/proveedores.js` | proveedores y su stock | index.html |
+| `pedidos/estados-papelera.js` | cambiar estado, `confirmar()`, papelera | index.html |
+| `pantalla/escaner.js` | QR y lectura del ticket por foto | index.html |
+| `pantalla/inicio.js` | encabezado del negocio y **el arranque** (nube + primer pintado) | index.html |
+| `pedidos/pin-papelera.js` | PIN y papelera | config.js |
+| `pedidos/pedido-docs.js` | WhatsApp, documentos, visor, links, monto | config.js |
+| `pedidos/pedido-form.js` | abrir el pedido, cliente recurrente, pegar WhatsApp | config.js |
+| `shalom/shalom-registro.js` | clave de recojo y registro en Shalom | config.js |
+| `shalom/shalom-origen.js` | agencia de origen y cuenta Shalom Pro | config.js |
+| `pedidos/pedido-reniec.js` | DNI → RENIEC, agencia identificada | config.js |
+| `pedidos/pedido-guardar.js` | `saveShipment()` — guardar el pedido | config.js |
+| `compartir/excel.js` | exportar / importar | config.js |
+| `compartir/links-tokens.js` | links de pedido y tokens de un solo uso | config.js |
+| `config/configuracion.js` | la pantalla de Config, etiquetas, couriers | config.js |
+| `pedidos/pedido-ui.js` | acordeones, cajas de Shalom, medidas | index.html (final) |
 
 `cliente/`: `comun.js` (API, `CFG`, cabecera, pie, Toby, código de
 seguimiento), `seguimiento.js`, `cliente.css`, y el formulario en módulos

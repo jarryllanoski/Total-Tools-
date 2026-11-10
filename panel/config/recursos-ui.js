@@ -1,5 +1,5 @@
 /**
- * panel/recursos-ui.js — la pantalla del centro de recursos
+ * panel/config/recursos-ui.js — la pantalla del centro de recursos
  * =========================================================
  * Fase 3 (10/11/2026): el panel en módulos. Antes vivía en index.html.
  * Script CLÁSICO a propósito: sus funciones y variables son globales, igual

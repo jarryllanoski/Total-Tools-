@@ -40,7 +40,7 @@
 <script src="functions/fechaPedido.js?v=1"></script>
 <script src="appcheck.js?v=2"></script>
 <!-- FIREBASE via REST API — sin SDK, funciona en Brave/Chrome/Firefox/Safari -->
-<script src="panel/nube.js?v=1"></script>
+<script src="panel/datos/nube.js?v=2"></script>
 <link rel="stylesheet" href="panel.css?v=11">
 </head>
 <body>
@@ -1060,16 +1060,16 @@
 <script src="auth.js?v=10"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
-<script src="panel/estado.js?v=2"></script>
-<script src="panel/navegacion.js?v=1"></script>
-<script src="panel/lista.js?v=1"></script>
-<script src="panel/shalom-ajustes.js?v=2"></script>
-<script src="panel/recursos-ui.js?v=1"></script>
-<script src="panel/acciones.js?v=1"></script>
-<script src="panel/proveedores.js?v=1"></script>
-<script src="panel/estados-papelera.js?v=1"></script>
-<script src="panel/escaner.js?v=1"></script>
-<script src="panel/inicio.js?v=1"></script>
+<script src="panel/datos/estado.js?v=2"></script>
+<script src="panel/pantalla/navegacion.js?v=1"></script>
+<script src="panel/pantalla/lista.js?v=1"></script>
+<script src="panel/shalom/shalom-ajustes.js?v=2"></script>
+<script src="panel/config/recursos-ui.js?v=1"></script>
+<script src="panel/pantalla/acciones.js?v=1"></script>
+<script src="panel/config/proveedores.js?v=1"></script>
+<script src="panel/pedidos/estados-papelera.js?v=1"></script>
+<script src="panel/pantalla/escaner.js?v=1"></script>
+<script src="panel/pantalla/inicio.js?v=2"></script>
 <!-- ★ SHALOM tracking — cargado al final -->
 <script src="storage.js?v=6"></script>
 <script src="fotos.js?v=1"></script>
@@ -1077,16 +1077,16 @@
      lo usa. config.js, print.js y voz.js preguntan por los pedidos marcados,
      así que siguen yendo detrás. El orden de carga es un contrato
      (ver docs/ARQUITECTURA.md). -->
-<script src="panel/pin-papelera.js?v=1"></script>
-<script src="panel/pedido-docs.js?v=1"></script>
-<script src="panel/pedido-form.js?v=1"></script>
-<script src="panel/shalom-registro.js?v=2"></script>
-<script src="panel/shalom-origen.js?v=1"></script>
-<script src="panel/pedido-reniec.js?v=2"></script>
-<script src="panel/pedido-guardar.js?v=1"></script>
-<script src="panel/excel.js?v=1"></script>
-<script src="panel/links-tokens.js?v=1"></script>
-<script src="panel/configuracion.js?v=1"></script>
+<script src="panel/pedidos/pin-papelera.js?v=1"></script>
+<script src="panel/pedidos/pedido-docs.js?v=1"></script>
+<script src="panel/pedidos/pedido-form.js?v=1"></script>
+<script src="panel/shalom/shalom-registro.js?v=2"></script>
+<script src="panel/shalom/shalom-origen.js?v=1"></script>
+<script src="panel/pedidos/pedido-reniec.js?v=2"></script>
+<script src="panel/pedidos/pedido-guardar.js?v=1"></script>
+<script src="panel/compartir/excel.js?v=1"></script>
+<script src="panel/compartir/links-tokens.js?v=1"></script>
+<script src="panel/config/configuracion.js?v=1"></script>
 <script src="print.js?v=21"></script>
 <script src="notify.js?v=7"></script>
 <script src="shalom.js?v=35"></script>
@@ -1103,6 +1103,6 @@
 <script src="dashboard.js?v=2"></script>
 <script src="voz.js?v=3"></script>
 <script src="cotizacion.js?v=3"></script>
-<script src="panel/pedido-ui.js?v=2"></script>
+<script src="panel/pedidos/pedido-ui.js?v=2"></script>
 </body>
 </html>

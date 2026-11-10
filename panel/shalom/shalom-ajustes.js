@@ -1,5 +1,5 @@
 /**
- * panel/shalom-ajustes.js — Shalom en Config: barrido, puerta, seguimiento y cuentas
+ * panel/shalom/shalom-ajustes.js — Shalom en Config: barrido, puerta, seguimiento y cuentas
  * ==================================================================================
  * Fase 3 (10/11/2026): el panel en módulos. Antes vivía en index.html.
  * Script CLÁSICO a propósito: sus funciones y variables son globales, igual

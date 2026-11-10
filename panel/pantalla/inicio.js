@@ -1,5 +1,5 @@
 /**
- * panel/inicio.js — encabezado del negocio y ARRANQUE del panel
+ * panel/pantalla/inicio.js — encabezado del negocio y ARRANQUE del panel
  * =============================================================
  * Fase 3 (10/11/2026): el panel en módulos. Antes vivía en index.html.
  * Script CLÁSICO a propósito: sus funciones y variables son globales, igual
@@ -32,6 +32,16 @@ if(window._fbReady) {
   // Fallback: try after short delay
   setTimeout(_initFirebase, 500);
 }
+
+/* La capa de datos avisa que la configuración trajo cambios de otro equipo
+   (panel/datos/nube.js): aquí se repinta lo que está a la vista. */
+window.addEventListener('tt:config-cambiada', function(){
+  try{
+    renderChips();
+    if(typeof loadCfgUI==='function' && document.querySelector('#page-configurar.active')) loadCfgUI();
+    if(typeof recRender==='function' && document.querySelector('#page-recursos.active')) recRender();
+  }catch(_){}
+});
 
 /* INIT */
 pintarEncabezado();

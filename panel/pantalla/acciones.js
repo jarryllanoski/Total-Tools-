@@ -1,5 +1,5 @@
 /**
- * panel/acciones.js — resaltar, pegar, copiar, dictado por voz y mensajes rápidos
+ * panel/pantalla/acciones.js — resaltar, pegar, copiar, dictado por voz y mensajes rápidos
  * ===============================================================================
  * Fase 3 (10/11/2026): el panel en módulos. Antes vivía en index.html.
  * Script CLÁSICO a propósito: sus funciones y variables son globales, igual

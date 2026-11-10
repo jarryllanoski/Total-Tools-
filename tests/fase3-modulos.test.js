@@ -17,8 +17,12 @@ const path = require('path');
 
 module.exports = async ({bloque, ok}) => {
   const html = E.leerReal('index.html');
-  const mods = fs.readdirSync(path.join(E.RAIZ, 'panel')).filter((f) => /\.js$/.test(f));
-  const pos = (f) => html.indexOf('<script src="panel/' + f + '?v=');
+  // Fase 7: en carpetas por capa → 'datos/nube.js'. Las pruebas de abajo
+  // nombran el archivo ('nube.js') y aquí se busca su carpeta.
+  const mods = E.modulosPanel().map((f) => f.replace('panel/', ''));
+  const RUTA = {};
+  mods.forEach((m) => { RUTA[m.split('/').pop()] = m; });
+  const pos = (f) => html.indexOf('<script src="panel/' + (RUTA[f] || f) + '?v=');
 
   bloque('index.html es solo HTML');
 
@@ -82,8 +86,8 @@ module.exports = async ({bloque, ok}) => {
   bloque('El arranque de la nube, cuando la lista ya existe');
 
   {
-    const ini = E.leerReal('panel/inicio.js');
-    const est = E.leerReal('panel/estado.js');
+    const ini = E.leerReal('panel/pantalla/inicio.js');
+    const est = E.leerReal('panel/datos/estado.js');
     ok(/if\(window\._fbReady\) \{\s*_initFirebase\(\);/.test(ini) && !/if\(window\._fbReady\) \{/.test(est),
        'arranca en inicio.js (último del panel), no en estado.js');
     ok(ini.indexOf('_initFirebase();') < ini.indexOf('pintarEncabezado();\nrenderChips();\nrender();'),
@@ -113,4 +117,30 @@ module.exports = async ({bloque, ok}) => {
        ' — un nombre repetido pisaría al otro sin error');
     ok(Object.keys(def).length > 400, Object.keys(def).length + ' nombres repartidos en ' + archivos.length + ' módulos');
   }
+
+  bloque('Fase 7: el panel en carpetas por capa');
+
+  {
+    const CAPAS = {datos: ['nube.js', 'estado.js'],
+      pantalla: ['navegacion.js', 'lista.js', 'acciones.js', 'escaner.js', 'inicio.js'],
+      pedidos: ['pedido-form.js', 'pedido-docs.js', 'pedido-reniec.js', 'pedido-guardar.js', 'pedido-ui.js',
+        'estados-papelera.js', 'pin-papelera.js'],
+      shalom: ['shalom-registro.js', 'shalom-origen.js', 'shalom-ajustes.js'],
+      compartir: ['links-tokens.js', 'excel.js'],
+      config: ['configuracion.js', 'recursos-ui.js', 'proveedores.js']};
+    ok(fs.readdirSync(path.join(E.RAIZ, 'panel')).every((f) => fs.statSync(path.join(E.RAIZ, 'panel', f)).isDirectory()),
+       'ningún módulo suelto en panel/: cada uno en su carpeta');
+    const esperado = Object.keys(CAPAS).flatMap((c) => CAPAS[c].map((f) => c + '/' + f)).sort();
+    ok(JSON.stringify(mods.slice().sort()) === JSON.stringify(esperado),
+       'cada módulo en la carpeta de su capa (si agregas uno, decide su capa aquí)');
+    /* La capa de datos (nube.js) NO llama hacia arriba: avisa con un evento
+       y la pantalla repinta. */
+    const nube = E.leerReal('panel/datos/nube.js').replace(/\/\*[\s\S]*?\*\/|\/\/.*$/gm, '');
+    ok(!/\b(render|renderChips|loadCfgUI|recRender|openForm|goPage)\(/.test(nube),
+       'datos/nube.js no llama a la pantalla (ni render, ni loadCfgUI, ni recRender…)');
+    ok(/dispatchEvent\(new Event\('tt:config-cambiada'\)\)/.test(nube) &&
+       /addEventListener\('tt:config-cambiada'/.test(E.leerReal('panel/pantalla/inicio.js')),
+       'avisa «configuración cambiada» y pantalla/inicio.js repinta');
+  }
 };
+

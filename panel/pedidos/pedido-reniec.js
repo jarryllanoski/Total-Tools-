@@ -1,5 +1,5 @@
 /**
- * panel/pedido-reniec.js — DNI → RENIEC y la agencia identificada
+ * panel/pedidos/pedido-reniec.js — DNI → RENIEC y la agencia identificada
  * ===============================================================
  * Fase 3 (10/11/2026): el panel en módulos. Antes vivía en config.js.
  * Script CLÁSICO a propósito: sus funciones y variables son globales, igual

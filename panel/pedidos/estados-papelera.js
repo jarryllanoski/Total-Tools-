@@ -1,5 +1,5 @@
 /**
- * panel/estados-papelera.js — cambiar estado, confirmar, papelera
+ * panel/pedidos/estados-papelera.js — cambiar estado, confirmar, papelera
  * ===============================================================
  * Fase 3 (10/11/2026): el panel en módulos. Antes vivía en index.html.
  * Script CLÁSICO a propósito: sus funciones y variables son globales, igual

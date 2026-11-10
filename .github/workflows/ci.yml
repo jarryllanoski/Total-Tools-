@@ -144,7 +144,7 @@ jobs:
           # Fase 2 y 3: el código del cliente y del panel vive en cliente/ y
           # panel/. Sin ellos aquí, esta red dejaría de mirar casi todo.
           fuentes = (sorted(pathlib.Path('.').glob('*.js')) +
-                     sorted(pathlib.Path('panel').glob('*.js')) +
+                     sorted(pathlib.Path('panel').rglob('*.js')) +
                      sorted(pathlib.Path('cliente').glob('*.js')) + [
               pathlib.Path('index.html'), pathlib.Path('formulario.html'),
               pathlib.Path('seguimiento.html')])

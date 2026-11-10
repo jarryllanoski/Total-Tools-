@@ -1,5 +1,5 @@
 /**
- * panel/nube.js — la capa de Firestore: leer, escribir, sincronizar
+ * panel/datos/nube.js — la capa de Firestore: leer, escribir, sincronizar
  * =================================================================
  * Fase 3 (10/11/2026): el panel en módulos. Antes vivía en index.html.
  * Script CLÁSICO a propósito: sus funciones y variables son globales, igual
@@ -667,11 +667,12 @@
         // Lo que acaba de quedar en la nube es la nueva base.
         if(_cfgQueda) window._cfgBase = _cfgQueda;
       }
-      // Si la mezcla trajo algo de otro equipo, que se vea sin esperar.
+      /* Si la mezcla trajo algo de otro equipo, que se vea sin esperar.
+         La capa de datos AVISA y la pantalla repinta (pantalla/inicio.js):
+         datos no llama hacia arriba (Fase 7). */
       if(window._cfgAjenoPintar){
         window._cfgAjenoPintar = false;
-        try{ renderChips(); if(typeof loadCfgUI==='function' && document.querySelector('#page-configurar.active')) loadCfgUI();
-             if(typeof recRender==='function' && document.querySelector('#page-recursos.active')) recRender(); }catch(_){}
+        try{ window.dispatchEvent(new Event('tt:config-cambiada')); }catch(_){}
       }
 
       // ★ El éxito parcial cuenta. Se descuenta lo que Firestore confirmó,
