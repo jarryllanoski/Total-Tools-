@@ -26,8 +26,15 @@
     raiz.RegistroShalom = fabrica();
   }
 })(typeof globalThis !== "undefined" ? globalThis : window, () => {
-  /** El único estado desde el que se registra. Lo pidió el dueño así. */
+  /** Desde dónde se registra. Lo pidió el dueño así: POR ALISTAR, y también
+   * ALISTADO (10/11/2026) — un paquete ya armado al que le faltaba la guía.
+   * Que no tenga guía ya lo exige el candado de `estaRegistrado`. */
   const ESTADO_PUERTA = "POR ALISTAR";
+  const ESTADOS_PUERTA = ["POR ALISTAR", "ALISTADO"];
+
+  /** Pasado este plazo sin dejar el paquete en la agencia, Shalom da la guía
+   * por vencida y se puede registrar una nueva (10/11/2026). */
+  const PLAZO_MS = 24 * 3600 * 1000;
 
   /**
    * Catálogo de cajas de Shalom. Medidas confirmadas DOS VECES: por la app
@@ -90,12 +97,69 @@
    */
   function contenidoDe(pedido) {
     const p = pedido || {};
+    /* La caja elegida a mano (los botones XXS…L, como en Shalom Pro) manda
+       sobre las medidas: quien la elige dice dónde entra el paquete. */
+    const elegida = tipoElegido(p);
+    if (elegida) {
+      return "PAQUETE " + (elegida === "XXS" ? "XS" : elegida);
+    }
     const c = clasificar(p.pkgLargo, p.pkgAncho, p.pkgAlto, p.pkgPeso);
     if (!c || c.tipo === "OTRA") return null;
     // XXS no existe en el registro: va como XS, la más chica que sí ofrece.
     const t = c.tipo === "XXS" ? "XS" : c.tipo;
     const txt = "PAQUETE " + t;
     return CONTENIDOS.indexOf(txt) >= 0 ? txt : null;
+  }
+
+  /**
+   * La caja elegida a mano, si es una del catálogo.
+   * @param {Object} pedido el pedido
+   * @return {string} "XXS"…"L", o "" si no eligió ninguna
+   */
+  function tipoElegido(pedido) {
+    const t = _txt(pedido && pedido.pkgCaja).toUpperCase();
+    return CAJAS.some((c) => c.tipo === t) ? t : "";
+  }
+
+  /**
+   * ¿Lo registró ESTE sistema con Shalom Pro? Una guía escrita a mano o
+   * escaneada del ticket no cuenta: solo lo que salió de `orquestar` o
+   * `recuperarEnvio`, que dejan su marca. Los de antes de la marca se
+   * reconocen por la hora del registro, que solo ponía `orquestar`.
+   * @param {Object} pedido el pedido
+   * @return {boolean} true si se registró por Shalom Pro desde el panel
+   */
+  function registradoPorPro(pedido) {
+    const p = pedido || {};
+    if (!estaRegistrado(p)) return false;
+    return p.shalomPor === "pro" || !!_txt(p.shalomRegistradoEn);
+  }
+
+  /**
+   * ¿Ya venció la guía? Solo se puede afirmar con la hora del registro.
+   * @param {Object} pedido el pedido
+   * @param {number} ahoraMs ahora, en ms
+   * @return {boolean} true si pasaron 24 h desde el registro
+   */
+  function plazoVencido(pedido, ahoraMs) {
+    const t = Date.parse(_txt(pedido && pedido.shalomRegistradoEn));
+    return isFinite(t) && (ahoraMs - t) >= PLAZO_MS;
+  }
+
+  /**
+   * La línea que se añade a la nota PRIVADA del pedido al registrar. La nota
+   * privada no sale jamás al cliente (pedidoPublico.js la tiene en SECRETOS).
+   * @param {string} previa la nota que ya había
+   * @param {string} clave la clave de recojo
+   * @param {string} guia la guía nueva
+   * @return {string} la nota con la línea añadida
+   */
+  function notaConClave(previa, clave, guia) {
+    const linea = "🔑 Clave Shalom: " + _dig(clave) +
+      (guia ? " · guía " + _txt(guia) : "");
+    const p = _txt(previa);
+    if (p.indexOf(linea) >= 0) return p;
+    return (p ? p + "\n" : "") + linea;
   }
 
   /**
@@ -163,8 +227,8 @@
       return f; // lo demás ya no importa
     }
 
-    if (_txt(p.status).toUpperCase() !== ESTADO_PUERTA) {
-      f.push("Solo se registra lo que está en POR ALISTAR " +
+    if (ESTADOS_PUERTA.indexOf(_txt(p.status).toUpperCase()) < 0) {
+      f.push("Solo se registra lo que está en POR ALISTAR o ALISTADO " +
         "(este está en " + (_txt(p.status) || "sin estado") + ").");
     }
     if (!/SHALOM/i.test(_txt(p.courier))) {
@@ -207,6 +271,9 @@
       f.push("Falta el nombre del destinatario partido por RENIEC: " +
         "consulta el DNI en el formulario.");
     }
+
+    // Con la caja elegida a mano, no hacen falta medidas ni peso.
+    if (tipoElegido(p)) return f;
 
     // Las medidas, que deciden la caja.
     const faltaMedida = !(parseFloat(p.pkgLargo) > 0) ||
@@ -377,9 +444,10 @@
    *
    * @param {*} lista lo que devolvió pending-shipments
    * @param {Object} cuerpoEnviado el cuerpo que se mandó (clave, destino)
+   * @param {Array<string>} [excluir] guías que NO pueden ser la buscada
    * @return {Object} el envío, o null
    */
-  function buscarEnPendientes(lista, cuerpoEnviado) {
+  function buscarEnPendientes(lista, cuerpoEnviado, excluir) {
     if (!lista || typeof lista !== "object") return null;
     const c = (cuerpoEnviado && typeof cuerpoEnviado === "object") ?
       cuerpoEnviado : {};
@@ -388,8 +456,13 @@
     if (clave.length !== 4 || !(destino > 0)) return null;
     const todos = Array.isArray(lista) ? lista : Object.keys(lista)
         .map((k) => lista[k]);
+    // Al registrar de nuevo, la guía VIEJA tiene la misma clave y destino:
+    // no puede pasar por la nueva.
+    const fuera = Array.isArray(excluir) ? excluir.map(_txt) : [];
     const casan = todos.filter((x) => {
       if (!x || typeof x !== "object") return false;
+      if (fuera.length && fuera.indexOf(_txt(x.service_order_guia_empresarial ||
+          x.guia || x.orderNumber)) >= 0) return false;
       const est = (x.destination_station && typeof x.destination_station ===
         "object") ? x.destination_station : {};
       return _dig(x.code_val) === clave &&
@@ -463,9 +536,10 @@
    * Lo que se guarda en el pedido a partir de un envío ya creado.
    * @param {Object} env el envío, como lo devuelve Shalom
    * @param {string} [nacimiento] cuándo se creó la guía, en ISO
+   * @param {Object} [pedido] el pedido (para la nota privada con la clave)
    * @return {Object} los campos a escribir
    */
-  function _deEnvio(env, nacimiento) {
+  function _deEnvio(env, nacimiento, pedido) {
     const e = env || {};
     const guia = _txt(e.service_order_guia_empresarial || e.guia ||
       e.orderNumber);
@@ -495,6 +569,14 @@
        reloj de Shalom y cubre también los recuperados. Viaja ya en la
        respuesta de la puerta; falta medir su formato antes de parsearla. */
     if (nacimiento) campos.shalomRegistradoEn = nacimiento;
+    // La marca de «lo registró el panel con Shalom Pro».
+    campos.shalomPor = "pro";
+    /* La clave a la nota PRIVADA (la del doble clic en el nombre), para
+       tenerla a mano. Nunca a `notes`: esa la ve el cliente. */
+    if (pedido && guia) {
+      campos.privateNote = notaConClave(pedido.privateNote, pedido.shalomClave,
+          guia);
+    }
     return campos;
   }
 
@@ -510,9 +592,9 @@
    * no puede estar encendida por defecto. En simulacro decide todo igual,
    * devuelve el cuerpo exacto que mandaría, y NO llama a nadie.
    *
-   * @param {Object} datos {pedidoId}
+   * @param {Object} datos {pedidoId, renovar}
    * @param {Object} deps {leerPedido, leerConfig, llamar, pendientes,
-   *   guardar, ahora}
+   *   guardar, ahora, rastrear}
    * @param {Object} [opc] {simulacro}
    * @return {Promise<Object>} el resultado, siempre con motivo en palabras
    */
@@ -521,9 +603,31 @@
     const pedidoId = _txt(datos && datos.pedidoId);
     if (!pedidoId) return {ok: false, motivo: "SIN_DATO"};
 
-    const pedido = await deps.leerPedido(pedidoId);
-    if (!pedido) return {ok: false, motivo: "NO_ENCONTRADO"};
+    const leido = await deps.leerPedido(pedidoId);
+    if (!leido) return {ok: false, motivo: "NO_ENCONTRADO"};
     const cfg = await deps.leerConfig();
+
+    /* ⏰ REGISTRAR DE NUEVO, pasadas 24 h (10/11/2026). Shalom da por vencida
+       la guía que no se deja en la agencia en 24 h. Cuesta dinero otra vez,
+       así que se exige TODO, aquí en el servidor:
+         · que haya una guía y su hora de registro (sin hora no se puede
+           afirmar que venció: no se ofrece);
+         · que hayan pasado 24 h por el reloj del SERVIDOR;
+         · que el pedido no diga ya que el paquete avanzó;
+         · y que Shalom, preguntado AHORA, diga que no entró a ninguna
+           agencia. Cualquier otra respuesta —entró, sin red, rara— frena. */
+    let pedido = leido;
+    let anteriores = null;
+    if (datos && datos.renovar === true) {
+      const v = await _puedeRenovar(leido, deps);
+      if (!v.ok) return v;
+      anteriores = (Array.isArray(leido.shalomGuiasAnteriores) ?
+        leido.shalomGuiasAnteriores.slice(-9) : []).concat([{
+        guia: _txt(leido.shalomGuia), codigo: _txt(leido.shalomCodigo),
+        registradoEn: _txt(leido.shalomRegistradoEn), motivo: "vencida",
+      }]);
+      pedido = Object.assign({}, leido, {shalomGuia: "", shalomCodigo: ""});
+    }
 
     /* Los candados, contra lo que hay AHORA en la base de datos — no contra
        lo que el navegador creía hace un rato. */
@@ -547,7 +651,12 @@
         service_order_guia_empresarial: g.guia,
         code_service_order_empresarial: g.codigo,
         quote: g.monto,
-      }, _ahora(deps));
+      }, _ahora(deps), pedido);
+      if (anteriores) {
+        campos.shalomGuiasAnteriores = anteriores;
+        // El seguimiento viejo era de la guía vencida: se empieza limpio.
+        Object.assign(campos, _seguimientoLimpio());
+      }
       await deps.guardar(campos);
       // Los NOMBRES de los campos que trajo Shalom, sin un solo valor: es
       // lo que hace falta para cerrar el traductor, y se puede pegar en un
@@ -569,13 +678,18 @@
        segundo cobro. Se consulta la lista de pendientes y se busca. */
     let encontrado = null;
     try {
-      encontrado = buscarEnPendientes(await deps.pendientes(), c);
+      encontrado = buscarEnPendientes(await deps.pendientes(), c,
+          anteriores ? anteriores.map((a) => a.guia) : null);
     } catch (e) {
       encontrado = null;
     }
     if (encontrado) {
       // Recién creado hace segundos: su hora de nacimiento es ahora.
-      const campos = _deEnvio(encontrado, _ahora(deps));
+      const campos = _deEnvio(encontrado, _ahora(deps), pedido);
+      if (anteriores) {
+        campos.shalomGuiasAnteriores = anteriores;
+        Object.assign(campos, _seguimientoLimpio());
+      }
       await deps.guardar(campos);
       return {ok: true, estado: "exito", recuperado: true, campos: campos};
     }
@@ -634,12 +748,70 @@
     }
     /* SIN SELLO DE HORA, A PROPÓSITO: esto puede correr horas después del
        registro, y poner "ahora" regalaría 24 h de plazo que ya no existen. */
-    const campos = _deEnvio(env);
+    const campos = _deEnvio(env, "", pedido);
     await deps.guardar(campos);
     return {ok: true, estado: "exito", recuperado: true, campos: campos};
   }
 
-  return {ESTADO_PUERTA, CAJAS, CONTENIDOS, clasificar, contenidoDe,
+  /**
+   * Los campos de seguimiento, vacíos: eran de la guía anterior.
+   * @return {Object} los campos a escribir
+   */
+  function _seguimientoLimpio() {
+    return {trackingStatus: "", trackingMessage: "", trackingLastUpdate: "",
+      trackingOrderNumber: "", trackingOrderCode: "", trackingHistory: [],
+      trackingHistorialShalom: []};
+  }
+
+  /**
+   * ¿Se puede registrar de nuevo este pedido? Ver `orquestar`.
+   * @param {Object} p el pedido leído de la base
+   * @param {Object} deps {ahora, rastrear}
+   * @return {Promise<Object>} {ok:true} o el motivo, en palabras
+   */
+  async function _puedeRenovar(p, deps) {
+    const no = (motivo, detalle) => ({ok: false, motivo, detalle});
+    if (!estaRegistrado(p)) {
+      return no("SIN_DATO", "Este pedido no tiene guía: regístralo normal.");
+    }
+    if (!_txt(p.shalomRegistradoEn)) {
+      return no("NO_VENCIDA", "No sabemos cuándo se registró esta guía, " +
+        "así que no se puede afirmar que venció. Mírala en pro.shalom.pe.");
+    }
+    const ahora = Date.parse(_ahora(deps));
+    if (!plazoVencido(p, ahora)) {
+      return no("NO_VENCIDA", "La guía todavía está dentro de sus 24 h: " +
+        "deja el paquete en la agencia con esa misma guía.");
+    }
+    if (_txt(p.trackingStatus)) {
+      return no("YA_EN_AGENCIA", "Shalom ya movió este paquete (" +
+        _txt(p.trackingStatus) + "). No se registra de nuevo.");
+    }
+    if (!deps || typeof deps.rastrear !== "function") {
+      return no("NO_VERIFICADO", "No se pudo consultar la guía en Shalom.");
+    }
+    let t = null;
+    try {
+      t = await deps.rastrear(_txt(p.shalomGuia), _txt(p.shalomCodigo));
+    } catch (e) {
+      t = null;
+    }
+    const m = t && t.motivo;
+    if (t && !t.ok && (m === "SOLO_REGISTRADO" || m === "NO_ENCONTRADO")) {
+      return {ok: true};
+    }
+    if (t && t.ok) {
+      return no("YA_EN_AGENCIA", "Shalom dice que el paquete ya entró (" +
+        _txt(t.estado) + "). No se registra de nuevo: sería un segundo cobro.");
+    }
+    return no("NO_VERIFICADO", "No pudimos confirmar con Shalom que la guía " +
+      "venció" + (m ? " (" + m + ")" : "") + ". No se registró nada. " +
+      "Intenta en un rato o míralo en pro.shalom.pe.");
+  }
+
+  return {ESTADO_PUERTA, ESTADOS_PUERTA, PLAZO_MS, CAJAS, tipoElegido,
+    registradoPorPro, plazoVencido, notaConClave,
+    puedeRenovar: _puedeRenovar, CONTENIDOS, clasificar, contenidoDe,
     faltantes, cuerpo, resultado, buscarEnPendientes, orquestar,
     reniecDe, guiaDe, camposDe, recuperarEnvio, estaRegistrado, configDe};
 });

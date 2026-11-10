@@ -458,8 +458,12 @@
        → fallo:     {ok:false, estado:'fallo', motivo, detalle}
        → duda:      {ok:false, estado:'duda', detalle} ← NO reintentar
        → faltan:    {ok:false, motivo:'SIN_DATO', faltan:[textos]} */
-    registrarEnvio: function (pedidoId) {
-      return _pedir({op: 'registrarEnvio', datos: {pedidoId: pedidoId}});
+    /* `opc.renovar`: registrar de nuevo una guía vencida (24 h sin dejarse
+       en la agencia). El servidor lo vuelve a comprobar TODO. */
+    registrarEnvio: function (pedidoId, opc) {
+      var d = {pedidoId: pedidoId};
+      if (opc && opc.renovar === true) d.renovar = true;
+      return _pedir({op: 'registrarEnvio', datos: d});
     },
 
     /* Rellenar la guía de un envío que YA está en Shalom. SOLO LEE: busca
@@ -570,6 +574,9 @@
            `origen` (el paquete entró a la agencia); la puerta ya no las
            aplasta, así que esta respuesta por fin se puede decir. */
         SOLO_REGISTRADO: 'Registrado en Shalom, pero el paquete todavía no entró a la agencia. Déjalo allí: el plazo es de 24 horas.',
+        NO_VENCIDA:    'La guía todavía no venció: déjala en la agencia con esa misma guía.',
+        YA_EN_AGENCIA: 'Shalom ya recibió este paquete: no se registra de nuevo.',
+        NO_VERIFICADO: 'No pudimos confirmar con Shalom que la guía venció. No se registró nada.',
         BLOQUEADO:     'Shalom rechazó la clave de la API, o el plan venció.',
         /* Medido: con un instanceId malo, Shalom responde 403 "Invalid API
            Key or instance access". Antes se traducía como BLOQUEADO y

@@ -115,8 +115,8 @@ module.exports = async ({bloque, ok}) => {
        'que es el unico motivo por el que se puede cerrar sin perder nada');
   }
   {
-    // Fuera de POR ALISTAR no hay nada que hacer hoy: se dice, pero sin gritar.
-    const m = montar({pedido: Object.assign(PEDIDO(), {status: 'ALISTADO',
+    // Fuera de POR ALISTAR/ALISTADO no hay nada que hacer hoy: se dice, sin gritar.
+    const m = montar({pedido: Object.assign(PEDIDO(), {status: 'ENVIADO',
       shalomClave: ''})});
     m.api.pintar();
     ok(/faltan/.test(m.resumen()), 'se sigue diciendo que falta');
@@ -125,10 +125,18 @@ module.exports = async ({bloque, ok}) => {
   }
   {
     const m = montar({pedido: Object.assign(PEDIDO(), {shalomGuia: '98173469',
-      shalomCodigo: 'WKKH', status: 'ALISTADO'})});
+      shalomCodigo: 'WKKH', status: 'ALISTADO', shalomPor: 'pro'})});
     m.api.pintar();
     ok(/registrado/.test(m.resumen()), 'y un pedido ya registrado lo dice');
     ok(!/faltan/.test(m.resumen()), 'sin pedirte datos que ya no hacen falta');
+  }
+  {
+    // 10/11/2026: una guía puesta A MANO no la registró Shalom Pro desde aquí.
+    const m = montar({pedido: Object.assign(PEDIDO(), {shalomGuia: '98173469',
+      shalomCodigo: 'WKKH', status: 'ALISTADO'})});
+    m.api.pintar();
+    ok(!/registrado|clave/.test(m.resumen()) && m.html() === '',
+       'guía a mano: ni «registrado», ni clave, ni caja verde — como antes');
   }
   {
     const m = montar({sinEditar: true});
@@ -200,7 +208,7 @@ module.exports = async ({bloque, ok}) => {
        HTML no se puede pulsar de ninguna forma. */
     const m = montar({pedido: Object.assign(PEDIDO(),
       {shalomGuia: '98173469', shalomCodigo: 'WKKH', shalomMonto: 12,
-        status: 'ALISTADO'})});
+        status: 'ALISTADO', shalomPor: 'pro'})});
     m.api.pintar();
     ok(!/btnRegistrarShalom/.test(m.html()),
        'con guía ya puesta, el botón de registrar NO está en el HTML');
@@ -230,10 +238,10 @@ module.exports = async ({bloque, ok}) => {
     ok(/cuenta de Shalom/i.test(m.html()), 'sin cuenta de Shalom Pro, lo dice');
   }
   {
-    const m = montar({pedido: Object.assign(PEDIDO(), {status: 'ALISTADO'})});
+    const m = montar({pedido: Object.assign(PEDIDO(), {status: 'ENVIADO'})});
     m.api.pintar();
-    ok(/POR ALISTAR/.test(m.html()),
-       'y fuera de POR ALISTAR se explica por qué no se puede');
+    ok(/POR ALISTAR o ALISTADO/.test(m.html()),
+       'y fuera de POR ALISTAR o ALISTADO se explica por qué no se puede');
   }
 
   bloque('El dato viejo: Shalom lee la nube, no tu pantalla');

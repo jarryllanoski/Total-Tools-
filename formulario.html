@@ -835,7 +835,7 @@ function abrirAyudaForm(){
    ⚠️ LA CLAVE DE RECOJO NO SE MENCIONA NUNCA: es secreta, no viaja al link
    (functions/pedidoPublico.js) y no se comparte por aquí.
    Lógica pura (sin DOM): devuelve {estados, faq} con texto YA escapado. */
-function _ayudaTrackContenido(tipo, esShalom, tiendaDir, estado, nombre){
+function _ayudaTrackContenido(tipo, esShalom, tiendaDir, estado, nombre, shalom){
   const dir = esc(tiendaDir||'');
   const enTienda = dir ? ' en <b>'+dir+'</b>' : '';
   const T = {
@@ -876,11 +876,18 @@ function _ayudaTrackContenido(tipo, esShalom, tiendaDir, estado, nombre){
   /* ★ TOBY habla del estado REAL de este pedido (30/10/2026): lo mismo que
      dice su fila, con el saludo. Una sola verdad: la fila y Toby salen del
      mismo texto. Nunca la clave de recojo. */
-  const actual = estados.findIndex(e => e.k.indexOf(String(estado||'').toUpperCase()) >= 0);
+  /* Ya en Shalom (10/11/2026): manda el estado de SHALOM, no la etiqueta
+     del panel. `shalom` es {estado} cuando el envío tiene guía; si no, nada. */
+  const enShalom = !!(shalom && typeof shalom === 'object');
+  const actual = enShalom ? -1 : estados.findIndex(e => e.k.indexOf(String(estado||'').toUpperCase()) >= 0);
   const hola = nombre ? _holaNombre(nombre) : '';
-  const toby = actual >= 0
-    ? hola + 'Tu pedido: <b>' + esc(String(estado).toUpperCase()) + '</b>. ' + estados[actual].d
-    : hola + 'Aquí ves qué significa cada estado de tu pedido.';
+  const toby = enShalom
+    ? hola + 'Tu envío ya está en <b>Shalom</b>. ' + (shalom.estado
+        ? 'Shalom dice: <b>' + esc(String(shalom.estado)) + '</b>.'
+        : 'Estamos esperando que lo reciban en la agencia; aquí verás cada avance.')
+    : (actual >= 0
+      ? hola + 'Tu pedido: <b>' + esc(String(estado).toUpperCase()) + '</b>. ' + estados[actual].d
+      : hola + 'Aquí ves qué significa cada estado de tu pedido.');
 
   const faq = [];
   if(esShalom){
@@ -906,7 +913,8 @@ function abrirAyudaTrack(){
   const ov = _ayudaHoja();
   const cc = (CFG && (CFG.config || CFG)) || {};
   const c = _ayudaTrackContenido(window._trackTipo||'', !!window._trackEsShalom,
-    String(cc.city||'').trim(), window._trackEstado||'', window._trackNombre||'');
+    String(cc.city||'').trim(), window._trackEstado||'', window._trackNombre||'',
+    window._trackShalom || null);
   const wa = _ayudaWa('Hola, tengo una consulta sobre mi pedido');
   ov.innerHTML = `<div class="ay-sheet">
     ${_toby(c.toby, 'Guía de seguimiento')}
@@ -2763,7 +2771,11 @@ function _shalomTrackingBlock(ship){
   var pasos = ['En origen','En camino','En destino','Entregado'];
 
   // HERO: el titulo es EXACTAMENTE el estado de Shalom
-  var titulo = estado || 'Estado pendiente de actualizar';
+  var titulo = estado || 'Registrado en Shalom';
+  if(!estado && guia){
+    f = {idx:-1, color:'var(--purple)', bg:'rgba(167,139,250,.08)', bd:'rgba(167,139,250,.3)',
+      ic:'\ud83d\udce6', sub:'Esperando que lo reciban en la agencia. Aqu\u00ed ver\u00e1s cada avance.', pill:null};
+  }
   var pillHtml = '';
   if(f.pill === 'destino'){
     pillHtml = '<span style="display:inline-block;margin-top:9px;font-size:12.5px;font-weight:800;'
@@ -2874,6 +2886,12 @@ function renderTrackResult(ship, code){
   window._trackEsShalom = narr.esShalom;
   window._trackEstado = ship.status||'';
   window._trackNombre = ship.name||'';
+  /* ★ YA EN SHALOM → SOLO LOS ESTADOS DE SHALOM (10/11/2026). Con guía, la
+     etiqueta del panel (POR ALISTAR, ALISTADO…) ya no le dice nada útil al
+     cliente y puede contradecir a Shalom: se esconde, y manda el bloque de
+     Shalom. Sin guía, todo como siempre. */
+  const _enShalom = narr.esShalom && !!(ship.shalomGuia || ship.trackingOrderNumber);
+  window._trackShalom = _enShalom ? {estado: String(ship.trackingStatus||'').trim()} : null;
 
   const dateLabel = ship.date
     ? new Date(ship.date+'T12:00:00').toLocaleDateString('es-PE',{weekday:'short',year:'numeric',month:'short',day:'numeric'})
@@ -2898,12 +2916,12 @@ function renderTrackResult(ship, code){
         <div class="tk-lbl">${_nroTk ? 'Factura / Boleta' : 'Código de seguimiento'}</div>
         <div style="font-size:22px;font-weight:700;color:var(--purple);letter-spacing:${_nroTk ? '1px' : '3px'};word-break:break-all">${_nroTk ? '' : '#'}${esc(tc)}</div>
       </div>
-      <div class="tk-section">
+      ${_enShalom ? '' : `<div class="tk-section">
         <div class="tk-lbl">Estado actual</div>
         <div class="status-badge" style="background:${meta.color}22;border:1px solid ${meta.color}55;color:${meta.color}">
           ${meta.emoji} ${esc(ship.status||'Desconocido')}
         </div>
-      </div>
+      </div>`}
       ${shalomBlock}
       <div class="tk-section">
         <div class="tk-lbl">Detalle</div>
@@ -2917,6 +2935,7 @@ function renderTrackResult(ship, code){
         ${_dniTk?`<div class="tk-row"><span class="tk-row-lbl">${_dniTkLbl}</span><span class="tk-row-val">${esc(_dniTk)}</span></div>`:''}
         ${ship.notes?`<div class="tk-row"><span class="tk-row-lbl">Notas</span><span class="tk-row-val">${esc(ship.notes)}</span></div>`:''}
         ${extraRows}
+        ${ship.minimo?`<div class="tk-row"><span class="tk-row-val" style="color:var(--text2);font-size:12px">🔒 Por tu privacidad, los datos de un pedido entregado hace tiempo ya no se muestran aquí. Si necesitas algo, escríbenos.</span></div>`:''}
       </div>
       ${(ship.links&&ship.links.length)?`<div class="tk-section"><div class="tk-lbl">📄 Documentos adjuntos</div>${ship.links.map(l=>`<a href="${l.u}" target="_blank" rel="noopener" style="display:flex;align-items:center;justify-content:space-between;padding:13px 16px;background:var(--bg2);border:1px solid var(--bd);border-radius:10px;text-decoration:none;margin-bottom:6px"><span style="color:var(--blue);font-weight:600;font-size:14px">📄 Presiona para ver tu documento</span><span style="color:var(--text2);font-size:18px">→</span></a>`).join('')}</div>`:''}
     </div>

@@ -1052,7 +1052,12 @@ async function handleTrack(req, res) {
     return;
   }
   const code = (order.id || "").slice(-4).toUpperCase();
-  const frozen = ["ENTREGADO", "CANCELADO"].includes(order.status || "");
+  /* FINALIZADO también: es la etiqueta final de hoy (ENTREGADO es el nombre
+     viejo). Sin él, un pedido terminado se seguía consultando cada 30 s
+     mientras el cliente miraba —una lectura y una llamada cada vez— para
+     algo que ya no cambia. */
+  const frozen = ["ENTREGADO", "CANCELADO", "FINALIZADO"]
+      .includes(String(order.status || "").trim().toUpperCase());
 
   /* ★ LISTA BLANCA, no lista negra.
      Aqui se copiaba el pedido ENTERO y se borraba una lista de campos
@@ -1071,14 +1076,16 @@ async function handleTrack(req, res) {
      Lo que el cliente ve se decide en functions/pedidoPublico.js, y hay una
      prueba que compara esa lista con los campos que el formulario lee de
      verdad — asi no se puede quedar corta sin que salte. */
-  const safe = pedidoPublico.proyectar(order, {code, frozen});
+  const safe = pedidoPublico.minimizarViejo(
+      pedidoPublico.proyectar(order, {code, frozen}), order, Date.now());
 
   // Estado de Shalom: solo se muestra al cliente si el operador activo la
   // opcion "Mostrar en el link del cliente". Filtro MOTOR-AGNOSTICO: aplica
   // sin importar que motor genero el dato (A o B). Si esta apagado, ocultamos
   // el texto de tracking del link publico (el panel siempre lo ve). Solo
   // leemos config cuando hay un estado que potencialmente ocultar.
-  if (order.trackingStatus) {
+  // Un pedido viejo ya minimizado no lleva estado de Shalom: no se lee nada.
+  if (order.trackingStatus && !safe.minimo) {
     const cfgSnap = await db.doc(CFG_DOC).get();
     const cfg = (cfgSnap.exists && cfgSnap.data().config) || {};
     if (!cfg.trackingWebMostrarCliente) {
@@ -1829,6 +1836,17 @@ exports.shalomPuerta = onRequest(
               return (pr && pr.ok && pr.json) || null;
             },
             guardar: (campos) => ref.set(_conMts(campos), {merge: true}),
+            /* Solo para «registrar de nuevo» tras 24 h: pregunta a Shalom
+               si la guía vieja entró a alguna agencia. Una consulta, y solo
+               cuando se pide renovar. */
+            rastrear: async (guia, codigo) => {
+              const rt = await _porLaPuerta("track",
+                  {orderNumber: guia, orderCode: codigo || ""});
+              if (!rt || !rt.ok) {
+                return {ok: false, motivo: (rt && rt.motivo) || "SIN_RED"};
+              }
+              return shalomPuerta.traducir("track", rt.json);
+            },
           };
           /* `recuperarEnvio` SOLO LEE: busca el envio en pendientes y
              rellena la guia. Nunca llama a `register`, asi que no tiene

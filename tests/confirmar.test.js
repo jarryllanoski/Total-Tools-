@@ -158,8 +158,9 @@ module.exports = async ({bloque, ok}) => {
        dinero, así que merece la misma puerta que la papelera. */
     const todo = E.leer('index.html') + E.leer('config.js');
     const usos = (todo.match(/confirmar\(\{/g) || []).length;
-    ok(usos === 8,
-       'las ocho pantallas irreversibles pasan por la misma puerta ' +
+    // 10/11/2026: +2, «guardar y registrar» y «registrar de nuevo» (cuestan).
+    ok(usos === 10,
+       'las diez pantallas irreversibles pasan por la misma puerta ' +
        '(vistas: ' + usos + ')');
   }
 };

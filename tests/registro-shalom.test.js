@@ -133,14 +133,16 @@ module.exports = async ({bloque, ok}) => {
   {
     /* LA PUERTA DEL ESTADO. El dueño lo pidio asi: solo se registra lo que
        esta POR ALISTAR. Un pedido recien tomado todavia puede cambiar. */
-    ['NUEVO PEDIDO', 'EN PROCESO', 'ALISTADO', 'ENVIADO', 'FINALIZADO']
+    ['NUEVO PEDIDO', 'EN PROCESO', 'ENVIADO', 'FINALIZADO']
         .forEach((st) => {
           const p = Object.assign({}, PEDIDO_OK, {status: st});
-          ok(R.faltantes(p, CFG_OK).some((t) => /por alistar/i.test(t)),
-             st + ' no se registra: solo POR ALISTAR');
+          ok(R.faltantes(p, CFG_OK).some((t) => /por alistar o alistado/i.test(t)),
+             st + ' no se registra: solo POR ALISTAR o ALISTADO');
         });
     ok(R.faltantes(Object.assign({}, PEDIDO_OK, {status: 'POR ALISTAR'}),
         CFG_OK).length === 0, 'y POR ALISTAR si');
+    ok(R.faltantes(Object.assign({}, PEDIDO_OK, {status: 'ALISTADO'}),
+        CFG_OK).length === 0, 'y ALISTADO también (10/11/2026: paquete armado sin guía)');
   }
 
   {

@@ -48,6 +48,8 @@
   const CAMPOS = [
     // Identidad del pedido
     "id", "code", "frozen", "createdAt", "date", "status",
+    // Marca calculada: pedido viejo y finalizado, enseñado al mínimo.
+    "minimo",
     /* El N° de factura/boleta (26/10/2026). Cuando existe, ES el código que
        el cliente ve en su seguimiento: ya lo recibió en su WhatsApp de
        confirmación y es su propio comprobante. Si no saliera aquí, el link
@@ -76,6 +78,10 @@
    */
   const SECRETOS = [
     "shalomClave",
+    /* La nota PRIVADA lleva la clave de recojo desde el 10/11/2026 (el
+       registro por Shalom Pro la apunta ahí). Y el historial de guías
+       vencidas tampoco es asunto del cliente. */
+    "privateNote", "shalomGuiasAnteriores",
     "agenciaId", "agenciaNombre", "agenciaGeo", "agenciaCourier",
   ];
 
@@ -151,7 +157,63 @@
         out[k] = recortarDoc(out[k]);
       }
     });
+    /* Cuarta reja: si alguien ESCRIBIÓ la clave en un texto que el cliente
+       ve —«clave 3321» en las notas o en un campo extra—, se tapa. Solo
+       donde va pegada a la palabra «clave»: tapar cualquier número de
+       cuatro cifras rompería direcciones («Mz D lote 3321»). */
+    if (typeof out.notes === "string") out.notes = taparClave(out.notes);
+    if (out.extra && typeof out.extra === "object") {
+      const ex = {};
+      Object.keys(out.extra).forEach((k) => {
+        ex[k] = /clave/i.test(k) ? "****" : taparClave(out.extra[k]);
+      });
+      out.extra = ex;
+    }
     return out;
+  }
+
+  /**
+   * Tapa «clave … 1234» dentro de un texto.
+   * @param {*} t el texto
+   * @return {*} el texto con la clave tapada, o igual si no es texto
+   */
+  function taparClave(t) {
+    if (typeof t !== "string") return t;
+    return t.replace(/(clave[^0-9\n]{0,20})\d{4}/gi, "$1****");
+  }
+
+  /** Días en FINALIZADO tras los que el link enseña lo mínimo. */
+  const DIAS_MINIMO = 60;
+  /** Lo único que queda de un pedido viejo y finalizado. */
+  const CAMPOS_MINIMOS = ["id", "code", "frozen", "createdAt", "date",
+    "status", "nroComprobante", "courier", "shalomGuia", "shalomCodigo",
+    "minimo"];
+
+  /**
+   * PRIVACIDAD CON EL TIEMPO (10/11/2026). Un link no caduca —el cliente lo
+   * usa para garantías y reclamos—, pero una captura vieja reenviada no
+   * tiene por qué seguir mostrando su dirección, sus notas ni su DNI.
+   * Pasados DIAS_MINIMO desde la creación, un pedido FINALIZADO enseña solo
+   * su código, estado, fecha y guía. No ahorra lecturas (para saberlo hay
+   * que leerlo): protege.
+   * @param {Object} out lo que devolvió `proyectar`
+   * @param {Object} pedido el pedido completo
+   * @param {number} ahoraMs ahora en ms
+   * @return {Object} el mismo `out`, o su versión mínima
+   */
+  function minimizarViejo(out, pedido, ahoraMs) {
+    const p = pedido || {};
+    const fin = ["FINALIZADO", "ENTREGADO"].indexOf(
+        String(p.status || "").trim().toUpperCase()) >= 0;
+    const t = Date.parse(String(p.createdAt || p.date || ""));
+    if (!fin || !isFinite(t) || ahoraMs - t < DIAS_MINIMO * 86400000) {
+      return out;
+    }
+    const m = {minimo: true};
+    CAMPOS_MINIMOS.forEach((k) => {
+      if (k in out) m[k] = out[k];
+    });
+    return m;
   }
 
   /**
@@ -167,5 +229,5 @@
   }
 
   return {CAMPOS, SECRETOS, ENMASCARAR, proyectar, secretosEn,
-    recortarDoc};
+    recortarDoc, taparClave, minimizarViejo, DIAS_MINIMO};
 });

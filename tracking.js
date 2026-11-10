@@ -813,6 +813,10 @@ Tracking._guardarEdicion = function(shipId) {
     ship.trackingMessage   = '';
     ship.trackingLastUpdate= '';
     ship.shalomEstado      = '';
+    /* La guía nueva no la registró Shalom Pro desde aquí: sin su marca ni
+       su hora, no hay plazo de 24 h ni «registrar de nuevo» que ofrecer. */
+    ship.shalomPor          = '';
+    ship.shalomRegistradoEn = '';
   }
 
   // Guardar la guía NO mueve la etiqueta: conserva la que tenía. Es la primera

@@ -27,7 +27,7 @@
   var Ayuda = {};
   window.Ayuda = Ayuda;
 
-  var ACTUALIZADO = '2026-10-30';
+  var ACTUALIZADO = '2026-11-10';
 
   /* ══════════════════════════════════════════════════════════════════
      DOCUMENTACIÓN CENTRALIZADA
@@ -347,19 +347,22 @@
     registroShalom: {
       titulo: 'Registrar el envío en Shalom',
       icono: '🚚',
-      toby: 'Dicta la <b>🔑 clave de recojo</b> a tu cliente: sin ella, la agencia no le entrega el paquete.',
-      actualizado: '2026-10-03',
+      toby: 'Elige la <b>caja</b> de un toque, marca <b>Registrar al guardar</b> y pulsa Guardar: el pedido pasa solo a ALISTADO y la clave queda en tu nota privada 🔒.',
+      actualizado: '2026-11-10',
       pasos: [
         '<b>🔑 Clave de recojo</b>: los 4 dígitos que tu cliente necesita para retirar el paquete en la agencia. Se genera sola al abrir un pedido nuevo de Shalom y se le manda a Shalom al registrar el envío. <b>Díctasela al cliente</b> — sin ella no se lo entregan.',
-        '<b>📦 Medidas y peso</b>: deciden la caja, y por tanto lo que te cobra Shalom. El peso cuenta tanto como las medidas: 20×15×12 con 3 kg no entra en XS, se va a M.',
+        '<b>📦 Tamaño de la caja</b>: tócala (XXS, XS, S, M o L), como en Shalom Pro. No hace falta medir ni pesar. Si no sabes cuál, toca <b>📏 Medidas</b>: con largo, ancho, alto y peso se calcula sola (el peso cuenta: 20×15×12 con 3 kg no entra en XS, se va a M).',
         '<b>🔌 Cuenta de Shalom Pro</b>: la instancia que el panel usa para registrar. Se comprueba sola —al abrir Config y al abrir el pedido— porque comprobarla no gasta cuota.',
         '<b>Conectar</b> (⚙️ Config → Shalom): un solo botón. Si escribes correo y contraseña, los guarda <b>y</b> entra; si los dejas vacíos, entra con los que ya estaban guardados. Crea la instancia solo si no existe, así que pulsarlo dos veces no crea dos cuentas.',
         '<b>Tus credenciales</b> se guardan cifradas en Secret Manager y <b>no se pueden volver a leer desde el panel</b> — ni por ti. Por eso los campos salen siempre vacíos: no es que se olviden, es que no hay forma de pedirlas de vuelta.',
         '<b>🏢 Agencia de origen</b>: desde dónde despachas. <b>Es UNA sola para todo el negocio</b>, no por pedido: si la cambias aquí, cambian todos los envíos que registres después.',
-        '<b>🚚 Registrar</b>: solo aparece si no falta nada. Crea la guía en Shalom, trae el número y el código, y el pedido pasa a ALISTADO.'
+        '<b>🚚 Registrar al guardar</b>: en <b>POR ALISTAR</b> o <b>ALISTADO</b>, cuando no falta nada aparece <b>☐ Registrar en Shalom al guardar</b>. Márcalo y el botón dice <b>Guardar y registrar</b>: se guarda, y en cuanto sube se crea la guía. El pedido pasa a ALISTADO.',
+        '<b>🔒 La clave en tu nota privada</b>: al registrarse por Shalom Pro, la clave y la guía se anotan solas en la nota privada del pedido (doble clic en el nombre). Esa nota <b>nunca</b> la ve el cliente.',
+        '<b>⏰ Registrar de nuevo</b>: si pasan 24 h y no dejaste el paquete, la guía vence. Aparece <b>🔁 Registrar de nuevo</b>: antes de cobrar se pregunta a Shalom, y si el paquete ya entró a una agencia no se hace nada. La clave sigue igual.'
       ],
       faq: [
-        {q:'¿Por qué dice que faltan datos si los acabo de escribir?', a:'Porque se comprueba <b>lo guardado</b>, que es lo que Shalom va a leer del servidor — no lo que ves en pantalla. Guarda el pedido y vuelve a abrirlo.'},
+        {q:'¿Tengo que guardar y volver a abrir para registrar?', a:'Ya no. Lo que falta se calcula con lo que tienes en pantalla, y con <b>Registrar al guardar</b> se registra en cuanto el pedido sube a la nube (el servidor registra con lo guardado, por eso espera a que suba).'},
+        {q:'Puse la guía a mano. ¿Por qué no sale «Registrado»?', a:'Porque ese envío no lo registró Shalom Pro desde aquí. La clave, la guía y el código del bloque solo salen cuando el registro se hizo por Shalom Pro.'},
         {q:'¿Qué es el simulacro?', a:'Un ensayo: decide todo igual, te enseña exactamente lo que mandaría, y NO llama a Shalom. No cuesta nada. Con el simulacro apagado, el botón se pone naranja y cada clic crea un envío real que se cobra.'},
         {q:'Pulsé registrar y dice "no sabemos si se creó". ¿Vuelvo a pulsar?', a:'<b>No.</b> Shalom no anula envíos y no tiene clave de idempotencia: un segundo intento sería un segundo paquete y un segundo cobro. Usa el botón <b>Recuperar</b> que sale ahí mismo: solo lee los pendientes de Shalom y rellena la guía si el envío sí se creó.'},
         {q:'¿Por qué el pedido sigue en ALISTADO si ya lo registré?', a:'Porque registrar crea la guía, no mueve el paquete. Pasa a ENVIADO cuando Shalom fecha el ingreso a la agencia de origen — es decir, cuando de verdad lo dejaste allí.'},

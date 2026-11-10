@@ -533,6 +533,10 @@ function openForm(id){
       if($('fPkgAncho')) $('fPkgAncho').value = s.pkgAncho||'';
       if($('fPkgAlto'))  $('fPkgAlto').value  = s.pkgAlto||'';
       if($('fPkgPeso'))  $('fPkgPeso').value  = s.pkgPeso||'';
+      if($('fPkgCaja'))  $('fPkgCaja').value  = s.pkgCaja||'';
+      // Las medidas se ven si las había (y no eligió caja): no se esconde lo escrito.
+      window._pkgMedir = !s.pkgCaja && !!(s.pkgLargo||s.pkgAncho||s.pkgAlto||s.pkgPeso);
+      _regPrepararForm();
       if(typeof _pkgClasificar==='function') _pkgClasificar(); // pinta el tipo ya guardado
       _pintarShalomEstado(s.trackingStatus);
     }
@@ -547,6 +551,9 @@ function openForm(id){
     if($('fPkgAncho')) $('fPkgAncho').value = '';
     if($('fPkgAlto'))  $('fPkgAlto').value  = '';
     if($('fPkgPeso'))  $('fPkgPeso').value  = '';
+    if($('fPkgCaja'))  $('fPkgCaja').value  = '';
+    window._pkgMedir = false;
+    _regPrepararForm();
     if(typeof _pkgClasificar==='function') _pkgClasificar(); // limpia el badge
     /* ⚠️ EL VIGILANTE, DESPUÉS DE LIMPIAR. Estaba veinte líneas MÁS ARRIBA,
        y `Guias.vigilar` pinta en el acto: leía el campo cuando todavía tenía
@@ -983,6 +990,155 @@ function _congelarSiRegistrado(s){
 
 let _regTimer = null;
 
+/* ── ★ REGISTRAR AL GUARDAR (10/11/2026) ──────────────────────────────────
+   Antes había que guardar, cerrar, volver a abrir y recién ahí registrar.
+   Ahora el bloque mira lo que tienes EN PANTALLA (estado, caja o medidas,
+   clave): si con eso ya se puede, ofrece «Registrar en Shalom al guardar»
+   y el botón Guardar pasa a «Guardar y registrar». Los cambios valen al
+   guardar, como siempre, y el registro va DESPUÉS de que el pedido subió:
+   el servidor registra con lo que hay en la nube.
+   Cero lecturas y cero llamadas para decidir: la lista de lo que falta es la
+   MISMA función del servidor, corriendo aquí. */
+let _regAlGuardar = false;
+let _regFormListo = false;   // el formulario ya cargó los valores de ESTE pedido
+const _REG_CAMPOS = {status:'fStatus', pkgLargo:'fPkgLargo', pkgAncho:'fPkgAncho',
+  pkgAlto:'fPkgAlto', pkgPeso:'fPkgPeso', pkgCaja:'fPkgCaja', shalomClave:'fShalomClave'};
+
+function _regPrepararForm(){ _regAlGuardar = false; _regFormListo = true; _regBotonGuardar(); }
+function _regBotonGuardar(){
+  const b = $('btnGuardarEnvio'); if(!b) return;
+  b.textContent = _regAlGuardar ? '💾 Guardar y registrar en Shalom' : '💾 Guardar envío';
+}
+function regAlGuardarToggle(){
+  _regAlGuardar = !_regAlGuardar; _regBotonGuardar(); _pintarRegistroShalom();
+}
+/** Lo guardado + lo que tienes en pantalla en los campos que deciden.
+ * @param {Object} ped el pedido guardado
+ * @return {Object} el pedido tal como quedaría al guardar */
+function _regBorrador(ped){
+  if(!_regFormListo || !ped) return ped;
+  const b = Object.assign({}, ped);
+  Object.keys(_REG_CAMPOS).forEach(k => {
+    const e = $(_REG_CAMPOS[k]); if(e) b[k] = String(e.value || '').trim();
+  });
+  // Una guía escrita a mano en pantalla también cuenta: ese ya no se registra.
+  const g = ($('fShalomGuia')||{value:''}).value.trim();
+  if(g) b.shalomGuia = g;
+  return b;
+}
+function _regDifiere(a, b){
+  return Object.keys(_REG_CAMPOS).concat(['shalomGuia'])
+    .some(k => String(a[k]||'') !== String(b[k]||''));
+}
+
+/* La confirmación ANTES de guardar: cuesta dinero y no se deshace. */
+function _confirmarGuardarYRegistrar(){
+  const R = window.RegistroShalom;
+  const ped = _editId ? (S.shipments||[]).find(x=>x.id===_editId) : null;
+  if(!R || !ped || !window.Shalom){ _regAlGuardar = false; _regBotonGuardar(); return saveShipment(true); }
+  const bor = _regBorrador(ped);
+  if(R.faltantes(bor, _regCfg()).length){
+    _regAlGuardar = false; _regBotonGuardar(); _pintarRegistroShalom();
+    toast('⚠️ Falta algo para registrar — mira la lista'); return;
+  }
+  const sim = _regEsSimulacro();
+  const org = (_regCfg().agenciaOrigen) || {};
+  confirmar({
+    html: '<div style="text-align:left;line-height:1.65;font-size:13px">'+
+      (sim ? '<b style="color:var(--blue)">🧪 Simulacro.</b> Se guarda y se prueba el registro: no se crea nada y no cuesta.'
+           : '<b style="color:#f59e0b">⚠️ Se guarda y se crea un envío real en Shalom, que se cobra.</b>'+
+             '<br><span style="font-size:12px;color:var(--text2)">Shalom no anula envíos: una vez creado, no se deshace.</span>')+
+      '<div style="margin-top:9px;font-size:12.5px;color:var(--text2)">'+
+      '<b style="color:var(--text)">'+escH(bor.name||'')+'</b><br>'+
+      escH(R.contenidoDe(bor)||'—')+' · de '+escH(org.agenciaNombre||'origen')+
+      ' a '+escH(bor.agenciaNombre||'destino')+'<br>Clave de recojo: <b style="color:var(--text)">'+
+      escH(bor.shalomClave||'—')+'</b><br>Al registrarse pasa a <b style="color:var(--text)">ALISTADO</b>.</div></div>',
+    textoSi: sim ? 'Guardar y probar' : 'Sí, guardar y registrar',
+    colorSi: sim ? 'var(--blue)' : '#f59e0b',
+    trabajando: 'Guardando…',
+    alConfirmar: () => {
+      const id = _editId;
+      if(saveShipment(true) === 'ok') _registrarTrasGuardar(id);
+    }
+  });
+}
+
+/** Espera a que ESTE pedido termine de subir (o se rinde).
+ * @param {string} id el pedido
+ * @param {number} tope ms como máximo
+ * @return {Promise<boolean>} true si ya está en la nube */
+function _esperarSubida(id, tope){
+  return new Promise(res => {
+    const t0 = Date.now();
+    (function mira(){
+      if(!_regSinSubir(id) && !window._isSaving) return res(true);
+      if(Date.now() - t0 > tope) return res(false);
+      setTimeout(mira, 400);
+    })();
+  });
+}
+
+async function _registrarTrasGuardar(id){
+  _regAlGuardar = false; _regBotonGuardar();
+  toast('💾 Guardando… y luego se registra en Shalom');
+  const subio = await _esperarSubida(id, 25000);
+  const ped = (S.shipments||[]).find(x=>x.id===id);
+  if(!ped || !window.Shalom) return;
+  if(!subio){
+    _regReabrir(id, '<span style="color:#f59e0b">⚠️ Los cambios no terminaron de subir: '+
+      '<b>no se registró nada</b>. Revisa tu conexión y vuelve a intentarlo.</span>');
+    return;
+  }
+  let r = null;
+  try{ r = await window.Shalom.registrarEnvio(id); }catch(e){ r = null; }
+  if(r && r.ok && r.campos && !r.simulacro){
+    Object.assign(ped, r.campos);
+    save(ped.id);
+    if(typeof render==='function') render();
+    toast('✅ Registrado en Shalom — guía '+(r.campos.shalomGuia||'')+' · pasó a ALISTADO');
+    return;
+  }
+  // Simulacro, fallo o duda: se reabre el pedido para verlo con sus palabras.
+  _regReabrir(id, null, r);
+}
+
+function _regReabrir(id, html, r){
+  if(typeof openForm==='function') openForm(id);
+  const body = $('pkgBody');
+  if(body && !body.classList.contains('open') && typeof togglePkgAccordion==='function') togglePkgAccordion();
+  const ped = (S.shipments||[]).find(x=>x.id===id);
+  if(html) _regSalida(html); else _aplicarRegistroShalom(ped, r);
+}
+
+/* ⏰ REGISTRAR DE NUEVO — pasadas 24 h sin dejar el paquete en la agencia.
+   El servidor vuelve a comprobarlo TODO (hora, y que Shalom diga que no
+   entró): si el paquete ya entró, no se registra y no se cobra. */
+function renovarEnvioPanel(){
+  const R = window.RegistroShalom;
+  const ped = _editId ? (S.shipments||[]).find(x=>x.id===_editId) : null;
+  if(!R || !ped || !window.Shalom) return;
+  const sim = _regEsSimulacro();
+  confirmar({
+    html: '<div style="text-align:left;line-height:1.65;font-size:13px">'+
+      '<b style="color:#f59e0b">🔁 Registrar de nuevo</b><br>'+
+      'La guía <b>'+escH(ped.shalomGuia||'')+'</b> venció sin dejarse en la agencia. '+
+      (sim ? 'Simulacro: no se crea nada.' : 'Se crea un envío <b>nuevo</b> y <b>se cobra otra vez</b>.')+
+      '<div style="margin-top:8px;font-size:12px;color:var(--text2)">Antes preguntamos a Shalom: '+
+      'si el paquete ya entró a una agencia, no se hace nada. La clave sigue siendo <b>'+
+      escH(ped.shalomClave||'—')+'</b>: el cliente no tiene que cambiar nada.</div></div>',
+    textoSi: sim ? 'Probar' : 'Sí, registrar de nuevo',
+    colorSi: sim ? 'var(--blue)' : '#f59e0b',
+    trabajando: 'Comprobando con Shalom…',
+    alConfirmar: async () => {
+      const b = $('btnRenovarShalom');
+      if(b){ b.disabled = true; b.onclick = null; b.style.opacity = '.45'; b.textContent = '⏳ Registrando…'; }
+      let r = null;
+      try{ r = await window.Shalom.registrarEnvio(ped.id, {renovar: true}); }catch(e){ r = null; }
+      _aplicarRegistroShalom(ped, r);
+    }
+  });
+}
+
 /* ── ⚠️ LO GUARDADO NO ES LO COMPROBADO ──────────────────────────────────
    La primera versión de este bloque pintaba «🔌 Cuenta Total» leyendo
    `S.shalomInstancia`, que es lo que hay en TU NAVEGADOR. El 3 de octubre el
@@ -1065,21 +1221,27 @@ function _pintarResumenPaquete(ped, faltan, registrado){
   const h = $('pkgResumen'); if(!h) return;
   const p = ped || {};
   const R = window.RegistroShalom;
-  const caja = (R && R.clasificar) ?
-    R.clasificar(p.pkgLargo, p.pkgAncho, p.pkgAlto, p.pkgPeso) : null;
-  const clave = String(p.shalomClave || '').trim();
+  const elegida = (R && R.tipoElegido) ? R.tipoElegido(p) : '';
+  const caja = elegida ? {etiqueta: 'Paquete ' + elegida} : ((R && R.clasificar) ?
+    R.clasificar(p.pkgLargo, p.pkgAncho, p.pkgAlto, p.pkgPeso) : null);
+  /* La clave en la cabecera: mientras se prepara el registro (para
+     dictársela al cliente) y cuando lo registró Shalom Pro. Con una guía
+     puesta a mano, nada — como antes (10/11/2026). */
+  const aMano = !!(R && R.estaRegistrado && R.estaRegistrado(p) &&
+    !(R.registradoPorPro && R.registradoPorPro(p)));
+  const clave = aMano ? '' : String(p.shalomClave || '').trim();
   const trozos = [];
   if(caja) trozos.push(escH(caja.etiqueta));
   if(clave) trozos.push('clave <b>'+escH(clave)+'</b>');
 
   let color = '';
   if(registrado){
-    trozos.push('<span style="color:#3fb950">registrado</span>');
+    if(!aMano) trozos.push('<span style="color:#3fb950">registrado</span>');
   } else if(faltan && faltan.length){
     trozos.push('<span style="color:#d29922">faltan '+faltan.length+
       (faltan.length === 1 ? ' dato' : ' datos')+'</span>');
     // Ámbar solo si se puede hacer algo YA: en POR ALISTAR.
-    if(String(p.status||'').trim().toUpperCase() === 'POR ALISTAR'){
+    if(['POR ALISTAR','ALISTADO'].indexOf(String(p.status||'').trim().toUpperCase()) >= 0){
       color = 'color:#d29922';
     }
   } else if(faltan){
@@ -1128,6 +1290,10 @@ function _pintarRegistroShalom(reintento){
      envío con un segundo cobro. */
   if(R.estaRegistrado(ped)){
     _pintarResumenPaquete(ped, null, true);
+    _regAlGuardar = false; _regBotonGuardar();
+    /* Guía puesta a mano (o escaneada del ticket): no la registró Shalom Pro
+       desde aquí, así que no se muestra nada de registro — como antes. */
+    if(R.registradoPorPro && !R.registradoPorPro(ped)){ box.innerHTML = ''; return; }
     const m = parseFloat(ped.shalomMonto);
     box.innerHTML = tit +
       '<div style="background:rgba(63,185,80,.09);border:1px solid rgba(63,185,80,.25);'+
@@ -1137,7 +1303,16 @@ function _pintarRegistroShalom(reintento){
       'Guía <b style="color:var(--text)">'+escH(ped.shalomGuia||'—')+'</b> · '+
       'Código <b style="color:var(--text)">'+escH(ped.shalomCodigo||'—')+'</b>'+
       (isFinite(m)&&m>0 ? ' · <b style="color:var(--text)">S/ '+m.toFixed(2)+'</b>' : '')+
-      '</div></div>';
+      '</div></div>' + _regPlazoHtml(ped, R);
+    return;
+  }
+
+  /* Escribiste una guía a mano en pantalla: este pedido no se registra. */
+  const bor = _regBorrador(ped);
+  if(R.estaRegistrado(bor)){
+    _pintarResumenPaquete(bor, null, true);
+    _regAlGuardar = false; _regBotonGuardar();
+    box.innerHTML = '';
     return;
   }
 
@@ -1197,9 +1372,10 @@ function _pintarRegistroShalom(reintento){
     'max-height:220px;overflow-y:auto;box-shadow:0 8px 24px rgba(0,0,0,.4)"></div></div>';
 
   /* ── LO QUE FALTA, EN PALABRAS. Mismo archivo que el servidor. */
-  const faltan = R.faltantes(ped, cfg);
-  _pintarResumenPaquete(ped, faltan, false);
+  const faltan = R.faltantes(bor, cfg);
+  _pintarResumenPaquete(bor, faltan, false);
   if(faltan.length){
+    _regAlGuardar = false; _regBotonGuardar();
     html += '<div style="background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.25);'+
       'border-radius:9px;padding:9px 11px;margin-top:4px">'+
       '<div style="font-size:11.5px;font-weight:700;color:#f59e0b;margin-bottom:5px">'+
@@ -1217,6 +1393,34 @@ function _pintarRegistroShalom(reintento){
     box.innerHTML = html;
     return;
   }
+
+  /* ── TODO LISTO CON LO DE PANTALLA, pero aún no guardado: se ofrece
+     registrar AL GUARDAR. Nada se llama hasta pulsar Guardar. */
+  if(_regFormListo && _regDifiere(bor, ped)){
+    const sim2 = _regEsSimulacro();
+    html += '<div style="background:rgba(63,185,80,.08);border:1px solid rgba(63,185,80,.3);'+
+      'border-radius:9px;padding:9px 11px;margin-top:4px;font-size:11.5px;color:var(--text2);line-height:1.6">'+
+      '✅ <b style="color:var(--text)">Todo listo.</b> Se registrará como <b style="color:var(--text)">'+
+      escH(R.contenidoDe(bor)||'—')+'</b>, a <b style="color:var(--text)">'+
+      escH(bor.agenciaNombre||'destino')+'</b>, clave <b style="color:var(--text)">'+
+      escH(bor.shalomClave||'—')+'</b>.</div>'+
+      '<button type="button" id="btnRegAlGuardar" onclick="regAlGuardarToggle()" '+
+      'style="width:100%;margin-top:9px;padding:11px;border-radius:9px;cursor:pointer;font-family:inherit;'+
+      'font-size:13px;font-weight:700;'+(_regAlGuardar ?
+        'background:rgba(63,185,80,.18);border:2px solid #3fb950;color:#3fb950">☑ Se registrará al guardar' :
+        'background:rgba(245,158,11,.12);border:1px solid rgba(245,158,11,.45);color:#f59e0b">☐ Registrar en Shalom al guardar')+
+      '</button><div style="font-size:10.5px;color:var(--text2);margin-top:5px;text-align:center">'+
+      (_regAlGuardar ? 'Pulsa <b>Guardar y registrar</b> abajo. ' : '')+
+      (sim2 ? '🧪 Simulacro: no cuesta.' : 'Crea un envío real y se cobra.')+'</div>';
+    html += '<div style="margin-top:8px;text-align:right">'+
+      _regLink(sim2 ? 'Apagar simulacro (registrará de verdad)' : 'Encender simulacro',
+               'regToggleSimulacro()')+'</div>';
+    html += '<div id="regShalomSalida" style="display:none;margin-top:9px;'+
+      'font-size:11.5px;line-height:1.55"></div>';
+    box.innerHTML = html;
+    return;
+  }
+  _regAlGuardar = false; _regBotonGuardar();
 
   /* ── TODO LISTO. Antes del botón, la trampa de los datos sin subir. */
   const caja = R.clasificar(ped.pkgLargo, ped.pkgAncho, ped.pkgAlto,
@@ -1283,6 +1487,30 @@ function _pintarRegistroShalom(reintento){
     'font-size:11.5px;line-height:1.55"></div>';
 
   box.innerHTML = html;
+}
+
+/* ⏳ / ⏰ El plazo de 24 h de Shalom para dejar el paquete. Dentro del
+   plazo, cuánto queda (urgencia real, no inventada); vencido y sin que
+   Shalom lo haya recibido, la salida: registrar de nuevo. Sin la hora del
+   registro no se dice nada: mejor callar que inventar un plazo. */
+function _regPlazoHtml(ped, R){
+  if(!R || !R.plazoVencido || String(ped.trackingStatus||'').trim()) return '';
+  const t = Date.parse(String(ped.shalomRegistradoEn||''));
+  if(!isFinite(t)) return '';
+  const resta = t + R.PLAZO_MS - Date.now();
+  if(resta > 0){
+    const h = Math.floor(resta/3600000), mi = Math.floor((resta%3600000)/60000);
+    return '<div style="margin-top:8px;font-size:11.5px;color:'+(h < 4 ? '#f59e0b' : 'var(--text2)')+
+      ';line-height:1.5">⏳ Déjalo en la agencia: quedan <b>'+h+' h '+mi+' min</b> de las 24 h.</div>';
+  }
+  return '<div style="margin-top:9px;background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.35);'+
+    'border-radius:9px;padding:10px 12px;font-size:11.5px;line-height:1.55;color:var(--text2)">'+
+    '<b style="color:#f59e0b">⏰ Esta guía venció</b>: pasaron más de 24 h y Shalom no la ha recibido en la agencia.'+
+    '<button type="button" id="btnRenovarShalom" onclick="renovarEnvioPanel()" style="width:100%;margin-top:9px;'+
+    'padding:10px;border-radius:8px;cursor:pointer;font-family:inherit;font-size:12.5px;font-weight:700;'+
+    'background:rgba(245,158,11,.15);border:1px solid rgba(245,158,11,.45);color:#f59e0b">🔁 Registrar de nuevo</button>'+
+    '<div style="font-size:10.5px;margin-top:6px">Antes de cobrar se pregunta a Shalom: si el paquete ya entró, no se hace nada.</div>'+
+    '</div><div id="regShalomSalida" style="display:none;margin-top:9px;font-size:11.5px;line-height:1.55"></div>';
 }
 
 function _regSalida(html){
@@ -1985,7 +2213,12 @@ document.addEventListener('click',function(e){
   drop.style.display='none';
 });
 
-function saveShipment(){
+function saveShipment(confirmadoReg){
+  /* ★ GUARDAR Y REGISTRAR (10/11/2026). Con «Registrar en Shalom al
+     guardar» encendido, primero se pide la confirmación de siempre (cuesta
+     dinero) y solo después se guarda; el registro va cuando el pedido ya
+     subió, porque el servidor registra con lo que hay en la nube. */
+  if(_regAlGuardar && _editId && confirmadoReg !== true){ _confirmarGuardarYRegistrar(); return; }
   // Auto-agregar link si hay texto en el campo pero no se presionó +Add
   const pendingLink = ($('fLink')||{value:''}).value.trim();
   if(pendingLink && pendingLink.startsWith('http')){
@@ -2088,6 +2321,9 @@ function saveShipment(){
   data.pkgLargo=_pkgL; data.pkgAncho=_pkgA; data.pkgAlto=_pkgH; data.pkgPeso=_pkgP;
   const _pkgClasif=(window.Shalom&&Shalom.clasificarPaquete)?Shalom.clasificarPaquete(_pkgL,_pkgA,_pkgH,_pkgP):null;
   data.pkgTipo=_pkgClasif?_pkgClasif.tipo:'';
+  /* La caja elegida de un toque manda: es la que se registra en Shalom. */
+  data.pkgCaja=($('fPkgCaja')||{value:''}).value||'';
+  if(data.pkgCaja) data.pkgTipo=data.pkgCaja;
 
   /* ★ EL NOMBRE DE RENIEC, PARTIDO, SE GUARDA CON EL PEDIDO.
      Hasta ahora la consulta vivía solo en `window._dniUltima` —memoria
@@ -2145,6 +2381,11 @@ function saveShipment(){
      'dniDestinatario'].forEach(k=>{
       if(prev[k]!==undefined&&!data[k]) data[k]=prev[k];
     });
+    /* Guía cambiada A MANO sobre una registrada por Shalom Pro: la nueva no
+       la registró Pro, así que se quitan su marca y su hora (sin ellas no hay
+       plazo de 24 h ni «registrar de nuevo» sobre una guía ajena). */
+    const _gPrev = String(prev.trackingOrderNumber||prev.shalomGuia||'').trim();
+    if(_sGuia && _gPrev && _sGuia !== _gPrev){ data.shalomPor=''; data.shalomRegistradoEn=''; }
     S.shipments[idx]={...prev,...data, _localTs: Date.now()};
     // ★ Aquí había además un _fbSaveShipmentNow(): el mismo pedido se escribía
     // DOS veces, una suelta al instante y otra 800 ms después dentro de la
@@ -2155,7 +2396,8 @@ function saveShipment(){
     save(_editId);closeOverlay('formOverlay');render(); // ★ incremental: solo este pedido
     if(window.FotosModule) FotosModule.trasGuardar(_editId); // fotos pendientes → cola
     if(window.DeliveryModule&&DeliveryModule.refrescar)DeliveryModule.refrescar(); // ruta al día si está abierta
-    toast('✅ Actualizado');}
+    toast('✅ Actualizado');
+    return 'ok';}
   else{
     data.id='id_'+Date.now();data.createdAt=new Date().toISOString();data._localTs=Date.now();
     /* ★ EL TOKEN DEL LINK DE SEGUIMIENTO.

@@ -487,3 +487,14 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);max
    mismo anillo que el botón de seleccionar (.tb-btn.sel-on)—. */
 .prn-btn{background:transparent;border:1px solid var(--bd);filter:grayscale(1);opacity:.75}
 .prn-btn.on{background:transparent;border-color:var(--blue);box-shadow:0 0 0 2px rgba(56,139,253,.45);filter:none;opacity:1}
+
+/* ★ CAJAS DE SHALOM (10/11/2026): elegir el tamaño de un toque, como en
+   Shalom Pro. 📏 abre las medidas. */
+.pkg-cajas{display:grid;grid-template-columns:repeat(6,1fr);gap:6px;margin-top:4px}
+.pkg-caja{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;min-height:52px;padding:6px 2px;border-radius:10px;border:1px solid var(--bd);background:var(--bg2);color:var(--text);font-family:inherit;cursor:pointer;transition:transform .12s,border-color .12s}
+.pkg-caja b{font-size:13px;font-weight:800}
+.pkg-caja small{font-size:9.5px;color:var(--text2)}
+.pkg-caja.on{border:2px solid #f85149;background:rgba(248,81,73,.08)}
+.pkg-caja.on b{color:#f85149}
+.pkg-caja:active{transform:scale(.96)}
+@media(max-width:380px){.pkg-cajas{grid-template-columns:repeat(3,1fr)}}
