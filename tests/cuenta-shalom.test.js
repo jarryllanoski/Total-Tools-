@@ -137,7 +137,7 @@ module.exports = async ({bloque, ok}) => {
     ok(!r2.ok && r2.motivo === 'FORMATO_DESCONOCIDO' && sinId.v.entrar.length === 0, 'si no devuelve el id, se para (no crea otra al lado)');
   }
 
-  bloque('Varias con TU correo: manda la guardada, si no la conectada, si no se para');
+  bloque('Varias con TU correo: siempre elige una (todas son tuyas), nunca se para');
 
   {
     const L = (a, b) => ({instances: [{id: 'x1', name: 'A', username: MI, isLoggedIn: a},
@@ -146,7 +146,22 @@ module.exports = async ({bloque, ok}) => {
     ok(C.mia(P.traducir('instances', L(false, true)).instancias, MI, '').instancia.id === 'x2', 'la única conectada');
     const m = mundo({lista: L(true, true)});
     const r = await C.conectar(m.deps, {usuario: MI, clave: CLAVE});
-    ok(!r.ok && r.motivo === 'VARIAS_INSTANCIAS' && m.v.guardada === null, 'dos conectadas y ninguna guardada: no se adivina');
+    ok(r.ok && m.v.guardada.id === 'x1' && m.v.entrar.length === 0 && m.v.crear.length === 0,
+       'dos conectadas y ninguna guardada: la primera por id, sin entrar ni crear');
+    const r2 = await C.conectar(mundo({lista: L(true, true)}).deps, {usuario: MI, clave: CLAVE});
+    ok(r2.id === r.id, 'estable: siempre la misma');
+    const conNombre = {instances: [{id: 'x1', name: 'A', username: MI, isLoggedIn: true},
+      {id: 'x9', name: C.NOMBRE, username: MI, isLoggedIn: true}]};
+    ok(C.mia(P.traducir('instances', conNombre).instancias, MI, '').instancia.id === 'x9', 'manda la del panel (su nombre)');
+    ok(C.mia(P.traducir('instances', conNombre).instancias, MI, 'x1').instancia.id === 'x1', 'pero la guardada manda sobre el nombre');
+    const ningunaCon = {instances: [{id: 'x2', name: 'B', username: MI, isLoggedIn: false},
+      {id: 'x1', name: 'A', username: MI, isLoggedIn: false}]};
+    const m3 = mundo({lista: ningunaCon});
+    const r3 = await C.conectar(m3.deps, {usuario: MI, clave: CLAVE});
+    ok(m3.v.entrar.join() === 'x1' && m3.v.crear.length === 0, 'ninguna conectada: entra en la primera por id, no crea otra');
+    const mixta = {instances: [{id: 'z', name: 'Otra', username: 'dueno.dos@ejemplo.pe', isLoggedIn: true},
+      {id: 'x2', name: 'B', username: MI, isLoggedIn: true}, {id: 'x3', name: 'C', username: MI, isLoggedIn: false}]};
+    ok(C.mia(P.traducir('instances', mixta).instancias, MI, '').instancia.id === 'x2', 'nunca la de otro correo, aunque esté primera');
   }
 
   bloque('Fallos de red y de formato no se toman por «no hay ninguna»');

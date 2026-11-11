@@ -65,7 +65,7 @@ function idDe(json) {
  * @param {Array} lista instancias traducidas {id, nombre, usuario, conectada}
  * @param {string} correo tu correo de Shalom Pro
  * @param {string} idGuardado la que el panel tenía guardada, si alguna
- * @return {Object} {estado: una|varias|ninguna, instancia}
+ * @return {Object} {estado: una|ninguna, instancia}
  */
 function mia(lista, correo, idGuardado) {
   const L = Array.isArray(lista) ? lista.filter((x) => x && _txt(x.id)) : [];
@@ -74,13 +74,24 @@ function mia(lista, correo, idGuardado) {
   const tuyas = L.filter((x) => _txt(x.usuario).toLowerCase() === c);
   if (tuyas.length === 1) return {estado: "una", instancia: tuyas[0]};
   if (tuyas.length > 1) {
-    // Varias con TU correo: todas son tuyas. Manda la guardada; si no, la
-    // única conectada. Si no se puede decidir, no se adivina.
-    const g = tuyas.filter((x) => _txt(x.id) === _txt(idGuardado));
-    if (g.length === 1) return {estado: "una", instancia: g[0]};
-    const con = tuyas.filter((x) => x.conectada === true);
-    if (con.length === 1) return {estado: "una", instancia: con[0]};
-    return {estado: "varias", instancia: null};
+    /* Varias con TU correo: TODAS son de tu cuenta de Shalom Pro (p. ej.
+       otra app tuya conectada con el mismo correo), así que usar cualquiera
+       registra en TU cuenta. Nunca se para: se elige siempre igual.
+       Orden: la guardada → la del panel (su nombre) → una conectada → la
+       primera. Entre iguales, por id (estable: siempre la misma). */
+    const orden = tuyas.slice().sort((a, b) =>
+      _txt(a.id) < _txt(b.id) ? -1 : (_txt(a.id) > _txt(b.id) ? 1 : 0));
+    const elegir = [
+      (x) => _txt(idGuardado) !== "" && _txt(x.id) === _txt(idGuardado),
+      (x) => _txt(x.nombre) === NOMBRE && x.conectada === true,
+      (x) => _txt(x.nombre) === NOMBRE,
+      (x) => x.conectada === true,
+      () => true,
+    ];
+    for (let i = 0; i < elegir.length; i++) {
+      const hit = orden.find(elegir[i]);
+      if (hit) return {estado: "una", instancia: hit};
+    }
   }
   /* Una creada por el panel que nunca llegó a entrar no tiene correo: se
      reconoce por SU nombre y por no tener usuario (nunca una ajena). */
@@ -112,12 +123,6 @@ async function conectar(deps, opc) {
       detalle: "No se pudo consultar Shalom. Intenta en un momento."};
   }
   const e = mia(lis.instancias, usuario, o.idGuardado);
-  if (e.estado === "varias") {
-    return {ok: false, motivo: "VARIAS_INSTANCIAS",
-      detalle: "Hay más de una instancia con tu correo en shalom-api.lat. " +
-        "Deja una sola y vuelve a pulsar Conectar."};
-  }
-
   let id = e.instancia ? _txt(e.instancia.id) : "";
   let conectada = !!(e.instancia && e.instancia.conectada === true);
   if (!id) {
