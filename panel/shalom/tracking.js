@@ -157,7 +157,9 @@ function _aplicarEstadoShalom(ship, resp, origen){
     return {cambio: false,
             motivo: (resp && resp.motivo) || 'SIN_DATO',
             detalle: (resp && resp.detalle) ||
-                     (resp && resp.http ? 'HTTP ' + resp.http : '')};
+                     (resp && resp.http ? 'HTTP ' + resp.http : ''),
+            // el servidor ya miró tus envíos pendientes (y no estaba)
+            revisoPendientes: !!(resp && resp.revisoPendientes)};
   }
   ship.trackingLastAutoCheck = Date.now();
 
@@ -896,18 +898,25 @@ function _situacion(ship){
 /* «Shalom no conoce esta guía» (NO_ENCONTRADO) o «solo registrada»
    (SOLO_REGISTRADO), dicho según la situación. No es un error: con la guía
    del panel por dejar es justo lo esperado. */
-function _textoSinRastro(ship){
+function _textoSinRastro(ship, r){
   var sit = _situacion(ship);
-  if (sit.tipo === 'porDejar') {
+  var pendiente = r && r.motivo === 'PENDIENTE';
+  if (sit.tipo === 'porDejar' || pendiente) {
     var v = sit.venceEn;
     var cuando = (typeof v !== 'number') ? '' : (v > 0 ?
       ' · vence en ' + Math.max(1, Math.round(v / 3600000)) + ' h' :
       ' · el plazo de 24 h ya pasó: regístrala de nuevo');
-    return '📦 Registrado — aún no entra a la agencia' + cuando;
+    return (pendiente ? '📦 Registrada en tu Shalom Pro — pendiente: falta dejar el paquete en la agencia' :
+      '📦 Registrado — aún no entra a la agencia') + cuando;
+  }
+  /* El servidor ya miró tus envíos pendientes y no está: no es «normal». */
+  if (r && r.revisoPendientes) {
+    return '⚠️ Shalom no tiene esta guía (ni en su rastreo ni en tus pendientes) — revisa número y código';
   }
   return '📦 Shalom aún no tiene esta guía en su rastreo — si no dejaste el paquete, es normal; si ya lo dejaste, revisa número y código';
 }
-function _esSinRastro(motivo){ return motivo === 'NO_ENCONTRADO' || motivo === 'SOLO_REGISTRADO'; }
+/* PENDIENTE: el servidor la encontró entre los envíos pendientes de tu cuenta. */
+function _esSinRastro(motivo){ return motivo === 'NO_ENCONTRADO' || motivo === 'SOLO_REGISTRADO' || motivo === 'PENDIENTE'; }
 
 /* ── consultarAhora: botón ⟳ por tarjeta ─────────────────────────── */
 Tracking.consultarAhora = async function(shipId) {
@@ -943,7 +952,7 @@ Tracking.consultarAhora = async function(shipId) {
     if (window.toast) {
       // PUERTA_CERRADA trae `reabre` (una hora) en vez de `detalle` (un texto).
       var extra = (r.motivo === 'PUERTA_CERRADA') ? r.reabre : r.detalle;
-      window.toast(_esSinRastro(r.motivo) ? _textoSinRastro(ship) : _motivoTexto(r.motivo, extra));
+      window.toast(_esSinRastro(r.motivo) ? _textoSinRastro(ship, r) : _motivoTexto(r.motivo, extra));
     }
   }
   // Se restaura SIEMPRE, en los dos caminos. Antes solo se hacía en el de
@@ -975,7 +984,7 @@ Tracking.bulkTrack = async function(ids) {
       if (r.avanzo || r.resultado === 'EN_DESTINO' ||
           r.resultado === 'FINALIZADO') avanzaron++;
     }
-    else if (_esSinRastro(r.motivo) && _situacion(ships[i]).tipo === 'porDejar') porDejar++;
+    else if (r.motivo === 'PENDIENTE' || (_esSinRastro(r.motivo) && _situacion(ships[i]).tipo === 'porDejar')) porDejar++;
     else { err++; ultimoMotivo = r.motivo; ultimoDetalle = r.detalle; }
     if (i < ships.length - 1) await new Promise(function(res){ setTimeout(res, 700); });
   }

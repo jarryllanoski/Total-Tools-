@@ -213,6 +213,35 @@ async function _porLaPuerta(destino, datos, diagnostico) {
 }
 
 /**
+ * ¿Es esta guía un envío PENDIENTE de tu cuenta de Shalom Pro? Una guía
+ * pendiente no sale en el rastreo público (/track dice «no la conozco»),
+ * pero sí en esta lista. Una consulta por llamada: `memo` la guarda para
+ * que la consulta por horarios la pida UNA sola vez por corrida.
+ * @param {string} guia número de guía
+ * @param {Object} [memo] {lista} compartido entre llamadas
+ * @return {Promise<?boolean>} true/false, o null si no se pudo mirar
+ */
+async function _esPendiente(guia, memo) {
+  const m = memo || {};
+  if (m.lista === undefined) {
+    m.lista = null;
+    try {
+      const c = await db.doc(CFG_DOC).get();
+      const cfg = c.exists ? c.data() : {};
+      const id = (cfg.shalomInstancia && cfg.shalomInstancia.id) || "";
+      if (id) {
+        const pr = await _porLaPuerta("pendientes", {instanceId: id});
+        m.lista = (pr && pr.ok && pr.json) || null;
+      }
+    } catch (e) {
+      console.warn("pendientes:", e && e.message);
+    }
+  }
+  if (!m.lista) return null;
+  return registroShalom.enPendientes(m.lista, guia);
+}
+
+/**
  * Un fallo del servicio que la llamada no pudo ver por sí sola (p. ej.
  * «Shalom no conoce» una guía que YA conocía): cuenta para el interruptor
  * igual que un ERROR_SHALOM.
@@ -1605,6 +1634,7 @@ async function _correrBarrido(forzado) {
   const escrituras = [];
   const detalle = [];
   let consultadas = 0; let fallidas = 0; let cortado = "";
+  const memoPend = {}; // la lista de pendientes, UNA vez por corrida
   let porDejar = 0; // guías del panel que aún no entran a la agencia
   /* Por que fallaron, no solo cuantas. "6 fallaron" no se puede accionar:
      no distingue un corte de red de una cuota agotada ni de una clave
@@ -1625,7 +1655,8 @@ async function _correrBarrido(forzado) {
            cuenta para el interruptor como un fallo del servicio. Así una
            caída real se sigue detectando aunque llegue disfrazada. */
     const sinRastro = !r.ok && r.motivo === "NO_ENCONTRADO";
-    if (sinRastro && item.porDejar) {
+    if (sinRastro && (item.porDejar ||
+        await _esPendiente(item.guia, memoPend) === true)) {
       porDejar++;
       await new Promise((res) => setTimeout(res, PAUSA_MS));
       continue;
@@ -1933,6 +1964,7 @@ exports.shalomPuerta = onRequest(
               return (cfg5.shalomInstancia && cfg5.shalomInstancia.id) || "";
             },
             descargar: _voucherPorLaPuerta,
+            esPendiente: (g) => _esPendiente(g),
             subir: _subirAlBucket,
             guardar: async (campos) => {
               await ref.set(_conMts(campos), {merge: true});
@@ -2066,6 +2098,21 @@ exports.shalomPuerta = onRequest(
       // 4 · el interruptor y la llamada, por el camino unico.
       try {
         const r = await _porLaPuerta(destino, paso.datos, diagnostico);
+        /* «No la conozco» en /track: ¿es un envío PENDIENTE de tu cuenta?
+           Entonces existe y solo falta dejar el paquete: se dice con
+           certeza (PENDIENTE), no como «revisa la guía». */
+        if (!r.ok && destino === "track" && !diagnostico &&
+            r.motivo === "NO_ENCONTRADO") {
+          const g = paso.datos && paso.datos.orderNumber;
+          const pend = await _esPendiente(g);
+          if (pend === true) {
+            res.status(200).json({ok: false, motivo: "PENDIENTE"});
+            return;
+          }
+          res.status(200).json({ok: false, motivo: "NO_ENCONTRADO",
+            detalle: r.detalle, revisoPendientes: pend === false});
+          return;
+        }
         if (!r.ok) {
           res.status(200).json({
             ok: false, motivo: r.motivo, detalle: r.detalle,

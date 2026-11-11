@@ -1195,3 +1195,12 @@ status 403». `motivoDeHttp` lo traduce a `NO_ENCONTRADO`, que NO cuenta para
 el interruptor. En los horarios, «no la conoce» sobre una guía que YA tenía
 movimiento sí cuenta (`_contarFalloDeServicio`): una caída real se sigue
 detectando. Pruebas: `tests/situacion-guia.test.js`.
+
+**Guía pendiente escrita a mano (11/11/2026, guía 103375443).** Shalom no
+publica en su rastreo los envíos PENDIENTES (registrados en Shalom Pro, sin
+dejar en la agencia), los haya creado el panel o no. Cuando /track dice «no la
+conozco», el servidor la busca en `pending-shipments` de tu cuenta
+(`_esPendiente`, `registroShalom.enPendientes`): si está → `PENDIENTE` («falta
+dejar el paquete»); si no → `NO_ENCONTRADO` con `revisoPendientes` («revisa
+número y código»). Los horarios piden la lista una vez por corrida; el ticket
+también la mira.

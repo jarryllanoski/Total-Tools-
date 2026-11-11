@@ -518,6 +518,28 @@
   }
 
   /**
+   * ¿Está esta guía entre los envíos PENDIENTES de tu cuenta? (11/11/2026)
+   * Una guía pendiente (registrada en Shalom Pro, el paquete aún no está en
+   * la agencia) NO sale en el rastreo público: /track dice «no la conozco».
+   * Esta lista es la que dice con certeza «sí existe, falta dejarla».
+   * Busca por el NÚMERO exacto. La lista llega como objeto {"0":…} (medido),
+   * y por si acaso también como array o envuelta en `data`.
+   * @param {*} lista lo que devolvió pending-shipments
+   * @param {*} guia el número de guía
+   * @return {boolean} true si está
+   */
+  function enPendientes(lista, guia) {
+    const g = _dig(guia);
+    if (!g || !lista || typeof lista !== "object") return false;
+    const base = (lista.data && typeof lista.data === "object") ?
+      lista.data : lista;
+    const todos = Array.isArray(base) ? base : Object.keys(base)
+        .map((k) => base[k]);
+    return todos.some((x) => x && typeof x === "object" &&
+      _dig(x.service_order_guia_empresarial || x.guia || x.orderNumber) === g);
+  }
+
+  /**
    * El nombre de RENIEC que corresponde a ESTE pedido, o null.
    *
    * ⚠️ SOLO SI EL DNI COINCIDE. La consulta a RENIEC vive en memoria
@@ -856,7 +878,8 @@
   }
 
   return {ESTADO_PUERTA, ESTADOS_PUERTA, PLAZO_MS, VENCIDA_MS, CAJAS,
-    tipoElegido, registradoPorPro, plazoVencido, situacion, notaConClave,
+    tipoElegido, registradoPorPro, plazoVencido, situacion, enPendientes,
+    notaConClave,
     puedeRenovar: _puedeRenovar, CONTENIDOS, clasificar, contenidoDe,
     faltantes, cuerpo, resultado, buscarEnPendientes, orquestar,
     reniecDe, guiaDe, camposDe, recuperarEnvio, estaRegistrado, configDe};

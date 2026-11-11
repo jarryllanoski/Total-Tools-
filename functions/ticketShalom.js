@@ -66,6 +66,13 @@ async function jalar(datos, deps) {
     orderCode: String(d.orderCode || "").trim(),
     instanceId: instanceId,
   });
+  /* Shalom no tiene el comprobante: si la guía es un envío PENDIENTE de tu
+     cuenta (escrita a mano, p. ej. registrada en pro.shalom.pe), no es un
+     error: el comprobante nace al dejar el paquete. */
+  if (r && !r.ok && r.motivo === "NO_ENCONTRADO" && deps.esPendiente &&
+      await deps.esPendiente(String(d.orderNumber || "").trim()) === true) {
+    return {ok: false, motivo: "POR_DEJAR"};
+  }
   if (!r || !r.ok) {
     return {ok: false, motivo: (r && r.motivo) || "ERROR_SHALOM",
       detalle: (r && r.detalle) || ""};

@@ -106,8 +106,9 @@ module.exports = async ({bloque, ok}) => {
 
     const idx = fs.readFileSync(path.join(__dirname, '..', 'functions', 'index.js'), 'utf8');
     const loop = idx.slice(idx.indexOf('const sel = barrido.aConsultar'), idx.indexOf('// 4 · escribir'));
-    ok(/sinRastro && item\.porDejar\)\s*\{\s*porDejar\+\+;[\s\S]*?continue;/.test(loop),
-       'por dejar + «no la conoce»: se cuenta aparte y NO como fallida');
+    ok(/sinRastro && \(item\.porDejar \|\|\s*await _esPendiente\(item\.guia, memoPend\) === true\)\)\s*\{\s*porDejar\+\+;[\s\S]*?continue;/.test(loop),
+       'por dejar (del panel, o hallada en tus pendientes) + «no la conoce»: aparte, NO como fallida');
+    ok(/const memoPend = \{\}/.test(idx), 'la lista de pendientes se pide UNA vez por corrida');
     ok(/sinRastro && item\.conMovimiento\) await _contarFalloDeServicio\(\)/.test(loop),
        '⚠️ con movimiento + «no la conoce»: SÍ cuenta para el interruptor (caída real disfrazada)');
     ok(/porDejar: porDejar/.test(idx), 'el informe dice cuántas están por dejar');
@@ -182,5 +183,45 @@ module.exports = async ({bloque, ok}) => {
   {
     const r = await R.puedeRenovar(delPanel(30), {ahora: () => AHORA, rastrear: async () => ({ok: false, motivo: P.motivoDeHttp(502, 'Shalom buscar API returned status 403')})});
     ok(r.ok === true, 'Shalom no la conoce + 24 h pasadas → se puede registrar de nuevo');
+  }
+  bloque('Guía escrita a mano pero PENDIENTE en tu Shalom Pro (el caso 103375443)');
+
+  {
+    const lista = {'0': {service_order_guia_empresarial: '103375443', code_val: '1234'},
+      '1': {service_order_guia_empresarial: '103376505'}};
+    ok(R.enPendientes(lista, '103375443') === true, 'la encuentra en la lista (llega como objeto {"0":…})');
+    ok(R.enPendientes([{guia: '103375443'}], 103375443) === true, 'también como array y con número');
+    ok(R.enPendientes({data: [{orderNumber: '103375443'}]}, '103375443') === true, 'y envuelta en data');
+    ok(R.enPendientes(lista, '10337544') === false, 'por el número EXACTO, no por parecido');
+    ok(R.enPendientes(null, '103375443') === false && R.enPendientes(lista, '') === false, 'sin lista o sin guía: no');
+
+    const idx = fs.readFileSync(path.join(__dirname, '..', 'functions', 'index.js'), 'utf8');
+    const gen = idx.slice(idx.indexOf('const r = await _porLaPuerta(destino, paso.datos, diagnostico);'));
+    ok(/destino === "track" && !diagnostico &&\s*r\.motivo === "NO_ENCONTRADO"[\s\S]{0,200}_esPendiente\(g\)[\s\S]{0,120}motivo: "PENDIENTE"/.test(gen),
+       'Consultar: «no la conoce» → busca en tus pendientes → PENDIENTE');
+    ok(/revisoPendientes: pend === false/.test(gen), 'si miró y no está, lo dice (revisoPendientes)');
+    ok(/esPendiente: \(g\) => _esPendiente\(g\)/.test(idx), 'el ticket también mira tus pendientes');
+
+    const aManoAlistado = Object.assign({}, aMano, {id: 'p5', status: 'ALISTADO', shalomGuia: '103375443', trackingOrderNumber: '103375443'});
+    let p = panel({ok: false, motivo: 'PENDIENTE'}, [aManoAlistado]);
+    await p.T.consultarAhora('p5');
+    ok(/Registrada en tu Shalom Pro — pendiente: falta dejar el paquete en la agencia/.test(p.toasts.join('|')),
+       'a mano + pendiente en tu cuenta: «Registrada en tu Shalom Pro — pendiente…»');
+    p = panel({ok: false, motivo: 'NO_ENCONTRADO', revisoPendientes: true}, [aManoAlistado]);
+    await p.T.consultarAhora('p5');
+    ok(/ni en su rastreo ni en tus pendientes/.test(p.toasts.join('|')), 'ni pública ni pendiente: «revisa número y código», sin «es normal»');
+    p = panel({ok: false, motivo: 'PENDIENTE'}, [aManoAlistado]);
+    await p.T.bulkTrack(['p5']);
+    ok(/📦 1 por dejar en agencia/.test(p.toasts.join('|')), 'masivo: la pendiente cuenta como «por dejar»');
+
+    const v = {d: 0};
+    const deps = {leerPedido: async () => aManoAlistado, instancia: async () => 'inst-1', ahora: () => AHORA,
+      descargar: async () => { v.d++; return {ok: false, motivo: 'NO_ENCONTRADO'}; },
+      esPendiente: async (g) => g === '103375443', subir: async () => '', guardar: async () => {}};
+    const rt = await T.jalar({pedidoId: 'p5', orderNumber: '103375443', orderCode: 'JPHN'}, deps);
+    ok(!rt.ok && rt.motivo === 'POR_DEJAR', 'ticket de una guía a mano pendiente: «sale cuando dejes el paquete»');
+    deps.esPendiente = async () => false;
+    const rt2 = await T.jalar({pedidoId: 'p5', orderNumber: '103375443', orderCode: 'JPHN'}, deps);
+    ok(!rt2.ok && rt2.motivo === 'NO_ENCONTRADO', 'y si no está en pendientes, sigue siendo «no encontró»');
   }
 };
