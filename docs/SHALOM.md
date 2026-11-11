@@ -1177,3 +1177,21 @@ es tan viejo como tu último clic. La frescura solo la da el webhook.
    constante, deduplicación con un `create()` atómico.
 10. **Medir antes de traducir.** Siempre.
 
+
+## ¿Se puede consultar esta guía? — UNA verdad (11/11/2026)
+
+`functions/registroShalom.js → situacion(pedido, ahora)`. La usan el botón
+Consultar, el masivo, Jalar ticket y la consulta por horarios.
+
+| Situación | Cuándo | Consultar | Ticket | Horarios |
+|---|---|---|---|---|
+| `sinGuia` | sin número | — | — | se salta |
+| `normal` | escrita a mano (cualquier etiqueta) o del panel ya movida | sí | sí | sí |
+| `porDejar` | del panel, Shalom aún no la movió, < 72 h | sí, «no la conoce» = esperado | `POR_DEJAR`, sin llamar | sí, aparte en el informe |
+| `vencida` | del panel, sin movimiento, > 72 h | no | `VENCIDA` | se salta |
+
+Con una guía pendiente, `/track` no da 404: da «Shalom buscar API returned
+status 403». `motivoDeHttp` lo traduce a `NO_ENCONTRADO`, que NO cuenta para
+el interruptor. En los horarios, «no la conoce» sobre una guía que YA tenía
+movimiento sí cuenta (`_contarFalloDeServicio`): una caída real se sigue
+detectando. Pruebas: `tests/situacion-guia.test.js`.

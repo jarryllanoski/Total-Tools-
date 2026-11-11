@@ -112,12 +112,15 @@
   TicketModule.textoMotivo = function (rt) {
     var m = rt && rt.motivo;
     if (m === 'SIN_DATO') return '⚠️ Revisa la guía y el código (guía de 8 o 9 dígitos)';
-    if (m === 'NO_ENCONTRADO') return '⚠️ Shalom no encontró esa guía con ese código';
+    // POR_DEJAR / VENCIDA: la regla única (RegistroShalom.situacion), en el servidor.
+    if (m === 'POR_DEJAR') return '📦 El comprobante sale cuando dejes el paquete en la agencia — después jálalo aquí';
+    if (m === 'VENCIDA') return '⏰ Esta guía venció sin dejar el paquete — regístrala de nuevo';
+    if (m === 'NO_ENCONTRADO') return '⚠️ Shalom aún no tiene el comprobante de esa guía — sale cuando el paquete entra a la agencia; si ya lo dejaste, revisa número y código';
     if (m === 'SIN_SESION') return '🔒 Tu sesión venció — ingresa de nuevo';
     if (m === 'SIN_PERMISO') return '🚫 Tu cuenta no está autorizada';
     if (m === 'SIN_RED') return '📡 Sin conexión con Shalom — intenta en un momento';
     if (m === 'SIN_INSTANCIA') return '🔌 Conecta tu cuenta de Shalom Pro en Config → Conectar';
-    if (m === 'SIN_INSTANCIA_VALIDA') return '🔌 La cuenta de Shalom Pro no responde — pulsa «comprobar» o Conectar en Config';
+    if (m === 'SIN_INSTANCIA_VALIDA') return '🔌 La cuenta de Shalom Pro no responde — pulsa Conectar en Config';
     if (m === 'BLOQUEADO') return '🔒 Shalom rechazó la sesión — pulsa Conectar en Config';
     if (m === 'PETICION_INVALIDA') return '⚠️ Shalom rechazó la petición del ticket. Avísame con una foto de este mensaje' + (rt && rt.detalle ? ': ' + String(rt.detalle).slice(0, 120) : '');
     if (m === 'LIMITE') return '⏳ Cuota de Shalom agotada — intenta más tarde';

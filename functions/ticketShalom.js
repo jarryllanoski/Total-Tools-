@@ -14,6 +14,8 @@
  */
 
 const ID_PEDIDO = /^[A-Za-z0-9_-]{1,80}$/;
+// ¿Se puede pedir ya? La MISMA regla que Consultar y los horarios.
+const registroShalom = require("./registroShalom");
 
 /**
  * @param {Object} datos {pedidoId, orderNumber, orderCode} (del navegador)
@@ -35,6 +37,21 @@ async function jalar(datos, deps) {
   if (!/SHALOM/i.test(String(pedido.courier || ""))) {
     return {ok: false, motivo: "SIN_DATO",
       detalle: "el ticket de Shalom es solo para pedidos de Shalom"};
+  }
+  /* ⏳ GUÍA DEL PANEL AÚN POR DEJAR (registroShalom.situacion): el
+     comprobante lo emite Shalom en el MOSTRADOR, al recibir el paquete.
+     Antes de eso no existe, y pedirlo solo devolvía «no encontró esa guía».
+     Se dice sin gastar una llamada. Si escribiste OTRA guía en el
+     formulario (aún sin guardar), esa es tuya a mano: se pide normal. */
+  const guiaPedido = String(pedido.trackingOrderNumber || pedido.shalomGuia ||
+      "").trim();
+  if (String(d.orderNumber || "").trim() === guiaPedido) {
+    const sit = registroShalom.situacion(pedido,
+        deps.ahora ? deps.ahora() : Date.now());
+    if (sit.tipo === "porDejar" || sit.tipo === "vencida") {
+      return {ok: false, motivo: sit.tipo === "porDejar" ? "POR_DEJAR" :
+        "VENCIDA"};
+    }
   }
   /* La cuenta de Shalom Pro: de la configuración del SERVIDOR (la guardó
      «Conectar»). Lo que el navegador mandara con ese nombre se ignora. */

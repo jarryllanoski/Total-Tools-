@@ -407,7 +407,8 @@ module.exports = async (t) => {
   {
     ok(/case 'DESCONECTADO':\s*return '🔧 Rastreo Shalom en reconstrucción'/.test(E.leer('tracking.js')),
         'el botón ⟳');
-    ok(/Shalom no encontró esa guía con ese código/.test(E.leer('ticket.js')) &&
+    ok(/Shalom aún no tiene el comprobante de esa guía/.test(E.leer('ticket.js')) &&
+       /POR_DEJAR/.test(E.leer('ticket.js')) &&
        /textoMotivo/.test(E.leer('ticket.js')), 'el botón 🧾 (dice cada motivo)');
     ok(/Extraer agencias de Shalom está en reconstrucción/.test(E.leer('agencias-extractor.js')),
         'el extractor, y aclara que el catálogo actual sigue sirviendo');

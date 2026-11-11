@@ -138,6 +138,49 @@
     return p.shalomPor === "pro" || !!_txt(p.shalomRegistradoEn);
   }
 
+  /** Sin movimiento en Shalom pasado este plazo, la guía del panel se da por
+   * muerta y ya no se consulta (72 h y no 24: ni dos días de cortes de red
+   * la dejan fuera por error). */
+  const VENCIDA_MS = 72 * 3600 * 1000;
+
+  /**
+   * ★ LA ÚNICA VERDAD sobre «¿se puede consultar esta guía?» (11/11/2026).
+   * La usan el botón Consultar, el masivo, Jalar ticket y la consulta por
+   * horarios. Cuatro situaciones:
+   *
+   *   sinGuia  → no tiene número.
+   *   normal   → escrita A MANO (cualquier etiqueta), o la del panel que
+   *              Shalom ya movió: se consulta y se jala el ticket como siempre.
+   *   porDejar → la creó el panel y Shalom aún no la movió: es un envío
+   *              PENDIENTE (el paquete no está en la agencia). Se consulta
+   *              —así el panel se entera solo cuando lo dejas—, pero «Shalom
+   *              no la conoce» es lo esperado, no un error. Sin ticket aún:
+   *              el comprobante nace en el mostrador.
+   *   vencida  → la del panel, sin movimiento y pasadas 72 h: no se consulta.
+   *
+   * Cambiar la guía a mano quita la marca del panel (pedido-guardar.js y
+   * tracking.js), así que esa pasa sola a `normal`.
+   * @param {Object} pedido el pedido
+   * @param {number} ahoraMs ahora, en ms
+   * @return {Object} {tipo, venceEn} — venceEn: ms hasta las 24 h de Shalom
+   *   (negativo si ya pasaron), o null si no se sabe la hora del registro
+   */
+  function situacion(pedido, ahoraMs) {
+    const p = (pedido && typeof pedido === "object") ? pedido : {};
+    const guia = _txt(p.trackingOrderNumber) || _txt(p.shalomGuia);
+    if (!guia) return {tipo: "sinGuia", venceEn: null};
+    if (!registradoPorPro(p) || _txt(p.trackingStatus)) {
+      return {tipo: "normal", venceEn: null};
+    }
+    const t = Date.parse(_txt(p.shalomRegistradoEn));
+    if (!isFinite(t)) return {tipo: "porDejar", venceEn: null};
+    const ahora = Number(ahoraMs) || Date.now();
+    if (ahora - t > VENCIDA_MS) {
+      return {tipo: "vencida", venceEn: t + PLAZO_MS - ahora};
+    }
+    return {tipo: "porDejar", venceEn: t + PLAZO_MS - ahora};
+  }
+
   /**
    * ¿Ya venció la guía? Solo se puede afirmar con la hora del registro.
    * @param {Object} pedido el pedido
@@ -812,8 +855,8 @@
       "Intenta en un rato o míralo en pro.shalom.pe.");
   }
 
-  return {ESTADO_PUERTA, ESTADOS_PUERTA, PLAZO_MS, CAJAS, tipoElegido,
-    registradoPorPro, plazoVencido, notaConClave,
+  return {ESTADO_PUERTA, ESTADOS_PUERTA, PLAZO_MS, VENCIDA_MS, CAJAS,
+    tipoElegido, registradoPorPro, plazoVencido, situacion, notaConClave,
     puedeRenovar: _puedeRenovar, CONTENIDOS, clasificar, contenidoDe,
     faltantes, cuerpo, resultado, buscarEnPendientes, orquestar,
     reniecDe, guiaDe, camposDe, recuperarEnvio, estaRegistrado, configDe};

@@ -213,6 +213,19 @@ async function _porLaPuerta(destino, datos, diagnostico) {
 }
 
 /**
+ * Un fallo del servicio que la llamada no pudo ver por sí sola (p. ej.
+ * «Shalom no conoce» una guía que YA conocía): cuenta para el interruptor
+ * igual que un ERROR_SHALOM.
+ * @return {Promise<void>}
+ */
+async function _contarFalloDeServicio() {
+  const estado = await _leerPuerta();
+  const cambios = interruptor.tras(estado, {ok: false,
+    motivo: "ERROR_SHALOM"}, Date.now(), false);
+  if (cambios) await _guardarPuerta(cambios);
+}
+
+/**
  * El ticket (binario) por la MISMA puerta: respeta el interruptor —si la
  * puerta está apagada o pausada tras fallos, no se llama— y cuenta como una
  * consulta más para abrirla o cerrarla.
@@ -1592,6 +1605,7 @@ async function _correrBarrido(forzado) {
   const escrituras = [];
   const detalle = [];
   let consultadas = 0; let fallidas = 0; let cortado = "";
+  let porDejar = 0; // guías del panel que aún no entran a la agencia
   /* Por que fallaron, no solo cuantas. "6 fallaron" no se puede accionar:
      no distingue un corte de red de una cuota agotada ni de una clave
      rechazada, y cada una se arregla en un sitio distinto. */
@@ -1604,6 +1618,19 @@ async function _correrBarrido(forzado) {
     const r = await _porLaPuerta("track",
         {orderNumber: item.guia, orderCode: item.codigo});
     consultadas++;
+    /* «Shalom no conoce esta guía» (situacion de registroShalom):
+         · por dejar → lo esperado: el paquete aún no está en la agencia.
+           No es un fallo; se cuenta aparte para verlo en el informe.
+         · con movimiento → Shalom ya la conocía: huele a Shalom caído, y
+           cuenta para el interruptor como un fallo del servicio. Así una
+           caída real se sigue detectando aunque llegue disfrazada. */
+    const sinRastro = !r.ok && r.motivo === "NO_ENCONTRADO";
+    if (sinRastro && item.porDejar) {
+      porDejar++;
+      await new Promise((res) => setTimeout(res, PAUSA_MS));
+      continue;
+    }
+    if (sinRastro && item.conMovimiento) await _contarFalloDeServicio();
     if (!r.ok) {
       fallidas++;
       const m = r.motivo || "DESCONOCIDO";
@@ -1618,6 +1645,7 @@ async function _correrBarrido(forzado) {
       continue;
     }
     const traducido = shalomPuerta.traducir("track", r.json);
+    if (!traducido.ok && traducido.motivo === "SOLO_REGISTRADO") porDejar++;
     const cambios = barrido.cambiosDe(porId[item.id], traducido, modo);
     if (cambios) {
       escrituras.push({id: item.id, campos: cambios.campos});
@@ -1670,7 +1698,7 @@ async function _correrBarrido(forzado) {
     ts: Date.now(), hora: ahoraLocal, forzado: !!forzado,
     modo: modo,
     candidatos: sel.consultar.length, consultadas: consultadas,
-    fallidas: fallidas, motivos: motivos,
+    fallidas: fallidas, motivos: motivos, porDejar: porDejar,
     conCambio: escrituras.length, escritas: escritas,
     movidas: escrituras.filter((w) => w.campos.status).length,
     saltados: sel.saltados, guiasMalas: sel.guiasMalas.slice(0, 20),

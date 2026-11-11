@@ -201,6 +201,17 @@ function sanear(texto) {
  * @return {string} motivo del contrato
  */
 function motivoDeHttp(status, texto) {
+  /* ⚠️ «SHALOM NO CONOCE ESA GUÍA» VIENE DISFRAZADO (11/11/2026).
+     Con una guía recién creada en Shalom Pro (envío pendiente: el paquete
+     aún no está en la agencia) /track no da 404: da un error con el texto
+     «Shalom buscar API returned status 403». Se traducía a ERROR_SHALOM, que
+     el interruptor cuenta como servicio caído: unas cuantas guías por dejar
+     en la consulta por horarios y la puerta se pausaba PARA TODOS. Medido:
+     a la misma hora, una guía ya dejada en la agencia respondía bien. Es la
+     misma respuesta que un 404: Shalom aún no la tiene. */
+  if (/buscar[\s\S]*returned status 40[34]/i.test(String(texto || ""))) {
+    return "NO_ENCONTRADO";
+  }
   /* ⚠️ UN 403 QUE HABLA DE INSTANCIA NO ES UNA CLAVE BLOQUEADA.
      Medido el 01/10/2026 con un `instanceId` inventado: Shalom responde
      403 "Invalid API Key or instance access". Traducirlo a BLOQUEADO hace

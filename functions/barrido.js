@@ -24,11 +24,6 @@ const HORAS_POR_DEFECTO = ["08:00", "11:30", "16:30", "19:00"];
 /** Zona del negocio. Fija: "8am" es 8am en Perú, sin cuentas con UTC. */
 const ZONA = "America/Lima";
 
-/** Horas sin ningún movimiento en Shalom tras las que una guía registrada
-    se da por muerta. 72 y no 24: una guía viva se mueve en horas, y así ni
-    dos días de cortes de red la dejan fuera por error. */
-const VENCIDA_H = 72;
-
 /** Minutos que tienen que pasar para volver a consultar la misma guía.
     No es un intervalo: es la defensa contra que el Scheduler dispare dos
     veces la misma ranura (reintentos) y se consulte todo por duplicado. */
@@ -49,6 +44,11 @@ const GUIA_OK = /^(?:[0-9]{8}|1[0-9]{8})$/;
 const etiquetas = require("./etiquetas");
 // Qué significa lo que dice Shalom: la MISMA regla en todos lados (Fase 6).
 const shalomEstado = require("./shalomEstado");
+// ¿Se consulta esta guía? La MISMA regla que el panel (situacion).
+const registroShalom = require("./registroShalom");
+/** Horas sin movimiento tras las que la guía del panel se da por muerta.
+    Sale de la regla única: no hay un segundo número que pueda divergir. */
+const VENCIDA_H = registroShalom.VENCIDA_MS / 3600000;
 
 /**
  * Ajusta una hora a la ranura de 30 minutos más cercana.
@@ -150,14 +150,12 @@ function aConsultar(pedidos, ahora) {
     if (shalomEstado.rango(p.trackingStatus) === 3) {
       saltados.yaEntregados++; return;
     }
-    /* ⏰ GUÍA MUERTA (11/11/2026). Registrada por Shalom Pro hace más de
-       VENCIDA_H horas y Shalom nunca la movió: no se dejó en la agencia y
-       Shalom la da por vencida. Consultarla 4 veces al día para siempre
-       gastaba cuota en nada. Al registrarla de nuevo cambia la hora y
-       vuelve a entrar. Las guías puestas a mano (sin hora) no se tocan. */
-    const reg = Date.parse(String(p.shalomRegistradoEn || ""));
-    if (isFinite(reg) && !String(p.trackingStatus || "").trim() &&
-        t - reg > VENCIDA_H * 3600000) {
+    /* ⏰ GUÍA MUERTA: la regla es la ÚNICA de registroShalom.situacion
+       (la misma del botón Consultar y del ticket). Registrada por el panel,
+       sin movimiento y pasadas 72 h: no se dejó en la agencia y Shalom la
+       dio por vencida. Al registrarla de nuevo cambia la hora y vuelve. */
+    const sit = registroShalom.situacion(p, t);
+    if (sit.tipo === "vencida") {
       saltados.vencidas++; return;
     }
     if (!GUIA_OK.test(guia)) {
@@ -173,6 +171,11 @@ function aConsultar(pedidos, ahora) {
       nombre: p.name || "",
       guia: guia,
       codigo: String(p.trackingOrderCode || p.shalomCodigo || "").trim(),
+      /* Por dejar: «Shalom no la conoce» es lo esperado (envío pendiente).
+         Con movimiento: Shalom YA la conocía, así que «no la conoce» huele
+         a Shalom caído y cuenta para el interruptor (index.js). */
+      porDejar: sit.tipo === "porDejar",
+      conMovimiento: !!String(p.trackingStatus || "").trim(),
     });
   });
 

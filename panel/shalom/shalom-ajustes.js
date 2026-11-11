@@ -84,6 +84,7 @@ async function _pintarUltimoBarrido(){
     '<b>Última corrida:</b> ' + cuando + ' (' + (u.hora||'') + ')' +
     '<br>Consultó ' + (u.consultadas||0) + ' · cambió ' + (u.conCambio||0) +
     ' · movió ' + (u.movidas||0) + ' etiqueta' + (u.movidas===1?'':'s') +
+    (u.porDejar ? ' · 📦 ' + u.porDejar + ' por dejar en agencia' : '') +
     (u.fallidas ? ' · <b style="color:#d29922">' + u.fallidas + ' fallaron</b>' +
       _motivosBarrido(u.motivos) : '') +
     '<br>No preguntó a ' + ahorro + ' (ya entregados o finalizados)' +

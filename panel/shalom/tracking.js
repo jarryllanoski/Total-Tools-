@@ -886,6 +886,29 @@ function _avisoConsulta(ship, r){
   return '✓ Sin cambios — sigue ' + estado;
 }
 
+/* La situación de la guía: la ÚNICA regla (functions/registroShalom.js →
+   situacion), la misma que usan el ticket y la consulta por horarios. */
+function _situacion(ship){
+  var R = window.RegistroShalom;
+  return (R && R.situacion) ? R.situacion(ship, Date.now()) : {tipo: 'normal', venceEn: null};
+}
+
+/* «Shalom no conoce esta guía» (NO_ENCONTRADO) o «solo registrada»
+   (SOLO_REGISTRADO), dicho según la situación. No es un error: con la guía
+   del panel por dejar es justo lo esperado. */
+function _textoSinRastro(ship){
+  var sit = _situacion(ship);
+  if (sit.tipo === 'porDejar') {
+    var v = sit.venceEn;
+    var cuando = (typeof v !== 'number') ? '' : (v > 0 ?
+      ' · vence en ' + Math.max(1, Math.round(v / 3600000)) + ' h' :
+      ' · el plazo de 24 h ya pasó: regístrala de nuevo');
+    return '📦 Registrado — aún no entra a la agencia' + cuando;
+  }
+  return '📦 Shalom aún no tiene esta guía en su rastreo — si no dejaste el paquete, es normal; si ya lo dejaste, revisa número y código';
+}
+function _esSinRastro(motivo){ return motivo === 'NO_ENCONTRADO' || motivo === 'SOLO_REGISTRADO'; }
+
 /* ── consultarAhora: botón ⟳ por tarjeta ─────────────────────────── */
 Tracking.consultarAhora = async function(shipId) {
   var ship = _findShip(shipId);
@@ -896,6 +919,11 @@ Tracking.consultarAhora = async function(shipId) {
   var guia = ship.trackingOrderNumber || ship.shalomGuia || '';
   if (!guia) {
     if (window.toast) window.toast('⚠️ Primero guarda el número de orden');
+    return;
+  }
+  // Vencida (72 h sin movimiento): no se gasta una consulta en ella.
+  if (_situacion(ship).tipo === 'vencida') {
+    if (window.toast) window.toast('⏰ Esta guía venció sin dejar el paquete — regístrala de nuevo');
     return;
   }
   var btn = document.getElementById('btn-consult-'+shipId);
@@ -915,7 +943,7 @@ Tracking.consultarAhora = async function(shipId) {
     if (window.toast) {
       // PUERTA_CERRADA trae `reabre` (una hora) en vez de `detalle` (un texto).
       var extra = (r.motivo === 'PUERTA_CERRADA') ? r.reabre : r.detalle;
-      window.toast(_motivoTexto(r.motivo, extra));
+      window.toast(_esSinRastro(r.motivo) ? _textoSinRastro(ship) : _motivoTexto(r.motivo, extra));
     }
   }
   // Se restaura SIEMPRE, en los dos caminos. Antes solo se hacía en el de
@@ -931,11 +959,11 @@ Tracking.bulkTrack = async function(ids) {
   var ships = (ids || []).map(_findShip).filter(Boolean).filter(function(s){
     var isShalom = s.courier && String(s.courier).toUpperCase().indexOf('SHALOM') >= 0;
     var guia = s.trackingOrderNumber || s.shalomGuia || '';
-    return isShalom && guia && s.status !== 'FINALIZADO';
+    return isShalom && guia && s.status !== 'FINALIZADO' && _situacion(s).tipo !== 'vencida';
   });
   if (!ships.length) { if (window.toast) window.toast('Nada Shalom para consultar'); return; }
   if (window.toast) window.toast('⏳ Consultando ' + ships.length + ' Shalom...');
-  var ok = 0, err = 0, avanzaron = 0, changed = [], ultimoMotivo = null, ultimoDetalle = '';
+  var ok = 0, err = 0, porDejar = 0, avanzaron = 0, changed = [], ultimoMotivo = null, ultimoDetalle = '';
   for (var i = 0; i < ships.length; i++) {
     var r = await _consultarYAplicar(ships[i]);
     if (r.cambio) {
@@ -947,6 +975,7 @@ Tracking.bulkTrack = async function(ids) {
       if (r.avanzo || r.resultado === 'EN_DESTINO' ||
           r.resultado === 'FINALIZADO') avanzaron++;
     }
+    else if (_esSinRastro(r.motivo) && _situacion(ships[i]).tipo === 'porDejar') porDejar++;
     else { err++; ultimoMotivo = r.motivo; ultimoDetalle = r.detalle; }
     if (i < ships.length - 1) await new Promise(function(res){ setTimeout(res, 700); });
   }
@@ -954,9 +983,10 @@ Tracking.bulkTrack = async function(ids) {
   if (window.render) window.render();
   if (window.toast) {
     // Si NINGUNO respondió, di el motivo (p.ej. desconectado); si algunos sí, resume.
-    if (!ok && ultimoMotivo) window.toast(_motivoTexto(ultimoMotivo, ultimoDetalle));
+    if (!ok && !porDejar && ultimoMotivo) window.toast(_motivoTexto(ultimoMotivo, ultimoDetalle));
     else window.toast('✅ ' + ok + ' consultado' + (ok!==1?'s':'') +
       (avanzaron ? ' · 📍 ' + avanzaron + ' avanzó' + (avanzaron!==1?'n':'') : '') +
+      (porDejar ? ' · 📦 ' + porDejar + ' por dejar en agencia' : '') +
       (err ? ' · ' + err + ' sin dato' : ''));
   }
 };
