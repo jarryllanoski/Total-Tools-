@@ -79,11 +79,17 @@ module.exports = async ({bloque, ok}) => {
     ok(B.VENCIDA_H * H === R.VENCIDA_MS, 'los horarios usan el MISMO plazo (no hay un segundo número)');
   }
 
-  bloque('«Shalom no conoce la guía» ya no es «Shalom caído»');
+  bloque('El 500 «buscar … 403» es falla de shalom-api, no guía desconocida (medido 11/11)');
 
   {
-    ok(P.motivoDeHttp(502, 'Shalom buscar API returned status 403') === 'NO_ENCONTRADO', 'el 403 de buscar (lo real) → NO_ENCONTRADO');
-    ok(P.motivoDeHttp(500, 'Shalom buscar API returned status 404') === 'NO_ENCONTRADO', 'el 404 de buscar, igual');
+    /* 103379262: «En origen» en shalom.com.pe y, a la misma hora, /track 500
+       «Shalom buscar API returned status 403». Las guías ya guardadas: 200. */
+    ok(P.motivoDeHttp(500, 'Shalom buscar API returned status 403') === 'SHALOM_SIN_RESPUESTA',
+       '⚠️ NO es NO_ENCONTRADO (no manda a «revisa número y código»)');
+    ok(P.motivoDeHttp(502, 'Shalom buscar API returned status 404') === 'SHALOM_SIN_RESPUESTA', 'su variante 404, igual');
+    ok(I.tras({fallos: 4}, {ok: false, motivo: 'SHALOM_SIN_RESPUESTA'}, AHORA, false) === null,
+       '⚠️ no pausa la puerta: las guías guardadas siguen respondiendo');
+    ok(P.motivoDeHttp(404, 'Not found') === 'NO_ENCONTRADO', 'un 404 de verdad sí es NO_ENCONTRADO');
     ok(P.motivoDeHttp(502, 'Bad gateway') === 'ERROR_SHALOM', 'un 502 de verdad sigue siendo ERROR_SHALOM');
     ok(P.motivoDeHttp(403, 'Invalid API Key') === 'BLOQUEADO', 'una clave rechazada sigue siendo BLOQUEADO');
     ok(P.motivoDeHttp(403, 'Invalid API Key or instance access') === 'SIN_INSTANCIA_VALIDA', 'y la instancia mala, igual que antes');
@@ -178,11 +184,23 @@ module.exports = async ({bloque, ok}) => {
        'masivo: la por dejar se cuenta aparte, no como «sin dato»');
   }
 
-  bloque('Renovar a las 24 h: el 403 de buscar ya no lo bloquea');
+  bloque('Renovar a las 24 h: solo con un «no la conozco» de verdad');
 
   {
-    const r = await R.puedeRenovar(delPanel(30), {ahora: () => AHORA, rastrear: async () => ({ok: false, motivo: P.motivoDeHttp(502, 'Shalom buscar API returned status 403')})});
-    ok(r.ok === true, 'Shalom no la conoce + 24 h pasadas → se puede registrar de nuevo');
+    const r = await R.puedeRenovar(delPanel(30), {ahora: () => AHORA, rastrear: async () => ({ok: false, motivo: P.motivoDeHttp(404, 'Not found')})});
+    ok(r.ok === true, 'Shalom no la conoce (404) + 24 h pasadas → se puede registrar de nuevo');
+    const r2 = await R.puedeRenovar(delPanel(30), {ahora: () => AHORA, rastrear: async () => ({ok: false, motivo: P.motivoDeHttp(500, 'Shalom buscar API returned status 403')})});
+    ok(r2.ok === false && r2.motivo === 'NO_VERIFICADO',
+       '⚠️ shalom-api no pudo leerla: NO se registra otra vez (podría estar ya en la agencia → doble cobro)');
+  }
+
+  bloque('El panel lo dice como es');
+
+  {
+    const p = panel({ok: false, motivo: 'SHALOM_SIN_RESPUESTA', detalle: 'Shalom buscar API returned status 403'}, [aMano]);
+    await p.T.consultarAhora('p1');
+    ok(p.consultas.length === 1 && /Shalom-API no pudo leer esta guía ahora/.test(p.toasts.join('|')) &&
+       !/revisa número/.test(p.toasts.join('|')), 'Consultar hace la consulta normal y, si falla de su lado, lo dice sin culpar a la guía');
   }
   bloque('Guía escrita a mano pero PENDIENTE en tu Shalom Pro (el caso 103375443)');
 

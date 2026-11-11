@@ -60,6 +60,7 @@ const _MOTIVO_HUMANO = {
   LIMITE: 'cuota agotada', BLOQUEADO: 'clave rechazada',
   NO_ENCONTRADO: 'guía no encontrada', SIN_DATO: 'sin estado',
   PETICION_INVALIDA: 'petición rechazada',
+  SHALOM_SIN_RESPUESTA: 'guía nueva que Shalom-API no pudo leer (falla suya)',
   FORMATO_DESCONOCIDO: 'respuesta no reconocida',
   PUERTA_CERRADA: 'puerta cerrada', APAGADA: 'puerta apagada'
 };

@@ -330,6 +330,7 @@
            paquete. Shalom distingue `registrado` (la guía existe) de
            `origen` (el paquete entró a la agencia); la puerta ya no las
            aplasta, así que esta respuesta por fin se puede decir. */
+        SHALOM_SIN_RESPUESTA: 'Shalom-API no pudo leer esta guía en Shalom ahora (falla de su lado). Reintenta más tarde.',
         SOLO_REGISTRADO: 'Registrado en Shalom, pero el paquete todavía no entró a la agencia. Déjalo allí: el plazo es de 24 horas.',
         NO_VENCIDA:    'La guía todavía no venció: déjala en la agencia con esa misma guía.',
         YA_EN_AGENCIA: 'Shalom ya recibió este paquete: no se registra de nuevo.',

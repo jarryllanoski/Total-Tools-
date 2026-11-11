@@ -108,6 +108,10 @@ function _motivoTexto(motivo, detalle){
       ' — reintenta en un momento';
     case 'ERROR_SHALOM':  return '⚠️ Shalom tuvo un error' + _conDetalle(detalle) +
       ' — reintenta en un momento';
+    /* shalom-api no pudo leer la guía en Shalom (su búsqueda en vivo recibe
+       403). No es la guía ni tu cuenta: en shalom.com.pe se ve bien. */
+    case 'SHALOM_SIN_RESPUESTA':
+      return '⏳ Shalom-API no pudo leer esta guía ahora (falla de su lado con guías nuevas; en shalom.com.pe sí se ve) — reintenta más tarde, los horarios lo vuelven a intentar solos';
     case 'SIN_RED':       return '📡 Sin conexión — revisa tu internet y reintenta';
     /* Los dos del INTERRUPTOR. No son fallos: son el sistema protegiéndose.
        Y son distintos entre sí — uno lo decidió el operador y el otro lo

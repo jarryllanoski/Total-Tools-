@@ -201,16 +201,17 @@ function sanear(texto) {
  * @return {string} motivo del contrato
  */
 function motivoDeHttp(status, texto) {
-  /* ⚠️ «SHALOM NO CONOCE ESA GUÍA» VIENE DISFRAZADO (11/11/2026).
-     Con una guía recién creada en Shalom Pro (envío pendiente: el paquete
-     aún no está en la agencia) /track no da 404: da un error con el texto
-     «Shalom buscar API returned status 403». Se traducía a ERROR_SHALOM, que
-     el interruptor cuenta como servicio caído: unas cuantas guías por dejar
-     en la consulta por horarios y la puerta se pausaba PARA TODOS. Medido:
-     a la misma hora, una guía ya dejada en la agencia respondía bien. Es la
-     misma respuesta que un 404: Shalom aún no la tiene. */
+  /* ⚠️ «SHALOM BUSCAR API RETURNED STATUS 403» ES UNA FALLA DE SHALOM-API,
+     NO UNA GUÍA DESCONOCIDA (medido el 11/11/2026). La guía 103379262 se
+     veía «En origen» en shalom.com.pe y a la misma hora su /track daba 500
+     con ese texto; las guías que ya tenían guardadas respondían 200. Es su
+     consulta EN VIVO a Shalom la que es rechazada: falla con guías nuevas.
+     · No es NO_ENCONTRADO: eso mandaba a «revisa número y código».
+     · No es ERROR_SHALOM: no cuenta para el interruptor, porque las guías
+       guardadas siguen respondiendo y pausar la puerta las dejaría sin
+       consultar a todas. Los horarios lo vuelven a intentar solos. */
   if (/buscar[\s\S]*returned status 40[34]/i.test(String(texto || ""))) {
-    return "NO_ENCONTRADO";
+    return "SHALOM_SIN_RESPUESTA";
   }
   /* ⚠️ UN 403 QUE HABLA DE INSTANCIA NO ES UNA CLAVE BLOQUEADA.
      Medido el 01/10/2026 con un `instanceId` inventado: Shalom responde

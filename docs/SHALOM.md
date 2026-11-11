@@ -1190,11 +1190,15 @@ Consultar, el masivo, Jalar ticket y la consulta por horarios.
 | `porDejar` | del panel, Shalom aún no la movió, < 72 h | sí, «no la conoce» = esperado | `POR_DEJAR`, sin llamar | sí, aparte en el informe |
 | `vencida` | del panel, sin movimiento, > 72 h | no | `VENCIDA` | se salta |
 
-Con una guía pendiente, `/track` no da 404: da «Shalom buscar API returned
-status 403». `motivoDeHttp` lo traduce a `NO_ENCONTRADO`, que NO cuenta para
-el interruptor. En los horarios, «no la conoce» sobre una guía que YA tenía
-movimiento sí cuenta (`_contarFalloDeServicio`): una caída real se sigue
-detectando. Pruebas: `tests/situacion-guia.test.js`.
+⚠️ **Corregido el mismo día:** el 500 «Shalom buscar API returned status 403»
+NO es una guía desconocida. Medido: 103379262 se veía «En origen» en
+shalom.com.pe mientras su `/track` daba ese 500; las guías que shalom-api ya
+tenía guardadas respondían 200. Es su consulta en vivo a Shalom la que falla
+con guías nuevas → `SHALOM_SIN_RESPUESTA`: mensaje honesto, no cuenta para el
+interruptor, no permite «registrar de nuevo» (podría estar ya en la agencia).
+Solo un 404 de verdad es `NO_ENCONTRADO`; en los horarios, un 404 sobre una
+guía que YA tenía movimiento sí cuenta (`_contarFalloDeServicio`).
+Pruebas: `tests/situacion-guia.test.js`.
 
 **Guía pendiente escrita a mano (11/11/2026, guía 103375443).** Shalom no
 publica en su rastreo los envíos PENDIENTES (registrados en Shalom Pro, sin
