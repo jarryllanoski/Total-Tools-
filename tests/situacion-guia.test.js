@@ -242,4 +242,44 @@ module.exports = async ({bloque, ok}) => {
     const rt2 = await T.jalar({pedidoId: 'p5', orderNumber: '103375443', orderCode: 'JPHN'}, deps);
     ok(!rt2.ok && rt2.motivo === 'NO_ENCONTRADO', 'y si no está en pendientes, sigue siendo «no encontró»');
   }
+  bloque('🔬 Medir los caminos por Shalom Pro (seguimiento, historial, lote)');
+
+  {
+    ['trackingList', 'historial', 'trackBatch'].forEach((op) =>
+      ok(P.PERMITIDAS[op] && P.PERMITIDAS[op].soloServidor === true, op + ': solo el servidor (el navegador no lo alcanza)'));
+    ok(P.ORQUESTADAS.medirShalomPro === true, 'la medición es una orquestación (el navegador solo manda guías)');
+
+    // El querystring: solo lo declarado, con su forma, codificado.
+    const llamadas = [];
+    const fetchReal = global.fetch;
+    global.fetch = async (url) => { llamadas.push(url); return {ok: true, status: 200, text: async () => '{"data":{"items":[]}}'}; };
+    try {
+      await P.llamar('trackingList', 'sk_prueba', {instanceId: 'abc-123', page: '2', otro: 'x'});
+      ok(/\/account\/tracking-list\?instanceId=abc-123&page=2$/.test(llamadas[0]), 'arma ?instanceId=…&page=… y descarta lo no declarado');
+      const mal = await P.llamar('historial', 'sk_prueba', {instanceId: 'abc&x=1', order_number: '103379262'});
+      ok(!mal.ok && mal.motivo === 'SIN_DATO' && llamadas.length === 1, '⚠️ un parámetro con forma rara NO sale');
+      await P.llamar('historial', 'sk_prueba', {instanceId: 'abc-123', order_number: '103379262'});
+      ok(/order_number=103379262/.test(llamadas[1]), 'el historial filtra por número de guía');
+    } finally { global.fetch = fetchReal; }
+
+    // La medición: forma, filas y sí/no — nunca un valor con letras.
+    const resp = {success: true, data: {items: [
+      {id: 91230250, guideNumber: '103379262', code: 'D97M', shippingDate: '2026-11-11 20:07:00',
+        origin: {id: 159, name: 'Agencia Origen'}, destination: {id: 497, name: 'Agencia Destino'}}],
+    meta: {current_page: 1, last_page: 3, per_page: 20, total: 48}}};
+    const m = P.medirLista(resp, ['103379262', '103376802']);
+    ok(m.filas === 1 && m.estan['103379262'] === true && m.estan['103376802'] === false, 'sí/no por guía, exacto');
+    ok(m.meta.last_page === 3 && m.meta.total === 48, 'la paginación (solo números)');
+    ok(!/Agencia Origen|D97M/.test(JSON.stringify(m)), '⚠️ ni nombres ni códigos salen en la medición');
+    ok(P.filasDe({'0': {a: 1}, '1': {a: 2}}).length === 2 && P.filasDe([1, 2, 3]).length === 3 && P.filasDe({x: 1}).length === 0,
+       'encuentra las filas en objeto {"0":…}, array, o ninguna');
+    ok(P.filaTieneGuia({guia: 103379262}, '103379262') && !P.filaTieneGuia({guia: '1033792620'}, '103379262'),
+       'la guía se compara EXACTA');
+
+    const idx = fs.readFileSync(path.join(__dirname, '..', 'functions', 'index.js'), 'utf8');
+    const med = idx.slice(idx.indexOf('if (paso.orquestar === "medirShalomPro")'), idx.indexOf('/* ★ CONECTAR LA CUENTA DE SHALOM PRO'));
+    ok(/\.slice\(0, 5\)/.test(med) && /\^\[0-9\]\{8,12\}\$/.test(med), 'máximo 5 guías, con forma de guía');
+    ok(/for \(let pg = 1; pg <= 10; pg\+\+\)/.test(med), 'el seguimiento recorre como mucho 10 páginas');
+    ok(!/register|instanceLogin|instanceCrear/.test(med), '⚠️ medir SOLO LEE: no registra, no entra, no crea');
+  }
 };

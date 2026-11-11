@@ -130,6 +130,42 @@ async function correrBarridoAhora(){
   }
 }
 
+/* 🔬 MEDIR los caminos por Shalom Pro (11/11/2026). Elige 4 guías NUEVAS
+   (sin estado de Shalom: las que /track no puede leer) y 1 de CONTROL (ya
+   en camino, que /track sí lee). El resultado son formas y sí/no por guía:
+   se copia o se fotografía y con eso se escribe el arreglo. */
+function _guiasParaMedir(){
+  const lista = (window.S && S.shipments) || [];
+  const con = lista.filter(s => /SHALOM/i.test(String(s.courier||'')) &&
+    String(s.status||'').toUpperCase() !== 'FINALIZADO' &&
+    /^[0-9]{8,12}$/.test(String(s.trackingOrderNumber||s.shalomGuia||'').trim()) &&
+    /^[A-Za-z0-9]{4}$/.test(String(s.trackingOrderCode||s.shalomCodigo||'').trim()));
+  const reciente = (a, b) => String(b.createdAt||'').localeCompare(String(a.createdAt||''));
+  const par = s => ({g: String(s.trackingOrderNumber||s.shalomGuia).trim(),
+    c: String(s.trackingOrderCode||s.shalomCodigo).trim()});
+  const nuevas = con.filter(s => !String(s.trackingStatus||'').trim()).sort(reciente).slice(0, 4).map(par);
+  const control = con.filter(s => String(s.trackingStatus||'').trim()).sort(reciente).slice(0, 1).map(par);
+  return nuevas.concat(control);
+}
+async function medirShalomPro(){
+  const btn = $('btnMedirPro'), sal = $('medirProSalida');
+  if(!btn || !sal || !window.Shalom || !Shalom.medirPro) return;
+  const guias = _guiasParaMedir();
+  if(!guias.length){ toast('No hay guías de Shalom abiertas para medir'); return; }
+  const antes = btn.textContent;
+  btn.disabled = true; btn.textContent = '⏳ Midiendo… (hasta un minuto)';
+  try{
+    const r = await Shalom.medirPro(guias);
+    sal.style.display = 'block';
+    sal.textContent = JSON.stringify(r, null, 1).slice(0, 6000);
+    toast(r && r.ok ? '🔬 Medido — mándame una foto del resultado' : '⚠️ No se pudo medir: ' + ((r && r.motivo) || '—'));
+  }catch(e){
+    toast('📡 No se pudo conectar — revisa tu internet');
+  }finally{
+    btn.disabled = false; btn.textContent = antes;
+  }
+}
+
 /* SHALOM: el interruptor maestro de la puerta (Config) */
 /* SHALOM: toggle auto-tracking (Config) */
 function toggleShalomAuto(){

@@ -1982,6 +1982,98 @@ exports.shalomPuerta = onRequest(
         return;
       }
 
+      /* ★ MEDIR LOS CAMINOS POR SHALOM PRO (11/11/2026). /track falla con
+         las guías nuevas porque el buscador PÚBLICO de Shalom rechaza a
+         shalom-api. Aquí se miden tres caminos que usan TU sesión de Shalom
+         Pro, con las guías que manda el panel (máx. 5). SOLO LEE y devuelve
+         formas y sí/no: ningún nombre, documento ni dirección. */
+      if (paso.orquestar === "medirShalomPro") {
+        try {
+          const cm = await db.doc(CFG_DOC).get();
+          const cfgM = cm.exists ? cm.data() : {};
+          const idM = (cfgM.shalomInstancia && cfgM.shalomInstancia.id) || "";
+          if (!idM) {
+            res.status(200).json({ok: false, motivo: "SIN_INSTANCIA"});
+            return;
+          }
+          const pedidas = (paso.datos && Array.isArray(paso.datos.guias)) ?
+            paso.datos.guias : [];
+          const guias = pedidas.filter((x) => x &&
+            /^[0-9]{8,12}$/.test(String(x.g || "")) &&
+            /^[A-Za-z0-9]{4}$/.test(String(x.c || ""))).slice(0, 5)
+              .map((x) => ({g: String(x.g), c: String(x.c).toUpperCase()}));
+          const nums = guias.map((x) => x.g);
+          const fallo = (r) => ({ok: false, motivo: r && r.motivo,
+            http: r && r.http, detalle: r && r.detalle});
+          const out = {ok: true, guias: nums};
+
+          // 1 · Seguimiento de envíos (Shalom Pro), todas sus páginas (máx 10)
+          const lista = {paginas: 0, filas: 0, estan: {}};
+          nums.forEach((g) => {
+            lista.estan[g] = false;
+          });
+          for (let pg = 1; pg <= 10; pg++) {
+            const r = await _porLaPuerta("trackingList",
+                {instanceId: idM, page: String(pg)}, true);
+            if (!r.ok) {
+              lista.error = fallo(r); break;
+            }
+            const m = shalomPuerta.medirLista(r.json, nums);
+            if (pg === 1) {
+              lista.forma = m.forma; lista.meta = m.meta;
+            }
+            lista.paginas = pg; lista.filas += m.filas;
+            nums.forEach((g) => {
+              if (m.estan[g]) lista.estan[g] = true;
+            });
+            const ult = Number(m.meta.last_page) || 1;
+            if (!m.filas || pg >= ult) break;
+          }
+          out.seguimiento = lista;
+
+          // 2 · Historial de envíos (entregados), por número de guía
+          out.historial = {};
+          for (const g of nums) {
+            const r = await _porLaPuerta("historial",
+                {instanceId: idM, order_number: g}, true);
+            if (!r.ok) {
+              out.historial[g] = fallo(r); continue;
+            }
+            const m = shalomPuerta.medirLista(r.json, [g]);
+            out.historial[g] = {ok: true, filas: m.filas, esta: m.estan[g]};
+            if (!out.historialForma) out.historialForma = m.forma;
+          }
+
+          // 3 · /track/batch: ¿falla igual que /track?
+          if (guias.length) {
+            const r = await _porLaPuerta("trackBatch", {orders: guias.map(
+                (x) => ({orderNumber: x.g, orderCode: x.c}))}, true);
+            if (!r.ok) {
+              out.lote = fallo(r);
+            } else {
+              const items = Array.isArray(r.json) ? r.json :
+                shalomPuerta.filasDe(r.json);
+              out.lote = {forma: shalomPuerta.forma(r.json), porGuia: {}};
+              nums.forEach((g, i) => {
+                const it = items[i];
+                const t = it ? shalomPuerta.traducir("track", it) : null;
+                const msg = it && (it.message || it.error);
+                out.lote.porGuia[g] = t && t.ok ? {ok: true, estado: t.estado} :
+                  {ok: false, motivo: t && t.motivo,
+                    mensaje: typeof msg === "string" ?
+                      shalomPuerta.sanear(msg).slice(0, 120) : ""};
+              });
+            }
+          }
+          res.status(200).json(out);
+        } catch (e) {
+          console.error("medirShalomPro:", e && e.message);
+          res.status(200).json({ok: false, motivo: "ERROR_SHALOM",
+            detalle: "La medición se cortó. Intenta de nuevo."});
+        }
+        return;
+      }
+
       /* ★ CONECTAR LA CUENTA DE SHALOM PRO — crear si hace falta, entrar
          siempre, comprobar. Una sola operacion idempotente: pulsarla dos
          veces no crea dos instancias.

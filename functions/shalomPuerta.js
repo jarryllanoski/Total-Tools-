@@ -149,6 +149,23 @@ const PERMITIDAS = {
      no como array. Va en soloServidor porque solo la orquestacion la usa. */
   pendientes: {metodo: "POST", ruta: "/account/pending-shipments",
     soloServidor: true, cuerpoCampos: ["instanceId"]},
+  /* ★ CAMINOS POR LA SESIÓN DE SHALOM PRO (11/11/2026). /track busca en el
+     rastreo PÚBLICO de Shalom, y ese buscador rechaza a shalom-api con las
+     guías nuevas («Shalom buscar API returned status 403»). Estos tres no
+     pasan por él: usan TU sesión de Shalom Pro. Se están MIDIENDO (la orquesta
+     `medirShalomPro` devuelve solo formas y sí/no), todavía no se usan.
+       · trackingList → «Seguimiento de envíos» de Shalom Pro (en tránsito)
+       · historial    → «Historial de envíos» (entregados), por número de guía
+       · trackBatch   → /track en lote: medir si falla igual que /track
+     Los parámetros del querystring van en `consulta`, con su forma exacta. */
+  trackingList: {metodo: "GET", ruta: "/account/tracking-list",
+    soloServidor: true,
+    consulta: {instanceId: /^[A-Za-z0-9-]{1,64}$/, page: /^[0-9]{1,3}$/}},
+  historial: {metodo: "GET", ruta: "/account/history", soloServidor: true,
+    consulta: {instanceId: /^[A-Za-z0-9-]{1,64}$/, page: /^[0-9]{1,3}$/,
+      order_number: /^[0-9]{8,12}$/}},
+  trackBatch: {metodo: "POST", ruta: "/track/batch", soloServidor: true,
+    cuerpoCampos: ["orders"]},
   /* ⚠️ LO QUE NO ESTA, Y ES UNA DECISION:
 
      · `POST /instances/logout` — su doc dice "borra la sesion Y LAS
@@ -179,7 +196,8 @@ const PERMITIDAS = {
        `****` ya seria confirmar su longitud.
      · La auditoria registra quien y cuando. El valor no. */
 const ORQUESTADAS = {registrarEnvio: true, recuperarEnvio: true,
-  conectarShalom: true, estadoShalom: true, jalarTicket: true};
+  conectarShalom: true, estadoShalom: true, jalarTicket: true,
+  medirShalomPro: true};
 
 /**
  * Quita de un texto cualquier cosa con forma de clave antes de devolverlo.
@@ -398,6 +416,24 @@ async function llamar(op, clave, cuerpo) {
       }
       ruta = ruta.split("{" + k + "}").join(dato);
     }
+  }
+  /* El querystring: SOLO los campos declarados en `consulta`, cada uno con
+     su forma exacta, y codificados. Lo que no tenga la forma, no sale. */
+  if (def.consulta) {
+    const qs = [];
+    const ks = Object.keys(def.consulta);
+    for (let i = 0; i < ks.length; i++) {
+      const k = ks[i];
+      if (!cuerpo || cuerpo[k] === undefined || cuerpo[k] === null ||
+          cuerpo[k] === "") continue;
+      const dato = String(cuerpo[k]).trim();
+      if (!def.consulta[k].test(dato)) {
+        return {ok: false, motivo: "SIN_DATO",
+          detalle: sanear("el parametro '" + k + "' no tiene la forma pedida")};
+      }
+      qs.push(encodeURIComponent(k) + "=" + encodeURIComponent(dato));
+    }
+    if (qs.length) ruta += "?" + qs.join("&");
   }
   // Un hueco sin rellenar significa que la declaracion y lo que llego no
   // coinciden. Antes de llamar a una URL con una llave dentro, no se llama.
@@ -1253,7 +1289,73 @@ async function _bajarUrl(url, clave) {
   }
 }
 
+/**
+ * Las filas de una lista, vengan donde vengan: array directo, `items`,
+ * `data`, `data.items`, o un objeto {"0":…} estilo PHP.
+ * @param {*} j respuesta
+ * @return {Array} filas (vacío si no hay)
+ */
+function filasDe(j) {
+  const cands = [j, j && j.items, j && j.data, j && j.data && j.data.items,
+    j && j.data && j.data.data];
+  for (let i = 0; i < cands.length; i++) {
+    const c = cands[i];
+    if (Array.isArray(c)) return c;
+  }
+  const o = (j && j.data && typeof j.data === "object") ? j.data : j;
+  if (o && typeof o === "object" && Object.keys(o).length &&
+      Object.keys(o).every((k) => /^[0-9]+$/.test(k))) {
+    return Object.keys(o).map((k) => o[k]);
+  }
+  return [];
+}
+
+/**
+ * ¿Aparece esta guía en una fila? Mira los valores de primer nivel.
+ * @param {*} fila una fila
+ * @param {string} guia número de guía
+ * @return {boolean} true si alguno coincide exacto
+ */
+function filaTieneGuia(fila, guia) {
+  if (!fila || typeof fila !== "object") return false;
+  const g = String(guia || "").replace(/\D/g, "");
+  if (!g) return false;
+  return Object.keys(fila).some((k) => {
+    const v = fila[k];
+    return (typeof v === "string" || typeof v === "number") &&
+      String(v).replace(/\D/g, "") === g;
+  });
+}
+
+/**
+ * La MEDICIÓN de una respuesta de lista: su forma (sin valores), cuántas
+ * filas, el `meta` de paginación (solo números) y, por cada guía pedida,
+ * SÍ o NO aparece. Ningún nombre, documento ni dirección sale de aquí.
+ * @param {*} json respuesta
+ * @param {Array<string>} guias guías a buscar
+ * @return {Object} {forma, filas, meta, estan}
+ */
+function medirLista(json, guias) {
+  const filas = filasDe(json);
+  const m = (json && json.data && json.data.meta) || (json && json.meta) ||
+    null;
+  const meta = {};
+  if (m && typeof m === "object") {
+    Object.keys(m).forEach((k) => {
+      if (typeof m[k] === "number") meta[k] = m[k];
+    });
+  }
+  const estan = {};
+  (guias || []).forEach((g) => {
+    estan[g] = filas.some((f) => filaTieneGuia(f, g));
+  });
+  return {forma: forma(json), filas: filas.length, meta: meta, estan: estan};
+}
+
 module.exports = {
+  filasDe,
+  filaTieneGuia,
+  medirLista,
   BASE,
   GUIA_FORMA,
   INSTANCIA_FORMA,
