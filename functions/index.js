@@ -5,7 +5,8 @@ const {onRequest} = require("firebase-functions/https");
 const {onSchedule} = require("firebase-functions/scheduler");
 const {defineSecret} = require("firebase-functions/params");
 const {initializeApp} = require("firebase-admin/app");
-const {getFirestore, FieldValue} = require("firebase-admin/firestore");
+const {getFirestore, FieldValue, Timestamp} =
+    require("firebase-admin/firestore");
 const {getAuth} = require("firebase-admin/auth");
 const {getAppCheck} = require("firebase-admin/app-check");
 const {getStorage} = require("firebase-admin/storage");
@@ -24,6 +25,7 @@ const interruptor = require("./interruptor");
 const webhook = require("./webhook");
 // A quien consulta el barrido y cuando (logica pura).
 const barrido = require("./barrido");
+const limpieza = require("./limpieza");
 // Que etiqueta le toca a un pedido. LO COMPARTE CON EL PANEL: ver la
 // cabecera de etiquetas.js — dos copias de esta regla divergirian.
 const etiquetas = require("./etiquetas");
@@ -1689,6 +1691,22 @@ async function _correrBarrido(forzado) {
 }
 
 // El horario. Cada 30 min pregunta; _correrBarrido decide si le toca.
+/* ★ LIMPIEZA DIARIA DE LÁPIDAS (Fase 8, 11/11/2026). Ver functions/limpieza.js:
+   ningún equipo usa una lápida de más de 12 h, y se borran las de más de 30
+   días. Una consulta al día que solo lee lo que va a borrar; a las 03:17 de
+   Lima, lejos de las horas del barrido y del trabajo. */
+exports.limpiezaLapidas = onSchedule({
+  schedule: "17 3 * * *",
+  timeZone: barrido.ZONA,
+  region: "us-central1",
+  timeoutSeconds: 300,
+  retryCount: 0,
+}, async () => {
+  const r = await limpieza.limpiarLapidas(db, Date.now(),
+      (ms) => Timestamp.fromMillis(ms));
+  console.log("limpiezaLapidas:", JSON.stringify(r));
+});
+
 exports.barridoShalom = onSchedule({
   schedule: "*/30 * * * *",
   timeZone: barrido.ZONA,

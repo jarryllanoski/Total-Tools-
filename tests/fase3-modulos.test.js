@@ -133,7 +133,7 @@ module.exports = async ({bloque, ok}) => {
   bloque('Fase 7: el panel en carpetas por capa');
 
   {
-    const CAPAS = {datos: ['nube.js', 'estado.js', 'storage.js', 'fotos.js', 'respaldo.js', 'mezclaConfig.js', 'errores.js'],
+    const CAPAS = {datos: ['nube.js', 'estado.js', 'storage.js', 'fotos.js', 'respaldo.js', 'mezclaConfig.js', 'errores.js', 'copia-local.js'],
       pantalla: ['navegacion.js', 'lista.js', 'acciones.js', 'escaner.js', 'inicio.js', 'whatsapp.js',
         'floatpanel.js', 'seleccion.js', 'voz.js', 'dashboard.js', 'ayuda.js'],
       pedidos: ['pedido-form.js', 'pedido-docs.js', 'pedido-reniec.js', 'pedido-guardar.js', 'pedido-ui.js',

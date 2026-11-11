@@ -727,7 +727,7 @@ function cardDocs(s,gChk,tChk,eChk){
 // La selección es estado EFÍMERO de UI: se guarda solo en local, nunca en
 // Firestore. Antes, save() sin id reescribía los ~170 pedidos por cada click
 // de checkbox (causa del pico de escrituras). saveLocal() no toca Firestore.
-function saveLocal(){ try{ lsSet('dpanel', JSON.stringify(window._slimStateForLocal ? window._slimStateForLocal(S) : S)); }catch(e){} }
+function saveLocal(){ try{ _guardarCopiaLocal(); }catch(e){} }
 /* Marcar una casilla NO cambia la lista: cambia una casilla. Antes esto
    llamaba a saveLocal() + render(), es decir, serializaba el estado completo
    (~0,7 MB con 1039 pedidos) y reconstruía las ~1039 tarjetas con innerHTML.

@@ -109,6 +109,21 @@ cada texto, y **falla si alguien escribe otra copia** en cualquier archivo.
 Divergencias que había: «En reparto» (panel: destino · cliente: «en
 camino») y el código de un pedido antiguo sin fecha (etiqueta 4 · link 6).
 
+### Rendimiento (Fase 8, 11/11/2026)
+
+- **Copia local** (`panel/datos/copia-local.js`): la copia de los pedidos
+  sigue en localStorage mientras quepa (el panel abre pintado al instante) y
+  además en IndexedDB. Si localStorage se llena (~5 MB), se libera y se marca
+  `dpanel_en_idb`: al abrir, la copia se lee de IndexedDB antes de pedir a la
+  nube, que sigue mandando solo lo que cambió. Una sola puerta de escritura:
+  `_guardarCopiaLocal()` (datos/estado.js).
+- **Lápidas** (`functions/limpieza.js`, función programada
+  `limpiezaLapidas`, 03:17 de Lima): borra las de más de 30 días. Ningún
+  equipo usa una de más de 12 h (`Sincro.COMPLETA_CADA_MS`).
+- **Freno anti-bots**: sus registros llevan `rlExpira`; la política TTL de
+  Firestore (grupo de colecciones `items`, campo `rlExpira`) los borra sola.
+  Solo afecta a documentos que tengan ese campo.
+
 ### Lo que sigue (etapas siguientes)
 
 Llevar cada módulo a su capa de § 5: `nube.js` → `datos/`; las reglas que hoy

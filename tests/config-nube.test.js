@@ -96,7 +96,7 @@ function equipo(n) {
     _sinRepetir: (a) => Array.from(new Set(a || [])),
     _dirtyShips: dirty.ships, _dirtySupps: dirty.supps, _S_TS: 0,
     lsSet: () => {}, render: () => {}, renderChips: () => {}, toast: () => {}, salida: {},
-    _avisar: () => {},
+    _avisar: () => {}, _guardarCopiaLocal: () => {},
     save: (k) => { if (k === 'config') win._pidioGuardarCfg = true; }};
   const kM = Object.keys(ctxM);
   new Function(...kM, MERGE + '\nsalida.merge = window._mergeRemote;')(...kM.map((k) => ctxM[k]));

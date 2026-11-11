@@ -29,6 +29,27 @@ function lsGet(k){try{return localStorage.getItem(k)}catch(e){return _mem[k]||nu
 function lsSet(k,v){try{localStorage.setItem(k,v)}catch(e){_mem[k]=v}}
 
 let S=JSON.parse(lsGet('dpanel')||'{}');
+/* ★ LA COPIA LOCAL (Fase 8). Si localStorage se llenó, la copia vive en
+   IndexedDB (panel/datos/copia-local.js) y se lee al arrancar, antes de
+   pedir a la nube (pantalla/inicio.js). */
+window._copiaEnIdb = !lsGet('dpanel') && lsGet('dpanel_en_idb') === '1';
+/** Guarda la copia local: localStorage mientras quepa, y siempre IndexedDB.
+ *  Una sola puerta para las tres escrituras que había sueltas. */
+function _guardarCopiaLocal(){
+  const txt = JSON.stringify(window._slimStateForLocal ? window._slimStateForLocal(S) : S);
+  try{
+    localStorage.setItem('dpanel', txt);
+    if(localStorage.getItem('dpanel_en_idb')) localStorage.removeItem('dpanel_en_idb');
+  }catch(e){
+    /* Lleno: antes esto caía en memoria y al recargar no había copia (el
+       panel bajaba TODO). Ahora se libera localStorage para lo pequeño y la
+       copia queda en IndexedDB. */
+    try{ localStorage.removeItem('dpanel'); localStorage.setItem('dpanel_en_idb', '1'); }catch(_){}
+    _mem.dpanel = undefined;
+  }
+  if(window.CopiaLocal) window.CopiaLocal.programar();
+}
+window._guardarCopiaLocal = _guardarCopiaLocal;
 window.S = S; // ★ Exponer S globalmente para tracking.js
 
 // ── Normalización de teléfono (una sola regla, reutilizada en todos los campos)
@@ -176,7 +197,7 @@ const save = (shipId) => {
     _dirtyAll = true; // sin id → cambio de config/suppliers/masivo → subir todo
     _dirtyConfigOnly = false;
   }
-  lsSet('dpanel', JSON.stringify(window._slimStateForLocal ? window._slimStateForLocal(S) : S)); // ★ Mejora 3: local sin base64 pesadas
+  _guardarCopiaLocal(); // ★ Mejora 3: local sin base64 pesadas · Fase 8: + IndexedDB
   _guardarSucios(); // qué quedó sin subir viaja con el respaldo, no solo en memoria
   clearTimeout(_fbSaveTimer);
   _fbSaveTimer = setTimeout(() => { _fbSaveWithRetry(S, 0); }, 800);
@@ -419,7 +440,7 @@ window._mergeRemote = (remote) => {
   // de ESTE dispositivo (seleccion.js) no se toca: el latido de otro
   // dispositivo ya no puede desmarcarte nada.
   if(window.Seleccion) Seleccion._olvidarHeredado();
-  lsSet('dpanel', JSON.stringify(window._slimStateForLocal ? window._slimStateForLocal(S) : S)); // ★ Mejora 3: local sin base64 pesadas
+  _guardarCopiaLocal(); // ★ Mejora 3: local sin base64 pesadas · Fase 8: + IndexedDB
   // El nombre y el teléfono del negocio también vienen de la nube: sin esto se
   // quedaban en los valores por defecto hasta la siguiente recarga.
   // La pantalla repinta encabezado, lista y chips, libera Config/Recursos

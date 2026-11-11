@@ -47,11 +47,27 @@ window._pantallaLista = true;
    panel. Los de Config (panel/configuracion.js y compañía) cargan después,
    exactamente igual que cuando eran config.js: el código los llama con
    `typeof … === 'function'`. */
+function _arrancarNube(){
 if(window._fbReady) {
   _initFirebase();
 } else {
   // Fallback: try after short delay
   setTimeout(_initFirebase, 500);
+}
+}
+/* ★ Fase 8: si la copia local está en IndexedDB (localStorage se llenó), se
+   lee ANTES de pedir a la nube: con copia, la nube manda solo lo que cambió.
+   Si no hay copia o falla, se arranca igual que siempre. */
+if(window._copiaEnIdb && window.CopiaLocal){
+  CopiaLocal.leer().then(function(c){
+    if(c && typeof c === 'object' && !window._nubeLista){
+      Object.keys(c).forEach(function(k){ S[k] = c[k]; });
+      S.labels = [...FIXED_LABELS, ..._sinRepetir((S.labels||[]).filter(function(l){ return !FIXED_LABELS.includes(l); }))];
+      try{ pintarEncabezado(); render(); renderChips(); }catch(_){}
+    }
+  }).then(_arrancarNube, _arrancarNube);
+} else {
+  _arrancarNube();
 }
 
 /* La capa de datos avisa que la configuración trajo cambios de otro equipo

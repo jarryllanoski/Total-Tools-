@@ -213,6 +213,7 @@ function montarMerge(op) {
     lsSet: (k, v) => { almacen[k] = String(v); },
     render: () => {}, renderChips: () => {}, toast: () => {},
     _avisar: (nombre) => { (win._avisos = win._avisos || []).push(nombre); },
+    _guardarCopiaLocal: () => { win._copias = (win._copias || 0) + 1; },
     salida: {}
   };
   const codigo = MERGE + '\nsalida.merge = window._mergeRemote;';
