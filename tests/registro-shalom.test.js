@@ -462,13 +462,16 @@ module.exports = async ({bloque, ok}) => {
        2 · El nombre de RENIEC no se vuelve a consultar al abrir un pedido,
            asi que un pedido guardado antes nunca gana el campo aunque
            tenga el DNI puesto y el nombre en pantalla. */
-    const idx = E.leer('index.html');
-    const fn = idx.slice(idx.indexOf('function verificarInstanciaShalom'),
-        idx.indexOf('function _pintarElectorInstancia'));
-    ok(/S\.shalomInstancia\s*=/.test(fn),
-       'al resolver la cuenta, se GUARDA para que el servidor la vea');
-    ok(/declarada|una/.test(fn),
-       'y solo cuando se resolvio sola (declarada o unica), nunca ante duda');
+    /* 11/11/2026: la cuenta la resuelve Y LA GUARDA el SERVIDOR al
+       conectar (functions/cuentaShalom.js → shalomInstancia en Firestore).
+       El panel ya no la escribe: un equipo con un id viejo la pisaba. */
+    const srv = E.leer('functions/index.js');
+    ok(/guardarCuenta: \(id, usuario\) => db\.doc\(CFG_DOC\)\.set\(\{\s*shalomInstancia: \{id: id/.test(srv),
+       'al conectar, el SERVIDOR guarda la cuenta donde el registro la lee');
+    const proy = E.leer('index.html');
+    const p0 = proy.indexOf('window._cfgProy = (data) => {');
+    ok(!/shalomInstancia:data\.shalomInstancia/.test(proy.slice(p0, proy.indexOf('};', p0))),
+       'y el panel ya no la escribe en la configuración (no la puede pisar)');
 
     const cfg = E.leer('config.js');
     ok(/_dniReniec\s*\(/.test(cfg.slice(cfg.indexOf('$(\'fDni\').value=s.dni'),

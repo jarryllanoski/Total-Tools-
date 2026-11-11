@@ -51,7 +51,11 @@ const PERMITIDAS = {
      que el GET no pide nada Y DEVUELVE ESE ID — que es además la llave que
      van a necesitar el ticket y el registro de envíos. No gasta cuota y no
      puede crear ni borrar nada. */
-  instances: {metodo: "GET", ruta: "/instances"},
+  /* ⚠️ `soloServidor` desde el 11/11/2026: la cuenta de la API tiene
+     instancias de otros negocios, y esta lista (con sus correos) llegaba
+     al navegador. Ahora solo la lee el servidor (functions/cuentaShalom.js)
+     y el panel recibe «conectada · tu correo». */
+  instances: {metodo: "GET", ruta: "/instances", soloServidor: true},
   /* El catálogo de agencias. Va la variante PÚBLICA a propósito: devuelve la
      misma estructura que `/agencies` y NO CONSUME CUOTA, así que refrescar el
      catálogo sale gratis. `publico` hace que la puerta no mande la clave: una
@@ -80,7 +84,7 @@ const PERMITIDAS = {
      Shalom. Si termina en `/login`, se deslogueo — eso es un diagnostico de
      verdad, no un booleano. Pide el `instanceId` y NADA MAS. */
   instanceStatus: {metodo: "POST", ruta: "/instances/status",
-    cuerpoCampos: ["instanceId"]},
+    soloServidor: true, cuerpoCampos: ["instanceId"]},
   /* ⚠️ EL LOGIN, Y POR QUE SU LISTA DE CAMPOS ESTA VACIA.
      `POST /instances/login` pide usuario y contraseña de Shalom Pro. El
      cuerpo de una operacion llega DEL NAVEGADOR (`paso.datos` en
@@ -164,7 +168,7 @@ const PERMITIDAS = {
  * llamar, y escribir el resultado. El navegador manda SOLO el id del
  * pedido — no puede falsificar el cuerpo ni saltarse un candado.
  */
-/* ⚠️ `guardarCredenciales` ES LA UNICA DE ESTA LISTA QUE RECIBE UN SECRETO
+/* ⚠️ `conectarShalom` ES LA UNICA DE ESTA LISTA QUE PUEDE RECIBIR UN SECRETO
    DEL NAVEGADOR, y por eso conviene leer esto antes de tocarla:
 
      · Es WRITE-ONLY. No existe su pareja de lectura, ni aqui ni en
@@ -175,7 +179,7 @@ const PERMITIDAS = {
        `****` ya seria confirmar su longitud.
      · La auditoria registra quien y cuando. El valor no. */
 const ORQUESTADAS = {registrarEnvio: true, recuperarEnvio: true,
-  conectarShalom: true, guardarCredenciales: true, jalarTicket: true};
+  conectarShalom: true, estadoShalom: true, jalarTicket: true};
 
 /**
  * Quita de un texto cualquier cosa con forma de clave antes de devolverlo.

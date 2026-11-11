@@ -210,242 +210,6 @@
        `agencias-extractor.js` y la misma del archivo del catálogo. */
     agencias: function () { return _pedir({op: 'agencies'}); },
 
-    /* ✅ CONECTADO · GET /instances — 2026-09-22
-       Si la cuenta de Shalom Pro tiene sesión abierta. Va el GET y no el
-       `POST /instances/status` que decía el plan: el POST exige un
-       `instanceId` que el panel no tiene, y el GET no pide nada Y LO DEVUELVE.
-       → {ok:true, sesion:{conocido, conectada, usuario, nombre, id, url}}
-       ⚠️ "Instancia encendida" NO es "sesión viva": el robot puede estar
-       corriendo parado en la pantalla de login, y así los registros fallan
-       uno tras otro sin decir por qué. Esto contesta la pregunta correcta. */
-    estadoInstancia: function () { return _pedir({op: 'instances'}); },
-
-    /* ★ CUAL DE TUS INSTANCIAS USA EL PANEL — y nunca se decide sola.
-       ───────────────────────────────────────────────────────────────
-       ⚠️ POR QUE, con el caso real del 01/10/2026. La cuenta devuelve DOS
-       instancias y LAS DOS CONECTADAS:
-           Total     — Totaltools@gmail.com
-           Yapaitas  — ramossuyin@gmail.com
-       Son dos negocios distintos. Elegir "la primera" o "la que está
-       conectada" habría acertado o no AL AZAR, y el día que fallara habría
-       registrado el envío de un cliente en la cuenta del OTRO negocio,
-       cobrado a ellos, sin que nadie se enterara hasta que el paquete no
-       apareciera.
-
-       Cinco estados, y cada uno pide una cosa distinta:
-         ninguna            → no hay cuenta de Shalom Pro
-         una                → hay una sola: se usa, sin preguntar
-         falta_elegir       → hay varias y no elegiste
-         elegida            → tu elección sigue existiendo
-         elegida_no_existe  → tu elección ya no está. SE DICE.
-
-       ⚠️ `elegida_no_existe` NO se cae a otra instancia, ni siquiera si
-       queda una sola. Caer a otra es cambiarte de negocio en silencio.
-       Y esto resuelve la razón por la que el id NO se guardaba: un id
-       guardado puede quedar viejo. Guardarlo ahora hace falta, así que el
-       riesgo se gestiona —se comprueba contra la lista viva cada vez— en
-       vez de evitarse.
-       @param {Array} lista instancias traducidas
-       @param {string} idGuardado la elección de Config, si hay
-       @return {Object} {estado, instancia, instancias} */
-    /* ★ LA CUENTA DE SHALOM PRO DE ESTE PANEL, DECLARADA.
-       Este panel es el de Total Tools, y su cuenta en Shalom Pro se llama
-       `Total`. No es una suposición del código: es un dato del negocio,
-       escrito donde se pueda leer y cambiar.
-
-       ⚠️ LA DISTINCIÓN QUE HACE QUE ESTO NO SEA ADIVINAR:
-         · Adivinar  = el código elige entre varias cuando no sabe cuál.
-                       Eso registraría el envío de un cliente en el otro
-                       negocio, cobrado a ellos. Sigue prohibido.
-         · Configurar = el dueño declara una vez cuál es la suya, y el
-                       código la respeta sin volver a preguntar.
-       La frontera no se mueve: si la declarada NO está, o si hay DOS con el
-       mismo nombre, se vuelve a pedir que elija. Nunca se sustituye. */
-    /* ⚠️ EL LÍMITE DE 1 INSTANCIA NOS ESTABA PROTEGIENDO, Y YA NO ESTÁ.
-       Hasta el 3 oct 2026 el plan era «Pro — 1 instancia máxima». Con ese
-       tope, el botón «Obtener instancia» de la otra aplicación del dueño
-       —que no manda nombre, lo elige su servidor, y eligió `Total`— recibía
-       un 403 «límite de instancias alcanzado» y no podía crear nada.
-
-       Al renovar, el tope pasó a 900. Ahora ese botón funciona SIEMPRE, y
-       el plan B de aquí abajo (casar por NOMBRE cuando el id no está) casaría
-       una instancia ajena llamada `Total` y registraríamos los envíos de tus
-       clientes en la cuenta del otro negocio, cobrados a ellos.
-
-       Por eso el nombre declarado deja de ser `Total`: es `Total Tools
-       Panel`, que el servidor de la otra aplicación no genera ni por
-       accidente. El plan B sigue haciendo falta —es justo lo que pasó hoy:
-       el cambio de plan vació el lote y el id viejo murió— pero ahora apunta
-       a un nombre que solo puede ser el nuestro.
-
-       ⚠️ EL `id` VA VACÍO, Y ESTA VEZ EL COMENTARIO Y EL CÓDIGO DICEN LO
-       MISMO. Van DOS ids muertos:
-         · `d14b120a-983d-4369-b519-c9d6bcf70d6a` murió el 3/10/2026 cuando
-           el cambio de plan vació el lote;
-         · `70f5a14e-186a-40be-a0d9-43f82cb38a0e` lo sustituyó a mano ese
-           mismo día y murió igual: el 11/10/2026 el panel de shalom-api.lat
-           mostraba «0 de 900 utilizadas · Aún no tienes instancias».
-
-       Y entre medias este comentario ya decía «va vacío» mientras la línea
-       de abajo llevaba un UUID escrito. Un comentario que contradice a su
-       código es peor que no tener comentario: se lee, se cree, y nadie mira
-       la línea.
-
-       El id es el ancla MÁS específica y la MÁS perecedera — se muere cada
-       vez que la instancia se rehace, y es justo entonces cuando hace falta
-       un ancla. El correo no se muere: es la cuenta del negocio. Así que el
-       id no se declara a mano nunca más; lo guarda Firestore al conectar, y
-       quien manda aquí es el correo. Si tampoco casa, se PREGUNTA — que es
-       lo correcto cuando no se sabe. */
-    INSTANCIA_PREFERIDA: {
-      id: '',
-      correo: 'Totaltools@gmail.com',
-      nombre: 'Total Tools Panel'
-    },
-
-    elegirInstancia: function (lista, idGuardado, preferida) {
-      var L = Array.isArray(lista) ? lista.filter(function (x) {
-        return x && typeof x === 'object' && x.id;
-      }) : [];
-      var id = String(idGuardado || '').trim();
-      var vacio = {estado: 'ninguna', instancia: null, instancias: L};
-      /* La identidad declarada se lee ARRIBA porque ahora hace falta antes
-         de decidir sobre la elección guardada, no solo después. */
-      var pid = '';
-      var pcorreo = '';
-      var pnom = '';
-      if (preferida && typeof preferida === 'object') {
-        pid = String(preferida.id || '').trim();
-        pcorreo = String(preferida.correo || '').trim().toLowerCase();
-        pnom = String(preferida.nombre || '').trim().toLowerCase();
-      } else {
-        pnom = String(preferida || '').trim().toLowerCase();
-      }
-      var unaPorCorreo = function () {
-        if (!pcorreo) return null;
-        var c = L.filter(function (x) {
-          return String(x.usuario || '').trim().toLowerCase() === pcorreo;
-        });
-        return c.length === 1 ? c[0] : null;
-      };
-      if (id) {
-        var hallada = null;
-        for (var i = 0; i < L.length; i++) {
-          if (L[i].id === id) { hallada = L[i]; break; }
-        }
-        if (hallada) return {estado: 'elegida', instancia: hallada, instancias: L};
-        /* ⚠️ TU ELECCIÓN MURIÓ. Antes esto devolvía `elegida_no_existe` y
-           te pedía elegir otra, siempre. Esa regla se escribió cuando lo
-           único que teníamos era el id: caerse a «otra» habría sido caerse
-           a la cuenta del otro negocio.
-
-           Ahora hay un CORREO declarado, y volver a él no es caerse a otra:
-           es volver a lo que configuraste. La frontera sigue intacta —el
-           código no elige entre varias cuando no sabe cuál— porque esto
-           solo actúa si el correo declarado casa EXACTAMENTE UNA.
-
-           Pasó de verdad el 3/10/2026: el cambio de plan vació el lote, el
-           id guardado dejó de existir, y el panel pedía elegir entre `Total`
-           y `Yapaitas` —dos negocios— cuando el correo ya decía cuál era. */
-        var rescate = unaPorCorreo();
-        if (rescate) {
-          return {estado: 'declarada', instancia: rescate, instancias: L,
-            rescatada: true};
-        }
-        // Ni por correo. Y NO se sustituye por otra, pase lo que pase.
-        return {estado: 'elegida_no_existe', instancia: null, instancias: L};
-      }
-      if (!L.length) return vacio;
-      if (L.length === 1) {
-        return {estado: 'una', instancia: L[0], instancias: L};
-      }
-      /* LA DECLARADA, por id o por nombre — los dos son datos que puso el
-         dueño, no deducciones del código.
-
-         POR QUÉ LOS DOS Y NO SOLO UNO:
-           · el `id` es exacto y sobrevive a que renombre la cuenta;
-           · el `nombre` sobrevive a que la instancia se rehaga y cambie de
-             id, que es justo lo que este archivo no quería dar por perdido.
-
-         EXACTO en los dos casos. Por prefijo, "Tot" cazaría "Total 2" y
-         volveríamos a elegir por parecido, que es adivinar con otro nombre.
-
-         Y SE EXIGE UNA SOLA CANDIDATA. Si hay dos cuentas con el mismo
-         nombre, o si el id declarado apunta a una y el nombre a OTRA, eso
-         no es una elección: es una contradicción, y se pregunta. */
-      /* ★ PRECEDENCIA: PRIMERO EL ID, Y EL NOMBRE SOLO SI EL ID NO ESTÁ.
-         No son alternativas, y confundirlas me costó un fallo real
-         (02/10/2026): la cuenta pasó a tener DOS instancias llamadas
-         "Total" —una la creó otra aplicación con un botón que decía
-         "Obtener" y en realidad creaba— y, al tratar id y nombre como
-         alternativas, el nombre casaba una segunda fila, saltaba la
-         guardia de ambigüedad y el panel volvía a pedir elegir.
-         La guardia estaba bien; la precedencia estaba mal. El id es el
-         dato más específico: si resuelve UNA, no hay nada que preguntar. */
-      if (pid) {
-        var porId = L.filter(function (x) { return x.id === pid; });
-        if (porId.length === 1) {
-          return {estado: 'declarada', instancia: porId[0], instancias: L};
-        }
-      }
-      /* ★ PLAN B: EL CORREO. Es el ancla más fuerte de las tres, y no es
-         una idea del código: es la regla que puso el dueño el 3/10/2026,
-         «una instancia por cada correo de inicio de sesión». Con esa regla
-         el correo es una CLAVE ÚNICA.
-
-         Por qué va antes que el nombre, con lo que pasó esta semana:
-           · el `id` es exacto pero MURIÓ al vaciarse el lote con el cambio
-             de plan (3/10) — sobrevive a un renombrado, no a rehacerla;
-           · el `nombre` COLISIONÓ (2/10) con una instancia que creó la otra
-             aplicación del dueño, y con 900 slots puede volver a pasar;
-           · el `correo` es el NEGOCIO. Sobrevive a que la instancia se
-             rehaga Y a que la renombres, y no puede colisionar sin romper
-             la regla de arriba.
-
-         Y si DOS casan el correo, se pregunta — porque eso significaría que
-         la regla se rompió, y ese es justo el momento de no adivinar. */
-      if (pcorreo) {
-        var porCorreo = L.filter(function (x) {
-          return String(x.usuario || '').trim().toLowerCase() === pcorreo;
-        });
-        if (porCorreo.length === 1) {
-          return {estado: 'declarada', instancia: porCorreo[0], instancias: L};
-        }
-      }
-      /* Plan C: el nombre, el más débil de los tres. Sigue exigiendo UNA
-         sola: si dos se llaman igual, el nombre no identifica nada. */
-      if (pnom) {
-        var porNombre = L.filter(function (x) {
-          if (String(x.nombre || '').trim().toLowerCase() !== pnom) return false;
-          /* ⚠️ Y EL CORREO MANDA SOBRE EL NOMBRE, aunque el nombre case.
-             Si declaraste un correo y esta instancia tiene OTRO, no es la
-             tuya por mucho que se llame igual: es una contradicción, y este
-             archivo ya decidió una vez que ante una contradicción se
-             pregunta. Sin esto, una instancia ajena bautizada con nuestro
-             nombre se colaría el día que la nuestra desapareciera — que es
-             exactamente el día en que el plan C entra en juego.
-             Si no trae correo, no se sabe y no se descarta. */
-          var u = String(x.usuario || '').trim().toLowerCase();
-          return !(pcorreo && u && u !== pcorreo);
-        });
-        if (porNombre.length === 1) {
-          return {estado: 'declarada', instancia: porNombre[0], instancias: L};
-        }
-      }
-      return {estado: 'falta_elegir', instancia: null, instancias: L};
-    },
-
-    /* ✅ CONECTADO · POST /instances/status — 2026-10-01
-       El estado de UNA instancia. Lo que aporta sobre `estadoInstancia()`
-       es `url`: dónde quedó parado el navegador headless de Shalom. Si
-       termina en /login, se deslogueó — y eso es un diagnóstico, no un
-       booleano.
-       → {ok:true, sesion:{conocido, conectada, usuario, nombre, id, url,
-                           enLogin}}
-       ⚠️ `usuario` puede venir NULO con la sesión conectada: medido.
-       ⚠️ `enLogin: null` = no se sabe (no hubo url), que no es lo mismo
-          que `false`.
-       Necesita el instanceId, que sale de `estadoInstancia()`. */
     /* ⚠️ REGISTRAR UN ENVIO — LA UNICA OPERACION QUE CUESTA DINERO.
        Shalom NO tiene endpoint para anular y NO tiene clave de
        idempotencia: dos llamadas son dos envios y dos cobros.
@@ -478,32 +242,21 @@
       return _pedir({op: 'recuperarEnvio', datos: {pedidoId: pedidoId}});
     },
 
-    /* ✅ CONECTAR LA CUENTA — crear si hace falta, entrar siempre,
-       comprobar. Una sola operación idempotente: el navegador manda el
-       nombre y NADA MÁS. El servidor pone la identidad declarada y las
-       credenciales desde Secret Manager; su documentación desaconseja este
-       endpoint en un panel justo porque «obligaría a que tus credenciales
-       de Shalom Pro pasen por tu sistema», y así no pasan.
-       → {ok:true, id, creada, conectada, usuario, forma} */
-    conectarCuenta: function () {
-      return _pedir({op: 'conectarShalom', datos: {}});
+    /* ★ LA CUENTA DE SHALOM PRO (rehecho el 11/11/2026) — la decide el
+       servidor (functions/cuentaShalom.js). El navegador nunca recibe la
+       lista de instancias de la cuenta de la API.
+       conectar(usuario, clave): con datos, van UNA vez a Secret Manager y no
+       vuelven; vacíos, se usan los guardados. Busca TU instancia por tu
+       correo, la crea si no existe y entra solo si hace falta.
+       → {ok:true, conectada:true, usuario, id} | {ok:false, motivo, detalle}
+       estadoCuenta(): ¿sigue conectada? Gratis.
+       → {ok, conectada, usuario, id, hayCredenciales, motivo} */
+    conectar: function (usuario, clave) {
+      var d = {};
+      if (usuario && clave) { d.usuario = usuario; d.clave = clave; }
+      return _pedir({op: 'conectarShalom', datos: d});
     },
-
-    /* ★ GUARDAR LAS CREDENCIALES DE SHALOM PRO — write-only.
-       Van a Secret Manager, no a Firestore: Firestore se sincroniza al
-       navegador, Secret Manager no sale del servidor. NO existe la pareja
-       de lectura, ni aquí ni en la puerta: lo que entra no vuelve a salir.
-       La respuesta trae el correo —que no es un secreto— y nunca la clave,
-       ni enmascarada: devolver `****` ya confirmaría su longitud.
-       → {ok:true, usuario} · {ok:false, motivo, faltan[]} */
-    guardarCredenciales: function (usuario, clave) {
-      return _pedir({op: 'guardarCredenciales',
-        datos: {usuario: usuario, clave: clave}});
-    },
-
-    estadoSesion: function (instanceId) {
-      return _pedir({op: 'instanceStatus', datos: {instanceId: instanceId}});
-    },
+    estadoCuenta: function () { return _pedir({op: 'estadoShalom'}); },
 
     /* ✅ CONECTADO · GET /validate — 2026-09-13
        Dice si la clave sirve y cuánto se ha consumido. Es el primero a
@@ -585,14 +338,15 @@
         /* Medido: con un instanceId malo, Shalom responde 403 "Invalid API
            Key or instance access". Antes se traducía como BLOQUEADO y
            mandaba a revisar la clave, que estaba perfecta. */
-        VARIAS_INSTANCIAS: 'Tienes más de una cuenta de Shalom Pro. Elige en Config cuál usa el panel: registrar en la equivocada cobra al otro negocio.',
-        INSTANCIA_NO_EXISTE: 'La cuenta de Shalom Pro que elegiste ya no está. Elige otra en Config — no se cambia sola, porque sería cambiarte de negocio sin avisar.',
+        VARIAS_INSTANCIAS: 'Hay más de una instancia con tu correo en tu panel de Shalom API. Deja una sola y vuelve a pulsar Conectar.',
+        PLAN_LLENO: 'Tu plan de Shalom API llegó al límite de instancias. Libera una en tu panel de Shalom API y vuelve a pulsar Conectar.',
+        SIN_SESION_SHALOM: 'Entró, pero Shalom aún no confirma la sesión. Espera un minuto.',
         NO_ENCONTRADO_PEDIDO: 'Ese pedido ya no está en la base de datos.',
-        SIN_CREDENCIALES: 'Faltan las credenciales de Shalom Pro. Guárdalas en ⚙️ Config → Shalom, arriba del botón de conectar.',
-        CREDENCIALES_MALAS: 'Shalom Pro rechazó ese correo o esa contraseña. No es la clave de la API: son los datos con los que entras en pro.shalom.pe. Vuelve a guardarlos en Config.',
+        SIN_CREDENCIALES: 'Falta conectar tu cuenta de Shalom Pro: escribe tu correo y contraseña en ⚙️ Config → Shalom y pulsa Conectar.',
+        CREDENCIALES_MALAS: 'Shalom Pro no aceptó ese correo o esa contraseña (los de pro.shalom.pe). Escríbelos de nuevo en Config.',
         ERROR_SECRETOS: 'No se pudieron leer las credenciales de Secret Manager. El detalle de abajo trae el motivo exacto de Google.',
         SIN_PERMISO_SECRETOS: 'La función no tiene permiso para escribir en Secret Manager. Hay que darle el rol `roles/secretmanager.admin` a su cuenta de servicio, una sola vez.',
-        SIN_INSTANCIA_VALIDA: 'El id de instancia de Shalom Pro no sirve. La clave de la API puede estar bien: compruébala con «Verificar sesión».',
+        SIN_INSTANCIA_VALIDA: 'La cuenta de Shalom Pro guardada ya no existe. Pulsa Conectar en ⚙️ Config.',
         LIMITE:        'Se agotó la cuota del plan de Shalom.',
         ERROR_SHALOM:  'Shalom respondió con un error. Reintenta en unos minutos.',
         DESCONECTADO:  'Esa parte de la integración todavía no está conectada.',

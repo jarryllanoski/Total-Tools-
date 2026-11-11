@@ -35,8 +35,7 @@ const enlace = require("./enlaceSeguimiento");
 const registroShalom = require("./registroShalom");
 const nroComp = require("./nroComprobante");
 const ticketShalom = require("./ticketShalom");
-const instanciaShalom = require("./instanciaShalom");
-const puertaInstancias = require("./puertaInstancias");
+const cuentaShalom = require("./cuentaShalom");
 const reniecPublico = require("./reniecPublico");
 const credenciales = require("./credenciales");
 
@@ -1932,96 +1931,103 @@ exports.shalomPuerta = onRequest(
          instancia, y eso es lo que hace que la sesion se levante sola
          cuando expira. Sin credenciales guardadas llega el 401 que su
          propia documentacion llama «el fallo mas repetido de esta API». */
-      if (paso.orquestar === "conectarShalom") {
+      /* ★ LA CUENTA DE SHALOM PRO (rehecho el 11/11/2026, ver
+         functions/cuentaShalom.js). Dos operaciones:
+           conectarShalom → {usuario?, clave?}: si llegan, van UNA vez a
+             Secret Manager (nunca vuelven); si no, se usan las guardadas.
+             Encuentra TU instancia por tu correo, la crea si no existe,
+             entra solo si hace falta y guarda en el servidor cuál es.
+           estadoShalom → ¿sigue conectada? Gratis.
+         El navegador recibe «conectada · tu correo» y nada más: ni la
+         contraseña, ni la lista de instancias de la cuenta de la API. */
+      if (paso.orquestar === "conectarShalom" ||
+          paso.orquestar === "estadoShalom") {
         try {
-          /* Si leer el secreto falla de verdad —permiso, API caída— se
-             dice QUÉ pasó. Antes todo acababa en «faltan las credenciales»,
-             que manda a guardarlas otra vez y no arregla nada. */
-          let cred = null;
-          try {
-            cred = await credenciales.leer({leer: _leerSecreto});
-          } catch (e) {
-            console.error("leerCredenciales:", e && e.message);
-            res.status(200).json({ok: false,
-              motivo: (e && e.motivo) || "ERROR_SECRETOS",
-              detalle: "No se pudieron LEER las credenciales de Secret " +
-                "Manager (guardarlas sí funcionó). Motivo de Google: " +
-                String((e && e.message) || e).slice(0, 300)});
-            return;
-          }
           const cfgSnap2 = await db.doc(CFG_DOC).get();
           const cfg2 = cfgSnap2.exists ? cfgSnap2.data() : {};
-          const decl = (cfg2.shalomInstanciaPreferida &&
-            typeof cfg2.shalomInstanciaPreferida === "object") ?
-            cfg2.shalomInstanciaPreferida : {};
-          /* ⚠️ LAS CUATRO LLAMADAS VIVEN EN `puertaInstancias`, NO AQUI.
-             Estuvieron escritas aqui mismo, sueltas, y dos de las cuatro
-             devolvian la respuesta EN CRUDO donde `conectar` esperaba la
-             traducida: `lis.instancias` y `st.sesion` salian `undefined`
-             siempre, asi que no se veia ninguna instancia existente —se
-             creaba una nueva en cada pulsacion— y el login bueno se
-             reportaba como «no conectada». Ninguna prueba en rojo: los
-             dobles devolvian la forma traducida, mas amable que la realidad.
-             Ahora el empalme es un modulo y se prueba con el JSON medido. */
-          const cables = puertaInstancias.hacer(
-              _porLaPuerta, shalomPuerta.traducir);
-          const salida3 = await instanciaShalom.conectar(cables, {
-            // Lo declarado en Config pisa lo del codigo, igual que el resto.
-            // Config puede pisarla sin desplegar; si no, la del modulo.
-            // NUNCA del navegador: ver el comentario de DECLARADA.
-            correo: decl.correo || instanciaShalom.DECLARADA.correo,
-            nombre: decl.nombre || instanciaShalom.DECLARADA.nombre,
-            usuario: (cred && cred.usuario) || "",
-            clave: (cred && cred.clave) || "",
-          });
-          /* Si acabo de conectar una instancia, se guarda cual — el
-             registro de envios la lee de Firestore, no del navegador. */
-          if (salida3 && salida3.ok && salida3.id) {
-            await db.doc(CFG_DOC).set({shalomInstancia: {
-              id: salida3.id,
-              nombre: decl.nombre || instanciaShalom.DECLARADA.nombre,
-            }}, {merge: true});
+          const inst = (cfg2.shalomInstancia &&
+            typeof cfg2.shalomInstancia === "object") ? cfg2.shalomInstancia :
+            {};
+          const audit = (cfg2.shalomCredenciales &&
+            typeof cfg2.shalomCredenciales === "object") ?
+            cfg2.shalomCredenciales : {};
+          const depsCuenta = {
+            listar: async () => {
+              const r = await _porLaPuerta("instances", {});
+              if (!r || !r.ok) {
+                return {ok: false, motivo: (r && r.motivo) || "SIN_RED"};
+              }
+              const t = shalomPuerta.traducir("instances", r.json) || {};
+              return Array.isArray(t.instancias) ?
+                {ok: true, instancias: t.instancias} :
+                {ok: false, motivo: t.motivo || "FORMATO_DESCONOCIDO"};
+            },
+            crear: (nombre) => _porLaPuerta("instanceCrear", {name: nombre}),
+            entrar: (id, usuario, clave) => _porLaPuerta("instanceLogin",
+                {instanceId: id, username: usuario, password: clave}),
+            estado: async (id) => {
+              const r = await _porLaPuerta("instanceStatus", {instanceId: id});
+              if (!r || !r.ok) {
+                return {ok: false, motivo: (r && r.motivo) || "SIN_RED"};
+              }
+              return shalomPuerta.traducir("instanceStatus", r.json);
+            },
+            // El registro de envíos lee la instancia de AQUÍ, no del navegador.
+            guardarCuenta: (id, usuario) => db.doc(CFG_DOC).set({
+              shalomInstancia: {id: id, nombre: cuentaShalom.NOMBRE,
+                usuario: usuario}}, {merge: true}),
+          };
+
+          if (paso.orquestar === "estadoShalom") {
+            res.status(200).json(await cuentaShalom.estado(depsCuenta, {
+              idGuardado: inst.id,
+              usuarioGuardado: inst.usuario || audit.usuario,
+              hayCredenciales: !!audit.usuario,
+            }));
+            return;
           }
-          res.status(200).json(salida3);
-        } catch (e) {
-          console.error("conectarShalom:", e);
-          res.status(200).json({ok: false, motivo: "ERROR_SHALOM",
-            detalle: "Algo se rompio al conectar. Mira la cuenta en " +
-              "shalom-api.lat antes de volver a intentarlo."});
-        }
-        return;
-      }
 
-      /* ★ GUARDAR LAS CREDENCIALES DE SHALOM PRO — write-only.
-         Es la unica operacion que recibe un secreto del navegador, y el
-         trato es: entra una vez, va a Secret Manager, y no se puede volver
-         a sacar. No hay operacion de lectura; la respuesta no devuelve la
-         clave ni enmascarada; y lo que se audita es QUIEN y CUANDO.
-
-         Su documentacion desaconseja tener el login en un panel porque
-         «obligaria a que tus credenciales pasen por tu sistema». Pasan UNA
-         vez, en una peticion, y acaban en la misma caja fuerte que la clave
-         de la API. Una contraseña que se escribe una vez se expone una vez
-         — frente a escribirla cada vez que la sesion se cae. */
-      if (paso.orquestar === "guardarCredenciales") {
-        try {
           const d = (paso.datos && typeof paso.datos === "object") ?
             paso.datos : {};
-          const salida4 = await credenciales.guardar({
-            escribir: _escribirSecreto,
-            auditar: (a) => db.doc(CFG_DOC).set({shalomCredenciales: {
-              usuario: a.usuario, // el correo SI: no es un secreto
-              cuando: a.cuando,
-              porQuien: paso.correo || "",
-            }}, {merge: true}),
-          }, {usuario: d.usuario, clave: d.clave});
-          /* Sin `clave` en la respuesta, ni aqui ni en el error. El correo
-             si vuelve: es lo que el panel pinta para que sepas cual quedo. */
-          res.status(200).json(salida4);
+          const escritas = !!(String(d.usuario || "").trim() && d.clave);
+          let cred = null;
+          if (escritas) {
+            const g = await credenciales.guardar({
+              escribir: _escribirSecreto,
+              auditar: (a) => db.doc(CFG_DOC).set({shalomCredenciales: {
+                usuario: a.usuario, // el correo SÍ: no es un secreto
+                cuando: a.cuando,
+                porQuien: paso.correo || "",
+              }}, {merge: true}),
+            }, {usuario: d.usuario, clave: d.clave});
+            // Sin `clave` en la respuesta, ni aquí ni en el error.
+            if (!g || !g.ok) {
+              res.status(200).json(g || {ok: false, motivo: "ERROR_SHALOM"});
+              return;
+            }
+            cred = {usuario: g.usuario, clave: d.clave};
+          } else {
+            try {
+              cred = await credenciales.leer({leer: _leerSecreto});
+            } catch (e) {
+              console.error("leerCredenciales:", e && e.message);
+              res.status(200).json({ok: false,
+                motivo: (e && e.motivo) || "ERROR_SECRETOS",
+                detalle: "No se pudieron leer tus credenciales guardadas."});
+              return;
+            }
+          }
+          res.status(200).json(await cuentaShalom.conectar(depsCuenta, {
+            usuario: cred && cred.usuario,
+            clave: cred && cred.clave,
+            idGuardado: inst.id,
+            recienEscritas: escritas,
+          }));
         } catch (e) {
-          console.error("guardarCredenciales:", e && e.message);
+          console.error("cuentaShalom:", e && e.message);
           res.status(200).json({ok: false, motivo: "ERROR_SHALOM",
-            detalle: "No se pudieron guardar las credenciales."});
+            detalle: "Algo falló al conectar con Shalom. Intenta en un " +
+              "momento."});
         }
         return;
       }

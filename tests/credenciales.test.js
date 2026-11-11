@@ -57,7 +57,8 @@ module.exports = async ({bloque, ok}) => {
     ok(lectoras.length === 0,
        'NO hay ninguna operacion que lea credenciales — solo `guardar`. ' +
        'Sobran: ' + lectoras.join(', '));
-    ok(P.ORQUESTADAS.guardarCredenciales === true,
+    // 11/11/2026: guardar va DENTRO de «conectar» (con usuario y clave).
+    ok(P.ORQUESTADAS.conectarShalom === true && !P.ORQUESTADAS.guardarCredenciales,
        'y guardar es una orquestacion: el navegador manda los datos, pero ' +
        'quien decide que hacer con ellos es el servidor');
   }

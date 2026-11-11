@@ -146,59 +146,9 @@ module.exports = async ({bloque, ok}) => {
        'de que opinar');
   }
 
-  bloque('⚠️ Lo guardado no es lo comprobado');
-
-  {
-    /* EL ERROR QUE YO MISMO ESCRIBI, el 3 de octubre. Este bloque pintaba
-       «🔌 Cuenta Total» leyendo `S.shalomInstancia`, que vive en el
-       navegador. Ese mismo dia el cambio de plan de Shalom vacio el lote de
-       instancias y la pantalla siguio diciendo «Cuenta Total» tan tranquila
-       — exactamente lo que yo le estaba criticando a la otra aplicacion del
-       dueño, que mostraba «Instancia asignada» sin instancia ninguna.
-
-       Y no habia excusa: su documentacion dice que `GET /instances` y
-       `POST /instances/status` NO consumen cuota. Comprobarlo es gratis. */
-    const m = montar();
-    m.api.pintar();
-    ok(!/sesi.n activa/i.test(m.html()),
-       'antes de preguntar, NO se da por buena la cuenta guardada');
-    ok(/comprobando/i.test(m.html()),
-       'se dice que se esta comprobando, que es la verdad en ese instante');
-    await tick();
-    ok(m.visto.comprobaciones === 1, 'y se pregunta a Shalom, sin que lo pidas');
-    ok(/sesi.n activa/i.test(m.html()),
-       'solo cuando Shalom contesta se afirma que la sesion esta viva');
-  }
-  {
-    /* LA SITUACION REAL DEL 3 OCT: la cuenta guardada ya no existe. */
-    const m = montar({sesion: {ok: false, motivo: 'SIN_INSTANCIA_VALIDA'}});
-    m.api.pintar();
-    await tick();
-    ok(/ya no existe/i.test(m.html()),
-       'si la instancia desaparecio, se dice — no se calla con el nombre viejo');
-    ok(/btnRegistrarShalom/.test(m.html()),
-       'pero NO se esconde el boton: un registro sin instancia da 403 y no ' +
-       'crea ni cobra nada, mientras que bloquear por una lectura que puede ' +
-       'fallar por red te dejaria sin registrar teniendolo todo bien');
-  }
-  {
-    const m = montar({sesion: {ok: true, sesion: {conectada: false}}});
-    m.api.pintar();
-    await tick();
-    ok(/sin sesi.n/i.test(m.html()),
-       'instancia viva pero deslogueada tambien se avisa: es el fallo mas ' +
-       'repetido de esta API segun su propia documentacion');
-  }
-  {
-    const m = montar({sesion: null});
-    m.api.pintar(); await tick();
-    m.api.pintar(); await tick();
-    m.api.pintar(); await tick();
-    ok(m.visto.comprobaciones === 1,
-       'se pregunta UNA vez por cuenta, no en cada repintado — gratis no es ' +
-       'excusa para llamar en bucle');
-  }
-
+  /* «Lo guardado no es lo comprobado» (la fila de la cuenta en el registro)
+     vive desde el 11/11/2026 en panel/shalom/shalom-cuenta.js y se prueba en
+     tests/cuenta-shalom.test.js. */
 
   bloque('Un pedido ya registrado no tiene botón — no existe, no es que esté gris');
 

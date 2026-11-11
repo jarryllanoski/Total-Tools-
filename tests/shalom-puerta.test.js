@@ -842,12 +842,17 @@ module.exports = async ({bloque, ok}) => {
      'NO_PERMITIDO',
      'y no sirve para asomarse a un endpoint que no está permitido');
   {
-    const r = await pasar({cuerpo: {op: 'instances'}});
-    ok(r.ok === true && r.destino === 'instances',
-       'instances ya pasa como operación normal');
-    const d = await pasar({cuerpo: {op: 'esquema', de: 'instances'}});
-    ok(d.ok === true && d.diagnostico === true,
-       'y se le puede seguir mirando la forma, por si Shalom la cambia');
+    /* 11/11/2026: la lista de instancias de la cuenta de la API incluye
+       las de otros negocios (con sus correos). Ya NO llega al navegador: la
+       lee solo el servidor (functions/cuentaShalom.js). */
+    for (const op of ['instances', 'instanceStatus']) {
+      const r = await pasar({cuerpo: {op: op, datos: {instanceId: 'x'}}});
+      ok(motivo(r) === 'NO_PERMITIDO', '⚠️ ' + op + ': el navegador ya no la puede pedir');
+      const d = await pasar({cuerpo: {op: 'esquema', de: op}});
+      ok(motivo(d) === 'NO_PERMITIDO', '⚠️ ' + op + ': ni para «mirar la forma»');
+    }
+    const c = await pasar({cuerpo: {op: 'estadoShalom'}});
+    ok(c.ok === true && c.orquestar === 'estadoShalom', 'el estado de la cuenta va por la orquestación del servidor');
   }
   {
     /* La guarda de `soloMedir` no se prueba con un endpoint ya conectado: se
@@ -1215,8 +1220,8 @@ module.exports = async ({bloque, ok}) => {
     /* Un motivo sin traducción sale como código en la pantalla, y
        "VARIAS_INSTANCIAS" no le dice nada a nadie. */
     const html = E.leer('index.html');
-    ok(/SIN_INSTANCIA:'[^']+'/.test(html), 'SIN_INSTANCIA se explica');
-    ok(/VARIAS_INSTANCIAS:'[^']+'/.test(html), 'VARIAS_INSTANCIAS también');
+    ['VARIAS_INSTANCIAS', 'PLAN_LLENO', 'CREDENCIALES_MALAS', 'SIN_CREDENCIALES', 'SIN_SESION_SHALOM']
+        .forEach((m) => ok(new RegExp(m + ":\\s*'[^']+'").test(html), m + ' se explica con palabras'));
   }
 
   bloque('Traducir GET /public/agencies — el catálogo, sin sorpresas');

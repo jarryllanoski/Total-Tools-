@@ -138,7 +138,7 @@ module.exports = async ({bloque, ok}) => {
         'floatpanel.js', 'seleccion.js', 'voz.js', 'dashboard.js', 'ayuda.js'],
       pedidos: ['pedido-form.js', 'pedido-docs.js', 'pedido-reniec.js', 'pedido-guardar.js', 'pedido-ui.js',
         'estados-papelera.js', 'pin-papelera.js', 'print.js', 'notify.js', 'delivery.js'],
-      shalom: ['shalom-registro.js', 'shalom-origen.js', 'shalom-ajustes.js', 'shalom.js', 'tracking.js',
+      shalom: ['shalom-registro.js', 'shalom-origen.js', 'shalom-ajustes.js', 'shalom-cuenta.js', 'shalom.js', 'tracking.js',
         'qrtracking.js', 'ticket.js', 'guias.js', 'agencias-extractor.js'],
       compartir: ['links-tokens.js', 'excel.js'],
       config: ['configuracion.js', 'recursos-ui.js', 'proveedores.js', 'recursos.js', 'cotizacion.js']};

@@ -546,13 +546,10 @@
          antes de guardar, no después. El formulario del cliente no la
          necesita, así que no viaja. */
       agenciaOrigen:data.agenciaOrigen||null,
-      /* ★ También HERMANA de `config`, y por el mismo motivo.
-         ⚠️ Y TIENE QUE ESTAR AQUÍ SÍ O SÍ: la Cloud Function que registra
-         envíos en Shalom lee esta cuenta de Firestore. Si solo viviera en
-         memoria y en el respaldo local —como estuvo hasta ahora— el panel
-         la recordaría, pero el servidor diría "falta la cuenta de Shalom
-         Pro" con la cuenta ya elegida, y nadie entendería por qué. */
-      shalomInstancia:data.shalomInstancia||null,
+      /* `shalomInstancia` YA NO VA AQUÍ (11/11/2026): la escribe SOLO el
+         servidor al conectar la cuenta (functions/cuentaShalom.js). Si
+         viajara desde el panel, un equipo con un id viejo lo pisaría — que
+         es justo como el panel quedó apuntando a una cuenta que no existe. */
       /* ★ El interruptor del simulacro de REGISTRO. Hermana de `config`
          por lo mismo que las dos de arriba, y aquí sí o sí: lo lee la
          Cloud Function. Si no viajara, apagarlo en el panel no lo

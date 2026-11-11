@@ -109,6 +109,19 @@ cada texto, y **falla si alguien escribe otra copia** en cualquier archivo.
 Divergencias que había: «En reparto» (panel: destino · cliente: «en
 camino») y el código de un pedido antiguo sin fecha (etiqueta 4 · link 6).
 
+### La cuenta de Shalom Pro (rehecha el 11/11/2026)
+
+- **Servidor:** `functions/cuentaShalom.js` (reemplaza a `instanciaShalom.js`
+  y `puertaInstancias.js`). Operaciones `conectarShalom` (con correo y
+  contraseña opcionales: van UNA vez a Secret Manager) y `estadoShalom`.
+  Regla de oro: solo la instancia cuyo `username` es tu correo; si ya está
+  conectada no se vuelve a entrar; el servidor guarda `shalomInstancia`.
+- **Navegador:** `panel/shalom/shalom-cuenta.js`. Una línea, un botón, y
+  reconexión sola al entrar (una vez por sesión). `instances` e
+  `instanceStatus` son `soloServidor`: la lista de instancias de la cuenta
+  de la API (con correos de otros negocios) nunca llega al navegador.
+- El panel ya NO escribe `shalomInstancia` en la configuración.
+
 ### Rendimiento (Fase 8, 11/11/2026)
 
 - **Copia local** (`panel/datos/copia-local.js`): la copia de los pedidos
