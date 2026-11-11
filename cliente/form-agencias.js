@@ -17,7 +17,7 @@
 const AGENCY_SOURCES = {
   SHALOM: {
     label: 'Shalom',
-    version: '2026-10-30', // meta.generado
+    version: '2026-11-11', // meta.generado
     jsonPath: './data/agencias-shalom.json',
     // Sin respaldo en vivo: la función agenciasShalom se retiró (el portal de
     // Shalom exige reCAPTCHA v3). El buscador usa solo el catálogo local, que

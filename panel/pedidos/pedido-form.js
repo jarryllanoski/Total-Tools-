@@ -431,7 +431,7 @@ function parseWAOrder(){
 let _shTimer=null;
 /* Versión del catálogo = fecha de `meta.generado` de data/agencias-shalom.json.
    La MISMA que AGENCY_SOURCES.SHALOM.version en formulario.html (hay prueba). */
-const SHALOM_CATALOGO_V='2026-10-30';
+const SHALOM_CATALOGO_V='2026-11-11';
 async function _panelShalomLoad(){
   if(window._shalomData && window._shalomData.length) return window._shalomData;
   // 1) cache localStorage (24 h) — solo si es de ESTA versión del catálogo

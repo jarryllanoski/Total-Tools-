@@ -1,7 +1,7 @@
 {
   "meta": {
-    "total": 562,
-    "generado": "2026-10-30T04:28:13.037Z"
+    "total": 563,
+    "generado": "2026-11-11T05:04:27.123Z"
   },
   "agencias": [
     {
@@ -2936,13 +2936,13 @@
       "departamento": "LAMBAYEQUE",
       "provincia": "CHICLAYO",
       "distrito": "PIMENTEL",
-      "direccion": "CALLE MIGUEL GRAU MZ B LOTE 3 - PIMENTEL - CHICLAYO - LAMBAYEQUE, REF. AL COSTADO DE LA COMISARIA DE PIMENTEL",
+      "direccion": "CALLE JUAN VELASCO ALVARADO N.° 472. REF. INTERSECCIÓN CON LA CALLE CIRO ALEGRÍA. A UNAS CDRAS. DEL CENTRO DE SALUD PIMENTEL.",
       "referencia": "",
       "telefono": "(01) 500 7878",
       "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
       "horarioDom": "",
-      "latitud": "-6.8347500905235",
-      "longitud": "-79.935907463187"
+      "latitud": "-6.8318488760978",
+      "longitud": "-79.930162497091"
     },
     {
       "ter_id": "479",
@@ -4528,7 +4528,7 @@
     },
     {
       "ter_id": "727",
-      "nombre": "LIMA / LIMA / ATE-VITARTE / LOS VIRREYES - ATE (POR DEFINIR)",
+      "nombre": "LIMA / LIMA / ATE-VITARTE / AV LOS VIRREYES - ATE",
       "departamento": "LIMA",
       "provincia": "LIMA",
       "distrito": "ATE-VITARTE",
@@ -4542,7 +4542,7 @@
     },
     {
       "ter_id": "728",
-      "nombre": "LIMA / LIMA / SANTA ANITA / AV. FERROCARRIL - SANTA ANITA (POR DEFINIR)",
+      "nombre": "LIMA / LIMA / SANTA ANITA / AV EL FERROCARRIL STA ANITA",
       "departamento": "LIMA",
       "provincia": "LIMA",
       "distrito": "SANTA ANITA",
@@ -4612,7 +4612,7 @@
     },
     {
       "ter_id": "735",
-      "nombre": "LAMBAYEQUE / CHICLAYO / LA VICTORIA / CHOSICA DEL NORTE CO (POR DEFINIR)",
+      "nombre": "LAMBAYEQUE / CHICLAYO / LA VICTORIA / CHOSICA DEL NORTE CO",
       "departamento": "LAMBAYEQUE",
       "provincia": "CHICLAYO",
       "distrito": "LA VICTORIA",
@@ -4693,6 +4693,20 @@
       "horarioDom": "",
       "latitud": "-9.3467063197505",
       "longitud": "-77.168945341141"
+    },
+    {
+      "ter_id": "743",
+      "nombre": "JUNIN / HUANCAYO / HUANCAYO / PALIAN HUANCAYO (POR DEFINIR)",
+      "departamento": "JUNIN",
+      "provincia": "HUANCAYO",
+      "distrito": "HUANCAYO",
+      "direccion": "AV. PALIÁN MZ. G  - LT. 22, REF: A DOS CDRAS. DEL COLEGIO ASUNCIÓN DE PALIÁN",
+      "referencia": "",
+      "telefono": "(01) 500 7878",
+      "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
+      "horarioDom": "",
+      "latitud": "-12.032964441175",
+      "longitud": "-75.189687219029"
     },
     {
       "ter_id": "4",
@@ -5739,10 +5753,10 @@
       "direccion": "AV. JOSÉ GRANDA 3826 DE LA URB. CONDEVILLA SEÑOR Y VALDIVIESO MZ. M7 LT 20, 2 ETAPA, 2 SECTOR - S.M.P. , REF.  ENTRE AV. CONDEVILLA Y AV. LOS PRÓCERES",
       "referencia": "",
       "telefono": "(01) 500 7878",
-      "horario": "LUNES A VIERNES - 8AM A 8PM",
+      "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
       "horarioDom": "",
-      "latitud": "-12.020561244152566",
-      "longitud": "-77.08705644110377"
+      "latitud": "-12.020561244153",
+      "longitud": "-77.087056441104"
     },
     {
       "ter_id": "462",
@@ -6845,10 +6859,10 @@
       "direccion": "AV. TUPAC AMARU N° 4708 - 4710, REF. A UNA CDRA. DEL PARADERO ESTACIÓN NARANJAL",
       "referencia": "",
       "telefono": "(01) 500 7878",
-      "horario": "LUNES A VIERNES - 08:00 AM A 7:00 PM",
+      "horario": "LUNES A VIERNES - 8:00 AM A 7:00 PM",
       "horarioDom": "",
-      "latitud": "-11.978882502306485",
-      "longitud": "-77.0591044310316"
+      "latitud": "-11.978882502306",
+      "longitud": "-77.059104431032"
     },
     {
       "ter_id": "166",
@@ -7041,10 +7055,10 @@
       "direccion": "CENTRO COMERCIAL MEGA PLAZA AV. ALFREDO MENDIOLA 3698 LIMA - INDEPENDENCIA. REF. PRIMER PISO DE MEGA PLAZA / AL COSTADO DEL ESTACIONAMIENTO DE BICICLETA",
       "referencia": "",
       "telefono": "(01) 500 7878",
-      "horario": "LUNES A VIERNES - 10:00 A.M. A 8:00 P.M.",
+      "horario": "LUNES A VIERNES - 10:00 AM A 6:00 PM",
       "horarioDom": "",
-      "latitud": "-11.993286670554024",
-      "longitud": "-77.06326926907906"
+      "latitud": "-11.993286670554",
+      "longitud": "-77.063269269079"
     },
     {
       "ter_id": "444",
@@ -7052,7 +7066,7 @@
       "departamento": "LA LIBERTAD",
       "provincia": "TRUJILLO",
       "distrito": "MOCHE",
-      "direccion": "AV. LA MARINA LOTE 25 - B – MOCHE – TRUJILLO - LA LIBERTAD, REF. A MEDIA CDRA DE LA COMISARÍA DE MOCHE",
+      "direccion": "CALLE ELIO JACOBO MZ. D - LT. 13. CRUCE CON AV. LA MARINA A UNA CDRA. DE ESSALUD MOCHE. FRENTE AL PARQUE EL PARAÍSO.",
       "referencia": "",
       "telefono": "(01) 500 7878",
       "horario": "LUNES A VIERNES - 8:00 AM A 8:00 PM",
@@ -7293,10 +7307,10 @@
       "direccion": "AV. LA MOLINA 2448, LA MOLINA 15026, LA MOLINA - LIMA - LIMA, REF. ESTACIONAMIENTO NIVEL -3",
       "referencia": "",
       "telefono": "(01) 500 7878",
-      "horario": "LUNES A VIERNES - 10:00 AM A 8:00 PM",
+      "horario": "LUNES A VIERNES - 10:00 AM A 6:00 PM",
       "horarioDom": "",
-      "latitud": "-12.07532253461305",
-      "longitud": "-76.93612151388963"
+      "latitud": "-12.075322534613",
+      "longitud": "-76.93612151389"
     },
     {
       "ter_id": "660",

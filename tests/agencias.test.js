@@ -399,6 +399,12 @@ module.exports = async ({bloque, ok}) => {
     ok(j.meta.total === j.agencias.length, 'meta.total cuadra con la lista (' + j.agencias.length + ')');
     const ids = j.agencias.map((a) => a.ter_id);
     ok(new Set(ids).size === ids.length, 'ningún ter_id repetido');
+    /* Shalom deja a veces agencias de PRUEBA en su catálogo (11/11/2026:
+       744 «cambio_de_nombre_prueba», dirección «no usar»). Un cliente la
+       podría elegir como destino. Al subir un JSON nuevo se quitan. */
+    const prueba = j.agencias.filter((a) => /prueba|no usar|\btest\b/i.test(a.nombre + ' ' + a.direccion));
+    ok(prueba.length === 0, 'ninguna agencia de prueba de Shalom en la lista' +
+       (prueba.length ? ' (' + prueba.map((a) => a.ter_id).join(', ') + ')' : ''));
     const f = E.leer('formulario.html');
     const c = E.leer('config.js');
     const vf = (/version: '(\d{4}-\d{2}-\d{2})', \/\/ meta\.generado\n\s*jsonPath: '\.\/data\/agencias-shalom\.json'/.exec(f) || [])[1];
