@@ -84,7 +84,7 @@
       return;
     }
     var btn = document.getElementById('btnJalarTicket');
-    var txt = btn ? btn.textContent : '';
+    var txt = btn ? btn.innerHTML : '';
     if (btn) { btn.disabled = true; btn.textContent = '⏳ Jalando ticket…'; }
     try {
       var rt = await global.Shalom.ticket(id, data.orderNumber, data.orderCode);
@@ -104,7 +104,7 @@
     } catch (e) {
       _toast('📡 No se pudo conectar — revisa tu internet');
     } finally {
-      if (btn) { btn.disabled = false; btn.textContent = txt; }
+      if (btn) { btn.disabled = false; btn.innerHTML = txt; }
     }
   };
 

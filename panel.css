@@ -8,7 +8,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);max
 
 /* HEADER */
 .hdr{background:var(--bg2);padding:12px 16px;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--bd);position:sticky;top:0;z-index:50}
-.hdr-logo{width:36px;height:36px;background:linear-gradient(135deg,var(--green),#1a7f37);border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:17px;flex-shrink:0}
+.hdr-logo{width:36px;height:36px;background:linear-gradient(135deg,var(--green),#1a7f37);border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:17px;flex-shrink:0;color:#fff}
 .hdr-title{font-family:'Syne',sans-serif;font-weight:700;font-size:16px;flex:1}
 .hdr-phone{font-size:11px;color:var(--text2)}
 .hdr-badge{background:#1a3a6b;border:1px solid var(--blue);color:var(--blue);font-size:9px;font-weight:700;padding:2px 7px;border-radius:20px}
@@ -40,7 +40,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);max
 .tb-search{background:var(--bg2);border:1px solid var(--bd);border-radius:7px;padding:7px 10px;flex:1;display:flex;align-items:center;gap:6px}
 .tb-search input{background:none;border:none;outline:none;color:var(--text);font-size:12px;width:100%}
 .tb-btns{display:flex;gap:7px;flex-wrap:wrap}
-.tb-btn{background:var(--bg2);border:1px solid var(--bd);border-radius:7px;width:36px;height:36px;cursor:pointer;color:var(--text2);font-size:14px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.tb-btn{background:var(--bg2);border:1px solid var(--bd);border-radius:7px;width:36px;height:36px;cursor:pointer;color:var(--text);font-size:14px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
 .tb-btn.pri{background:var(--blue-fill);border-color:var(--blue-fill);color:#fff}
 .tb-btn.danger{background:#2d1b1b;border-color:var(--red);color:var(--red)}
 /* Indicador de "cambiar etiqueta por QR" activo — mismo tamaño que la fila (36×36) */
@@ -499,3 +499,8 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);max
 @media(max-width:480px){.pkg-cajas{grid-template-columns:repeat(4,1fr)}}
 
 @supports (-webkit-touch-callout:none){input,select,textarea{font-size:16px}}
+.ic{display:inline-block;width:1.15em;height:1.15em;background-color:currentColor;-webkit-mask:no-repeat center/contain;mask:no-repeat center/contain;vertical-align:-.2em;flex-shrink:0;font-style:normal}
+.tb-btn .ic,.hdr-out .ic,.qr-scan-btn .ic{width:18px;height:18px}
+.tb-btn.pri .ic{width:20px;height:20px}
+.tab .ic{width:16px;height:16px}
+.chip .ic,.as-courier-chip .ic{margin-right:5px}

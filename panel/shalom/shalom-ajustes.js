@@ -101,7 +101,7 @@ async function _pintarUltimoBarrido(){
    cuando haga falta. Se salta el reloj pero NO el interruptor. */
 async function correrBarridoAhora(){
   const btn = $('btnBarridoAhora'); if(!btn) return;
-  const antes = btn.textContent;
+  const antes = btn.innerHTML;
   btn.disabled = true; btn.textContent = '⏳ Consultando… (puede tardar un minuto)';
   try{
     const tok = localStorage.getItem('tt_id_token') || '';
@@ -126,7 +126,7 @@ async function correrBarridoAhora(){
   }catch(e){
     toast('📡 No se pudo conectar — revisa tu internet');
   }finally{
-    btn.disabled = false; btn.textContent = antes;
+    btn.disabled = false; btn.innerHTML = antes;
     _pintarUltimoBarrido();
   }
 }

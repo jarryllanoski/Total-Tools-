@@ -351,7 +351,7 @@
           return;
         }
 
-        var icon = chip.textContent.trim().split(' ')[0];
+        var icon = (window.Iconos ? Iconos.textoOriginal(chip) : chip.textContent).trim().split(' ')[0];
         createPanel(cleanLabel, icon);
 
         // Hint primera vez

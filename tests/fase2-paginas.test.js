@@ -52,7 +52,8 @@ module.exports = async ({bloque, ok}) => {
     const cf = fo.indexOf('<script src="cliente/comun.js');
     ok(cf > fo.indexOf('id="app"') && cf < fo.indexOf('cliente/form-base.js'),
        'en el formulario, comun.js también antes de su script');
-    ok(/<link rel="stylesheet" href="cliente\/cliente\.css\?v=1">/.test(fo) && /<link rel="stylesheet" href="cliente\/cliente\.css\?v=1">/.test(se),
+    const vcss = (h) => (/<link rel="stylesheet" href="cliente\/cliente\.css\?v=(\d+)">/.exec(h) || [])[1];
+    ok(vcss(fo) && vcss(fo) === vcss(se),
        'el CSS es el mismo archivo (el navegador lo guarda una vez)');
     ok(!/<style>/.test(fo), 'y ya no va repetido dentro del formulario');
   }
