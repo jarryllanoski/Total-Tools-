@@ -1208,3 +1208,14 @@ conozco», el servidor la busca en `pending-shipments` de tu cuenta
 dejar el paquete»); si no → `NO_ENCONTRADO` con `revisoPendientes` («revisa
 número y código»). Los horarios piden la lista una vez por corrida; el ticket
 también la mira.
+
+**Respaldo por tu Shalom Pro (12/11/2026).** Medido con el botón temporal
+«Medir Shalom Pro» (ya retirado): `GET /account/tracking-list` (Seguimiento de
+envíos de Shalom Pro) trae por envío `guideNumber`, `code`, `status`,
+`packageDelivered`… y no pasa por el buscador público que rechaza a shalom-api.
+Cuando `/track` da `SHALOM_SIN_RESPUESTA`, el servidor busca la guía ahí
+(`_seguimientoPro`, `shalomPuerta.deSeguimientoPro`) y responde en el mismo
+contrato que /track. Registrado/Pendiente o un estado desconocido → nada.
+Los horarios bajan la lista una vez por corrida (máx. 10 páginas); el informe
+dice cuántas salieron de ahí (`porPro`). `/account/history` y `/track/batch` se
+midieron y no se usan.

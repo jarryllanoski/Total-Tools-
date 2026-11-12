@@ -213,6 +213,42 @@ async function _porLaPuerta(destino, datos, diagnostico) {
 }
 
 /**
+ * El estado de una guía desde el «Seguimiento de envíos» de TU Shalom Pro:
+ * el respaldo cuando /track falla del lado de shalom-api. Baja la lista
+ * entera (máx. 10 páginas de 20) UNA vez por `memo`: los horarios la piden
+ * una sola vez por corrida. Lee la sesión de Pro: no pasa por el buscador
+ * público que rechaza a shalom-api.
+ * @param {string} guia número de guía
+ * @param {Object} [memo] {filas} compartido entre llamadas
+ * @return {Promise<?Object>} {ok:true, estado, pasos, fuente} o null
+ */
+async function _seguimientoPro(guia, memo) {
+  const m = memo || {};
+  if (m.filas === undefined) {
+    m.filas = null;
+    try {
+      const c = await db.doc(CFG_DOC).get();
+      const cfg = c.exists ? c.data() : {};
+      const id = (cfg.shalomInstancia && cfg.shalomInstancia.id) || "";
+      const filas = [];
+      for (let pg = 1; id && pg <= 10; pg++) {
+        const r = await _porLaPuerta("trackingList",
+            {instanceId: id, page: String(pg)});
+        if (!r || !r.ok) break;
+        const f = shalomPuerta.filasDe(r.json);
+        f.forEach((x) => filas.push(x));
+        const meta = (r.json && r.json.data && r.json.data.meta) || {};
+        if (!f.length || pg >= (Number(meta.last_page) || 1)) break;
+      }
+      m.filas = filas;
+    } catch (e) {
+      console.warn("seguimientoPro:", e && e.message);
+    }
+  }
+  return shalomPuerta.deSeguimientoPro(m.filas, guia);
+}
+
+/**
  * ¿Es esta guía un envío PENDIENTE de tu cuenta de Shalom Pro? Una guía
  * pendiente no sale en el rastreo público (/track dice «no la conozco»),
  * pero sí en esta lista. Una consulta por llamada: `memo` la guarda para
@@ -1635,6 +1671,8 @@ async function _correrBarrido(forzado) {
   const detalle = [];
   let consultadas = 0; let fallidas = 0; let cortado = "";
   const memoPend = {}; // la lista de pendientes, UNA vez por corrida
+  const memoPro = {}; // el Seguimiento de Shalom Pro, UNA vez por corrida
+  let porPro = 0; // estados que salieron del Seguimiento de Shalom Pro
   let porDejar = 0; // guías del panel que aún no entran a la agencia
   /* Por que fallaron, no solo cuantas. "6 fallaron" no se puede accionar:
      no distingue un corte de red de una cuota agotada ni de una clave
@@ -1654,6 +1692,9 @@ async function _correrBarrido(forzado) {
          · con movimiento → Shalom ya la conocía: huele a Shalom caído, y
            cuenta para el interruptor como un fallo del servicio. Así una
            caída real se sigue detectando aunque llegue disfrazada. */
+    // shalom-api no pudo leerla: el estado, del Seguimiento de tu Shalom Pro
+    const pro = (!r.ok && r.motivo === "SHALOM_SIN_RESPUESTA") ?
+      await _seguimientoPro(item.guia, memoPro) : null;
     const sinRastro = !r.ok && r.motivo === "NO_ENCONTRADO";
     if (sinRastro && (item.porDejar ||
         await _esPendiente(item.guia, memoPend) === true)) {
@@ -1662,7 +1703,7 @@ async function _correrBarrido(forzado) {
       continue;
     }
     if (sinRastro && item.conMovimiento) await _contarFalloDeServicio();
-    if (!r.ok) {
+    if (!r.ok && !pro) {
       fallidas++;
       const m = r.motivo || "DESCONOCIDO";
       motivos[m] = (motivos[m] || 0) + 1;
@@ -1675,7 +1716,8 @@ async function _correrBarrido(forzado) {
       await new Promise((res) => setTimeout(res, PAUSA_MS));
       continue;
     }
-    const traducido = shalomPuerta.traducir("track", r.json);
+    if (pro) porPro++;
+    const traducido = pro || shalomPuerta.traducir("track", r.json);
     if (!traducido.ok && traducido.motivo === "SOLO_REGISTRADO") porDejar++;
     const cambios = barrido.cambiosDe(porId[item.id], traducido, modo);
     if (cambios) {
@@ -1729,7 +1771,7 @@ async function _correrBarrido(forzado) {
     ts: Date.now(), hora: ahoraLocal, forzado: !!forzado,
     modo: modo,
     candidatos: sel.consultar.length, consultadas: consultadas,
-    fallidas: fallidas, motivos: motivos, porDejar: porDejar,
+    fallidas: fallidas, motivos: motivos, porDejar: porDejar, porPro: porPro,
     conCambio: escrituras.length, escritas: escritas,
     movidas: escrituras.filter((w) => w.campos.status).length,
     saltados: sel.saltados, guiasMalas: sel.guiasMalas.slice(0, 20),
@@ -1982,98 +2024,6 @@ exports.shalomPuerta = onRequest(
         return;
       }
 
-      /* ★ MEDIR LOS CAMINOS POR SHALOM PRO (11/11/2026). /track falla con
-         las guías nuevas porque el buscador PÚBLICO de Shalom rechaza a
-         shalom-api. Aquí se miden tres caminos que usan TU sesión de Shalom
-         Pro, con las guías que manda el panel (máx. 5). SOLO LEE y devuelve
-         formas y sí/no: ningún nombre, documento ni dirección. */
-      if (paso.orquestar === "medirShalomPro") {
-        try {
-          const cm = await db.doc(CFG_DOC).get();
-          const cfgM = cm.exists ? cm.data() : {};
-          const idM = (cfgM.shalomInstancia && cfgM.shalomInstancia.id) || "";
-          if (!idM) {
-            res.status(200).json({ok: false, motivo: "SIN_INSTANCIA"});
-            return;
-          }
-          const pedidas = (paso.datos && Array.isArray(paso.datos.guias)) ?
-            paso.datos.guias : [];
-          const guias = pedidas.filter((x) => x &&
-            /^[0-9]{8,12}$/.test(String(x.g || "")) &&
-            /^[A-Za-z0-9]{4}$/.test(String(x.c || ""))).slice(0, 5)
-              .map((x) => ({g: String(x.g), c: String(x.c).toUpperCase()}));
-          const nums = guias.map((x) => x.g);
-          const fallo = (r) => ({ok: false, motivo: r && r.motivo,
-            http: r && r.http, detalle: r && r.detalle});
-          const out = {ok: true, guias: nums};
-
-          // 1 · Seguimiento de envíos (Shalom Pro), todas sus páginas (máx 10)
-          const lista = {paginas: 0, filas: 0, estan: {}};
-          nums.forEach((g) => {
-            lista.estan[g] = false;
-          });
-          for (let pg = 1; pg <= 10; pg++) {
-            const r = await _porLaPuerta("trackingList",
-                {instanceId: idM, page: String(pg)}, true);
-            if (!r.ok) {
-              lista.error = fallo(r); break;
-            }
-            const m = shalomPuerta.medirLista(r.json, nums);
-            if (pg === 1) {
-              lista.forma = m.forma; lista.meta = m.meta;
-            }
-            lista.paginas = pg; lista.filas += m.filas;
-            nums.forEach((g) => {
-              if (m.estan[g]) lista.estan[g] = true;
-            });
-            const ult = Number(m.meta.last_page) || 1;
-            if (!m.filas || pg >= ult) break;
-          }
-          out.seguimiento = lista;
-
-          // 2 · Historial de envíos (entregados), por número de guía
-          out.historial = {};
-          for (const g of nums) {
-            const r = await _porLaPuerta("historial",
-                {instanceId: idM, order_number: g}, true);
-            if (!r.ok) {
-              out.historial[g] = fallo(r); continue;
-            }
-            const m = shalomPuerta.medirLista(r.json, [g]);
-            out.historial[g] = {ok: true, filas: m.filas, esta: m.estan[g]};
-            if (!out.historialForma) out.historialForma = m.forma;
-          }
-
-          // 3 · /track/batch: ¿falla igual que /track?
-          if (guias.length) {
-            const r = await _porLaPuerta("trackBatch", {orders: guias.map(
-                (x) => ({orderNumber: x.g, orderCode: x.c}))}, true);
-            if (!r.ok) {
-              out.lote = fallo(r);
-            } else {
-              const items = Array.isArray(r.json) ? r.json :
-                shalomPuerta.filasDe(r.json);
-              out.lote = {forma: shalomPuerta.forma(r.json), porGuia: {}};
-              nums.forEach((g, i) => {
-                const it = items[i];
-                const t = it ? shalomPuerta.traducir("track", it) : null;
-                const msg = it && (it.message || it.error);
-                out.lote.porGuia[g] = t && t.ok ? {ok: true, estado: t.estado} :
-                  {ok: false, motivo: t && t.motivo,
-                    mensaje: typeof msg === "string" ?
-                      shalomPuerta.sanear(msg).slice(0, 120) : ""};
-              });
-            }
-          }
-          res.status(200).json(out);
-        } catch (e) {
-          console.error("medirShalomPro:", e && e.message);
-          res.status(200).json({ok: false, motivo: "ERROR_SHALOM",
-            detalle: "La medición se cortó. Intenta de nuevo."});
-        }
-        return;
-      }
-
       /* ★ CONECTAR LA CUENTA DE SHALOM PRO — crear si hace falta, entrar
          siempre, comprobar. Una sola operacion idempotente: pulsarla dos
          veces no crea dos instancias.
@@ -2190,6 +2140,17 @@ exports.shalomPuerta = onRequest(
       // 4 · el interruptor y la llamada, por el camino unico.
       try {
         const r = await _porLaPuerta(destino, paso.datos, diagnostico);
+        /* shalom-api no pudo leer la guía (su buscador público es
+           rechazado): el estado sale del Seguimiento de TU Shalom Pro. */
+        if (!r.ok && destino === "track" && !diagnostico &&
+            r.motivo === "SHALOM_SIN_RESPUESTA") {
+          const pro = await _seguimientoPro(paso.datos &&
+            paso.datos.orderNumber);
+          if (pro) {
+            res.status(200).json(pro);
+            return;
+          }
+        }
         /* «No la conozco» en /track: ¿es un envío PENDIENTE de tu cuenta?
            Entonces existe y solo falta dejar el paquete: se dice con
            certeza (PENDIENTE), no como «revisa la guía». */

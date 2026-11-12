@@ -20,6 +20,7 @@ const P = require('../functions/shalomPuerta.js');
 const B = require('../functions/barrido.js');
 const I = require('../functions/interruptor.js');
 const T = require('../functions/ticketShalom.js');
+const E_index = () => fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
 
 const H = 3600000;
 const AHORA = Date.parse('2026-11-11T18:00:00Z');
@@ -242,12 +243,12 @@ module.exports = async ({bloque, ok}) => {
     const rt2 = await T.jalar({pedidoId: 'p5', orderNumber: '103375443', orderCode: 'JPHN'}, deps);
     ok(!rt2.ok && rt2.motivo === 'NO_ENCONTRADO', 'y si no está en pendientes, sigue siendo «no encontró»');
   }
-  bloque('🔬 Medir los caminos por Shalom Pro (seguimiento, historial, lote)');
+  bloque('Respaldo: el estado desde el Seguimiento de tu Shalom Pro (forma medida 12/11)');
 
   {
-    ['trackingList', 'historial', 'trackBatch'].forEach((op) =>
-      ok(P.PERMITIDAS[op] && P.PERMITIDAS[op].soloServidor === true, op + ': solo el servidor (el navegador no lo alcanza)'));
-    ok(P.ORQUESTADAS.medirShalomPro === true, 'la medición es una orquestación (el navegador solo manda guías)');
+    ok(P.PERMITIDAS.trackingList && P.PERMITIDAS.trackingList.soloServidor === true, 'trackingList: solo el servidor');
+    ok(!P.PERMITIDAS.historial && !P.PERMITIDAS.trackBatch && !P.ORQUESTADAS.medirShalomPro,
+       'lo que solo servía para medir se retiró');
 
     // El querystring: solo lo declarado, con su forma, codificado.
     const llamadas = [];
@@ -256,30 +257,46 @@ module.exports = async ({bloque, ok}) => {
     try {
       await P.llamar('trackingList', 'sk_prueba', {instanceId: 'abc-123', page: '2', otro: 'x'});
       ok(/\/account\/tracking-list\?instanceId=abc-123&page=2$/.test(llamadas[0]), 'arma ?instanceId=…&page=… y descarta lo no declarado');
-      const mal = await P.llamar('historial', 'sk_prueba', {instanceId: 'abc&x=1', order_number: '103379262'});
+      const mal = await P.llamar('trackingList', 'sk_prueba', {instanceId: 'abc&x=1'});
       ok(!mal.ok && mal.motivo === 'SIN_DATO' && llamadas.length === 1, '⚠️ un parámetro con forma rara NO sale');
-      await P.llamar('historial', 'sk_prueba', {instanceId: 'abc-123', order_number: '103379262'});
-      ok(/order_number=103379262/.test(llamadas[1]), 'el historial filtra por número de guía');
     } finally { global.fetch = fetchReal; }
 
-    // La medición: forma, filas y sí/no — nunca un valor con letras.
-    const resp = {success: true, data: {items: [
-      {id: 91230250, guideNumber: '103379262', code: 'D97M', shippingDate: '2026-11-11 20:07:00',
-        origin: {id: 159, name: 'Agencia Origen'}, destination: {id: 497, name: 'Agencia Destino'}}],
-    meta: {current_page: 1, last_page: 3, per_page: 20, total: 48}}};
-    const m = P.medirLista(resp, ['103379262', '103376802']);
-    ok(m.filas === 1 && m.estan['103379262'] === true && m.estan['103376802'] === false, 'sí/no por guía, exacto');
-    ok(m.meta.last_page === 3 && m.meta.total === 48, 'la paginación (solo números)');
-    ok(!/Agencia Origen|D97M/.test(JSON.stringify(m)), '⚠️ ni nombres ni códigos salen en la medición');
-    ok(P.filasDe({'0': {a: 1}, '1': {a: 2}}).length === 2 && P.filasDe([1, 2, 3]).length === 3 && P.filasDe({x: 1}).length === 0,
-       'encuentra las filas en objeto {"0":…}, array, o ninguna');
-    ok(P.filaTieneGuia({guia: 103379262}, '103379262') && !P.filaTieneGuia({guia: '1033792620'}, '103379262'),
-       'la guía se compara EXACTA');
+    // La forma real medida: {success, message, data:{items:[…], meta, summary}}
+    const resp = {success: true, message: 'ok', data: {items: [
+      {id: 1, guideNumber: '103529375', code: 'X1Y2', status: 'En origen', packageDelivered: false, checkSendPackage: true},
+      {id: 2, guideNumber: '103379262', code: 'D97M', status: 'En tránsito', packageDelivered: false},
+      {id: 3, guideNumber: '103376802', code: '7J3W', status: 'En destino', packageDelivered: false},
+      {id: 4, guideNumber: '103300000', code: 'AAAA', status: 'En reparto', packageDelivered: false},
+      {id: 5, guideNumber: '103311111', code: 'BBBB', status: 'cualquiera', packageDelivered: true},
+      {id: 6, guideNumber: '103322222', code: 'CCCC', status: 'Registrado', packageDelivered: false},
+      {id: 7, guideNumber: '103333333', code: 'DDDD', status: 'Pendiente', packageDelivered: false},
+      {id: 8, guideNumber: '103344444', code: 'EEEE', status: 'Algo nuevo', packageDelivered: false}],
+    meta: {current_page: 1, last_page: 1, per_page: 20, total: 8}, summary: {en_origen: 1}}};
+    const F = P.filasDe(resp);
+    const e = (g) => P.deSeguimientoPro(F, g);
+    ok(F.length === 8, 'encuentra las filas en data.items');
+    ok(e('103529375').estado === 'En origen' && e('103529375').pasos === 0, 'En origen → paso 0');
+    ok(e('103379262').estado === 'En tránsito' && e('103379262').pasos === 1, 'En tránsito → paso 1 (ENVIADO)');
+    ok(e('103376802').estado === 'En destino' && e('103376802').pasos === 2, 'En destino → paso 2');
+    ok(e('103300000').estado === 'En reparto', 'En reparto, con su palabra');
+    ok(e('103311111').estado === 'Entregado' && e('103311111').pasos === 3, 'packageDelivered → Entregado');
+    ok(e('103322222') === null && e('103333333') === null, '⚠️ Registrado / Pendiente NO es un paso (el paquete no entró)');
+    ok(e('103344444') === null, 'un estado que no se reconoce → nada (no se inventa)');
+    ok(e('10352937') === null && e('999') === null, 'por número EXACTO; si no está → nada');
+    ok(e('103379262').fuente === 'seguimientoPro', 'dice de dónde salió');
+    // Cae en el aplicador de siempre: mismo contrato que /track.
+    const bc = B.cambiosDe({status: 'ALISTADO', trackingStatus: ''}, e('103379262'), 'auto');
+    ok(bc && bc.campos.trackingStatus === 'En tránsito', 'los horarios lo escriben igual que una respuesta de /track');
 
     const idx = fs.readFileSync(path.join(__dirname, '..', 'functions', 'index.js'), 'utf8');
-    const med = idx.slice(idx.indexOf('if (paso.orquestar === "medirShalomPro")'), idx.indexOf('/* ★ CONECTAR LA CUENTA DE SHALOM PRO'));
-    ok(/\.slice\(0, 5\)/.test(med) && /\^\[0-9\]\{8,12\}\$/.test(med), 'máximo 5 guías, con forma de guía');
-    ok(/for \(let pg = 1; pg <= 10; pg\+\+\)/.test(med), 'el seguimiento recorre como mucho 10 páginas');
-    ok(!/register|instanceLogin|instanceCrear/.test(med), '⚠️ medir SOLO LEE: no registra, no entra, no crea');
+    const gen = idx.slice(idx.indexOf('const r = await _porLaPuerta(destino, paso.datos, diagnostico);'));
+    ok(/r\.motivo === "SHALOM_SIN_RESPUESTA"\) \{\s*const pro = await _seguimientoPro\([\s\S]{0,80}\);\s*if \(pro\) \{\s*res\.status\(200\)\.json\(pro\);\s*return;/.test(gen),
+       'Consultar: si shalom-api no puede leerla, va al Seguimiento de tu Shalom Pro');
+    const loop = idx.slice(idx.indexOf('const sel = barrido.aConsultar'), idx.indexOf('// 4 · escribir'));
+    ok(/_seguimientoPro\(item\.guia, memoPro\)/.test(loop) && /const traducido = pro \|\|/.test(loop) && /if \(!r\.ok && !pro\)/.test(loop),
+       'los horarios también, y una guía rescatada NO cuenta como fallida');
+    ok(/const memoPro = \{\}/.test(idx) && /pg <= 10/.test(idx), 'la lista se baja UNA vez por corrida (máx. 10 páginas)');
+    ok(/porPro: porPro/.test(idx), 'el informe dice cuántas salieron de tu Shalom Pro');
+    ok(!/btnMedirPro|medirShalomPro/.test(E_index()), 'el botón temporal de medir ya no está');
   }
 };

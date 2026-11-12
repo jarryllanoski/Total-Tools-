@@ -507,8 +507,8 @@ module.exports = async ({bloque, ok}) => {
 
   ok(Object.keys(P.PERMITIDAS).join(',') ===
      'validate,track,instances,agencies,dni,instanceStatus,instanceLogin,' +
-     'instanceCrear,register,pendientes,trackingList,historial,trackBatch',
-  'hoy hay trece, y en el orden en que se reconstruyen');
+     'instanceCrear,register,pendientes,trackingList',
+  'hoy hay once, y en el orden en que se reconstruyen');
   ok(!P.PERMITIDAS.track.soloMedir,
      'track ya no es solo medible: su forma se midió y se tradujo');
   ok(P.PERMITIDAS.instances.metodo === 'GET' &&

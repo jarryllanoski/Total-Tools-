@@ -23,6 +23,9 @@
  */
 
 
+// Qué significa un estado de Shalom: la MISMA regla en todos lados.
+const shalomEstado = require("./shalomEstado");
+
 const BASE = "https://api.shalom-api.lat";
 const TIEMPO_MAX_MS = 20000;
 // Hasta dónde baja el diagnóstico. Con 4 se cortaba justo donde hacía falta:
@@ -149,23 +152,15 @@ const PERMITIDAS = {
      no como array. Va en soloServidor porque solo la orquestacion la usa. */
   pendientes: {metodo: "POST", ruta: "/account/pending-shipments",
     soloServidor: true, cuerpoCampos: ["instanceId"]},
-  /* ★ CAMINOS POR LA SESIÓN DE SHALOM PRO (11/11/2026). /track busca en el
-     rastreo PÚBLICO de Shalom, y ese buscador rechaza a shalom-api con las
-     guías nuevas («Shalom buscar API returned status 403»). Estos tres no
-     pasan por él: usan TU sesión de Shalom Pro. Se están MIDIENDO (la orquesta
-     `medirShalomPro` devuelve solo formas y sí/no), todavía no se usan.
-       · trackingList → «Seguimiento de envíos» de Shalom Pro (en tránsito)
-       · historial    → «Historial de envíos» (entregados), por número de guía
-       · trackBatch   → /track en lote: medir si falla igual que /track
-     Los parámetros del querystring van en `consulta`, con su forma exacta. */
+  /* ★ EL SEGUIMIENTO DE TU SHALOM PRO (medido el 12/11/2026). /track busca
+     en el rastreo PÚBLICO de Shalom, y ese buscador rechaza a shalom-api con
+     algunas guías («Shalom buscar API returned status 403»). Esta lista usa
+     TU sesión de Shalom Pro y trae el `status` de cada envío en camino: es
+     el respaldo (deSeguimientoPro). Solo LEE. Los parámetros del
+     querystring van en `consulta`, con su forma exacta. */
   trackingList: {metodo: "GET", ruta: "/account/tracking-list",
     soloServidor: true,
     consulta: {instanceId: /^[A-Za-z0-9-]{1,64}$/, page: /^[0-9]{1,3}$/}},
-  historial: {metodo: "GET", ruta: "/account/history", soloServidor: true,
-    consulta: {instanceId: /^[A-Za-z0-9-]{1,64}$/, page: /^[0-9]{1,3}$/,
-      order_number: /^[0-9]{8,12}$/}},
-  trackBatch: {metodo: "POST", ruta: "/track/batch", soloServidor: true,
-    cuerpoCampos: ["orders"]},
   /* ⚠️ LO QUE NO ESTA, Y ES UNA DECISION:
 
      · `POST /instances/logout` — su doc dice "borra la sesion Y LAS
@@ -196,8 +191,7 @@ const PERMITIDAS = {
        `****` ya seria confirmar su longitud.
      · La auditoria registra quien y cuando. El valor no. */
 const ORQUESTADAS = {registrarEnvio: true, recuperarEnvio: true,
-  conectarShalom: true, estadoShalom: true, jalarTicket: true,
-  medirShalomPro: true};
+  conectarShalom: true, estadoShalom: true, jalarTicket: true};
 
 /**
  * Quita de un texto cualquier cosa con forma de clave antes de devolverlo.
@@ -1311,51 +1305,50 @@ function filasDe(j) {
 }
 
 /**
- * ¿Aparece esta guía en una fila? Mira los valores de primer nivel.
- * @param {*} fila una fila
+ * ★ EL RESPALDO POR TU SHALOM PRO: el estado de una guía sacado del
+ * «Seguimiento de envíos» (GET /account/tracking-list), para cuando /track
+ * falla del lado de shalom-api (SHALOM_SIN_RESPUESTA).
+ *
+ * FORMA MEDIDA el 12/11/2026 (botón «Medir Shalom Pro»):
+ *   {success, message, data:{items:[{guideNumber:"#########", code, status,
+ *    packageDelivered:boolean, checkSendPackage:boolean, …}], meta, summary:
+ *    {en_origen, en_transito, en_reparto, en_destino}}}
+ *
+ * Se devuelve en el MISMO contrato que /track ({ok, estado, pasos}) y con
+ * los textos de siempre, para que el aplicador y el barrido no distingan de
+ * dónde vino. Reglas:
+ *   · por `guideNumber` EXACTO; si no está → null (no se inventa nada);
+ *   · `packageDelivered` → Entregado;
+ *   · un estado que hable de REGISTRADO o PENDIENTE NO es un paso (el
+ *     paquete no entró a la agencia: es la lección de `registrado`) → null;
+ *   · un estado que no se reconoce → null. Mejor sin dato que un dato falso.
+ * @param {Array} filas filas de una o varias páginas
  * @param {string} guia número de guía
- * @return {boolean} true si alguno coincide exacto
+ * @return {?Object} {ok:true, estado, pasos, fuente} o null
  */
-function filaTieneGuia(fila, guia) {
-  if (!fila || typeof fila !== "object") return false;
+function deSeguimientoPro(filas, guia) {
   const g = String(guia || "").replace(/\D/g, "");
-  if (!g) return false;
-  return Object.keys(fila).some((k) => {
-    const v = fila[k];
-    return (typeof v === "string" || typeof v === "number") &&
-      String(v).replace(/\D/g, "") === g;
-  });
-}
-
-/**
- * La MEDICIÓN de una respuesta de lista: su forma (sin valores), cuántas
- * filas, el `meta` de paginación (solo números) y, por cada guía pedida,
- * SÍ o NO aparece. Ningún nombre, documento ni dirección sale de aquí.
- * @param {*} json respuesta
- * @param {Array<string>} guias guías a buscar
- * @return {Object} {forma, filas, meta, estan}
- */
-function medirLista(json, guias) {
-  const filas = filasDe(json);
-  const m = (json && json.data && json.data.meta) || (json && json.meta) ||
-    null;
-  const meta = {};
-  if (m && typeof m === "object") {
-    Object.keys(m).forEach((k) => {
-      if (typeof m[k] === "number") meta[k] = m[k];
-    });
+  if (!g || !Array.isArray(filas)) return null;
+  const f = filas.find((x) => x && typeof x === "object" &&
+    String(x.guideNumber || "").replace(/\D/g, "") === g);
+  if (!f) return null;
+  const fuente = "seguimientoPro";
+  if (f.packageDelivered === true) {
+    return {ok: true, estado: "Entregado", pasos: 3, fuente};
   }
-  const estan = {};
-  (guias || []).forEach((g) => {
-    estan[g] = filas.some((f) => filaTieneGuia(f, g));
-  });
-  return {forma: forma(json), filas: filas.length, meta: meta, estan: estan};
+  const txt = String(f.status || "");
+  const u = txt.toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  if (!u.trim() || /REGISTR|PENDIENT/.test(u)) return null;
+  const etapa = shalomEstado.rango(txt);
+  if (etapa === null) return null;
+  const textos = ["En origen", "En tránsito", shalomEstado.fase(txt).reparto ?
+    "En reparto" : "En destino", "Entregado"];
+  return {ok: true, estado: textos[etapa], pasos: etapa, fuente};
 }
 
 module.exports = {
+  deSeguimientoPro,
   filasDe,
-  filaTieneGuia,
-  medirLista,
   BASE,
   GUIA_FORMA,
   INSTANCIA_FORMA,

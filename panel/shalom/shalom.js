@@ -387,12 +387,6 @@
        valor dentro. Es la herramienta con la que se escribe cada contrato
        contra lo que la API devuelve de verdad — la documentación y la
        realidad ya se contradijeron seis veces. */
-    /* Medición de los caminos por la sesión de Shalom Pro (seguimiento,
-       historial, lote). Solo vuelven formas y sí/no por guía. */
-    medirPro: function (guias) {
-      return _pedir({op: 'medirShalomPro', datos: {guias: guias || []}});
-    },
-
     esquema: function (de, datos) {
       return _pedir({op: 'esquema', de: de || 'validate', datos: datos});
     },
