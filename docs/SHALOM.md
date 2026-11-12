@@ -1219,3 +1219,14 @@ contrato que /track. Registrado/Pendiente o un estado desconocido → nada.
 Los horarios bajan la lista una vez por corrida (máx. 10 páginas); el informe
 dice cuántas salieron de ahí (`porPro`). `/account/history` y `/track/batch` se
 midieron y no se usan.
+
+## Registrar de nuevo borra la guía vencida (Fase 5, 12/11/2026)
+
+Tras registrar la guía nueva (o recuperarla de pendientes), `registroShalom`
+llama a `DELETE /account/pending-shipments` con la guía VIEJA (1 operación).
+Solo si el registro nuevo salió bien, nunca si coincide con la nueva, nunca en
+simulacro. Shalom solo borra envíos PENDIENTES: si el paquete entró a la
+agencia responde 404 (`no_pendiente`). Si el borrado falla, el registro nuevo
+igual se guarda; el resultado queda en `shalomGuiasAnteriores[].borrado`
+(`borrada` · `no_pendiente` · `fallo`) y el panel lo dice en el aviso.
+`borrarPendiente` es el único DELETE de la puerta, solo del servidor.

@@ -26,6 +26,8 @@ const PERMITIDAS = {
       "declaracion_jurada"]},
   pendientes: {metodo: "POST", ruta: "/account/pending-shipments",
     soloServidor: true, cuerpoCampos: ["instanceId"]},
+  borrarPendiente: {metodo: "DELETE", ruta: "/account/pending-shipments",
+    soloServidor: true, cuerpoCampos: ["instanceId", "guia"]},
   trackingList: {metodo: "GET", ruta: "/account/tracking-list",
     soloServidor: true,
     consulta: {instanceId: /^[A-Za-z0-9-]{1,64}$/, page: /^[0-9]{1,3}$/}},
@@ -160,7 +162,7 @@ async function llamar(op, clave, cuerpo) {
       headers: def.publico ? {} : {"x-api-key": clave},
       signal: AbortSignal.timeout(TIEMPO_MAX_MS),
     };
-    if (def.metodo === "POST") {
+    if (def.metodo === "POST" || def.metodo === "DELETE") {
       opciones.headers["Content-Type"] = "application/json";
       opciones.body = JSON.stringify(filtrarCuerpo(def, cuerpo));
     }

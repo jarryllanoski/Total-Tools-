@@ -441,9 +441,11 @@ module.exports = async ({bloque, ok}) => {
     const claves = Object.keys(P.PERMITIDAS);
     const metodos = claves.map((k) => P.PERMITIDAS[k].metodo);
     const rutas = claves.map((k) => P.PERMITIDAS[k].ruta);
-    ok(metodos.every((m) => m === 'GET' || m === 'POST'),
-       'ni un DELETE ni un PUT en la lista: la puerta no puede borrar nada, ' +
-       'y eso no depende de acordarse de un nombre');
+    const borrar = claves.filter((k) => P.PERMITIDAS[k].metodo !== 'GET' && P.PERMITIDAS[k].metodo !== 'POST');
+    const bp = P.PERMITIDAS.borrarPendiente || {};
+    ok(borrar.join() === 'borrarPendiente' && bp.metodo === 'DELETE' && bp.ruta === '/account/pending-shipments' &&
+       bp.soloServidor === true && JSON.stringify(bp.cuerpoCampos) === '["instanceId","guia"]',
+       'un solo DELETE: el del envio pendiente vencido, solo del servidor y solo con instanceId y guia (nada de instancias ni sesiones)');
     ok(rutas.every((r) => !/logout|subscriptions|webhooks/i.test(r)),
        'ni cerrar sesión, ni tocar webhooks o suscripciones');
 
@@ -507,8 +509,8 @@ module.exports = async ({bloque, ok}) => {
 
   ok(Object.keys(P.PERMITIDAS).join(',') ===
      'validate,track,instances,agencies,dni,instanceStatus,instanceLogin,' +
-     'instanceCrear,register,pendientes,trackingList',
-  'hoy hay once, y en el orden en que se reconstruyen');
+     'instanceCrear,register,pendientes,borrarPendiente,trackingList',
+  'hoy hay doce, y en el orden en que se reconstruyen');
   ok(!P.PERMITIDAS.track.soloMedir,
      'track ya no es solo medible: su forma se midió y se tradujo');
   ok(P.PERMITIDAS.instances.metodo === 'GET' &&

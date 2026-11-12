@@ -153,7 +153,8 @@ function renovarEnvioPanel(){
     html: '<div style="text-align:left;line-height:1.65;font-size:13px">'+
       '<b style="color:#f59e0b">🔁 Registrar de nuevo</b><br>'+
       'La guía <b>'+escH(ped.shalomGuia||'')+'</b> venció sin dejarse en la agencia. '+
-      (sim ? 'Simulacro: no se crea nada.' : 'Se crea un envío <b>nuevo</b> y <b>se cobra otra vez</b>.')+
+      (sim ? 'Simulacro: no se crea nada.' : 'Se crea un envío <b>nuevo</b> y <b>se cobra otra vez</b>. '+
+        'Después se borra la guía vencida de tu Shalom Pro (1 operación).')+
       '<div style="margin-top:8px;font-size:12px;color:var(--text2)">Antes preguntamos a Shalom: '+
       'si el paquete ya entró a una agencia, no se hace nada. La clave sigue siendo <b>'+
       escH(ped.shalomClave||'—')+'</b>: el cliente no tiene que cambiar nada.</div></div>',
@@ -499,7 +500,10 @@ function _aplicarRegistroShalom(ped, r){
     if(typeof _congelarSiRegistrado==='function') _congelarSiRegistrado(ped);
     if(typeof render==='function') render();
     _pintarRegistroShalom();
-    toast('✅ Registrado — guía '+(r.campos.shalomGuia||''));
+    const vieja = {borrada: ' · la guía vencida se borró de tu Shalom Pro',
+      no_pendiente: ' · la guía vencida ya no estaba en tus pendientes',
+      fallo: ' · no se pudo borrar la guía vencida: bórrala en pro.shalom.pe'}[r.vieja] || '';
+    toast('✅ Registrado — guía '+(r.campos.shalomGuia||'')+vieja);
     return;
   }
 

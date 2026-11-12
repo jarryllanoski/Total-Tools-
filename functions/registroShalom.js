@@ -334,6 +334,25 @@
     return campos;
   }
 
+  async function _borrarVieja(anteriores, nueva, deps) {
+    const ult = anteriores && anteriores[anteriores.length - 1];
+    const vieja = _dig(ult && ult.guia);
+    if (!ult || !/^[0-9]{8,12}$/.test(vieja) || vieja === _dig(nueva) ||
+        !deps || typeof deps.borrarPendiente !== "function") {
+      return null;
+    }
+    let r = null;
+    try {
+      r = await deps.borrarPendiente(vieja);
+    } catch (e) {
+      r = null;
+    }
+    const res = r && r.ok ? "borrada" :
+      (r && r.motivo === "NO_ENCONTRADO" ? "no_pendiente" : "fallo");
+    ult.borrado = res;
+    return res;
+  }
+
   async function orquestar(datos, deps, opc) {
     const o = opc || {};
     const pedidoId = _txt(datos && datos.pedidoId);
@@ -376,12 +395,14 @@
         code_service_order_empresarial: g.codigo,
         quote: g.monto,
       }, _ahora(deps), pedido);
+      let vieja = null;
       if (anteriores) {
+        vieja = await _borrarVieja(anteriores, campos.shalomGuia, deps);
         campos.shalomGuiasAnteriores = anteriores;
         Object.assign(campos, _seguimientoLimpio());
       }
       await deps.guardar(campos);
-      return {ok: true, estado: "exito", campos: campos,
+      return {ok: true, estado: "exito", campos: campos, vieja: vieja,
         forma: camposDe(r && r.json)};
     }
 
@@ -400,12 +421,15 @@
     }
     if (encontrado) {
       const campos = _deEnvio(encontrado, _ahora(deps), pedido);
+      let vieja = null;
       if (anteriores) {
+        vieja = await _borrarVieja(anteriores, campos.shalomGuia, deps);
         campos.shalomGuiasAnteriores = anteriores;
         Object.assign(campos, _seguimientoLimpio());
       }
       await deps.guardar(campos);
-      return {ok: true, estado: "exito", recuperado: true, campos: campos};
+      return {ok: true, estado: "exito", recuperado: true, campos: campos,
+        vieja: vieja};
     }
     return {ok: false, estado: "duda",
       motivo: (r && r.motivo) || "SIN_RED",

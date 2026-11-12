@@ -31,7 +31,7 @@ const HACE = (h) => new Date(AHORA - h * 3600000).toISOString();
 /* El servidor, con todo inyectado: cuenta cuántas veces se REGISTRA. */
 function mundo(op) {
   op = op || {};
-  const v = {registros: 0, rastreos: 0, guardado: null};
+  const v = {registros: 0, rastreos: 0, guardado: null, borradas: []};
   const deps = {
     leerPedido: async () => op.pedido,
     leerConfig: async () => CFG_OK,
@@ -40,6 +40,11 @@ function mundo(op) {
       return op.respuesta || {ok: true, json: {guia: '103300001', codigo: 'NUEV', quote: 12}};
     },
     pendientes: async () => op.pendientes || [],
+    borrarPendiente: async (g) => {
+      v.borradas.push(g);
+      if (op.borrarRevienta) throw new Error('red');
+      return op.borrar || {ok: true, json: {success: true}};
+    },
     guardar: async (c) => { v.guardado = c; },
     ahora: () => AHORA,
     rastrear: async () => {
@@ -166,6 +171,63 @@ module.exports = async ({bloque, ok}) => {
     ok(r.estado === 'duda' && m.v.guardado === null,
        '⚠️ en duda, la guía VIEJA no se toma por la nueva: se dice «no sabemos»');
   }
+  bloque('Fase 5: al registrar de nuevo, la guia vencida se borra de Shalom Pro');
+
+  {
+    const base = {pedido: VENCIDA(), rastreo: {ok: false, motivo: 'NO_ENCONTRADO'}};
+    let m = mundo(base);
+    let r = await R.orquestar({pedidoId: 'id_1', renovar: true}, m.deps, {simulacro: false});
+    let g = m.v.guardado || {};
+    ok(r.ok && m.v.borradas.join() === '103100000', 'se borra la vieja, por su numero exacto');
+    ok(r.vieja === 'borrada' && g.shalomGuiasAnteriores[0].borrado === 'borrada', 'y queda anotado en el historial del pedido');
+    ok(g.shalomGuia === '103300001' && m.v.registros === 1, 'la nueva queda registrada');
+
+    m = mundo(Object.assign({}, base, {borrar: {ok: false, motivo: 'NO_ENCONTRADO'}}));
+    r = await R.orquestar({pedidoId: 'id_1', renovar: true}, m.deps, {simulacro: false});
+    ok(r.ok && r.vieja === 'no_pendiente' && m.v.guardado.shalomGuiasAnteriores[0].borrado === 'no_pendiente',
+       'si ya no estaba pendiente (404), se dice asi y no pasa nada mas');
+
+    m = mundo(Object.assign({}, base, {borrarRevienta: true}));
+    r = await R.orquestar({pedidoId: 'id_1', renovar: true}, m.deps, {simulacro: false});
+    ok(r.ok && r.vieja === 'fallo' && m.v.guardado && m.v.guardado.shalomGuia === '103300001',
+       '⚠️ si el borrado falla, el registro nuevo IGUAL se guarda');
+
+    m = mundo(Object.assign({}, base, {respuesta: {ok: false, motivo: 'PETICION_INVALIDA', http: 400}}));
+    r = await R.orquestar({pedidoId: 'id_1', renovar: true}, m.deps, {simulacro: false});
+    ok(!r.ok && m.v.borradas.length === 0, 'si el registro nuevo falla, la vieja NO se borra');
+
+    m = mundo(base);
+    r = await R.orquestar({pedidoId: 'id_1', renovar: true}, m.deps, {simulacro: true});
+    ok(m.v.borradas.length === 0, 'en simulacro no se borra nada');
+
+    m = mundo(Object.assign({}, base, {respuesta: {ok: true, json: {guia: '103100000', codigo: 'VIEJ'}}}));
+    r = await R.orquestar({pedidoId: 'id_1', renovar: true}, m.deps, {simulacro: false});
+    ok(m.v.borradas.length === 0, '⚠️ nunca se borra si coincidiera con la guia nueva');
+
+    m = mundo(Object.assign({}, base, {respuesta: {ok: false, motivo: 'SIN_RED'},
+      pendientes: [{code_val: '5773', destination_station: {ter_id: 499},
+        service_order_guia_empresarial: '103300009', code_service_order_empresarial: 'NUEV'}]}));
+    r = await R.orquestar({pedidoId: 'id_1', renovar: true}, m.deps, {simulacro: false});
+    ok(r.ok && r.recuperado && m.v.borradas.join() === '103100000', 'tambien cuando el registro se recupera de pendientes');
+
+    m = mundo({pedido: PEDIDO_OK()});
+    r = await R.orquestar({pedidoId: 'id_1'}, m.deps, {simulacro: false});
+    ok(r.ok && m.v.borradas.length === 0, 'un registro normal (no renovar) no borra nada');
+
+    const P = require('../functions/shalomPuerta.js');
+    ok(P.PERMITIDAS.borrarPendiente && P.PERMITIDAS.borrarPendiente.soloServidor === true &&
+       P.PERMITIDAS.borrarPendiente.metodo === 'DELETE', 'borrar es solo del servidor (el navegador no lo alcanza)');
+    const fetchReal = global.fetch; let pedido = null;
+    global.fetch = async (url, o) => { pedido = o; return {ok: true, status: 200, text: async () => '{"success":true}'}; };
+    try { await P.llamar('borrarPendiente', 'sk_prueba', {instanceId: 'abc', guia: '103100000', otro: 'x'}); } finally { global.fetch = fetchReal; }
+    ok(pedido && pedido.method === 'DELETE' && pedido.body === '{"instanceId":"abc","guia":"103100000"}',
+       'DELETE con cuerpo, y solo instanceId y guia');
+    const srv = E.leer('functions/index.js');
+    ok(/borrarPendiente: \(guia\) => _porLaPuerta\("borrarPendiente", \{/.test(srv), 'el servidor se lo da a orquestar');
+    const reg = E.leer('panel/shalom/shalom-registro.js');
+    ok(/la guía vencida se borró de tu Shalom Pro/.test(reg) && /bórrala en pro\.shalom\.pe/.test(reg), 'el panel dice que paso');
+  }
+
   {
     const m = mundo({pedido: VENCIDA()});
     const r = await R.orquestar({pedidoId: 'id_1'}, m.deps, {simulacro: false});

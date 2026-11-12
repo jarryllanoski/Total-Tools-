@@ -1278,6 +1278,10 @@ exports.shalomPuerta = onRequest(
                   cfgDoc.shalomInstancia.id) || ""});
               return (pr && pr.ok && pr.json) || null;
             },
+            borrarPendiente: (guia) => _porLaPuerta("borrarPendiente", {
+              instanceId: (cfgDoc.shalomInstancia &&
+                cfgDoc.shalomInstancia.id) || "",
+              guia: guia}),
             guardar: (campos) => ref.set(_conMts(campos), {merge: true}),
             rastrear: async (guia, codigo) => {
               const rt = await _porLaPuerta("track",
