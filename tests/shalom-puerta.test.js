@@ -441,13 +441,19 @@ module.exports = async ({bloque, ok}) => {
     const claves = Object.keys(P.PERMITIDAS);
     const metodos = claves.map((k) => P.PERMITIDAS[k].metodo);
     const rutas = claves.map((k) => P.PERMITIDAS[k].ruta);
-    const borrar = claves.filter((k) => P.PERMITIDAS[k].metodo !== 'GET' && P.PERMITIDAS[k].metodo !== 'POST');
+    const otros = claves.filter((k) => P.PERMITIDAS[k].metodo !== 'GET' && P.PERMITIDAS[k].metodo !== 'POST');
     const bp = P.PERMITIDAS.borrarPendiente || {};
-    ok(borrar.join() === 'borrarPendiente' && bp.metodo === 'DELETE' && bp.ruta === '/account/pending-shipments' &&
+    const av = P.PERMITIDAS.avisosConfigurar || {};
+    ok(otros.join() === 'borrarPendiente,avisosConfigurar', 'solo dos operaciones que no son GET ni POST');
+    ok(bp.metodo === 'DELETE' && bp.ruta === '/account/pending-shipments' &&
        bp.soloServidor === true && JSON.stringify(bp.cuerpoCampos) === '["instanceId","guia"]',
        'un solo DELETE: el del envio pendiente vencido, solo del servidor y solo con instanceId y guia (nada de instancias ni sesiones)');
-    ok(rutas.every((r) => !/logout|subscriptions|webhooks/i.test(r)),
-       'ni cerrar sesión, ni tocar webhooks o suscripciones');
+    ok(av.metodo === 'PUT' && av.ruta === '/webhooks' && av.soloServidor === true &&
+       JSON.stringify(av.cuerpoCampos) === '["url","rotateSecret"]',
+       'un solo PUT: configurar el webhook, solo del servidor (el navegador no lo alcanza)');
+    ok(rutas.every((r) => !/logout/i.test(r)), 'nada que cierre la sesion');
+    ok(claves.filter((k) => /subscriptions|webhooks/i.test(P.PERMITIDAS[k].ruta)).every((k) => P.PERMITIDAS[k].soloServidor === true),
+       'webhooks y suscripciones: solo el servidor');
 
     /* ⚠️ `login` SALIÓ DE LA LISTA NEGRA DE NOMBRES, Y NO ES UN AFLOJE.
        Prohibirlo por el nombre decía "aquí no entra una contraseña". Pero el
@@ -509,8 +515,8 @@ module.exports = async ({bloque, ok}) => {
 
   ok(Object.keys(P.PERMITIDAS).join(',') ===
      'validate,track,instances,agencies,dni,instanceStatus,instanceLogin,' +
-     'instanceCrear,register,pendientes,borrarPendiente,trackingList',
-  'hoy hay doce, y en el orden en que se reconstruyen');
+     'instanceCrear,register,pendientes,borrarPendiente,suscribir,avisosConfigurar,trackingList',
+  'hoy hay catorce, y en el orden en que se reconstruyen');
   ok(!P.PERMITIDAS.track.soloMedir,
      'track ya no es solo medible: su forma se midió y se tradujo');
   ok(P.PERMITIDAS.instances.metodo === 'GET' &&

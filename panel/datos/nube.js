@@ -530,6 +530,7 @@
   window._fbLeerPuerta = () => fsGet(shalomPath()).catch(() => null);
 
   window._fbLeerBarrido = () => fsGet(`${RAIZ}/barrido`).catch(() => null);
+  window._fbLeerAvisos = () => fsGet(`${RAIZ}/webhook`).catch(() => null);
 
   window._fbEncenderPuerta = (on) =>
     fsPatch(shalomPath(), {encendida: !!on, ultimoCambio: Date.now()});

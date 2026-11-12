@@ -17,6 +17,7 @@ function loadCfgUI(){
     const ta=$('tglBarridoActivo');    if(ta) ta.classList.toggle('on', b.activo!==false);
   }
   if(typeof _pintarUltimoBarrido==='function') _pintarUltimoBarrido();
+  if(typeof _pintarAvisos==='function') _pintarAvisos();
   if(typeof _pintarOrigen==='function') _pintarOrigen();
   if(typeof _pintarShalomConfig==='function') _pintarShalomConfig();
   {

@@ -28,13 +28,18 @@ const PERMITIDAS = {
     soloServidor: true, cuerpoCampos: ["instanceId"]},
   borrarPendiente: {metodo: "DELETE", ruta: "/account/pending-shipments",
     soloServidor: true, cuerpoCampos: ["instanceId", "guia"]},
+  suscribir: {metodo: "POST", ruta: "/tracking/subscriptions",
+    soloServidor: true, cuerpoCampos: ["orderNumber", "orderCode"]},
+  avisosConfigurar: {metodo: "PUT", ruta: "/webhooks", soloServidor: true,
+    cuerpoCampos: ["url", "rotateSecret"]},
   trackingList: {metodo: "GET", ruta: "/account/tracking-list",
     soloServidor: true,
     consulta: {instanceId: /^[A-Za-z0-9-]{1,64}$/, page: /^[0-9]{1,3}$/}},
 };
 
 const ORQUESTADAS = {registrarEnvio: true, recuperarEnvio: true,
-  conectarShalom: true, estadoShalom: true, jalarTicket: true};
+  conectarShalom: true, estadoShalom: true, jalarTicket: true,
+  activarAvisos: true};
 
 function sanear(texto) {
   return String(texto === null || texto === undefined ? "" : texto)
@@ -162,7 +167,7 @@ async function llamar(op, clave, cuerpo) {
       headers: def.publico ? {} : {"x-api-key": clave},
       signal: AbortSignal.timeout(TIEMPO_MAX_MS),
     };
-    if (def.metodo === "POST" || def.metodo === "DELETE") {
+    if (def.metodo !== "GET") {
       opciones.headers["Content-Type"] = "application/json";
       opciones.body = JSON.stringify(filtrarCuerpo(def, cuerpo));
     }

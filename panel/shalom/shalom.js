@@ -95,6 +95,10 @@
 
     agencias: function () { return _pedir({op: 'agencies'}); },
 
+    activarAvisos: function () {
+      return _pedir({op: 'activarAvisos', datos: {}});
+    },
+
     registrarEnvio: function (pedidoId, opc) {
       var d = {pedidoId: pedidoId};
       if (opc && opc.renovar === true) d.renovar = true;

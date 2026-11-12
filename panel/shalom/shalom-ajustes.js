@@ -64,6 +64,7 @@ async function _pintarUltimoBarrido(){
     '<br>Consultó ' + (u.consultadas||0) + ' · cambió ' + (u.conCambio||0) +
     ' · movió ' + (u.movidas||0) + ' etiqueta' + (u.movidas===1?'':'s') +
     (u.porDejar ? ' · 📦 ' + u.porDejar + ' por dejar en agencia' : '') +
+    (u.suscritas ? ' · ⚡ ' + u.suscritas + ' guía(s) suscrita(s) a avisos' : '') +
     (u.porPro ? ' · 🔁 ' + u.porPro + ' leída(s) desde tu Shalom Pro' : '') +
     (u.fallidas ? ' · <b style="color:#d29922">' + u.fallidas + ' fallaron</b>' +
       _motivosBarrido(u.motivos) : '') +
@@ -72,6 +73,53 @@ async function _pintarUltimoBarrido(){
     ((u.guiasMalas||[]).length ? ' · ' + u.guiasMalas.length +
       ' guía(s) con formato raro: ' + u.guiasMalas.map(g=>g.guia).join(', ') : '') +
     (u.cortado ? '<br><b style="color:#d29922">Se cortó: ' + u.cortado + '</b>' : '');
+}
+
+function _haceCuanto(ts){
+  const m = Math.round((Date.now() - Number(ts||0)) / 60000);
+  if(!ts || !isFinite(m)) return '';
+  if(m < 1) return 'hace un momento';
+  if(m < 60) return 'hace ' + m + ' min';
+  const h = Math.round(m / 60);
+  return h < 48 ? 'hace ' + h + ' h' : 'hace ' + Math.round(h / 24) + ' días';
+}
+
+async function _pintarAvisos(){
+  const el = $('avisosShalomLinea'), btn = $('btnActivarAvisos');
+  if(!el) return;
+  const w = window._fbLeerAvisos ? await window._fbLeerAvisos() : null;
+  const activo = !!(w && w.activo === true);
+  if(btn) btn.style.display = activo ? 'none' : '';
+  if(!activo){
+    el.innerHTML = '<b>Avisos al instante:</b> apagados. Shalom avisa apenas cambia una guía y la etiqueta se mueve sola, sin esperar al horario.';
+    return;
+  }
+  const u = w.ultimo || {};
+  el.innerHTML = '<b>Avisos al instante:</b> <span style="color:#3fb950">● activos</span>' +
+    ' · ' + (Number(w.recibidos)||0) + ' recibido(s), ' + (Number(w.aplicados)||0) + ' aplicado(s)' +
+    (u.ts ? ' · último ' + _haceCuanto(u.ts) : ' · aún no llega ninguno') +
+    (Number(w.rechazados) ? '<br><b style="color:#d29922">' + w.rechazados + ' rechazado(s) por firma</b>' +
+      (w.ultimoRechazo ? ' (' + escH(String(w.ultimoRechazo.motivo||'')) + ')' : '') : '');
+}
+
+async function activarAvisosShalom(){
+  const btn = $('btnActivarAvisos');
+  if(!btn || !window.Shalom || !Shalom.activarAvisos) return;
+  const antes = btn.innerHTML;
+  btn.disabled = true; btn.textContent = '⏳ Activando…';
+  try{
+    const r = await Shalom.activarAvisos();
+    if(r && r.ok){
+      toast('⚡ Avisos activados · ' + (r.suscritas||0) + ' guía(s) suscrita(s)');
+    } else {
+      toast('⚠️ No se pudieron activar los avisos' + (r && r.detalle ? ': ' + r.detalle : ''));
+    }
+  }catch(e){
+    toast('📡 No se pudo conectar — revisa tu internet');
+  }finally{
+    btn.disabled = false; btn.innerHTML = antes;
+    _pintarAvisos();
+  }
 }
 
 async function correrBarridoAhora(){
@@ -102,6 +150,7 @@ async function correrBarridoAhora(){
   }finally{
     btn.disabled = false; btn.innerHTML = antes;
     _pintarUltimoBarrido();
+    _pintarAvisos();
   }
 }
 

@@ -1230,3 +1230,21 @@ agencia responde 404 (`no_pendiente`). Si el borrado falla, el registro nuevo
 igual se guarda; el resultado queda en `shalomGuiasAnteriores[].borrado`
 (`borrada` · `no_pendiente` · `fallo`) y el panel lo dice en el aviso.
 `borrarPendiente` es el único DELETE de la puerta, solo del servidor.
+
+## Avisos al instante (webhooks, Fase 6, 12/11/2026)
+
+- **Activar:** Config → Shalom → «Activar avisos al instante». El servidor
+  llama `PUT /webhooks {url, rotateSecret: true}` y guarda el secreto de firma
+  directo en Secret Manager (`SHALOM_WEBHOOK_SECRET`); el navegador solo recibe
+  cuántas guías se suscribieron. Estado en `panel/webhook` (activo, recibidos,
+  aplicados, rechazados).
+- **Suscribir:** `POST /tracking/subscriptions` por guía (abiertas, de Shalom,
+  con guía y código), al activar y en cada corrida de los horarios; el pedido
+  guarda `shalomAvisos: <guía>`.
+- **Recibir:** `shalomWebhook` busca la firma `t=…,v1=…` en cualquier cabecera,
+  la verifica (relee el secreto una vez si no cuadra), descarta repetidos, y
+  aplica `statusCode` (EN_ORIGIN, IN_TRANSIT, AT_DESTINATION, OUT_FOR_DELIVERY,
+  DELIVERED; REGISTERED no mueve nada) al pedido de esa guía Y código, con
+  `barrido.cambiosDe` (la misma regla de los horarios). Los rechazos se suman
+  en memoria y se escriben como mucho una vez por minuto.
+- Los horarios siguen como red de seguridad.

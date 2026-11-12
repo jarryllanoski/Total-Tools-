@@ -19,6 +19,7 @@ const shalomPuerta = require("./shalomPuerta");
 const interruptor = require("./interruptor");
 const webhook = require("./webhook");
 const barrido = require("./barrido");
+const avisosShalom = require("./avisosShalom");
 const limpieza = require("./limpieza");
 const etiquetas = require("./etiquetas");
 const agencias = require("./agencias");
@@ -47,7 +48,6 @@ const FORMCFG_COL = "panel/forms/configs";
 
 const SHALOM_API_KEY = defineSecret("SHALOM_API_KEY");
 
-const SHALOM_WEBHOOK_SECRET = defineSecret("SHALOM_WEBHOOK_SECRET");
 
 let _smCliente = null;
 function _sm() {
@@ -956,11 +956,96 @@ exports.extraerComprobante = onRequest(
 const WEB_DOC = "panel/webhook";
 const WEB_COL = "panel/webhook/eventos";
 
-const WEBHOOK_ACTIVO = false;
+const WEBHOOK_ACTIVO = true;
+const SECRETO_AVISOS = "SHALOM_WEBHOOK_SECRET";
+let _secretoAvisos = {v: "", ts: 0};
+let _rechazos = {n: 0, ts: 0, motivo: ""};
+
+async function _secretoWebhook(fresco) {
+  if (!fresco && _secretoAvisos.v && Date.now() - _secretoAvisos.ts < 300000) {
+    return _secretoAvisos.v;
+  }
+  let v = "";
+  try {
+    v = String(await _leerSecreto(SECRETO_AVISOS) || "").trim();
+  } catch (e) {
+    v = "";
+  }
+  _secretoAvisos = {v: v, ts: Date.now()};
+  return v;
+}
+
+async function _urlAvisos() {
+  return "https://us-central1-" + await _proyecto() +
+    ".cloudfunctions.net/shalomWebhook";
+}
+
+async function _aplicarAviso(aviso) {
+  if (!aviso || !aviso.res) return 0;
+  const [a, b] = await Promise.all([
+    db.collection(SHIP_COL).where("shalomGuia", "==", aviso.guia).get(),
+    db.collection(SHIP_COL).where("trackingOrderNumber", "==", aviso.guia)
+        .get(),
+  ]);
+  const vistos = {};
+  const pedidos = [];
+  [a, b].forEach((q) => q.forEach((d) => {
+    if (vistos[d.id]) return;
+    vistos[d.id] = true;
+    pedidos.push(Object.assign({id: d.id}, d.data()));
+  }));
+  let modo = etiquetas.MODOS.SEMI;
+  try {
+    const c = await db.doc(CFG_DOC).get();
+    const b2 = (c.exists && c.data().config && c.data().config.barrido) || {};
+    modo = String(b2.modo || modo);
+  } catch (e) {
+  }
+  let escritos = 0;
+  for (const p of pedidos) {
+    if (!avisosShalom.esDelPedido(p, aviso)) continue;
+    const cambios = barrido.cambiosDe(p, aviso.res, modo);
+    if (!cambios) continue;
+    await db.doc(SHIP_COL + "/" + p.id).set(_conMts(cambios.campos),
+        {merge: true});
+    escritos++;
+  }
+  if (escritos) {
+    await db.doc(CFG_DOC).set({ts: Date.now(), syncV: SYNC_V}, {merge: true});
+  }
+  return escritos;
+}
+
+async function _suscribirGuias(pedidos) {
+  const lista = avisosShalom.porSuscribir(pedidos, 60);
+  let hechas = 0;
+  for (const x of lista) {
+    const r = await _porLaPuerta("suscribir",
+        {orderNumber: x.guia, orderCode: x.codigo});
+    if (r && r.ok) {
+      await db.doc(SHIP_COL + "/" + x.id).set(
+          _conMts({shalomAvisos: x.guia}), {merge: true});
+      hechas++;
+    } else if (r && (r.motivo === "PUERTA_CERRADA" ||
+        r.motivo === "APAGADA")) {
+      break;
+    }
+    await new Promise((res) => setTimeout(res, PAUSA_MS));
+  }
+  return {pendientes: lista.length, hechas: hechas};
+}
+
+async function _avisosActivos() {
+  try {
+    const c = await db.doc(WEB_DOC).get();
+    return !!(c.exists && c.data().activo === true);
+  } catch (e) {
+    return false;
+  }
+}
 
 const _shalomWebhook = onRequest({
   region: "us-central1",
-  secrets: [SHALOM_WEBHOOK_SECRET],
   timeoutSeconds: 30,
   memory: "256MiB",
 }, async (req, res) => {
@@ -969,19 +1054,28 @@ const _shalomWebhook = onRequest({
     return;
   }
 
-  const firma = req.get("X-Shalom-Signature") || "";
+  const firma = avisosShalom.buscarFirma(req.headers);
   const crudo = req.rawBody;
-  const v = webhook.verificarFirma(
-      firma, crudo, SHALOM_WEBHOOK_SECRET.value(), Date.now());
+  let v = webhook.verificarFirma(
+      firma, crudo, await _secretoWebhook(false), Date.now());
+  if (!v.ok && (v.motivo === "FIRMA_INVALIDA" || v.motivo === "SIN_SECRETO")) {
+    v = webhook.verificarFirma(
+        firma, crudo, await _secretoWebhook(true), Date.now());
+  }
 
   if (!v.ok) {
-    console.warn("webhook rechazado:", v.motivo);
-    try {
-      await db.doc(WEB_DOC).set({
-        rechazados: FieldValue.increment(1),
-        ultimoRechazo: {ts: Date.now(), motivo: v.motivo},
-      }, {merge: true});
-    } catch (e) {
+    _rechazos.n++;
+    _rechazos.motivo = v.motivo;
+    if (Date.now() - _rechazos.ts > 60000) {
+      const n = _rechazos.n;
+      _rechazos = {n: 0, ts: Date.now(), motivo: ""};
+      try {
+        await db.doc(WEB_DOC).set({
+          rechazados: FieldValue.increment(n),
+          ultimoRechazo: {ts: Date.now(), motivo: v.motivo},
+        }, {merge: true});
+      } catch (e) {
+      }
     }
     res.status(401).send("no");
     return;
@@ -1001,23 +1095,32 @@ const _shalomWebhook = onRequest({
   } catch (e) {
     cuerpo = null;
   }
+  const aviso = avisosShalom.leer(cuerpo);
+  let aplicados = 0;
+  try {
+    aplicados = await _aplicarAviso(aviso);
+  } catch (e) {
+    console.error("webhook: no se pudo aplicar:", e && e.message);
+  }
   const codigos = webhook.codigos(cuerpo);
   try {
     await db.doc(WEB_COL + "/" + id).set({
       forma: shalomPuerta.forma(cuerpo),
       codigos: codigos,
+      aplicados: aplicados,
       bytes: crudo ? crudo.length : 0,
     }, {merge: true});
     await db.doc(WEB_DOC).set({
       recibidos: FieldValue.increment(1),
-      ultimo: {ts: Date.now(), codigos: codigos,
+      aplicados: FieldValue.increment(aplicados),
+      ultimo: {ts: Date.now(), codigos: codigos, aplicados: aplicados,
         bytes: crudo ? crudo.length : 0},
     }, {merge: true});
   } catch (e) {
     console.error("webhook: no se pudo anotar el evento:", e);
   }
 
-  console.log("webhook ok", JSON.stringify({id: id, codigos: codigos}));
+  console.log("webhook ok", JSON.stringify({id: id, aplicados: aplicados}));
   res.status(200).send("ok");
 });
 
@@ -1117,6 +1220,15 @@ async function _correrBarrido(forzado) {
     await new Promise((res) => setTimeout(res, PAUSA_MS));
   }
 
+  let suscripcion = null;
+  if (await _avisosActivos()) {
+    try {
+      suscripcion = await _suscribirGuias(docs);
+    } catch (e) {
+      console.warn("barrido: suscripciones:", e && e.message);
+    }
+  }
+
   let escritas = 0;
   if (escrituras.length) {
     for (let i = 0; i < escrituras.length; i += 400) {
@@ -1147,6 +1259,7 @@ async function _correrBarrido(forzado) {
     modo: modo,
     candidatos: sel.consultar.length, consultadas: consultadas,
     fallidas: fallidas, motivos: motivos, porDejar: porDejar, porPro: porPro,
+    suscritas: suscripcion ? suscripcion.hechas : 0,
     conCambio: escrituras.length, escritas: escritas,
     movidas: escrituras.filter((w) => w.campos.status).length,
     saltados: sel.saltados, guiasMalas: sel.guiasMalas.slice(0, 20),
@@ -1303,6 +1416,42 @@ exports.shalomPuerta = onRequest(
             motivo: "ERROR_SHALOM",
             detalle: "Algo se rompio a mitad y NO SABEMOS si el envio llego " +
               "a crearse. Verifica en pro.shalom.pe antes de reintentar."});
+        }
+        return;
+      }
+
+      if (paso.orquestar === "activarAvisos") {
+        try {
+          const url = await _urlAvisos();
+          const r = await _porLaPuerta("avisosConfigurar",
+              {url: url, rotateSecret: true});
+          const w = r && r.ok && r.json && r.json.webhook;
+          const secreto = String((w && w.secret) || "").trim();
+          if (!secreto) {
+            res.status(200).json({ok: false,
+              motivo: (r && !r.ok && r.motivo) || "FORMATO_DESCONOCIDO",
+              detalle: "Shalom no devolvió el secreto de firma."});
+            return;
+          }
+          await _escribirSecreto(SECRETO_AVISOS, secreto);
+          _secretoAvisos = {v: secreto, ts: Date.now()};
+          await db.doc(WEB_DOC).set({activo: true, desde: Date.now()},
+              {merge: true});
+          const abiertos = [];
+          const q = await db.collection(SHIP_COL)
+              .where("status", "!=", "FINALIZADO").get();
+          q.forEach((d) => abiertos.push(Object.assign({id: d.id}, d.data())));
+          const sus = await _suscribirGuias(abiertos);
+          res.status(200).json({ok: true, suscritas: sus.hechas,
+            pendientes: sus.pendientes});
+        } catch (e) {
+          console.error("activarAvisos:", e && e.message);
+          const permiso = /permission|denied|forbidden|403/i
+              .test(String((e && e.message) || ""));
+          res.status(200).json({ok: false,
+            motivo: permiso ? "SIN_PERMISO_SECRETOS" : "ERROR_SHALOM",
+            detalle: permiso ? "La función no puede guardar el secreto." :
+              "No se pudieron activar los avisos. Intenta en un momento."});
         }
         return;
       }
