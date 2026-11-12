@@ -1,29 +1,13 @@
 "use strict";
 
-/*
- * comprobante.js — Modulo aislado (Fase 1).
- *
- * Descarga un comprobante PDF de API Sale, extrae su texto y parsea los
- * productos (codigo interno / descripcion / cantidad). Detecta formato
- * ticket y A4. NO escribe en Firestore ni toca otras funciones: solo
- * descarga, lee y devuelve.
- *
- * El parser es la misma logica validada con muestras reales (ticket y A4,
- * con y sin codigo, con codigos raros tipo WAY1A10).
- */
-
 const pdfParse = require("pdf-parse");
 const crypto = require("crypto");
 
-// Version del parser: si se mejora, se sube este numero para reprocesar.
-// v3: arreglo A4 multi-item (EAN guion, cantidad y descripcion multilinea).
 const PARSER_VERSION = 3;
 
-// Hash SHA-256 de la URL (para idempotencia).
 const hashUrl = (u) =>
   crypto.createHash("sha256").update(String(u)).digest("hex");
 
-// Busca, entre los links de un pedido, el del comprobante API Sale.
 const buscarLink = (links) => {
   const arr = Array.isArray(links) ? links : [];
   for (let i = 0; i < arr.length; i++) {
@@ -33,13 +17,11 @@ const buscarLink = (links) => {
   return "";
 };
 
-// ── Seguridad: solo se permite este dominio y estas rutas (anti-SSRF) ──────
 const HOST_PERMITIDO = "apisale.institucional.pe";
 const RUTA_PDF_RE = /^\/sale\/view\/logistico\/pdf\/[^/]+\/(ticket|A4)\/?$/i;
-const MAX_BYTES = 8 * 1024 * 1024; // 8 MB
-const TIMEOUT_MS = 20000; // 20 s
+const MAX_BYTES = 8 * 1024 * 1024;
+const TIMEOUT_MS = 20000;
 
-// Valida que la URL sea segura para descargar. Devuelve {ok, motivo?, url?}.
 const validarUrl = (url) => {
   let u;
   try {
@@ -57,7 +39,6 @@ const validarUrl = (url) => {
   return {ok: true, url: u.href};
 };
 
-// Descarga el PDF con timeout, limite de tamano y validacion de tipo/firma.
 const descargarPdf = async (url) => {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), TIMEOUT_MS);
@@ -83,14 +64,11 @@ const descargarPdf = async (url) => {
   }
 };
 
-// Extrae el texto plano del PDF.
 const extraerTexto = async (buf) => {
   const data = await pdfParse(buf);
   return (data && data.text) || "";
 };
 
-// ── Parser (basado en el texto REAL de pdf-parse: columnas pegadas) ─────────
-// Codigo interno: 2-6 letras + un digito + alfanumerico (WAY1A10, THT1320503).
 const COD = /^([A-Z]{2,6}\d[A-Z0-9]{0,10})\b[\s:–—-]*/;
 const UNIT_WORDS = "UND|UNID|UN|PZA|PZS|PCS|DOC|JGO|KG|MT|GLN|LT";
 const UNIT = new RegExp("^(?:" + UNIT_WORDS + ")\\b", "i");
@@ -104,7 +82,6 @@ const A4_HDR = /ITEM.*CANTIDAD.*UNIDAD/i;
 const A4_ROW = /^(\d+)UND(\d{6,}|-)$/i;
 const CANT_HDR = /CANT.*(P\.?\s*UNIT|IMPORTE)/i;
 
-// Extrae el codigo interno del inicio de un texto. {codigo, resto}.
 const codeOf = (linea) => {
   const t = String(linea);
   const m = t.match(COD);
@@ -112,7 +89,6 @@ const codeOf = (linea) => {
   return {codigo: m[1].toUpperCase(), resto: t.slice(m[0].length)};
 };
 
-// Arma un item a partir de lineas de descripcion + cantidad (+ ean opcional).
 const buildItem = (buf, cant, ean) => {
   const arr = buf.slice();
   const c = codeOf(arr[0] || "");
@@ -122,8 +98,6 @@ const buildItem = (buf, cant, ean) => {
   return {codigo: c.codigo, desc: desc, cant: cant, ean: ean || ""};
 };
 
-// Ticket: la cantidad viene en lineas sueltas (numero, luego "UND", luego
-// precios); la descripcion son las lineas previas.
 const parseTicket = (lines) => {
   let s = 0;
   let e = lines.length;
@@ -151,8 +125,8 @@ const parseTicket = (lines) => {
         out.push(buildItem(buf, cant));
         buf = [];
       }
-      i += 2; // saltar numero + unidad
-      if (lines[i] && /^[\d.,]+$/.test(lines[i])) i += 1; // saltar precios
+      i += 2;
+      if (lines[i] && /^[\d.,]+$/.test(lines[i])) i += 1;
       continue;
     }
     buf.push(ln);
@@ -161,10 +135,6 @@ const parseTicket = (lines) => {
   return out;
 };
 
-// A4: cada producto viene pegado "ITEM+CANT UND EAN"; en las lineas
-// siguientes va el codigo interno + descripcion (puede ocupar varias
-// lineas). ITEM = numero de fila secuencial; CANT = lo que sigue al ITEM.
-// El EAN puede ser un guion "-" cuando el producto no tiene codigo de barras.
 const parseA4 = (lines) => {
   const hdr = lines.findIndex((l) => A4_HDR.test(l));
   const rows = [];
@@ -189,8 +159,8 @@ const parseA4 = (lines) => {
     for (let i = start; i < end; i++) {
       const ln = lines[i];
       if (STOP.test(ln)) break;
-      if (/^[\d.,]+$/.test(ln)) continue; // precio
-      if (/^(No|asignado|No asignado)$/i.test(ln)) continue; // "No asignado"
+      if (/^[\d.,]+$/.test(ln)) continue;
+      if (/^(No|asignado|No asignado)$/i.test(ln)) continue;
       buf.push(ln);
     }
     out.push(buildItem(buf, cant, ean));
@@ -198,7 +168,6 @@ const parseA4 = (lines) => {
   return out;
 };
 
-// Detecta el formato (ticket vs A4) y devuelve la lista de productos.
 const parseComprobante = (raw) => {
   const lines = String(raw || "")
       .replace(/\r/g, "")
@@ -209,7 +178,6 @@ const parseComprobante = (raw) => {
   return isA4 ? parseA4(lines) : parseTicket(lines);
 };
 
-// Orquesta todo: valida -> descarga -> extrae texto -> parsea.
 const procesarUrl = async (url) => {
   const v = validarUrl(url);
   if (!v.ok) return {ok: false, motivo: v.motivo};

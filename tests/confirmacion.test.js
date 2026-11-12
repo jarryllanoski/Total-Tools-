@@ -19,13 +19,13 @@ module.exports = async ({bloque, ok}) => {
 
   {
     ok(!/showOverlay/.test(form) && !/id="loadOverlay"/.test(form), 'ya no existe el telón de carga');
-    const sub = trozo('async function submitOrder(', '/* ─── CONFIRMACIÓN EN EL SITIO');
+    const sub = trozo('async function submitOrder(', 'function _confEmpezar(btn){');
     ok(/const t0=_confEmpezar\(btn\);/.test(sub), 'al confirmar: botón en progreso + etiqueta imprimiéndose');
     ok(/Math\.max\(0, 900-\(Date\.now\(\)-t0\)\)/.test(sub), 'la impresión se ve al menos 0,9 s');
     ok(/_confFallo\(btn\);/.test(sub), 'si falla, todo vuelve a su sitio (con el error)');
     const emp = trozo('function _confEmpezar(', 'function _confFallo(');
     ok(/btn\.disabled=true/.test(emp), '⚠️ doble toque: el botón se desactiva (un solo pedido)');
-    const fal = trozo('function _confFallo(', '/* El sello');
+    const fal = trozo('function _confFallo(', 'function _confSello(codigo){');
     ok(/btn\.disabled=false/.test(fal) && /classList\.remove\('tt-imprimiendo'\)/.test(fal), 'el fallo devuelve el botón y quita la impresión');
   }
 
@@ -52,7 +52,7 @@ module.exports = async ({bloque, ok}) => {
     ok(!/tt-burbuja/.test(sc) && !/\.tt-burbuja\{/.test(form), 'sin la burbuja: repetía lo que ya dice la etiqueta');
     ok(/if\(waHref\) setTimeout\(function\(\)\{ if\(!_waToco\) _waRecordar\(true\); \}, 1000\);/.test(sc),
        'lo amarillo entra 1 s después que lo demás');
-    const rc = trozo('function _waRecordar(', '/* Volvió de WhatsApp');
+    const rc = trozo('function _waRecordar(', 'try{ document.addEventListener(\'visibilitychange\', function(){');
     ok(/Solo falta este paso/.test(rc) && /Te falta enviarlo/.test(rc), 'primero meta cercana; el recordatorio, pérdida');
     ok(/class="tt-dedo"/.test(rc) && /@keyframes ttDedo/.test(form) && /classList\.add\('tt-asoma'\)/.test(rc),
        'entra con animación y la mano 👆 señala el botón');
@@ -89,7 +89,7 @@ module.exports = async ({bloque, ok}) => {
   {
     // Fase 2: el seguimiento tiene su propia página; el formulario no lo carga.
     const fo = E.leer('formulario.html'), se = E.leer('seguimiento.html');
-    ok(!/loading-screen\.js/.test(fo) && /<script src="loading-screen\.js\?v=1"><\/script>/.test(se),
+    ok(!/loading-screen\.js/.test(fo) && /<script src="loading-screen\.js\?v=\d+"><\/script>/.test(se),
        'loading-screen.js solo en el seguimiento (y síncrono, sin carrera con TTLoader)');
     ok(/<link rel="preconnect" href="https:\/\/us-central1-total-tools-24ce8\.cloudfunctions\.net" crossorigin>/.test(form),
        'preconnect al servidor de pedidos');

@@ -50,7 +50,7 @@ module.exports = async ({bloque, ok}) => {
     ok(/if \(await _tokenDeEseCelular\(req\.query\.t, phone\)\) return res\.json\(cli\);/.test(cl),
        'nombre completo y dirección SOLO si el link personalizado es de ese mismo celular');
     ok(/split\(\/\\s\+\/\)\[0\][\s\S]{0,40}parcial: true/.test(cl), 'si no, solo el primer nombre');
-    const tk = srv.slice(srv.indexOf('async function _tokenDeEseCelular'), srv.indexOf('// ── action=client'));
+    const tk = srv.slice(srv.indexOf('async function _tokenDeEseCelular'), srv.indexOf('async function handleClient(req, res) {'));
     ok(/if \(d\.used\) return false;/.test(tk) && /tp === phone/.test(tk), 'un link ya usado o de otro número no abre nada');
     ok(/\{phone: phone, t: currentToken\}/.test(form), 'el formulario manda el link junto al celular');
     ok(/&&!_knownClient\.parcial\) nameEl\.value/.test(form), 'con solo el primer nombre no rellena el campo');
@@ -73,7 +73,7 @@ module.exports = async ({bloque, ok}) => {
   bloque('El alta: transacción, create y link de un solo uso');
 
   {
-    const cr = srv.slice(srv.indexOf('async function handleCreate'), srv.indexOf('// ── action=token'));
+    const cr = srv.slice(srv.indexOf('async function handleCreate'), srv.indexOf('async function handleToken(req, res) {'));
     ok(/db\.runTransaction/.test(cr) && /tx\.create\(shipRef/.test(cr), 'transacción con create (falla si el id existe)');
     ok(!/batch\.set\(db\.doc\(`\$\{SHIP_COL\}/.test(cr), 'ya no hay set que pise un pedido');
     ok(/ts\.data\(\)\.used\)\) return "usado"/.test(cr), 'el link se mira y se marca en la MISMA operación');
@@ -86,7 +86,7 @@ module.exports = async ({bloque, ok}) => {
     ok(/if \(cfg\.memoria\) return _frenoMemoria\(/.test(srv), 'y checkRateLimit lo respeta');
     ok(/rlExpira: new Date\(windowStart \+ 3600 \* 1000\)/.test(srv), 'los registros del freno llevan vencimiento (TTL)');
     // El freno en memoria, ejecutado.
-    const f = srv.slice(srv.indexOf('const _frenoMem = new Map();'), srv.indexOf('/**\n * Devuelve false si la IP'));
+    const f = srv.slice(srv.indexOf('const _frenoMem = new Map();'), srv.indexOf('async function checkRateLimit(name, req) {'));
     const ctx = vm.createContext({Map});
     vm.runInContext(f + ';this.F=_frenoMemoria;', ctx);
     let pasa = 0;

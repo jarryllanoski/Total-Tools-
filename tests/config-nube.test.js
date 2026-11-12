@@ -25,7 +25,7 @@ function bloqueCon(marca) {
   throw new Error('no hay bloque con ' + marca);
 }
 const FIREBASE = bloqueCon('window._fbSave =');
-const MERGE = E.trozo('index.html', 'window._mergeRemote = (remote) => {', '// On Firebase ready');
+const MERGE = E.trozo('index.html', 'window._mergeRemote = (remote) => {', 'const _initFirebase = async (intento) => {');
 const FIJAS = ['NUEVO PEDIDO', 'ENVIADO', 'FINALIZADO'];
 
 /* ── Firestore de mentira ─────────────────────────────────────────────── */
@@ -219,7 +219,7 @@ module.exports = async ({bloque, ok}) => {
     ok(!/shipments\.(splice|filter\([^)]*\)\s*;?\s*S\.shipments\s*=)/.test(del) && /quedan en 🏷️ SIN ETIQUETA/.test(del),
        'borrar una etiqueta NO toca los pedidos y lo dice («quedan en SIN ETIQUETA»)');
     ok(/delete S\.msgTemplates\[name\]/.test(del), 'sus mensajes A/B se van con ella');
-    const ren = cfg.slice(cfg.indexOf('function saveLabelEdit('), cfg.indexOf('/* COURIER / EXTRA INLINE EDIT */'));
+    const ren = cfg.slice(cfg.indexOf('function saveLabelEdit('), cfg.indexOf('function openCourierEdit(i){'));
     ok(/if\(S\.labels\.includes\(newName\)\)\{ toast\('⚠️ Ya existe/.test(ren), 'renombrar a un nombre que ya existe: se avisa');
     ok(/movidos\.forEach\(x=>\{ x\.status=newName; \}\)/.test(ren) && /save\(movidos\.length \? movidos\.map\(x=>x\.id\) : 'config'\)/.test(ren),
        'renombrar se lleva sus pedidos (y sube solo esos)');
@@ -238,7 +238,7 @@ module.exports = async ({bloque, ok}) => {
     ok(f._sinRepetir(['A', 'B', 'A']).join() === 'A,B', 'al cargar, sin repetidas');
 
     // El filtro real de la lista.
-    const vs = E.trozo('index.html', 'function visibleShipments(){', '/* ══════');
+    const vs = E.trozo('index.html', 'function visibleShipments(){', 'let _renderPedido = false;');
     // eslint-disable-next-line no-new-func
     const vis = new Function('S', '$', '_dniDe', 'NroComprobante', '_adv',
         'const SIN_ETIQUETA="' + f.SIN_ETIQUETA + '";let _filt=SIN_ETIQUETA,_advActive=false;function _soloActivos(){return false}' + vs + ';return visibleShipments;',
@@ -257,6 +257,6 @@ module.exports = async ({bloque, ok}) => {
       ok(new RegExp(k + ':data\\.' + k).test(proy), k + ' viaja al documento de configuración'));
     ok(/const _PANTALLAS_NUBE = \['configurar', 'recursos'\];/.test(panel),
        'Config y Recursos no se pueden editar hasta que llega la nube (la copia local no manda)');
-    ok(/<script src="panel\/datos\/mezclaConfig\.js\?v=1"><\/script>/.test(E.leerReal('index.html')), 'el panel carga la mezcla');
+    ok(/<script src="panel\/datos\/mezclaConfig\.js\?v=\d+"><\/script>/.test(E.leerReal('index.html')), 'el panel carga la mezcla');
   }
 };

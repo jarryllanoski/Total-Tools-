@@ -1,45 +1,8 @@
-/**
- * panel/pantalla/seleccion.js — qué pedidos están marcados en ESTE dispositivo
- * Fase 7 (11/11/2026): movido de la raíz a su capa, sin cambiar una línea.
- */
-/**
- * seleccion.js — Qué pedidos están marcados, en ESTE dispositivo
- * ==============================================================
- * Un solo dueño de la selección, igual que shalom.js lo es del rastreo.
- *
- * POR QUÉ EXISTE ESTE ARCHIVO
- * Antes la selección era un campo del pedido (`ship.sel`). Parece inofensivo y
- * no lo es: el pedido es la cosa que se sincroniza. `slimShipment` copia el
- * pedido entero al subirlo, así que `sel` viajaba de acarreo a Firestore en
- * cualquier guardado; y `_mergeRemote` reemplaza los pedidos con los remotos
- * cada 5 segundos sin conservar `sel`. Resultado: desmarcabas algo y cinco
- * segundos después volvía solo, o te aparecía marcado lo que marcó otro
- * vendedor en su pantalla.
- *
- * Y no era solo molesto. `delSelected` leía la selección DOS VECES —una al
- * abrir el aviso y otra al confirmar— y entre las dos cabía un latido: podía
- * desaparecer de la pantalla un pedido que nunca entró a la papelera ni se
- * borró de Firestore.
- *
- * LA REGLA, para cualquier dato que venga después:
- *   ¿de esto depende un cliente o un pedido?  → va compartido, en Firestore
- *   ¿solo cambia lo que ves TÚ en tu pantalla? → va local, como esto
- *
- * La selección es lo segundo: es efímera, es tuya, y muere al recargar.
- *
- * A PROPÓSITO NO SE GUARDA en localStorage. Marcar 60 pedidos obligaba a
- * serializar el estado completo (~0,7 MB con 1039 pedidos) en cada clic. Y
- * tampoco tiene sentido: si recargas la página, esa selección ya no describe
- * nada que estuvieras haciendo.
- */
 (function (global) {
   'use strict';
 
   var _ids = new Set();
 
-  /* Los pedidos vivos, sea cual sea la fuente. Se lee al vuelo (y no se
-     guarda) porque _mergeRemote reemplaza el array entero cada pocos
-     segundos: una referencia guardada quedaría apuntando a fantasmas. */
   function _pedidos() {
     return (global.S && Array.isArray(global.S.shipments)) ? global.S.shipments : [];
   }
@@ -52,9 +15,6 @@
 
     hayAlguno: function () { return this.cantidad() > 0; },
 
-    /* Los ids marcados QUE TODAVÍA EXISTEN. Un pedido borrado (acá o en otro
-       dispositivo) deja de contar sin que nadie tenga que acordarse de
-       limpiarlo: el olvido es lo que produce borrados fantasma. */
     ids: function () {
       if (!_ids.size) return [];
       var vivos = {}, l = _pedidos();
@@ -66,7 +26,6 @@
       return out;
     },
 
-    /* Los pedidos marcados, en el orden en que están en el panel. */
     marcados: function () {
       if (!_ids.size) return [];
       return _pedidos().filter(function (s) { return _ids.has(String(s.id)); });
@@ -101,16 +60,11 @@
       this._pintarTodo();
     },
 
-    /* ── Pintado: se toca el DOM que cambió, no se rehace la lista ──────────
-       Volver a montar las tarjetas con innerHTML obliga al navegador a
-       reconstruir ~50 nodos por tarjeta (unos 50 000 con 1039 pedidos) y a
-       recalcular el layout entero. Marcar una casilla no cambia la LISTA:
-       cambia una casilla. Así que se cambia una clase y un carácter. */
     _pintarUno: function (id) {
       var doc = global.document;
       if (!doc) return;
       var card = doc.querySelector('.card[data-id="' + _cssId(id) + '"]');
-      if (!card) return; // fuera del filtro actual: se pintará al renderizar
+      if (!card) return;
       var chk = card.querySelector('.chk');
       if (!chk) return;
       var on = _ids.has(String(id));
@@ -139,12 +93,6 @@
       if (b) b.classList.toggle('sel-on', this.cantidad() > 0);
     },
 
-    /* Limpia el `sel` que quedó guardado dentro de los pedidos viejos.
-       Solo en memoria: NO se reescriben los documentos de Firestore. Ese
-       campo es inerte —ya nadie lo lee— y borrarlo de verdad costaría
-       reescribir un millar de documentos de golpe, que es exactamente la
-       tanda que deja el indicador de Firebase en rojo. Se limpia en memoria
-       para que no vuelva a subir de acarreo. */
     _olvidarHeredado: function () {
       var l = _pedidos(), n = 0;
       for (var i = 0; i < l.length; i++) {

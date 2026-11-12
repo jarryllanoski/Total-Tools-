@@ -1,23 +1,5 @@
 "use strict";
 
-/**
- * functions/fechaPedido.js — LAS DOS FECHAS DE UN PEDIDO.
- * =======================================================
- *   envío      `date`: el día programado para despachar («2026-10-28»).
- *   registro   el día en que ENTRÓ el pedido, sacado de `createdAt`.
- *
- * ⚠️ `createdAt` ESTÁ EN HORA UNIVERSAL, NO DE PERÚ. Un pedido registrado
- * el 26/10 a las 8:00 p. m. en Lima se guarda «2026-10-27T01:00:00Z».
- * Cortar los diez primeros caracteres lo mandaría al día siguiente — justo
- * los pedidos que llegan de noche. Aquí se convierte a la hora de Lima.
- *
- * ⚠️ LA IMPORTACIÓN DE EXCEL GUARDA «AAAA-MM-DDT00:00:00.000Z»: un día sin
- * hora. Convertido a Lima caería en el día ANTERIOR (medianoche UTC son las
- * 7:00 p. m. del día previo). Ese patrón exacto se toma tal cual.
- *
- * Solo lee: no escribe nada en ningún pedido.
- */
-
 /* global globalThis, window */
 (function(raiz, fabrica) {
   if (typeof module === "object" && module.exports) {
@@ -30,34 +12,16 @@
   const DIA = /^\d{4}-\d{2}-\d{2}$/;
   const SIN_HORA = /^(\d{4}-\d{2}-\d{2})T00:00:00(?:\.000)?Z$/;
 
-  /**
-   * «AAAA-MM-DD» de un instante, en la hora de Lima.
-   * @param {Date} d instante
-   * @return {string} el día, o "" si la fecha no vale
-   */
   function diaLima(d) {
     if (!(d instanceof Date) || isNaN(d.getTime())) return "";
-    // en-CA da «AAAA-MM-DD» directamente.
     return new Intl.DateTimeFormat("en-CA", {timeZone: ZONA,
       year: "numeric", month: "2-digit", day: "2-digit"}).format(d);
   }
 
-  /**
-   * Día de envío.
-   * @param {Object} p el pedido
-   * @return {string} el `date` guardado, o ""
-   */
   function envio(p) {
-    // Tal cual está guardado: es lo que comparaba la búsqueda antes de este
-    // módulo, y con «Fecha de envío» tiene que dar EXACTAMENTE lo mismo.
     return String((p && p.date) || "");
   }
 
-  /**
-   * Día de registro, en hora de Lima.
-   * @param {Object} p el pedido
-   * @return {string} «AAAA-MM-DD», o "" si no tiene `createdAt`
-   */
   function registro(p) {
     const v = String((p && p.createdAt) || "").trim();
     if (!v) return "";
@@ -67,34 +31,14 @@
     return diaLima(new Date(v));
   }
 
-  /**
-   * Hoy, en Lima.
-   * @param {Date} [ahora] para las pruebas
-   * @return {string} «AAAA-MM-DD»
-   */
   function hoyLima(ahora) {
     return diaLima(ahora || new Date());
   }
 
-  /**
-   * La fecha que manda según el campo elegido en la búsqueda avanzada.
-   * @param {Object} p el pedido
-   * @param {string} campo "registro" | "envio" (por defecto, envío)
-   * @return {string} «AAAA-MM-DD», o ""
-   */
   function segun(p, campo) {
     return campo === "registro" ? registro(p) : envio(p);
   }
 
-  /**
-   * ¿El pedido cae en el rango? Desde/hasta vacíos no limitan. Sin fecha
-   * en el campo elegido, no entra (si hay algún límite puesto).
-   * @param {Object} p el pedido
-   * @param {string} campo "registro" | "envio"
-   * @param {string} desde «AAAA-MM-DD» o ""
-   * @param {string} hasta «AAAA-MM-DD» o ""
-   * @return {boolean} si entra
-   */
   function enRango(p, campo, desde, hasta) {
     if (!desde && !hasta) return true;
     const f = segun(p, campo);
@@ -104,12 +48,6 @@
     return true;
   }
 
-  /**
-   * El día «AAAA-MM-DD» corrido `n` días (negativo = atrás).
-   * @param {string} dia «AAAA-MM-DD»
-   * @param {number} n días
-   * @return {string} «AAAA-MM-DD», o "" si `dia` no vale
-   */
   function sumarDias(dia, n) {
     if (!DIA.test(String(dia || ""))) return "";
     const [a, m, d] = dia.split("-").map(Number);
@@ -117,13 +55,6 @@
     return t.toISOString().slice(0, 10);
   }
 
-  /**
-   * El instante en que EMPIEZA un día de Lima, en ISO universal — para
-   * compararlo con fechas guardadas en UTC (`usedAt`, `createdAt`).
-   * Perú no cambia de hora desde 1994: medianoche de Lima = 05:00 UTC.
-   * @param {string} dia «AAAA-MM-DD»
-   * @return {string} «AAAA-MM-DDT05:00:00.000Z», o "" si `dia` no vale
-   */
   function inicioDiaLimaISO(dia) {
     if (!DIA.test(String(dia || ""))) return "";
     return new Date(dia + "T00:00:00-05:00").toISOString();

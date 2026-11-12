@@ -27,7 +27,7 @@ for e,v in M.items():
     body=re.search(r'>\s*([\s\S]*)</svg>',t.split('<svg',1)[1]).group(1)
     D[n]=re.sub(r'\s*\n\s*','',body).replace(' />','/>')
 claves=sorted(M,key=len,reverse=True)
-js=['/**\n * panel/pantalla/iconos.js — iconos de Lucide (ISC, https://lucide.dev) en lugar de emojis.\n */','(function(){',"  'use strict';",
+js=['// Lucide (ISC) https://lucide.dev','(function(){',"  'use strict';",
 '  var D = '+json.dumps(D,ensure_ascii=False,indent=0).replace('\n','\n    ')+';',
 '  var M = '+json.dumps({k:list(v) for k,v in M.items()},ensure_ascii=False,separators=(',',':'))+';',
 "  var RE = new RegExp('(' + "+json.dumps(claves,ensure_ascii=False)+".join('|') + ')\\uFE0F?', 'g');",

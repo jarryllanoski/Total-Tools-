@@ -1,29 +1,8 @@
 "use strict";
 
-/**
- * functions/ticketShalom.js — «🧾 Jalar ticket de Shalom».
- * =========================================================
- * El SERVIDOR hace todo: pide el ticket a Shalom (con la clave que nunca
- * sale del servidor), lo guarda en Firebase Storage, en la carpeta del
- * pedido, y lo apunta en el pedido como «Guía / Ticket» (`docGuia`). El
- * navegador solo recibe el enlace del archivo ya guardado: nunca manipula
- * el archivo, así que no hay base64 que se pierda ni memoria que se llene.
- *
- * Orquestación pura: la red, el bucket y Firestore llegan como `deps`, así
- * que se prueba sin ninguno de los tres.
- */
-
 const ID_PEDIDO = /^[A-Za-z0-9_-]{1,80}$/;
-// ¿Se puede pedir ya? La MISMA regla que Consultar y los horarios.
 const registroShalom = require("./registroShalom");
 
-/**
- * @param {Object} datos {pedidoId, orderNumber, orderCode} (del navegador)
- * @param {Object} deps {leerPedido(id), instancia() → id de Shalom Pro,
- *   descargar({orderNumber,orderCode,instanceId}),
- *   subir(ruta, bytes, tipo) → url, guardar(campos)}
- * @return {Promise<Object>} {ok:true, doc} o {ok:false, motivo, detalle}
- */
 async function jalar(datos, deps) {
   const d = datos || {};
   const pid = String(d.pedidoId || "").trim();
@@ -38,11 +17,6 @@ async function jalar(datos, deps) {
     return {ok: false, motivo: "SIN_DATO",
       detalle: "el ticket de Shalom es solo para pedidos de Shalom"};
   }
-  /* ⏳ GUÍA DEL PANEL AÚN POR DEJAR (registroShalom.situacion): el
-     comprobante lo emite Shalom en el MOSTRADOR, al recibir el paquete.
-     Antes de eso no existe, y pedirlo solo devolvía «no encontró esa guía».
-     Se dice sin gastar una llamada. Si escribiste OTRA guía en el
-     formulario (aún sin guardar), esa es tuya a mano: se pide normal. */
   const guiaPedido = String(pedido.trackingOrderNumber || pedido.shalomGuia ||
       "").trim();
   if (String(d.orderNumber || "").trim() === guiaPedido) {
@@ -53,8 +27,6 @@ async function jalar(datos, deps) {
         "VENCIDA"};
     }
   }
-  /* La cuenta de Shalom Pro: de la configuración del SERVIDOR (la guardó
-     «Conectar»). Lo que el navegador mandara con ese nombre se ignora. */
   const instanceId = String((deps.instancia && await deps.instancia()) || "")
       .trim();
   if (!instanceId) {
@@ -66,9 +38,6 @@ async function jalar(datos, deps) {
     orderCode: String(d.orderCode || "").trim(),
     instanceId: instanceId,
   });
-  /* Shalom no tiene el comprobante: si la guía es un envío PENDIENTE de tu
-     cuenta (escrita a mano, p. ej. registrada en pro.shalom.pe), no es un
-     error: el comprobante nace al dejar el paquete. */
   if (r && !r.ok && r.motivo === "NO_ENCONTRADO" && deps.esPendiente &&
       await deps.esPendiente(String(d.orderNumber || "").trim()) === true) {
     return {ok: false, motivo: "POR_DEJAR"};

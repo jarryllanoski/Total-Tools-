@@ -89,10 +89,10 @@ module.exports = async ({bloque, ok}) => {
     const c = E.leerReal('cliente/comun.js');
     const pr = E.leer('print.js');
     // eslint-disable-next-line no-new-func
-    const cseg = new Function('window', c.slice(c.indexOf('function codigoSeg('), c.indexOf('/* El TIPO de envío')) +
+    const cseg = new Function('window', c.slice(c.indexOf('function codigoSeg('), c.indexOf('function _tipoEnvioDe(name){')) +
         ';return codigoSeg;')({CodigoSeguimiento: CS});
     // eslint-disable-next-line no-new-func
-    const base = new Function('window', pr.slice(pr.indexOf('function _codigoBase(s){'), pr.indexOf('/* ★ ¿SE IMPRIMIÓ?')) +
+    const base = new Function('window', pr.slice(pr.indexOf('function _codigoBase(s){'), pr.indexOf('window.PrintModule.impreso = function(s){ return !!(s && (s.printed || s._printed)); };')) +
         ';return _codigoBase;')({CodigoSeguimiento: CS});
     [['id_1762790123456', '2026-11-10'], ['id_1752000009ABC', '2026-07-01'], ['id_1752000001234', '']].forEach(([id, f]) => {
       ok(cseg(id, f) === base({id, createdAt: f}), 'link y etiqueta dan el mismo código: ' + id + ' (' + (f || 'sin fecha') + ')');

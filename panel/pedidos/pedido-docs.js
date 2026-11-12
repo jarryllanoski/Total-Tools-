@@ -1,12 +1,3 @@
-/**
- * panel/pedidos/pedido-docs.js — WhatsApp, documentos, visor, links y monto del pedido
- * ============================================================================
- * Fase 3 (10/11/2026): el panel en módulos. Antes vivía en config.js.
- * Script CLÁSICO a propósito: sus funciones y variables son globales, igual
- * que cuando estaban en un solo archivo — moverlas no cambió ni una llamada.
- * El orden de los <script> en index.html es el orden de ejecución.
- */
-/* WA SHEET */
 let _waId=null, _waMsgIdx=-1;
 function openWA(id){
   _waId=id; _waMsgIdx=-1;
@@ -15,14 +6,11 @@ function openWA(id){
   const msgs=S.msgTemplates[s.status]||['',''];
   const hasMsg=(msgs[0]&&msgs[0].trim())||(msgs[1]&&msgs[1].trim());
 
-  // Sin docs marcados y sin mensajes → WhatsApp directo
   if(!gChk&&!tChk&&!eChk&&!hasMsg){
     window.waOpen(s.phone);
     return;
   }
 
-  // Sin docs marcados pero con mensajes → abrir sheet solo con mensajes
-  // Con docs marcados → abrir sheet completo
   $('waInfo').innerHTML=`<div style="font-weight:700;font-size:14px;margin-bottom:4px">${esc(s.name)}</div><div style="color:var(--blue)">📞 +51 ${esc(s.phone)}</div><div style="color:var(--text2);font-size:12px;margin-top:2px">🏠 ${esc(s.address)}</div>`;
   let html='';
   if(s.docTicket||s.docEmbalado||s.docGuia){
@@ -55,7 +43,7 @@ function togWADoc(slot){
   if(slot==='guia')s.chkGuia=!s.chkGuia;
   else if(slot==='embalado')s.chkEmbalado=!s.chkEmbalado;
   else s.chkTicket=!s.chkTicket;
-  save(s.id);render();openWA(_waId); // incremental: solo este pedido
+  save(s.id);render();openWA(_waId);
 }
 function selWAMsg(idx){
   _waMsgIdx=idx;
@@ -81,7 +69,6 @@ async function doWASend(){
       if(navigator.canShare&&navigator.canShare({files})){await navigator.share({files,title:s.name,text:msg||''});setTimeout(()=>window.open(`https://wa.me/${phone}${msg?'?text='+encodeURIComponent(msg):''}`,`_blank`),800);return}
     }catch(e){if(e.name==='AbortError')return}
   }
-  // Fallback screen
   const div=document.createElement('div');
   div.style.cssText='position:fixed;inset:0;background:#0d1117;z-index:600;overflow-y:auto;padding:16px';
   div.innerHTML=`<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
@@ -105,29 +92,17 @@ async function doWASend(){
   document.body.appendChild(div);
 }
 
-/* DOC MENU */
 function trigInp(inputId,slot){closeDocMenu(slot);setTimeout(()=>$(inputId).click(),50)}
 function toggleDocMenu(slot){const m=$('menu'+cap(slot));const o=m.classList.contains('open');document.querySelectorAll('.doc-menu').forEach(x=>x.classList.remove('open'));if(!o)m.classList.add('open')}
 function closeDocMenu(slot){const e=$('menu'+cap(slot));if(e)e.classList.remove('open')}
 document.addEventListener('click',e=>{if(!e.target.closest('.doc-sw')&&!e.target.classList.contains('doc-add'))document.querySelectorAll('.doc-menu').forEach(m=>m.classList.remove('open'))});
 
-/* DOC SLOTS */
 let _docs={guia:null,embalado:null,ticket:null};
-// Núcleo reutilizable: valida y guarda el archivo en un slot. Lo usan loadDoc
-// (input), dropDoc (arrastrar) y pasteDoc (portapapeles).
-// ★ Pedido EXISTENTE + Storage disponible → sube a Firebase Storage (URL que
-//   sincroniza en todos los dispositivos), igual que cámara/galería. Pedido
-//   NUEVO → base64 (storage.js lo migra a Storage al guardar). Así pegar y
-//   arrastrar dejan de guardarse solo como base64 (que se recorta a [img]).
 function _docToast(slot){ toast(slot==='guia'?'🚚 Guía subida ✓':slot==='embalado'?'📦 Foto de embalado subida ✓':'🧾 Documento subido ✓'); }
 function _procesarDoc(file,slot){
   if(!file)return;
   if(file.size>8*1024*1024){toast('⚠️ Máximo 8MB');return}
   var shipId=(typeof _editId!=='undefined')?_editId:null;
-  /* ★ fotos.js: comprime, sube con miniatura y, si no se puede subir, deja
-     la foto PENDIENTE (vista previa local) para la cola — nunca base64,
-     que al guardar terminaba en «[img]» y perdida. Pedido nuevo: pendiente
-     hasta guardar, porque aún no tiene id. */
   if(window.FotosModule){
     var F=window.FotosModule;
     if(!shipId){ _docs[slot]=F.marcaPendiente(file); refreshSlot(slot); toast('📎 Listo — se sube al guardar el pedido'); return; }
@@ -146,11 +121,8 @@ function _procesarDoc(file,slot){
     toast('⏳ Subiendo documento...');
     StorageModule.uploadFile(file,shipId,slot).then(function(docObj){
       _docs[slot]=docObj; refreshSlot(slot); _docToast(slot);
-      // Subir un documento ya NO mueve la etiqueta: el estado lo cambias tú.
     }).catch(function(e){
       console.warn('[Doc] Storage falló, usando base64:',e&&e.message);
-      // Si lo que falló fue la sesión, decirlo: el archivo quedó aquí, pero
-      // no está en la nube y eso se arregla volviendo a entrar, no esperando.
       var t = window._authTextoMotivo && window._authTextoMotivo(e);
       if(t) toast(t);
       _procesarDocBase64(file,slot);
@@ -165,7 +137,6 @@ function _procesarDocBase64(file,slot){
   r.readAsDataURL(file);
 }
 function loadDoc(input,slot){ _procesarDoc(input.files[0],slot); }
-// Arrastrar y soltar sobre el slot.
 function dragDoc(e,on){ e.preventDefault(); const t=e.currentTarget; if(t)t.classList.toggle('doc-drag',!!on); }
 function dropDoc(e,slot){
   e.preventDefault();
@@ -173,7 +144,6 @@ function dropDoc(e,slot){
   const f=e.dataTransfer&&e.dataTransfer.files&&e.dataTransfer.files[0];
   if(f)_procesarDoc(f,slot); else toast('⚠️ Suelta un archivo válido');
 }
-// Pegar imagen del portapapeles (icono 📋). Sin Ctrl+V.
 async function pasteDoc(slot){
   if(!navigator.clipboard||!navigator.clipboard.read){ toast('⚠️ Tu navegador no permite pegar aquí'); return; }
   try{
@@ -206,8 +176,6 @@ function refreshSlot(slot){
     if(btn)btn.style.display='block';act.style.display='none';lbl.className='doc-tap';return;
   }
   lbl.className='doc-tap '+m.cls;if(btn)btn.style.display='none';act.style.display='flex';
-  // Pendiente de subir: vista previa local y aviso. Si no, la miniatura
-  // (liviana) si la hay; la original se abre al tocar.
   const _marca = doc.pendiente ? '<div class="doc-ok" style="background:#d29922">⏳ por subir</div>' : '<div class="doc-ok">✓</div>';
   if(doc.t&&doc.t.startsWith('image/')){
     prev.innerHTML=`<div class="doc-full"><img src="${escH(doc.m||doc.d)}" decoding="async" style="width:100%;height:100%;object-fit:cover;display:block">${_marca}</div>`;
@@ -223,7 +191,6 @@ function viewSlot(slot){
   openViewer(d,labels[slot]||slot);
 }
 
-/* VIEWER */
 let _curDoc=null;
 function openViewer(doc,title){_curDoc=doc;if(doc.t&&doc.t.startsWith('image/')){$('viewerImg').src=doc.d;$('viewerTtl').textContent=title;$('viewer').classList.add('open')}else{const a=document.createElement('a');a.href=doc.d;a.target='_blank';a.click()}}
 function closeViewer(){$('viewer').classList.remove('open');$('viewerImg').src=''}
@@ -231,35 +198,28 @@ function dlDoc(){if(!_curDoc)return;const a=document.createElement('a');a.href=_
 function qView(shipId,slot){const s=S.shipments.find(x=>x.id===shipId);if(!s)return;const d=slot==='guia'?s.docGuia:slot==='embalado'?s.docEmbalado:s.docTicket;if(!d)return;openViewer(d,slot==='guia'?'🚚 Guía / Ticket':slot==='embalado'?'📦 Embalado':'🧾 Boleta / Factura')}
 $('viewer').addEventListener('click',e=>{if(e.target===$('viewer'))closeViewer()});
 
-/* LINKS */
 let _links=[];
 function addLink(){const v=$('fLink').value.trim();if(!v){toast('Ingresa un link');return}if(!v.startsWith('http')){toast('⚠️ Link inválido');return}const n=v.length>36?v.substring(0,36)+'…':v;_links.push({u:v,n});renderLinks();$('fLink').value='';toast('🔗 Agregado')}
 function removeLink(i){_links.splice(i,1);renderLinks()}
 function renderLinks(){$('linkListForm').innerHTML=_links.map((l,i)=>`<div class="link-item"><span>🔗</span><div class="link-name">${esc(l.n)}</div><a href="${esc(l.u)}" target="_blank" style="color:var(--blue);font-size:12px;text-decoration:none">↗</a><button class="link-del" type="button" onclick="removeLink(${i})">✕</button></div>`).join('')}
 
-/* MONTO / ADELANTO / DEUDA — deuda = max(0, monto − adelanto). El campo `cost`
-   del pedido guarda la DEUDA (lo leen 14 lugares que siguen funcionando igual). */
 function recalcDeuda(){
   const m=parseFloat(($('fMonto')||{value:''}).value)||0;
   const a=parseFloat(($('fAdelanto')||{value:''}).value)||0;
   const d=Math.max(0, m-a);
   const el=$('fDeudaDisplay'); if(!el) return;
-  el.style.color='';   // texto plano, sin color
-  // Pagado (monto>0 y deuda=0) → monto tachado. Debe / sin monto → texto normal.
-  // La regla vive en functions/montoPedido.js: la MISMA que la tarjeta.
+  el.style.color='';
   if(window.MontoPedido){ el.innerHTML=MontoPedido.html(MontoPedido.deDatos(m, a)); return; }
   const fmt=n=>'S/ '+(Math.round(n*100)/100).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
   if(m>0 && d<=0){ el.innerHTML='<s>'+fmt(m)+'</s>'; }
   else{ el.textContent=fmt(d); }
 }
-// Deuda: toca para desplegar/ocultar Monto/Adelanto (fila de abajo).
 function toggleDeuda(){
   const body=$('deudaBody'); if(!body) return;
   const abrir=(body.style.display==='none'||!body.style.display);
   body.style.display=abrir?'flex':'none';
   const ar=$('deudaArrow'); if(ar) ar.classList.toggle('open', abrir);
 }
-// Carga monto/adelanto/deuda al abrir el form. Pedido viejo: deriva monto=cost.
 function _loadMontoFields(s){
   let monto='', adel='';
   if(s){
@@ -268,12 +228,10 @@ function _loadMontoFields(s){
   }
   if($('fMonto')) $('fMonto').value=monto;
   if($('fAdelanto')) $('fAdelanto').value=adel;
-  const body=$('deudaBody'); if(body) body.style.display='none';   // colapsado al abrir
+  const body=$('deudaBody'); if(body) body.style.display='none';
   const ar=$('deudaArrow'); if(ar) ar.classList.remove('open');
   recalcDeuda();
 }
-/* ── "Sucio": ¿el formulario cambió respecto a como se abrió? Snapshot de los
-   campos clave. Sirve para no cerrar el modal al clic-fuera si hay cambios. */
 window._formSnap = '';
 function _formSnapshot(){
   const ids=['fName','fPhone','fDni','fAddr','fEncAgencia','fCourier','fDate',
@@ -288,10 +246,6 @@ window._formSnapshotDirty=function(){
   return typeof _formSnapshot==='function' && _formSnapshot()!==window._formSnap;
 };
 
-/* Chip de estado Shalom en el modal de editar (SOLO LECTURA).
-   Refleja s.trackingStatus tal cual está guardado — no consulta ni mueve nada.
-   Mismo criterio de color que _estadoChip de tracking.js, replicado inline para
-   no acoplar el modal a ese módulo. Sin estado → oculto (no muestra "—"). */
 function _pintarShalomEstado(estado){
   const el=$('fShalomEstado'); if(!el) return;
   const st=(estado||'').trim();
@@ -308,5 +262,4 @@ function _pintarShalomEstado(estado){
   el.style.display='inline-block';
 }
 
-/* FORM */
 let _editId=null;

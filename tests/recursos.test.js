@@ -178,7 +178,7 @@ module.exports = async ({bloque, ok}) => {
        los comunicados internos a quien pidiera esa URL. */
     const fidx = E.leer('functions/index.js');
     const pub = fidx.slice(fidx.indexOf('async function handleConfig'),
-        fidx.indexOf('// ── action=formcfg'));
+        fidx.indexOf('async function handleFormCfg(req, res) {'));
     ok(/config: configPublica\(d\.config\)/.test(pub) &&
        /const CONFIG_PUBLICA = \["name", "phone", "city"\];/.test(fidx),
        'la función pública devuelve de `config` SOLO nombre, celular y ' +
@@ -318,7 +318,7 @@ module.exports = async ({bloque, ok}) => {
     const fila = html.slice(html.indexOf('function _recFila(r){'),
         html.indexOf('function _recMosaicoCard(r){'));
     const mosaico = html.slice(html.indexOf('function _recMosaicoCard(r){'),
-        html.indexOf('/* ── Marcar ──'));
+        html.indexOf('function recMarcar(id){ if(_recSel.has(id)) _recSel.delete(id); else _recSel.add(id); recRender(); }'));
 
     [['la fila', fila], ['la tarjeta del mosaico', mosaico]].forEach(([nombre, t]) => {
       ok(/href="'\+escH\(r\.u\)\+'"/.test(t),
@@ -354,14 +354,14 @@ module.exports = async ({bloque, ok}) => {
   {
     // Guardar recursos NO puede costar lo que cuesta guardar los pedidos.
     const html = E.leer('index.html');
-    const conComentarios = html.slice(html.indexOf('/* ══ CENTRO DE RECURSOS'),
+    const conComentarios = html.slice(html.indexOf('let _recOrden = \'categoria\';'),
         html.indexOf('async function _pintarPuertaShalom'));
     /* Sin comentarios: se cuentan LLAMADAS, no prosa. Una explicación que
        menciona `save('config')` no es un guardado, y contarla haría que la
        prueba pasara o fallara según cómo esté redactado un comentario. */
     const bloqueRec = conComentarios
-        .replace(/\/\*[\s\S]*?\*\//g, '')
-        .replace(/^\s*\/\/.*$/gm, '');
+        
+        ;
     ok((bloqueRec.match(/save\('config'\)/g) || []).length === 2,
        'guardar y quitar usan `save(\'config\')`: sube UN documento, no los ' +
        '1169 pedidos');

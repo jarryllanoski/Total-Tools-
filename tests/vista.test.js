@@ -109,7 +109,7 @@ module.exports = (t) => {
     const sf = E.trozo('index.html', 'function setFilt(v){', 'function openChipSort');
     ok(/if\(v === _filt\) return;/.test(sf),
         'tocar el chip ya activo no repinta (el doble clic en TODOS costaba dos renders)');
-    const cs = E.trozo('index.html', 'function clearSearch()', '/* FILTER CHIPS */');
+    const cs = E.trozo('index.html', 'function clearSearch()', 'let _filt=\'\';');
     ok(/if\(!inp\.value\)\{ inp\.focus\(\); return; \}/.test(cs), 'la lupa con el campo vacío tampoco');
     ok(/clearTimeout\(_buscarTimer\)/.test(cs), 'y cancela el render pendiente del freno');
   }
@@ -133,12 +133,12 @@ module.exports = (t) => {
     /* Fase 7: seleccion.js es un módulo del panel (panel/pantalla/). Su
        contenido entra en línea en su sitio; el primer USO es el primer
        script que llama a `Seleccion.` y no es seleccion.js mismo. */
-    const posArchivo = html.indexOf(' * panel/pantalla/seleccion.js — ');
+    const posArchivo = html.indexOf('  var _ids = new Set();');
     let posUso = -1;
     const re = /<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/g;
     let m;
     while ((m = re.exec(html))) {
-      if (m[1].indexOf(' * panel/pantalla/seleccion.js — ') >= 0) continue;
+      if (m[1].indexOf('  var _ids = new Set();') >= 0) continue;
       const i = m[1].indexOf('Seleccion.');
       if (i >= 0) { posUso = m.index + i; break; }
     }

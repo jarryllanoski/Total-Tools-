@@ -1,13 +1,3 @@
-/* ═══════════════════════════════════════════════════════════════════
-   TOBY — el guía de las ayudas (formulario, seguimiento y panel).
-   UNA pieza para las tres: el mismo globo, el mismo estilo, sin copias.
-   · La imagen (narrador/toby.webp, ~9 KB) se pide SOLO cuando se abre una
-     ayuda: quien no la abre no descarga nada.
-   · Sin imagen (falla de red), queda el globo de texto.
-   · Cero lecturas y escrituras: Toby dice lo que ya está en pantalla.
-   Uso:  Toby.globo('Texto con <b>HTML ya escapado</b>', 'Guía de pedidos')
-         → devuelve el HTML del globo (y pone su CSS una sola vez).
-   ═══════════════════════════════════════════════════════════════════ */
 (function(){
   'use strict';
   var BASE=(function(){ var s=document.currentScript; return (s&&s.src)?s.src.replace(/[^/]*$/,''):'narrador/'; })();
@@ -26,7 +16,6 @@
     var st=document.createElement('style'); st.id='tobyCss'; st.textContent=CSS;
     (document.head||document.documentElement).appendChild(st);
   }
-  /* `texto` llega YA escapado por quien llama (puede traer <b>). */
   function globo(texto, rol){
     css();
     return '<div class="toby">'

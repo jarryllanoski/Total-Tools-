@@ -1,12 +1,3 @@
-/**
- * panel/pantalla/lista.js — la lista de envíos: estadísticas, búsqueda, chips, tarjetas y selección
- * ========================================================================================
- * Fase 3 (10/11/2026): el panel en módulos. Antes vivía en index.html.
- * Script CLÁSICO a propósito: sus funciones y variables son globales, igual
- * que cuando estaban en un solo archivo — moverlas no cambió ni una llamada.
- * El orden de los <script> en index.html es el orden de ejecución.
- */
-/* STATS */
 function updateStats(){
   if(_filt==='EN PROCESO'){
     renderStatsAsSuppliers();
@@ -80,8 +71,6 @@ function renderStatsAsSuppliers(){
 
 function openAllLabels(){
   const all=allStatuses();
-  // UNA pasada sobre los pedidos, no una por etiqueta. Antes esto recorría
-  // los 1039 pedidos once veces (una por etiqueta) para contar y sumar.
   const porEtiqueta={};
   S.shipments.forEach(x=>{
     const g=porEtiqueta[x.status]||(porEtiqueta[x.status]={cnt:0,deuda:0});
@@ -93,9 +82,6 @@ function openAllLabels(){
     ...all.map((st,i)=>{
       const g=porEtiqueta[st]||{cnt:0,deuda:0};
       const cnt=g.cnt;
-      // Solo estados ACTIVOS (antes de FINALIZADO) muestran deuda. Finalizado y
-      // lo que va después → como antes (solo el conteo). Monto centrado; conteo
-      // a la derecha (su posición de siempre).
       const finIdx=all.indexOf('FINALIZADO');
       const activo=(finIdx<0)||(i<finIdx);
       const deuda=g.deuda;
@@ -109,7 +95,6 @@ function openAllLabels(){
   openOverlay('allLabelsOverlay');
 }
 
-/* ⚡ SINCRONIZACIÓN (Fase 2) — estado y controles en 📦. */
 function pintarSync(){
   const el=$('syncEstado'); if(!el) return;
   const chk=$('syncRapidaChk'); if(chk) chk.checked=window._syncRapidaActiva?window._syncRapidaActiva():true;
@@ -133,8 +118,6 @@ function syncRapidaCambiar(on){
   pintarSync();
 }
 
-/* ADVANCED SEARCH */
-/* `campo`: qué fecha mira el rango — 'envio' (como siempre) o 'registro'. */
 function _advVacio(){ return {campo:'envio',dateFrom:'',dateTo:'',couriers:[],costMin:'',costMax:'',doc:'any',sort:'newest'}; }
 let _adv=_advVacio();
 let _advActive=false;
@@ -157,8 +140,6 @@ function toggleAsCourier(c){
   if(idx>=0) _adv.couriers.splice(idx,1); else _adv.couriers.push(c);
   document.querySelectorAll('.as-courier-chip').forEach(el=>el.classList.toggle('active',_adv.couriers.includes(el.textContent.replace('🚚 ','').trim())));
 }
-/* ¿«Hoy» está puesto? Registro, y Desde = Hasta = hoy en Lima. No es un
-   modo escondido: se deduce de lo que se ve en los campos. */
 function _asEsHoy(campo, desde, hasta){
   const hoy = (typeof FechaPedido!=='undefined') ? FechaPedido.hoyLima() : '';
   return campo==='registro' && !!hoy && desde===hoy && hasta===hoy;
@@ -200,7 +181,6 @@ function updateAdvBar(){
     `<div class="active-filter-tag" style="cursor:pointer;background:rgba(247,129,102,.12);border-color:rgba(247,129,102,.3);color:var(--red)" onclick="clearAdvSearch()">✕ Limpiar</div>`;
 }
 
-/* BULK STATUS CHANGE */
 function bulkChangeStatus(){
   const sel=Seleccion.marcados();
   if(!sel.length){ toast('No hay clientes seleccionados'); return; }
@@ -216,7 +196,6 @@ function bulkChangeStatus(){
 
 function applyBulkStatus(st){
   const sel=Seleccion.marcados();
-  // Marcar como sucio solo cada pedido cambiado (no reescribir los ~170).
   sel.forEach(s=>{ s.status=st; save(s.id); });
   Seleccion.limpiar();
   render();
@@ -226,15 +205,14 @@ function applyBulkStatus(st){
 
 function clearSearch(){
   const inp=$('fSearch');
-  if(!inp.value){ inp.focus(); return; }   // ya estaba vacío: nada que repintar
+  if(!inp.value){ inp.focus(); return; }
   inp.value=''; inp.focus();
-  clearTimeout(_buscarTimer);              // que no llegue después el render del freno
+  clearTimeout(_buscarTimer);
   render();
 }
 
-/* FILTER CHIPS */
 let _filt='';
-let _chipSort={}; // per-label sort: {label: 'courier_date'|'date'|'name'|'cost'}
+let _chipSort={};
 
 function renderChips(){
   const all=allStatuses();
@@ -248,53 +226,24 @@ function renderChips(){
       ondblclick="openChipSort('${v}')"
     >${stIcon(v)} ${v}${sortIcon?` <span style="font-size:9px">${sortIcon}</span>`:''}</div>`;
   }).join('') + _chipSinEtiqueta();
-  // Si la etiqueta activa quedó fuera del carrusel —al elegirla desde el
-  // listado completo, por ejemplo— se trae a la vista. Solo mueve el
-  // carrusel, nunca la página.
   if(window.ChipsNav) window.ChipsNav.verActivo();
 }
-/* «🏷️ SIN ETIQUETA» solo aparece cuando hay pedidos así: borrar una
-   etiqueta no borra sus pedidos, los deja aquí hasta que los muevas. */
 function _chipSinEtiqueta(){
   const n=pedidosSinEtiqueta().length;
   if(!n){ if(_filt===SIN_ETIQUETA) _filt=''; return ''; }
   return `<div class="chip ${_filt===SIN_ETIQUETA?'active':''}" onclick="setFilt(SIN_ETIQUETA)" title="Pedidos cuya etiqueta se borró">🏷️ SIN ETIQUETA <span style="font-size:10px;opacity:.7">${n}</span></div>`;
 }
 function setFilt(v){
-  // Cambiar a otro estado apaga el modo "cambiar etiqueta por QR".
   if(_qrMove.on && v!==_qrMove.status){ _qrMoveClearTimer(); _qrMove.on=false; _qrMove.status=''; _qrMove.last=null; _qrMove.shown=null; }
-  // Tocar el chip que YA está activo no cambia nada: no hay por qué
-  // reconstruir la lista. Es lo que hacía que el doble clic en TODOS
-  // costara dos reconstrucciones antes de abrir el listado de etiquetas.
   if(v === _filt) return;
   _filt=v;renderChips();render();
 }
 
-/* ══════════════════════════════════════════════════════════════════════
-   NAVEGAR ENTRE ETIQUETAS con las flechas ‹ › del carrusel
-   ══════════════════════════════════════════════════════════════════════
-   Las flechas ya no desplazan la fila: cambian la etiqueta activa, una por
-   toque. Desplazarla era un botón caro para algo que el dedo ya hace; en
-   cambio "etiqueta anterior / siguiente" no tenía atajo — había que buscar
-   el chip con la vista y apuntarle. La fila se mueve igual, pero como
-   CONSECUENCIA: renderChips() trae el chip activo a la vista.
-
-   El recorrido vive ACÁ y no en floatpanel.js a propósito: `_filt` y
-   `S.labels` son de este archivo. Que el carrusel tuviera que alcanzar un
-   `let` de otro script para decidir sería el tipo de acoplamiento que se
-   rompe en silencio (ver la comprobación de window.X en el CI).
-
-   TODOS es la primera posición: es el filtro vacío. */
 function _secuenciaFiltros(){ return ['', ...allStatuses()]; }
 
-/* ¿Hay etiqueta hacia ese lado? Lo usa el carrusel para mostrar u ocultar
-   cada flecha. Sin dar la vuelta: de la última no se salta a TODOS. El chip
-   TODOS está siempre visible y a un toque, así que dar once vueltas para
-   volver no aporta — y que la flecha desaparezca es la señal más clara de
-   que llegaste al final. */
 function filtroPuedeIr(dir){
   const sec=_secuenciaFiltros();
-  let i=sec.indexOf(_filt); if(i<0) i=0;   // etiqueta borrada en Config
+  let i=sec.indexOf(_filt); if(i<0) i=0;
   const j=i+dir;
   return j>=0 && j<sec.length;
 }
@@ -306,14 +255,8 @@ function navFiltro(dir){
   const j=i+dir;
   if(j<0 || j>=sec.length) return;
   const destino=sec[j];
-  // Mismo apagado del modo "cambiar etiqueta por QR" que setFilt.
   if(_qrMove.on && destino!==_qrMove.status){ _qrMoveClearTimer(); _qrMove.on=false; _qrMove.status=''; _qrMove.last=null; _qrMove.shown=null; }
   _filt=destino;
-  // Los chips, al instante: son 12 elementos y es la respuesta que esperas
-  // ver al tocar. La LISTA espera a que dejes de presionar — ir de TODOS a
-  // ENVIADO son cinco toques, y montar cinco listas de las que solo miras
-  // la última es trabajo tirado. Importa sobre todo al pasar de largo por
-  // FINALIZADO, que son 924 tarjetas.
   renderChips();
   if(window.ChipsNav) window.ChipsNav.actualizarFlechas();
   clearTimeout(_navFiltroTimer);
@@ -321,7 +264,6 @@ function navFiltro(dir){
 }
 
 function openChipSort(label){
-  // Abrir el sheet de OTRO estado también apaga el modo (evita confusión).
   if(_qrMove.on && label!==_qrMove.status){ _qrMoveClearTimer(); _qrMove.on=false; _qrMove.status=''; _qrMove.last=null; _qrMove.shown=null; }
   _filt=label; renderChips(); render();
   _qrMoveSetupSheet(label);
@@ -341,21 +283,6 @@ function setChipSort(v){
   toast('↕️ Orden actualizado');
 }
 
-/* RENDER */
-/* Fuente ÚNICA de verdad de "qué envíos se están mostrando": aplica la
-   etiqueta activa (_filt), la búsqueda y los filtros avanzados. La usan
-   render() (lo que se pinta) y selAll() (lo que se selecciona), para que
-   nunca se desincronicen. No ordena (el orden es solo visual). */
-/* ¿Está la vista mostrando SOLO los activos?
-   TODOS quiere decir "lo que tengo entre manos", no "todo lo que existió".
-   924 de 1040 pedidos están FINALIZADO: mostrarlos en la vista de trabajo
-   son 9 veces más tarjetas para ver 9 veces menos de lo que importa.
-
-   LA EXCEPCIÓN, y es la que hace que esto funcione: BUSCAR BUSCA EN TODO.
-   Consultar un pedido viejo por teléfono es justo para lo que se usa la
-   lupa; si la búsqueda respetara el filtro, buscar dejaría de encontrar
-   precisamente lo que se busca. En cuanto hay texto —o filtros avanzados—
-   los finalizados vuelven a entrar. */
 function _soloActivos(){
   return !_filt && !$('fSearch').value.trim() && !_advActive;
 }
@@ -366,7 +293,6 @@ function visibleShipments(){
   if(_filt===SIN_ETIQUETA){ const l=new Set(S.labels); data=data.filter(x=>!l.has(x.status)); }
   else if(_filt) data=data.filter(x=>x.status===_filt);
   else if(_soloActivos()) data=data.filter(x=>x.status!=='FINALIZADO');
-  // El N° de factura/boleta entra con su propia regla: «f001 123» encuentra F001-123.
   if(srch) data=data.filter(x=>x.name.toLowerCase().includes(srch)||x.phone.includes(srch)||(_dniDe(x)&&_dniDe(x).includes(srch))||x.address.toLowerCase().includes(srch)||x.courier.toLowerCase().includes(srch)||(typeof NroComprobante!=='undefined'&&NroComprobante.coincide(x,srch)));
   if(_advActive){
     if(typeof FechaPedido!=='undefined'){
@@ -385,37 +311,8 @@ function visibleShipments(){
   return data;
 }
 
-/* ══════════════════════════════════════════════════════════════════════
-   REPINTAR — una sola puerta
-   ══════════════════════════════════════════════════════════════════════
-   `render()` reconstruye TODAS las tarjetas. Con 1039 pedidos son ~37 400
-   elementos (36 por tarjeta) que el navegador tiene que parsear, estilar y
-   maquetar. Es la operación más cara del panel, y hay 87 sitios que la
-   llaman — muchos en cadena: `save(); render();` y dos líneas después otro
-   `render()`. Cada eslabón pagaba el precio completo.
-
-   El caso que lo delató: el chip TODOS lleva `onclick` Y `ondblclick`. El
-   navegador dispara click, click, dblclick — así que abrir el listado de
-   etiquetas costaba DOS reconstrucciones completas antes de que el modal
-   apareciera.
-
-   Ahora `render()` no pinta: apunta. Todas las llamadas del mismo tick se
-   juntan en una sola pasada en el siguiente frame. Los 87 sitios quedan
-   arreglados sin tocar ninguno, y los que se escriban mañana también.
-
-   `renderYa()` existe para el caso raro que necesite el DOM al instante.
-   Hoy no lo usa nadie: se revisaron las 87 llamadas y ninguna lee el DOM
-   inmediatamente después. */
 let _renderPedido = false;
 
-/* ★ EL ESTADO DE «QUÉ PEDIDO ESTÁ MARCADO», fuera del DOM.
-   Vive aquí y no en una clase pegada a un elemento porque esta lista se
-   reconstruye entera en cada repintado: lo que se pega, se borra.
-
-   Y se declara AQUÍ, antes de `_renderAhora` y de `cardHTML`, que son
-   quienes lo leen. Con `let` hay zona muerta temporal: declararlo más abajo
-   —junto a `irAlPedido`, que es donde se escribe— funcionaría de milagro,
-   solo porque nadie pinta durante la carga. Un milagro no es una garantía. */
 let _pedidoMarcado = '';
 let _scrollPendiente = '';
 let _marcaTimer = null;
@@ -427,28 +324,18 @@ function render(){
 function renderYa(){ _renderPedido = false; _renderAhora(); }
 
 function _renderAhora(){
-  // Vigilante "llegó a destino" (agnóstico al motor A/B). Avisa por transición
-  // de estado; hook explícito, sin monkey-patch. Idempotente (avisa una vez).
   if(window.Tracking&&Tracking.checkDestinoAlerts)Tracking.checkDestinoAlerts();
   updateStats(); updateAdvBar(); _qrMoveIndicator();
-  // Resaltar en azul el botón "seleccionar todo" si hay algún pedido
-  // seleccionado. Va con guarda A PROPÓSITO: es cosmético, y que un botón sin
-  // colorear impida ver los 1044 pedidos sería absurdo. Es literalmente lo que
-  // pasaba — un ReferenceError aquí abortaba _renderAhora entero.
   if(window.Seleccion) Seleccion._pintarBoton();
-  let data=visibleShipments();   // etiqueta + búsqueda + avanzados (fuente única)
+  let data=visibleShipments();
 
-  // Ordenar por fecha de registro — más reciente primero
   data=data.slice().sort((a,b)=>{
     const ta=a.createdAt?new Date(a.createdAt).getTime():(a._localTs||0);
     const tb=b.createdAt?new Date(b.createdAt).getTime():(b._localTs||0);
     return tb-ta;
   });
 
-  // Ordenamiento (los filtros avanzados ya se aplicaron en visibleShipments)
   if(_advActive){
-    // Con «Fecha de registro», más reciente/antiguo es por CUÁNDO ENTRÓ (con
-    // hora, no solo el día). Con «Fecha de envío», como siempre.
     const _tsReg=x=>{ const t=x.createdAt?new Date(x.createdAt).getTime():0; return isNaN(t)?0:t; };
     if(_adv.campo==='registro' && (_adv.sort==='oldest'||_adv.sort==='newest'))
       data=[...data].sort((a,b)=>_adv.sort==='oldest' ? _tsReg(a)-_tsReg(b) : _tsReg(b)-_tsReg(a));
@@ -457,7 +344,6 @@ function _renderAhora(){
     else if(_adv.sort==='name') data=[...data].sort((a,b)=>a.name.localeCompare(b.name));
     else if(_adv.sort==='cost') data=[...data].sort((a,b)=>parseFloat(b.cost||0)-parseFloat(a.cost||0));
   } else {
-    // Default sort: by courier then by date
     const sort=_filt?(_chipSort[_filt]||'courier_date'):'courier_date';
     if(sort==='courier_date')      data=[...data].sort((a,b)=>a.courier.localeCompare(b.courier)||b.date.localeCompare(a.date));
     else if(sort==='date')         data=[...data].sort((a,b)=>(b.date||'').localeCompare(a.date||''));
@@ -465,8 +351,6 @@ function _renderAhora(){
     else if(sort==='cost')         data=[...data].sort((a,b)=>parseFloat(a.cost||0)-parseFloat(b.cost||0));
     else if(sort==='cost_desc')    data=[...data].sort((a,b)=>parseFloat(b.cost||0)-parseFloat(a.cost||0));
   }
-  // Modo escaneo: tras escanear, la lista muestra SOLO ese pedido (movido o ya-en-estado).
-  // Al salir del modo o revertir (shown=null) vuelve la lista completa.
   if(_qrMove.on && _qrMove.shown){
     data = data.filter(x=>x.id===_qrMove.shown);
   }
@@ -484,9 +368,6 @@ function _renderAhora(){
       : '<div class="empty-st"><div style="font-size:36px">📭</div><p style="margin-top:10px">Sin envíos. Presiona ➕</p></div>';
     return;
   }
-  // Los finalizados escondidos se ANUNCIAN. Una lista que oculta cosas sin
-  // decirlo se siente rota; con el número delante y un toque para llegar a
-  // ellos, es una decisión visible.
   const _ocultos = _soloActivos()
     ? S.shipments.filter(x=>x.status==='FINALIZADO').length : 0;
   const _pieOcultos = _ocultos
@@ -503,13 +384,6 @@ function _renderAhora(){
       ${items.map(s=>cardHTML(s)).join('')}
     </div>`).join('') + _pieOcultos;
 
-  /* ★ Y EL SCROLL, DESPUÉS DE PINTAR. Antes se hacía antes, desde
-     `irAlPedido`, sobre la lista vieja: se desplazaba dentro de TODOS y
-     justo después la lista se reemplazaba por la de otra etiqueta, así que
-     la posición acababa apuntando a cualquier otra tarjeta.
-     Aquí la tarjeta existe con certeza —se acaba de escribir en la línea de
-     arriba— y la lista es la definitiva. No hay nada que esperar ni que
-     reintentar. */
   if(_scrollPendiente){
     const _c = area.querySelector('.card[data-id="' +
       String(_scrollPendiente).replace(/["\\]/g, '\\$&') + '"]');
@@ -521,13 +395,9 @@ function _renderAhora(){
   }
 }
 
-/* Sanitización XSS: datos de pedidos vienen del formulario público */
 function escH(s){ return s==null?'':String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
-/* Escape para strings dentro de onclick='...(' (comillas simples / backslash) */
 function escJs(s){ return String(s==null?'':s).replace(/\\/g,'\\\\').replace(/'/g,"\\'"); }
 
-/* ── Encabezado de courier: icono, seleccionar, imprimir, scroll por tarjeta ── */
-// Icono según el courier (reusa el criterio del formulario).
 function _courierIcon(name){
   var u=(name||'').toUpperCase();
   if(u.includes('SHALOM'))                              return '🚌';
@@ -539,42 +409,25 @@ function _courierIcon(name){
   if(u.includes('ENCOMIENDA')||u.includes('OTRAS'))     return '📦';
   return '🚚';
 }
-// Imprimir SOLO lo seleccionado de ese courier (contrato único, como el resto de
-// la app: imprimir = lo seleccionado). Si no hay ninguno seleccionado en ese
-// courier, NO imprime nada y guía con un aviso (evita el "imprime todo" que
-// confundía y también el no-op silencioso). Reusa PrintModule.openList.
 function printGroup(courier){
   let sel=visibleShipments().filter(s=>s.courier===courier && Seleccion.tiene(s.id));
   if(!sel.length){ if(window.toast) toast('Selecciona pedidos de '+courier+' para imprimir 🖨️'); return; }
-  // DELIVERY: imprimir las etiquetas en el MISMO orden que la ruta (fuente única).
   if(courier&&courier.toUpperCase().includes('DELIVERY')&&window.DeliveryModule&&DeliveryModule.sortForRoute){
     sel=DeliveryModule.sortForRoute(sel);
   }
   if(window.PrintModule) PrintModule.openList(sel.map(s=>s.id));
   else if(window.toast) toast('Impresión no disponible');
 }
-/* ★ LO FIJO ARRIBA — UNA sola medida (30/10/2026): barra superior + pestañas
-   «Envíos · Compartir · Config» (fijas desde el 26/10) + el encabezado del
-   courier de esa tarjeta. Antes ▲▼ no contaba las pestañas y la tarjeta
-   quedaba ESCONDIDA debajo de ellas (se veía la dirección, no el nombre), y
-   al volver a tocar creía seguir en la misma. Medido en vivo, sin píxeles
-   fijos: rotar, teclado o una barra más alta no lo descuadran. */
 function _altoFijoArriba(card){
   const alto=(e)=>e?e.getBoundingClientRect().height:0;
   const grupo=card&&card.closest?card.closest('.cgroup'):null;
   const ch=(grupo&&grupo.querySelector('.cgroup-hdr'))||document.querySelector('.cgroup-hdr');
-  // El encabezado del courier se pega en SU «top» del CSS (= barra + pestañas):
-  // su borde de abajo, ya pegado, es donde termina todo lo fijo. Así la cuenta
-  // es la misma que usa el navegador para pegarlo (una sola verdad).
   if(ch){ const top=parseFloat(getComputedStyle(ch).top); if(isFinite(top)) return top+alto(ch); }
   return alto(document.querySelector('.hdr'))+alto(document.querySelector('.tabs'))+(ch?alto(ch):44);
 }
-// Desplazar UNA tarjeta a la vez (▼ siguiente, ▲ anterior), dejándola justo
-// debajo de todo lo fijo (con su nombre visible).
 function scrollCard(dir){
   const cards=document.querySelectorAll('#cardsArea .card');
   if(!cards.length) return;
-  // «Tarjeta actual» = la de top más cercano a la línea bajo lo fijo.
   let cur=0, best=Infinity;
   for(let i=0;i<cards.length;i++){
     const d=Math.abs(cards[i].getBoundingClientRect().top-(_altoFijoArriba(cards[i])+6));
@@ -585,10 +438,6 @@ function scrollCard(dir){
   window.scrollTo({top:Math.max(0,y), behavior:'smooth'});
 }
 function escU(u){ u=String(u==null?'':u).trim(); return (/^https?:\/\//i.test(u)||/^data:image\//i.test(u))?escH(u):'#'; }
-/* El monto de la tarjeta. Pedidos de hoy en adelante: la regla única de
-   functions/montoPedido.js (debe · S/ 0.00 · tachado si pagó, redondeado).
-   Pedidos de antes: EXACTAMENTE lo de siempre — el dueño pidió no cambiarle
-   la cara a los de ayer. */
 function _montoCard(s){
   if(typeof MontoPedido!=='undefined' && MontoPedido.esNuevo(s)){
     const e=MontoPedido.de(s);
@@ -596,10 +445,6 @@ function _montoCard(s){
   }
   return s.cost?`<span class="meta">💰 S/ ${escH(s.cost)}</span>`:'';
 }
-/* 🖨️ de la tarjeta: imprime SOLO este pedido (el mismo panel de impresión
-   de siempre, vía PrintModule.openOne, sin tocar la selección). Círculo
-   con borde azul si ya se imprimió; sin color si no. La respuesta a «¿se
-   imprimió?» es una sola: PrintModule.impreso. */
 function _btnImprimir(s){
   const on = (window.PrintModule && PrintModule.impreso) ? PrintModule.impreso(s) : !!(s && s.printed);
   return `<button class="wa-btn prn-btn${on?' on':''}" onclick="event.stopPropagation();if(window.PrintModule)PrintModule.openOne('${s.id}')" title="${on?'Impreso — imprimir otra vez':'Imprimir este pedido'}">🖨️</button>`;
@@ -609,22 +454,6 @@ function cardHTML(s){
   const msgs=S.msgTemplates[s.status]||['',''];
   const m1=msgs[0]&&msgs[0].trim(), m2=msgs[1]&&msgs[1].trim();
   const pvtNote=s.privateNote||'';
-  /* ★ LA MARCA SE DIBUJA CON LA TARJETA, no se pega encima.
-     Antes `irAlPedido` hacía `c.classList.add(...)` sobre el elemento que
-     encontraba. Pero esta lista se reconstruye ENTERA en cada repintado
-     —`area.innerHTML = …`— así que cualquier cosa que repintara borraba la
-     marca: una sincronización de la nube, un pedido nuevo, o el propio
-     cambio de filtro que `irAlPedido` acababa de pedir.
-
-     Ese último caso es el que veía el dueño: estando en TODOS, la tarjeta
-     YA estaba en pantalla, se marcaba al instante, y medio segundo después
-     el repintado la destruía. Desde otra etiqueta funcionaba porque la
-     tarjeta NO estaba y había que esperar al repintado — encontrarla
-     demasiado pronto era peor que no encontrarla.
-
-     Ahora la marca es ESTADO, y el repintado la vuelve a pintar. Sobrevive
-     a cuantos repintados hagan falta, que es lo que no podía hacer una
-     clase puesta a mano. */
   const _marcada = (_pedidoMarcado === s.id) ? ' notify-card-highlight' : '';
   return `<div class="card${_marcada}" data-id="${s.id}">
     <div class="card-top">
@@ -666,9 +495,6 @@ function cardHTML(s){
   </div>`;
 }
 
-/* Bloque MOTORIZADO en la tarjeta — mismo patrón/CSS que el bloque de Tracking
-   Shalom (.trk-block), pero para DELIVERY. Solo aparece si hay motorizado; se
-   edita en el ✏️ del pedido, como la guía Shalom. */
 function dlvDriverBlock(s){
   if(!(s.courier||'').toUpperCase().includes('DELIVERY')) return '';
   const drv=s._dlvDriver||'', tel=s._dlvDriverPhone||'', link=s._dlvRutaLink||'';
@@ -686,12 +512,6 @@ function dlvDriverBlock(s){
   </div>`;
 }
 
-/* La miniatura de un documento en la tarjeta. ★ La versión LIVIANA (`m`,
-   ~20 KB) si existe, y `loading="lazy"`: solo se descarga lo que está en
-   pantalla. Antes cada tarjeta bajaba la foto original de 3–8 MB para
-   enseñarla en 52×66 px, todas a la vez — por eso a veces no se pintaban.
-   Las fotos de antes (sin miniatura) siguen saliendo, también diferidas.
-   Una foto pendiente de subir enseña ⏳ (su vista previa es local). */
 function _docMini(doc, icono){
   if(doc && doc.pendiente) return `<div class="doc-thumb-pdf" title="Por subir"><span style="font-size:18px">⏳</span></div>`;
   if(doc && doc.t && doc.t.startsWith('image/') && doc.d && doc.d!=='[img]'){
@@ -723,39 +543,17 @@ function cardDocs(s,gChk,tChk,eChk){
   </div>`;
 }
 
-/* SELECT */
-// La selección es estado EFÍMERO de UI: se guarda solo en local, nunca en
-// Firestore. Antes, save() sin id reescribía los ~170 pedidos por cada click
-// de checkbox (causa del pico de escrituras). saveLocal() no toca Firestore.
 function saveLocal(){ try{ _guardarCopiaLocal(); }catch(e){} }
-/* Marcar una casilla NO cambia la lista: cambia una casilla. Antes esto
-   llamaba a saveLocal() + render(), es decir, serializaba el estado completo
-   (~0,7 MB con 1039 pedidos) y reconstruía las ~1039 tarjetas con innerHTML.
-   Por un clic. Ahora Seleccion pinta esa casilla y el botón de "todos", y
-   nada más se mueve. */
 function toggleSel(id){ Seleccion.alternar(id); }
 function selAll(){
-  // DESELECCIONAR es GLOBAL: si hay CUALQUIER selección (en esta etiqueta o en
-  // otra), un toque limpia TODO, sin importar dónde se marcó. SELECCIONAR es
-  // contextual: solo si no hay nada seleccionado en ningún lado, marca lo
-  // VISIBLE de la etiqueta actual.
   if(Seleccion.hayAlguno()) Seleccion.limpiar();
   else Seleccion.marcar(visibleShipments().map(x=>x.id));
-  // Sin render(): Seleccion repinta las casillas que hay en pantalla. Con 1039
-  // pedidos, render() rehace ~50 000 nodos; esto toca una clase por tarjeta.
 }
 
-/* Buscar: se espera a que dejes de escribir.
-   Cada render() con TODOS reconstruye ~1039 tarjetas (~50 000 nodos) y obliga
-   al navegador a recalcular el layout entero. Atado a `oninput` sin freno, eso
-   pasaba una vez POR TECLA: escribir "mariano" eran siete reconstrucciones
-   completas, y por eso la lupa se sentía trabada. 150 ms es el punto en que ya
-   no se acumulan pulsaciones y todavía se siente inmediato. */
 let _buscarTimer=null;
 function buscarDebounce(){
   clearTimeout(_buscarTimer);
   _buscarTimer=setTimeout(render, 150);
 }
 
-/* DOC TOGGLE */
 function togDoc(id,slot){const s=S.shipments.find(x=>x.id===id);if(!s)return;if(slot==='guia')s.chkGuia=!s.chkGuia;else if(slot==='embalado')s.chkEmbalado=!s.chkEmbalado;else s.chkTicket=!s.chkTicket;save(id);render()}

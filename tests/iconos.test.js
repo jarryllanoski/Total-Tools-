@@ -8,7 +8,7 @@ const TIPOGRAFICOS = new Set(['→', '←', '↑', '↓', '↕', '↗', '↩', '
 const EMOJI = /[\u{1F000}-\u{1FAFF}\u{2190}-\u{21FF}\u{2300}-\u{23FF}\u{25A0}-\u{25FF}\u{2600}-\u{27BF}\u{2B00}-\u{2BFF}]/gu;
 
 function sinComentarios(t) {
-  return t.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '').replace(/<!--[\s\S]*?-->/g, '');
+  return t;
 }
 
 module.exports = async ({bloque, ok}) => {

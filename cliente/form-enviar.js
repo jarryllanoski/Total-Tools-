@@ -1,17 +1,5 @@
-/**
- * cliente/form-enviar.js — confirmar el pedido, el WhatsApp y la confirmación en el sitio
- * ========================================================================================
- * Fase 5 (11/11/2026): el formulario en módulos. Antes era cliente/formulario.js
- * (y antes, el script en línea de formulario.html), envuelto en una función.
- * Script CLÁSICO: sus declaraciones son globales y los módulos se ven entre
- * sí por su nombre, como el panel. El orden de los <script> es el de
- * ejecución, y init() corre en form-arranque.js, cuando ya existe todo.
- */
 'use strict';
 
-/* ─── SUBMIT ────────────────────────────────────────────────────── */
-/* ─── Mensaje de WhatsApp (centralizado y mejorado) ──────────────── */
-// Construye el texto del pedido para WhatsApp con mejor formato.
 function _construirWaMsg(order, trackCode, trackToken){
   const bizName  = (CFG&&(CFG.config&&CFG.config.name||CFG.name))||'Mi Negocio';
   const dateLabel = order.date
@@ -20,31 +8,22 @@ function _construirWaMsg(order, trackCode, trackToken){
   const trackUrl = `${location.origin}${location.pathname.replace(/[^/]*$/, 'seguimiento.html')}?seg=${trackToken}`;
 
   const refLine  = order.referencia    ? `\n📌 *Referencia:* ${order.referencia}` : '';
-  /* ★ La PUERTA, tocable: solo en delivery y solo si el cliente dio o
-     confirmó su punto. Sale de order.gpsCoords — lo MISMO que guarda el
-     pedido: el panel y el WhatsApp no pueden decir dos cosas distintas. */
   const _mapaUrl = selCourierType==='delivery' ? EnlaceMapa.de(order.gpsCoords) : '';
   const mapaLine = _mapaUrl ? `\n🗺️ *Ubicación exacta:* ${_mapaUrl}` : '';
-  // DNI: fuente única = order.dni (llega en todos los couriers). La etiqueta
-  // solo cambia el matiz según el tipo de envío.
   const _dniLbl  = selCourierType==='agencia'    ? 'DNI para recoger'
                  : selCourierType==='encomienda'  ? 'DNI destinatario'
                  :                                   'DNI';
   const dniLine  = order.dni ? `\n🪪 *${_dniLbl}:* ${order.dni}` : '';
   const encLine  = order.ciudadDestino ? `\n📦 *Ciudad destino:* ${order.ciudadDestino}` : '';
   const notesLine= order.notes ? `\n📝 *Notas:* ${order.notes}` : '';
-  /* N° de factura/boleta: lo puso la tienda en el link y lo devuelve el
-     servidor al crear el pedido (el cliente no lo escribe). Solo letras,
-     números y guion — ya viene limpio, pero se vuelve a filtrar. */
   const _nroTxt  = String(order.nroComprobante||'').replace(/[^A-Z0-9-]/g,'').slice(0,20);
   const nroLine  = _nroTxt ? `\n🧾 *Factura/Boleta:* ${_nroTxt}` : '';
   const dirLabel = selCourierType==='agencia'
     ? `\n🏢 *Agencia:* ${order.address||'—'}`
     : selCourierType==='retiro'
-      ? `\n🏪 *Retiro en tienda*`            // no hay dirección del cliente: decirlo, no «—»
+      ? `\n🏪 *Retiro en tienda*`
       : `\n🏠 *Dirección:* ${order.address||order.ciudadDestino||'—'}`;
 
-  // Mensaje con formato mejorado (negritas de WhatsApp con *, secciones claras)
   return `🛒 *NUEVO PEDIDO* — ${bizName}\n`+
     `━━━━━━━━━━━━━━━\n`+
     `👤 *Cliente:* ${order.name}\n`+
@@ -53,8 +32,6 @@ function _construirWaMsg(order, trackCode, trackToken){
     `🚚 *Courier:* ${order.courier}\n`+
     `📅 *Fecha de envío:* ${dateLabel}${notesLine}\n`+
     `━━━━━━━━━━━━━━━\n`+
-    /* Con factura/boleta, ESE es el código: sale solo él. Sin ella, el
-       código de seguimiento de siempre. */
     (nroLine ? `${nroLine.slice(1)}\n\n` : `🔑 *Código de seguimiento:* #${trackCode}\n\n`)+
     `📍 *Para ver el estado de tu pedido en tiempo real, abre este enlace:*\n${trackUrl}`;
 }
@@ -64,8 +41,6 @@ function _construirWaHref(order, trackCode, trackToken){
   bizPhone = String(bizPhone).replace(/\D/g,'');
   if(bizPhone.startsWith('51') && bizPhone.length>9) bizPhone = bizPhone.slice(2);
   const msg = _construirWaMsg(order, trackCode, trackToken);
-  // Con número del negocio → mensaje directo al negocio.
-  // Sin número (caso extremo) → abre WhatsApp con el mensaje listo para enviar.
   return bizPhone
     ? `https://wa.me/51${bizPhone}?text=${encodeURIComponent(msg)}`
     : `https://wa.me/?text=${encodeURIComponent(msg)}`;
@@ -88,12 +63,10 @@ async function submitOrder(){
 
   if(!selCourierName){ $('err_courier')&&$('err_courier').classList.add('show'); ok=false; }
   else               { $('err_courier')&&$('err_courier').classList.remove('show'); }
-  // Validación de agencia: si es OLVA/manual, leer directo del campo (robusto)
   const manualAgInput = $('agcManualInput');
   if(manualAgInput){
-    // Modo manual (OLVA): tomar lo escrito directamente
     const manualTxt = manualAgInput.value.trim();
-    agState.addr = manualTxt; // sincronizar por si acaso
+    agState.addr = manualTxt;
     if(selCourierType==='agencia' && !manualTxt){
       $('err_agency_manual')&&$('err_agency_manual').classList.add('show'); ok=false;
     } else {
@@ -107,14 +80,12 @@ async function submitOrder(){
   if(!selDateIso)    { $('err_date')&&$('err_date').classList.add('show'); ok=false; }
   else               { $('err_date')&&$('err_date').classList.remove('show'); }
 
-  // DNI (paso 1): obligatorio para todos (8 dígitos) — red de seguridad.
   {
     const dni=($('f_dni')||{value:''}).value.trim();
     if(!/^\d{8}$/.test(dni)){ $('err_dni')&&$('err_dni').classList.add('show'); ok=false; }
     else                    { $('err_dni')&&$('err_dni').classList.remove('show'); }
   }
 
-  // Encomienda: validate ciudad
   if(selCourierType==='encomienda'){
     const ciudad=($('f_ciudad')||{value:''}).value.trim();
     if(!ciudad){ $('err_ciudad')&&$('err_ciudad').classList.add('show'); ok=false; }
@@ -135,7 +106,7 @@ async function submitOrder(){
   let deliveryAddress='';
   let referencia='';
   if(selCourierType==='delivery'){
-    deliveryAddress=getDeliveryAddr();   // fuente única (misma que usa la boleta)
+    deliveryAddress=getDeliveryAddr();
     referencia=($('f_ref')||{value:''}).value.trim();
     if(!deliveryAddress){$('err_deliveryAddr')&&$('err_deliveryAddr').classList.add('show');ok=false;}
     else               {$('err_deliveryAddr')&&$('err_deliveryAddr').classList.remove('show');}
@@ -144,26 +115,20 @@ async function submitOrder(){
   if(!ok) return;
 
   let fullNotes=($('f_notes')||{value:''}).value.trim();
-  const _dni             = ($('f_dni')||{value:''}).value.trim();   // DNI único del paso 1
+  const _dni             = ($('f_dni')||{value:''}).value.trim();
   const dniRecoger       = selCourierType==='agencia'    ? _dni : '';
   const ciudadDestino    = selCourierType==='encomienda'  ? ($('f_ciudad')||{value:''}).value.trim()      : '';
   const dniDestinatario  = selCourierType==='encomienda'  ? _dni : '';
   const encAgencia       = selCourierType==='encomienda'  ? ($('f_agencia') ||{value:''}).value.trim()    : '';
 
-  // Dirección final: para agencia usar la dirección de la agencia, para delivery usar la del cliente
   let finalAddress = deliveryAddress;
   if(selCourierType==='agencia' && agState.addr){
-    finalAddress = agState.addr; // la dirección de la agencia va en address
+    finalAddress = agState.addr;
   }
 
   const now      = Date.now();
   const orderId  = `id_${now}`;
 
-  /* La identificación sobrevive solo si la dirección final es literalmente
-     la que puso el selector. Se compara el TEXTO y no se confía en eventos:
-     entre elegir y enviar puede haber pasado un cambio de courier, una
-     edición a mano o un relleno automático, y cualquiera de los tres deja el
-     id apuntando a otra agencia. Misma regla que el panel. */
   const _agOk = (window._agIdent && window._agIdentTxt === finalAddress)
     ? window._agIdent : null;
 
@@ -203,10 +168,9 @@ async function submitOrder(){
 
   const btn=$('confirmBtn');
   $('submitErrBox')&&($('submitErrBox').style.display='none');
-  const t0=_confEmpezar(btn);   // sin telón: el botón avanza y la etiqueta «se imprime»
+  const t0=_confEmpezar(btn);
 
   try{
-    // Crear el pedido vía Cloud Function (el público ya no escribe Firestore directo)
     const resp = await _api('create', null, {
       method: 'POST',
       headers: {'Content-Type':'application/json'},
@@ -215,13 +179,11 @@ async function submitOrder(){
     if(!resp || resp.status !== 'ok' || !resp.trackToken){
       throw new Error((resp && resp.error) || 'No se pudo registrar');
     }
-    order.id = resp.orderId; // id real asignado por el servidor
+    order.id = resp.orderId;
     if(resp.nroComprobante) order.nroComprobante = String(resp.nroComprobante);
     localStorage.setItem('dpanel_order_'+wsId, JSON.stringify({
       trackToken: resp.trackToken, orderId: resp.orderId, name: order.name
     }));
-    // La «impresión» se ve al menos 0,9 s: si el servidor responde al
-    // instante, el sello no cae antes de que se entienda qué pasa.
     const espera=Math.max(0, 900-(Date.now()-t0));
     setTimeout(function(){ showInlineConfirmed(order, codigoSeg(order.id, order.createdAt || new Date().toISOString()), resp.trackToken); }, espera);
   }catch(e){
@@ -231,19 +193,6 @@ async function submitOrder(){
   }
 }
 
-/* ─── CONFIRMACIÓN EN EL SITIO (30/10/2026) ───────────────────────────
-   Sin telón ni cambio de pantalla. El pedido YA se registró (llega al
-   panel); aquí se celebra y se lleva al cliente a WhatsApp:
-     1. mientras registra: el botón avanza y la etiqueta «se imprime»;
-     2. al responder: los pasos se recogen, cae el sello «✓ REGISTRADO»
-        con el código, confeti breve y vibración — el PICO (regla del pico
-        y el final: es lo que se recuerda);
-     3. abajo, WhatsApp con la verdad: barra «falta 1 toque», la burbuja
-        con lo que se va a enviar (sin sorpresas) y el beneficio real (el
-        link de seguimiento). Si vuelve sin enviarlo, se le recuerda; si lo
-        tocó, «¿Ya lo enviaste?».
-   ⚠️ Nada de mentir: el pedido está registrado aunque no envíe WhatsApp, y
-   no hay contadores falsos ni bloqueos. */
 function _confEmpezar(btn){
   if(btn){
     btn.disabled=true; btn.classList.add('tt-registrando');
@@ -257,7 +206,6 @@ function _confFallo(btn){
   var card=document.querySelector('#tt-lbl .card'); if(card) card.classList.remove('tt-imprimiendo');
   if(btn){ btn.disabled=false; btn.classList.remove('tt-registrando'); btn.textContent='Confirmar pedido →'; }
 }
-/* El sello y el confeti: el momento que se recuerda. */
 function _confSello(codigo){
   var card=document.querySelector('#tt-lbl .card'); if(!card) return;
   card.classList.remove('tt-imprimiendo');
@@ -285,8 +233,7 @@ function _confConfeti(){
 var _waToco=false, _waListo=false, _waRecordatorio=0;
 function showInlineConfirmed(order, trackCode, trackToken){
   const waHref = _construirWaHref(order, trackCode, trackToken);
-  window._ttFrozen = true;                 // detiene la actualización de la etiqueta
-  // Ocultar los inputs del formulario (todos los pasos + la barra de progreso)
+  window._ttFrozen = true;
   document.querySelectorAll('.wz-step').forEach(s=>{ s.hidden=true; });
   const prog=$('wzProgress'); if(prog) prog.style.display='none';
   const codigo = order.nroComprobante ? String(order.nroComprobante) : '#'+trackCode;
@@ -305,23 +252,11 @@ function showInlineConfirmed(order, trackCode, trackToken){
     <div class="tt-wa-sub">Al enviarlo recibes tu <b>link de seguimiento</b> y te avisamos cada avance.</div>
     <div class="tt-wa-vuelta" id="ttWaVuelta" style="display:none"></div>`
     : '<div class="error-box" style="margin-top:12px">No se pudo generar el enlace de WhatsApp. Contáctanos directamente.</div>';
-  /* 06/11/2026: sin la burbuja (repetía lo que ya dice la etiqueta de
-     arriba). La señal del dedo «👆» sale YA, apenas cae el sello: es el
-     siguiente paso y no hay por qué esperar. Si en 25 s no lo tocó, el
-     botón vuelve a llamar (una vez). */
   clearTimeout(_waRecordatorio);
-  /* 06/11/2026: primero el sello, la meta y el botón; lo amarillo entra
-     1 s DESPUÉS. Algo que aparece a destiempo atrae la vista justo cuando
-     el cliente ya leyó «registrado» y busca qué sigue. El primer mensaje es
-     de META CERCANA («solo falta este paso»: lo casi terminado se termina);
-     el recordatorio (25 s o al volver sin enviarlo) es de PÉRDIDA (sin
-     enviarlo no hay link). Las dos cosas son ciertas. */
   if(waHref) setTimeout(function(){ if(!_waToco) _waRecordar(true); }, 1000);
   _waRecordatorio=setTimeout(function(){ if(!_waToco) _waRecordar(); }, 25000);
 }
-/* Tocó «Enviar por WhatsApp». */
 function _waAbierto(){ _waToco=true; clearTimeout(_waRecordatorio); }
-/* Recordatorio honesto: sin enviarlo no le llega su link. */
 function _waRecordar(primera){
   var b=$('ttWaBtn'), v=$('ttWaVuelta'); if(!b || _waListo) return;
   b.classList.remove('tt-llama'); void b.offsetWidth; b.classList.add('tt-llama');
@@ -333,8 +268,6 @@ function _waRecordar(primera){
     v.classList.remove('tt-asoma'); void v.offsetWidth; v.classList.add('tt-asoma');
   }
 }
-/* Volvió de WhatsApp (o de otra app): si lo tocó, «¿Ya lo enviaste?»;
-   si no, el recordatorio. */
 try{ document.addEventListener('visibilitychange', function(){
   if(document.hidden || !$('ttWaBtn') || _waListo) return;
   if(!_waToco){ _waRecordar(); return; }

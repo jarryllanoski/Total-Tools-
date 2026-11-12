@@ -1,18 +1,6 @@
-/**
- * panel/shalom/qrtracking.js — el QR para el seguimiento manual
- * Fase 7 (11/11/2026): movido de la raíz a su capa, sin cambiar una línea.
- */
-/**
- * qrtracking.js — Módulo QR para tracking manual Shalom v2
- * =========================================================
- * - Botón QR en header del bloque tracking (junto a Ayuda)
- * - Genera QR automático con fórmula: orderNumber + 3473503
- * - Opción de escanear ticket físico con cámara como alternativa
- */
 (function(global){
 'use strict';
 
-/* ── Cargar librería QR ──────────────────────────────────────────── */
 function _loadQRLib(cb){
   if(global.QRCode){ cb(); return; }
   var s = document.createElement('script');
@@ -22,7 +10,6 @@ function _loadQRLib(cb){
   document.head.appendChild(s);
 }
 
-/* ── CSS ─────────────────────────────────────────────────────────── */
 function _injectCSS(){
   if(document.getElementById('qrTrkCSS')) return;
   var s = document.createElement('style');
@@ -40,14 +27,12 @@ function _injectCSS(){
     '.qrtrk-scan-btn{width:100%;margin-top:10px;padding:11px;background:rgba(163,113,247,.15);border:1px solid rgba(163,113,247,.3);border-radius:10px;color:#a371f7;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;}',
     '.qrtrk-close{width:100%;margin-top:8px;padding:11px;background:#1c2333;border:1px solid #30363d;border-radius:10px;color:#8b949e;font-size:13px;cursor:pointer;font-family:inherit;}',
     '.qrtrk-scan-result{font-size:11px;color:#22c55e;margin-top:6px;padding:6px 10px;background:rgba(34,197,94,.08);border:1px solid rgba(34,197,94,.2);border-radius:8px;display:none;}',
-    /* Botón QR en header del bloque tracking */
     '.trk-btn-qr-hdr{background:none;border:none;color:#8b949e;font-size:10px;cursor:pointer;padding:0;margin-left:6px;font-family:inherit;}',
     '.trk-btn-qr-hdr:hover{color:#a371f7;}',
   ].join('');
   document.head.appendChild(s);
 }
 
-/* ── Overlay ─────────────────────────────────────────────────────── */
 function _injectOverlay(){
   if(document.getElementById('qrTrkOv')) return;
   var ov = document.createElement('div');
@@ -69,7 +54,6 @@ function _injectOverlay(){
   document.body.appendChild(ov);
 }
 
-/* ── Generar QR en canvas ────────────────────────────────────────── */
 function _generarQR(qrData, guia){
   var canvas = document.getElementById('qrTrkCanvas');
   var guiaTxt = document.getElementById('qrTrkGuiaTxt');
@@ -100,20 +84,17 @@ function _generarQR(qrData, guia){
   });
 }
 
-/* ── Fórmula QR Shalom ───────────────────────────────────────────── */
 function _calcQRData(orderNumber){
   var qrId = Number(orderNumber) + 3473503;
   return String(qrId) + '/document/1/';
 }
 
-/* ── Variables de estado ─────────────────────────────────────────── */
 var _currentGuia = '';
 var _scanStream   = null;
 var _scanCanvas   = null;
 var _scanCtx      = null;
 var _scanAF       = null;
 
-/* ── API Pública ─────────────────────────────────────────────────── */
 var QRTracking = {};
 
 QRTracking.abrir = function(guia){
@@ -132,9 +113,7 @@ QRTracking.cerrar = function(){
   _stopScan();
 };
 
-/* ── Escanear ticket físico ──────────────────────────────────────── */
 QRTracking.escanarFisico = function(){
-  // Crear overlay de cámara encima del overlay QR
   var existing = document.getElementById('qrScanCam');
   if(existing) existing.remove();
 
@@ -151,7 +130,6 @@ QRTracking.escanarFisico = function(){
     '<div style="position:absolute;bottom:0;left:0;right:0;padding:18px;text-align:center;color:rgba(255,255,255,.8);font-size:13px;background:rgba(0,0,0,.7);z-index:10">Apunta al QR del ticket físico de Shalom</div>';
   document.body.appendChild(div);
 
-  // Iniciar cámara
   navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}})
     .then(function(stream){
       _scanStream = stream;
@@ -178,7 +156,6 @@ function _scanLoop(video){
   _scanCtx.drawImage(video, 0, 0, _scanCanvas.width, _scanCanvas.height);
   var found = null;
 
-  // Intentar BarcodeDetector primero
   if('BarcodeDetector' in global){
     var bd = new global.BarcodeDetector({formats:['qr_code']});
     bd.detect(_scanCanvas).then(function(codes){
@@ -193,7 +170,6 @@ function _scanLoop(video){
     if(code){ _onScanResult(code.data); return; }
     _scanAF = requestAnimationFrame(function(){ _scanLoop(video); });
   } else {
-    // Cargar jsQR si no está
     var s = document.createElement('script');
     s.src = 'https://cdnjs.cloudflare.com/ajax/libs/jsQR/1.4.0/jsQR.min.js';
     s.onload = function(){ _scanAF = requestAnimationFrame(function(){ _scanLoop(video); }); };
@@ -203,21 +179,16 @@ function _scanLoop(video){
 
 function _onScanResult(raw){
   _stopScan();
-  // Mostrar mensaje de escaneado
   var scanResult = document.getElementById('qrTrkScanResult');
   if(scanResult){
     scanResult.textContent = '✅ Escaneado: ' + raw;
     scanResult.style.display = 'block';
   }
-  // Limpiar completamente el canvas antes de regenerar
   var c = document.getElementById('qrTrkCanvas');
   if(c){
-    // Destruir cualquier instancia anterior de QRCode
     c.innerHTML = '';
-    // Forzar reflow para que el DOM se limpie
     void c.offsetHeight;
   }
-  // Pequeño delay para asegurar limpieza del DOM
   setTimeout(function(){
     _loadQRLib(function(){
       if(!global.QRCode) return;
@@ -249,7 +220,6 @@ function _stopScan(){
 
 QRTracking._cerrarCamara = _stopScan;
 
-/* ── Patch renderCardBlock — botón QR en header ──────────────────── */
 QRTracking.patchTrackingBlock = function(){
   if(!global.Tracking || !global.Tracking.renderCardBlock) return;
   var _orig = global.Tracking.renderCardBlock.bind(global.Tracking);
@@ -258,7 +228,6 @@ QRTracking.patchTrackingBlock = function(){
     if(!html) return html;
     var guia = s.trackingOrderNumber || s.shalomGuia || '';
     if(!guia) return html;
-    // Insertar solo botón 📷 QR en el header junto a "Ayuda"
     var qrBtn = '<button class="trk-btn-qr-hdr" onclick="QRTracking.abrir(\''+guia+'\')" title="Ver QR de seguimiento">📷 QR</button>';
     html = html.replace(
       '<button onclick="Tracking.abrirManual()" style="background:none;border:none;color:#8b949e;font-size:10px;cursor:pointer;padding:0" title="Instrucciones">📖 Ayuda</button>',
@@ -268,7 +237,6 @@ QRTracking.patchTrackingBlock = function(){
   };
 };
 
-/* ── Init ────────────────────────────────────────────────────────── */
 QRTracking.init = function(){
   _injectCSS();
   _injectOverlay();

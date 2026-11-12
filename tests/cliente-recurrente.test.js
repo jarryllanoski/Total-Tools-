@@ -144,8 +144,8 @@ module.exports = async ({bloque, ok}) => {
   {
     /* La lista es dato, pero quien rellena es codigo: que no se desvie. */
     const fn = E.trozo('config.js', 'function _clienteRellenar(i)',
-        '/* ── PEGAR PEDIDO DE WHATSAPP')
-        .replace(/\/\*[\s\S]*?\*\//g, '');
+        'function _spanishDateToIso(str){')
+        ;
     ['fShalomGuia', 'fShalomCodigo', 'fShalomClave', 'fPkgLargo', 'fPkgPeso',
       'fStatus', 'fDate', 'fMonto'].forEach((campo) => {
       ok(fn.indexOf(campo) < 0,
@@ -181,7 +181,7 @@ module.exports = async ({bloque, ok}) => {
     /* El vigilante de guias repetidas pintaba ANTES de que el campo se
        limpiara, y dejaba el aviso del pedido anterior colgado sobre un campo
        vacio. Vaciar por codigo no dispara `input`: nadie repintaba. */
-    const cfg = E.leer('config.js').replace(/\/\*[\s\S]*?\*\//g, '');
+    const cfg = E.leer('config.js');
     const ini = cfg.indexOf('function openForm');
     const cuerpo = cfg.slice(ini, ini + 9000);
     const limpia = cuerpo.indexOf("$('fShalomGuia').value   = ''");

@@ -192,8 +192,8 @@ module.exports = async ({bloque, ok}) => {
     /* Sin comentarios: dos de ellos CITAN el texto para explicarlo, y
        contar una cita como una copia es confundir hablar con hacer. Me
        paso ya con print.js esta misma semana. */
-    const codigo = form.replace(/<!--[\s\S]*?-->/g, '')
-        .replace(/\/\*[\s\S]*?\*\//g, '');
+    const codigo = form
+        ;
     const n = (codigo.match(/Buscando sedes cerca de ti/g) || []).length;
     ok(n === 1,
        'el texto esta escrito UNA vez: Shalom y Olva comparten plantilla, ' +

@@ -16,7 +16,7 @@ const E = require('./_entorno.js');
 const R = require('../functions/registroShalom.js');
 
 const FUENTE = E.trozo('config.js',
-    '/* ── 🚚 REGISTRAR EN SHALOM, DESDE EL PEDIDO',
+    'let _regTimer = null;',
     '\nfunction _claveAuto(){');
 
 const PEDIDO = () => ({

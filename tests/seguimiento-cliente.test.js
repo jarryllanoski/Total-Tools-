@@ -26,7 +26,7 @@ const esc = (s) => s == null ? '' : String(s).replace(/&/g, '&amp;').replace(/</
 function formulario(CFG) {
   const src = E.trozoCliente('function _isOtrasAg(name){', '\n}\n') + '\n}\n' +
     E.trozoCliente('function _tipoEnvioDe(name){', '\n}\n') + '\n}\n' +
-    E.trozoCliente('/* Deriva la fase del recorrido', 'function renderTrackResult(ship, code){') +
+    E.trozoCliente('var _FASE_VISTA = [', 'function renderTrackResult(ship, code){') +
     E.trozoCliente('function _ayudaTrackContenido(', 'function abrirAyudaTrack(){');
   // eslint-disable-next-line no-new-func
   return new Function('CFG', 'esc', 'window', 'DniPedido',
@@ -97,7 +97,7 @@ module.exports = async ({bloque, ok}) => {
        'retiro: la dirección de la tienda sale de Config');
     ok(F._datosNarrador({courier: 'DELIVERY'}).tiendaDir === '', 'y solo para retiro');
 
-    const r = E.trozoCliente('function renderTrackResult(ship, code){', '\n/* ─── ARRANQUE');
+    const r = E.trozoCliente('function renderTrackResult(ship, code){', 'function init(){');
     ok(/<div class="track-card" data-tipo="\$\{esc\(narr\.tipo\)\}"/.test(r) &&
        /data-shalom-st="\$\{narr\.shalomSt\}"/.test(r) && /data-tienda-dir="\$\{esc\(narr\.tiendaDir\)\}"/.test(r),
        'la tarjeta publica tipo, etapa de Shalom y dirección (escapados)');
@@ -152,7 +152,7 @@ module.exports = async ({bloque, ok}) => {
   bloque('«Copiar»: guía + código, y de verdad');
 
   {
-    const src = E.trozoCliente('/* ★ COPIAR, DE VERDAD.', '/* Deriva la fase del recorrido');
+    const src = E.trozoCliente('function _copiarClasico(txt){', 'var _FASE_VISTA = [');
     const correr = (clipboard, execOk) => {
       const r = {copiado: null, prompt: null, btn: {textContent: 'Copiar', _a: {},
         getAttribute(k) { return this._a[k] === undefined ? null : this._a[k]; },
@@ -230,7 +230,7 @@ module.exports = async ({bloque, ok}) => {
     const v = PP.proyectar({id: 'x', name: 'A', status: 'ENVIADO', shalomClave: '4321',
       courier: 'SHALOM'}, {code: '1', frozen: false});
     ok(!('shalomClave' in v), 'el link del cliente nunca la recibe (lista cerrada del servidor)');
-    const f = E.leer('formulario.html').replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
+    const f = E.leer('formulario.html');
     ok(!/shalomClave/.test(f), 'la página del cliente no la lee en ningún sitio');
     ok(!/shalomClave/.test(E.leer('narrador/narrador.js')), 'ni el narrador');
   }

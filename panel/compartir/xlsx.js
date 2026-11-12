@@ -1,6 +1,3 @@
-/**
- * panel/compartir/xlsx.js — carga la libreria de Excel solo cuando se usa.
- */
 (function(){
   'use strict';
   var URL_XLSX = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';

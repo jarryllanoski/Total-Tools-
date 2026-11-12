@@ -1,30 +1,10 @@
-/**
- * panel/pantalla/voz.js — comandos por voz
- * Fase 7 (11/11/2026): movido de la raíz a su capa, sin cambiar una línea.
- */
-/* voz.js — Asistente de voz "Jarvy" (Fase 1: push-to-talk)
-   ────────────────────────────────────────────────────────────────────────
-   AISLADO: no toca Shalom, delivery, tracking ni la lógica del panel.
-   Solo LEE el estado local `window.S` (ya está en memoria) y, cuando hay una
-   ACCIÓN, llama funciones que YA existen en index.html (save, render, waOpen).
-
-   CERO lecturas a Firebase: todas las consultas (buscar, contar, estado) se
-   resuelven sobre window.S en memoria. La ÚNICA escritura a Firebase ocurre al
-   cambiar una etiqueta, y usa save(idPedido) → sube SOLO ese pedido.
-
-   Push-to-talk: el micrófono NO queda encendido. Tocas el botón, escucha UNA
-   frase, ejecuta y se apaga. Sin polling, sin MutationObserver, sin mic activo.
-   ──────────────────────────────────────────────────────────────────────── */
 (function () {
   'use strict';
 
-  // ── Configuración rápida ────────────────────────────────────────────────
-  const LANG = 'es-PE';        // idioma del reconocimiento de voz
-  const SALTO_LIBRE = false;   // false = solo avanzar/retroceder 1 paso (SEGURO).
-                               // true  = permite saltar a cualquier etiqueta.
-  const HABLAR = true;         // true = Jarvy responde por voz (síntesis)
+  const LANG = 'es-PE';
+  const SALTO_LIBRE = false;
+  const HABLAR = true;
 
-  // ── Helpers seguros hacia el panel (nunca lanzan) ───────────────────────
   const _S      = () => (window.S || {});
   const _ships  = () => (_S().shipments || []);
   const _labels = () => (typeof allStatuses === 'function' ? allStatuses() : (_S().labels || []));
@@ -32,11 +12,9 @@
   const _render = () => { try { if (typeof render === 'function') render(); } catch (e) {} };
   const _toast  = (m) => { try { if (typeof toast === 'function') toast(m); else console.log(m); } catch (e) {} };
 
-  // normaliza: minúsculas y sin acentos (para comparar nombres y etiquetas)
   const norm = (t) => String(t || '').toLowerCase()
     .normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
 
-  // ── Voz de salida ───────────────────────────────────────────────────────
   function decir(texto) {
     _toast('🗣️ ' + texto);
     if (!HABLAR) return;
@@ -50,14 +28,12 @@
     } catch (e) {}
   }
 
-  // ── Búsqueda de pedidos por nombre (substring, sin acentos) ─────────────
   function buscarPedidos(txt) {
     const q = norm(txt);
     if (!q) return [];
     return _ships().filter((s) => norm(s.name).includes(q));
   }
 
-  // ── Resolver etiqueta hablada → etiqueta real del sistema ───────────────
   const ALIAS_ETIQUETA = {
     'nuevo': 'NUEVO PEDIDO', 'nuevo pedido': 'NUEVO PEDIDO',
     'en proceso': 'EN PROCESO', 'proceso': 'EN PROCESO',
@@ -70,16 +46,12 @@
   };
   function resolverEtiqueta(txt) {
     const q = norm(txt);
-    // 1) match exacto contra etiquetas reales (incluye personalizadas)
     for (const l of _labels()) { if (norm(l) === q) return l; }
-    // 2) alias hablados comunes
     if (ALIAS_ETIQUETA[q]) return ALIAS_ETIQUETA[q];
-    // 3) match parcial contra etiquetas reales
     for (const l of _labels()) { if (norm(l).includes(q) || q.includes(norm(l))) return l; }
     return null;
   }
 
-  // ── ACCIÓN: cambiar etiqueta (con guardia de 1 paso, igual que el panel) ─
   function cambiarEtiqueta(nombre, etiquetaTxt) {
     const matches = buscarPedidos(nombre);
     if (matches.length === 0) { decir('No encontré ningún pedido de ' + nombre); return; }
@@ -106,15 +78,13 @@
       return;
     }
 
-    // Aplicar — mismo patrón que applyStatus() del panel: incremental
     s.status = destino;
     if (window.Seleccion) Seleccion.quitar(s.id);
-    _save(s.id);   // ← SOLO este pedido sube a Firebase
+    _save(s.id);
     _render();
     decir(s.name + ' ahora está en ' + destino);
   }
 
-  // ── CONSULTA: contar por etiqueta (cero Firebase) ───────────────────────
   function contar(etiquetaTxt) {
     const etiqueta = resolverEtiqueta(etiquetaTxt);
     if (!etiqueta) {
@@ -131,7 +101,6 @@
     decir('Hay ' + lista.length + ' pedidos en ' + etiqueta);
   }
 
-  // ── CONSULTA: estado de un pedido (cero Firebase) ───────────────────────
   function estadoDe(nombre) {
     const m = buscarPedidos(nombre);
     if (m.length === 0) { decir('No encontré a ' + nombre); return; }
@@ -139,14 +108,12 @@
     decir(m[0].name + ' está en ' + m[0].status);
   }
 
-  // ── CONSULTA: buscar (llena el buscador del panel, cero Firebase) ───────
   function buscar(txt) {
     const inp = document.getElementById('fSearch');
     if (inp) { inp.value = txt; _render(); decir('Buscando ' + txt); }
     else decir('No encontré el buscador');
   }
 
-  // ── ACCIÓN: abrir WhatsApp del pedido (usa waOpen existente) ────────────
   function whatsapp(nombre) {
     const m = buscarPedidos(nombre);
     if (m.length === 0) { decir('No encontré a ' + nombre); return; }
@@ -157,19 +124,16 @@
     else decir('WhatsApp no disponible');
   }
 
-  // ── ACCIÓN: abrir el formulario de nuevo pedido (el botón +) ────────────
   function nuevoPedido() {
     if (typeof openForm === 'function') { openForm(null); decir('Nuevo pedido'); }
     else decir('No pude abrir el formulario');
   }
 
-  // ── Ayuda hablada ───────────────────────────────────────────────────────
   function ayudaVoz() {
     decir('Puedes decir: buscar nombre. Cuántos nuevos. Estado de nombre. ' +
           'Marca a nombre como enviado. WhatsApp a nombre.');
   }
 
-  // ── Frases personalizadas (se guardan en el dispositivo, cero Firebase) ─
   const LS_KEY = 'vozFrasesPersonalizadas';
   function cargarFrases() {
     try { return JSON.parse(localStorage.getItem(LS_KEY) || '[]'); } catch (e) { return []; }
@@ -183,8 +147,6 @@
     });
   }
 
-  // Ejecuta una acción YA programada. capturado = lo que sigue a tu frase;
-  // argFijo = el dato fijo que configuraste (opcional).
   function ejecutar(accion, capturado, argFijo) {
     capturado = (capturado || '').trim();
     argFijo = (argFijo || '').trim();
@@ -193,14 +155,13 @@
       case 'contar':   contar(argFijo || capturado); return true;
       case 'estado':   estadoDe(argFijo || capturado); return true;
       case 'whatsapp': whatsapp(argFijo || capturado); return true;
-      case 'etiqueta': cambiarEtiqueta(capturado, argFijo); return true; // argFijo = etiqueta destino
+      case 'etiqueta': cambiarEtiqueta(capturado, argFijo); return true;
       case 'nuevo':    nuevoPedido(); return true;
       case 'ayuda':    ayudaVoz(); return true;
       default: return false;
     }
   }
 
-  // ¿El texto hablado coincide con alguna frase personalizada?
   function matchPersonalizada(t) {
     const reglas = cargarFrases();
     for (let i = 0; i < reglas.length; i++) {
@@ -213,46 +174,36 @@
     return false;
   }
 
-  // ── Interpretar el texto reconocido → comando ───────────────────────────
   function interpretar(texto) {
     const t = norm(texto);
     let mm;
 
-    // 1º) Frases personalizadas (tienen prioridad sobre los comandos base)
     if (matchPersonalizada(t)) return;
 
-    // Cambiar etiqueta: "marca a juan como enviado" / "cambia a juan a enviado" / "pon a juan en enviado"
     mm = t.match(/^(?:marca|cambia|pon|mueve|pasa)\s+(?:a\s+)?(.+?)\s+(?:como|a|en|al)\s+(.+)$/);
     if (mm) { cambiarEtiqueta(mm[1], mm[2]); return; }
 
-    // Estado de X
     mm = t.match(/^(?:estado|status)\s+(?:de\s+)?(.+)$/);
     if (mm) { estadoDe(mm[1]); return; }
 
-    // Cuántos X
     mm = t.match(/^(?:cuantos|cuantas|cuenta)\s+(.+)$/);
     if (mm) { contar(mm[1]); return; }
 
-    // WhatsApp a X
     mm = t.match(/^(?:whatsapp|wasap|wasa|whats|wsp)\s+(?:a\s+|de\s+)?(.+)$/);
     if (mm) { whatsapp(mm[1]); return; }
 
-    // Buscar X
     mm = t.match(/^(?:buscar|busca|encuentra)\s+(?:a\s+)?(.+)$/);
     if (mm) { buscar(mm[1]); return; }
 
-    // Nuevo pedido (abre el formulario, igual que el botón +)
     if (/^(nuevo pedido|nuevo envio|nuevo|crear pedido|crear envio|agregar pedido|crear nuevo)$/.test(t)) {
       nuevoPedido(); return;
     }
 
-    // Ayuda
     if (/^(ayuda|que puedo decir|comandos)/.test(t)) { ayudaVoz(); return; }
 
     decir('No entendí. Di ayuda para ver los comandos.');
   }
 
-  // ── Motor de reconocimiento (push-to-talk) ──────────────────────────────
   let rec = null;
   let escuchando = false;
 
@@ -261,14 +212,12 @@
     if (!SR) return null;
     const r = new SR();
     r.lang = LANG;
-    r.continuous = false;     // una sola frase, luego se apaga
+    r.continuous = false;
     r.interimResults = false;
     r.maxAlternatives = 1;
     return r;
   }
 
-  // ── Indicador de estado: grabando vs inactivo ──────────────────────────
-  // Al grabar, el botón pasa a 🔴 y parpadea. Al terminar vuelve a 🎤.
   function setBtn(on) {
     const b = document.getElementById('voiceBtn');
     if (b) {
@@ -279,9 +228,6 @@
     }
   }
 
-  // Motivo por el que el dictado no está disponible (navegador). Se explica
-  // claro en vez de fallar en silencio. La Web Speech API solo va en Chrome/Edge
-  // de escritorio; Brave la desactiva por privacidad y Firefox no la soporta.
   function _motivoSinVoz() {
     if (!(window.SpeechRecognition || window.webkitSpeechRecognition)) {
       return '⚠️ Este navegador no soporta dictado. Usa Chrome o Edge.';
@@ -317,24 +263,22 @@
     try { rec.start(); } catch (e) { escuchando = false; setBtn(false); }
   }
 
-  // ── Triple toque sobre el 🎤 → abre la ayuda ────────────────────────────
   let taps = 0, tapTimer = null;
   function onTap() {
     taps++;
     clearTimeout(tapTimer);
-    if (taps >= 3) {                      // 3 toques seguidos → ayuda
+    if (taps >= 3) {
       taps = 0;
       if (escuchando) { try { rec && rec.stop(); } catch (e) {} }
       abrirAyuda();
       return;
     }
-    tapTimer = setTimeout(() => {          // 1 toque → grabar / detener
+    tapTimer = setTimeout(() => {
       const n = taps; taps = 0;
       if (n === 1) toggle();
     }, 320);
   }
 
-  // ── Panel de ayuda (se inyecta solo, no toca index.html) ────────────────
   function ensureAyuda() {
     if (document.getElementById('vozAyuda')) return;
     const ov = document.createElement('div');
@@ -362,7 +306,6 @@
         cmd('🆕 Nuevo pedido', '“nuevo pedido” — abre el formulario (botón +)') +
         cmd('❓ Ayuda por voz', '“ayuda”') +
 
-        // ── Mis frases personalizadas ──────────────────────────────────
         '<div style="border-top:1px solid var(--bd,#30363d);margin:14px 0 10px;padding-top:12px;' +
           'font-size:15px;font-weight:800">⭐ Mis frases</div>' +
         '<div style="font-size:12px;color:var(--text2,#8b949e);line-height:1.6;margin-bottom:10px">' +
@@ -451,7 +394,6 @@
   function abrirAyuda() { ensureAyuda(); renderFrases(); const o = document.getElementById('vozAyuda'); if (o) o.style.display = 'flex'; }
   function cerrarAyuda() { const o = document.getElementById('vozAyuda'); if (o) o.style.display = 'none'; }
 
-  // ── Estilos inyectados (parpadeo del botón al grabar) ───────────────────
   function ensureEstilos() {
     if (document.getElementById('vozEstilos')) return;
     const st = document.createElement('style');
@@ -461,9 +403,6 @@
     document.head.appendChild(st);
   }
 
-  // ── Auto-montaje del botón 🎤 (antes del punto verde #fbDot) ────────────
-  // No necesitas editar el header a mano: el botón se crea solo.
-  // Idempotente: si ya existe #voiceBtn no lo duplica.
   function montarBoton() {
     ensureEstilos();
     if (document.getElementById('voiceBtn')) return;
@@ -477,9 +416,8 @@
       'font-size:14px;line-height:1;padding:3px 6px;cursor:pointer;flex-shrink:0;color:inherit';
     b.addEventListener('click', onTap);
     if (dot && dot.parentNode) {
-      dot.parentNode.insertBefore(b, dot); // ← justo antes del punto verde
+      dot.parentNode.insertBefore(b, dot);
     } else {
-      // Respaldo: si no encuentra el punto verde, botón flotante arriba a la derecha
       b.style.cssText += ';position:fixed;top:12px;right:120px;z-index:99999';
       document.body.appendChild(b);
     }
@@ -491,7 +429,6 @@
     montarBoton();
   }
 
-  // API pública
   window.Voz = {
     toggle: toggle, decir: decir, interpretar: interpretar,
     montarBoton: montarBoton, abrirAyuda: abrirAyuda, cerrarAyuda: cerrarAyuda,

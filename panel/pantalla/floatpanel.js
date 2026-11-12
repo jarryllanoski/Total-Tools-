@@ -1,24 +1,11 @@
-/**
- * panel/pantalla/floatpanel.js — la barra flotante y el carrusel de etiquetas
- * Fase 7 (11/11/2026): movido de la raíz a su capa, sin cambiar una línea.
- */
-/**
- * floatpanel.js — Mini paneles flotantes para Total Tools (solo PC)
- * Al hacer clic largo (500ms) en una etiqueta de estado o en el header de courier,
- * se abre un panel flotante de solo lectura con esa vista filtrada.
- * Se sincroniza automáticamente con window.S.
- * Para desactivar: quitar <script src="floatpanel.js"> del index.html
- */
 
 (function(){
 
-  // Solo en PC con mouse
   if(!window.matchMedia('(pointer:fine)').matches) return;
 
-  var _panels  = [];   // paneles activos
+  var _panels  = [];
   var _zBase   = 9000;
 
-  /* ── CSS ─────────────────────────────────────────────────────────── */
   var style = document.createElement('style');
   style.textContent = `
     .fp-panel {
@@ -172,18 +159,15 @@
   `;
   document.head.appendChild(style);
 
-  /* ── CREAR PANEL ─────────────────────────────────────────────────── */
   function createPanel(label, icon){
     var id = 'fp_' + Date.now();
 
-    // Posición inicial — derecha del panel principal o donde haya espacio
     var appEl = document.querySelector('.app') || document.querySelector('#page-envios')?.parentElement;
     var startX = window.innerWidth - 340;
     var startY = 80 + _panels.length * 30;
 
     if(appEl){
       var r = appEl.getBoundingClientRect();
-      // Intentar poner a la derecha
       if(r.right + 340 < window.innerWidth){
         startX = r.right + 10;
       } else if(r.left > 340){
@@ -215,16 +199,12 @@
     var panel = { id, label, icon, el };
     _panels.push(panel);
 
-    // Arrastre desde cualquier parte excepto botones y el body scrolleable
     _makeDraggable(el, el, id);
 
-    // Resize
     _makeResizable(el);
 
-    // Render inicial
     _renderPanel(panel);
 
-    // Focus al crear
     el.addEventListener('mousedown', function(){
       el.style.zIndex = _zBase + _panels.length + 10;
     });
@@ -232,7 +212,6 @@
     return panel;
   }
 
-  /* ── RENDER CONTENIDO ───────────────────────────────────────────── */
   function _renderPanel(panel){
     var S = window.S;
     if(!S || !S.shipments) return;
@@ -263,7 +242,6 @@
     }).join('');
   }
 
-  /* ── CERRAR PANEL ───────────────────────────────────────────────── */
   function closePanel(id){
     var idx = _panels.findIndex(function(p){ return p.id === id; });
     if(idx < 0) return;
@@ -277,12 +255,10 @@
     _panels.splice(idx, 1);
   }
 
-  /* ── DRAG ───────────────────────────────────────────────────────── */
   function _makeDraggable(panel, handle, id){
     var dragging = false, sx, sy, ox, oy;
     handle.addEventListener('mousedown', function(e){
       if(e.button !== 0) return;
-      // No arrastrar si el clic fue en el body (scroll), botón, o resize handle
       if(e.target.closest('.fp-body,.fp-close,.fp-resize')) return;
       dragging = true;
       sx = e.clientX; sy = e.clientY;
@@ -307,7 +283,6 @@
     });
   }
 
-  /* ── LONG PRESS EN CHIPS ─────────────────────────────────────────── */
   var _pressTimer = null;
   var _pressEl    = null;
   var _pressStartX = 0;
@@ -325,16 +300,13 @@
       clearTimeout(_pressTimer);
       _pressTimer = setTimeout(function(){
         var label = chip.textContent.trim().replace(/[⚙️]/g,'').trim();
-        // Limpiar emojis del label para comparar con S.shipments
         var cleanLabel = '';
-        // Buscar el label real en allStatuses
         if(window.S && window.S.labels){
           window.S.labels.forEach(function(l){
             if(chip.innerHTML.includes(l)) cleanLabel = l;
           });
         }
         if(!cleanLabel){
-          // Fallback: buscar en FIXED_LABELS
           var fixed = ['NUEVO PEDIDO','EN PROCESO','POR ALISTAR','ALISTADO','ENVIADO','LLEGÓ A DESTINO','PENDIENTE DE PAGO','FINALIZADO'];
           fixed.forEach(function(l){
             if(chip.innerHTML.includes(l)) cleanLabel = l;
@@ -342,10 +314,8 @@
         }
         if(!cleanLabel) return;
 
-        // Verificar que no existe ya un panel con este label
         var exists = _panels.find(function(p){ return p.label === cleanLabel; });
         if(exists){
-          // Si ya existe, traer al frente
           var el = document.getElementById(exists.id);
           if(el) el.style.zIndex = _zBase + _panels.length + 10;
           return;
@@ -354,7 +324,6 @@
         var icon = (window.Iconos ? Iconos.textoOriginal(chip) : chip.textContent).trim().split(' ')[0];
         createPanel(cleanLabel, icon);
 
-        // Hint primera vez
         if(!localStorage.getItem('tt_fp_hint')){
           var hint = document.createElement('div');
           hint.className = 'fp-hint';
@@ -363,7 +332,7 @@
           setTimeout(function(){ hint.remove(); }, 3000);
           localStorage.setItem('tt_fp_hint','1');
         }
-      }, 600); // 600ms de clic sostenido
+      }, 600);
     });
 
     document.addEventListener('mouseup', function(){
@@ -375,7 +344,6 @@
       if(!_pressEl) return;
       var dx = Math.abs(e.clientX - _pressStartX);
       var dy = Math.abs(e.clientY - _pressStartY);
-      // Solo cancelar si se movió más de 8px
       if(dx > 8 || dy > 8){
         clearTimeout(_pressTimer);
         _pressEl = null;
@@ -383,11 +351,8 @@
     });
   }
 
-  /* ── SYNC CON WINDOW.S ──────────────────────────────────────────── */
-  // Cada vez que render() se llama, actualizar todos los paneles
   var _origRender = null;
   function _hookRender(){
-    // Intentar hookear render() — puede no existir aún, reintentar
     if(typeof window.render !== 'function'){
       setTimeout(_hookRender, 300);
       return;
@@ -400,7 +365,6 @@
     };
   }
 
-  /* ── HELPER ─────────────────────────────────────────────────────── */
   function _esc(s){
     return String(s||'')
       .replace(/&/g,'&amp;')
@@ -408,11 +372,10 @@
       .replace(/>/g,'&gt;');
   }
 
-  /* ── RESIZE DESDE BORDES ────────────────────────────────────────── */
   function _makeResizable(panel){
-    var EDGE = 8; // px de margen para detectar borde
+    var EDGE = 8;
     var resizing = false;
-    var edge = ''; // 'se','s','e','sw','w','ne','n','nw'
+    var edge = '';
     var sx, sy, sw, sh, sl, st;
 
     function _getEdge(e){
@@ -449,7 +412,7 @@
       if(e.button !== 0) return;
       if(e.target.closest('.fp-body,.fp-close')) return;
       var ed = _getEdge(e);
-      if(!ed) return; // dejar que el drag maneje el movimiento
+      if(!ed) return;
       resizing = true;
       edge = ed;
       sx = e.clientX; sy = e.clientY;
@@ -482,7 +445,6 @@
     });
   }
 
-  /* ── API PÚBLICA ─────────────────────────────────────────────────── */
   window.FloatPanel = {
     open:  function(label, icon){ createPanel(label, icon||'📦'); },
     close: closePanel,
@@ -490,13 +452,11 @@
     refresh: function(){ _panels.forEach(_renderPanel); }
   };
 
-  /* ── INIT ───────────────────────────────────────────────────────── */
   function init(){
     _bindChips();
     _hookRender();
     _fixChipsScroll();
 
-    // Hint de uso si es primera visita en PC
     if(!localStorage.getItem('tt_fp_hint')){
       setTimeout(function(){
         var chips = document.querySelectorAll('#filterChips .chip');
@@ -505,52 +465,13 @@
     }
   }
 
-  /* ── CARRUSEL DE ETIQUETAS · las flechas ‹ › ─────────────────────────
-     Las flechas avanzaban 120 px fijos. Las etiquetas miden desde "TODOS"
-     (~60 px) hasta "RECLAMOS, DEVOLUCIONES, GARANT" (~230 px), así que ese
-     salto no tenía relación con dónde empieza o acaba ninguna: a veces
-     pasaba casi dos y a veces dejaba media cortada.
-
-     Ahora la flecha va a la etiqueta SIGUIENTE: se miden dónde empiezan y
-     se salta a la primera que esté más allá de donde estás.
-
-     POR QUÉ NO `::scroll-button()` (2026-09): existe, hace esto sin una
-     línea de JavaScript y es lo que recomiendan los artículos de este año,
-     pero solo funciona en Chrome/Edge 135+ — no es Baseline. En los
-     navegadores sin soporte las flechas simplemente no existirían y nadie
-     sabría por qué. Cuando sea Baseline, esto se puede borrar casi entero.
-     Lo que sí se usa es la mitad universal: CSS Scroll Snap (panel.css).  */
-  /* ── CARRUSEL DE ETIQUETAS · las flechas ‹ › ─────────────────────────
-     Las flechas CAMBIAN LA ETIQUETA ACTIVA, una por toque — no desplazan la
-     fila. Desplazar era un botón caro para algo que el dedo ya hace; en
-     cambio "etiqueta anterior / siguiente" no tenía atajo: había que buscar
-     el chip con la vista y apuntarle. La fila se mueve igual, pero como
-     consecuencia (`verActivo` trae el chip activo a la vista).
-
-     Quién decide a qué etiqueta ir vive en index.html (`navFiltro`,
-     `filtroPuedeIr`): ahí están `_filt` y `S.labels`. Este archivo solo pone
-     los botones y los muestra u oculta.
-
-     Antes las flechas movían 120 px fijos. Las etiquetas miden de ~60 px
-     ("TODOS") a ~230 px ("RECLAMOS, DEVOLUCIONES, GARANT"), así que ese
-     salto dejaba medias etiquetas cortadas en el borde.
-
-     Del CSS se conserva Scroll Snap (panel.css), que alinea el deslizamiento
-     con el dedo. Se descartó `::scroll-button()` —hace esto sin JavaScript—
-     porque en 2026-09 solo funciona en Chrome/Edge 135+ y no es Baseline:
-     donde no hubiera soporte, las flechas no existirían y nadie sabría por
-     qué. Ver docs/ARQUITECTURA.md.                                        */
   function _fixChipsScroll(){
     var carrusel = document.getElementById('filterChips');
     if(!carrusel) return;
-    if(document.getElementById('chipsNav')) return;   // no duplicar flechas
+    if(document.getElementById('chipsNav')) return;
     var fila = carrusel.parentElement;
     if(!fila) return;
 
-    /* Envoltura propia para el carrusel. Antes las flechas se posicionaban
-       sobre TODA la fila, y la izquierda tapaba los ~25 px iniciales del
-       chip TODOS: ahí dejaba de responder al toque. Ahora `left:0` es el
-       borde del carrusel, no el de la fila. */
     var nav = document.createElement('div');
     nav.id = 'chipsNav';
     nav.style.cssText = 'position:relative;flex:1;min-width:0;display:flex';
@@ -574,9 +495,6 @@
       if(typeof window.navFiltro === 'function') window.navFiltro(dir);
     }
 
-    /* Cada flecha se ve si hay etiqueta hacia ese lado — no según si se
-       puede desplazar, que es lo que miraban antes. En TODOS no hay ‹; en la
-       última etiqueta no hay ›. */
     function actualizarFlechas(){
       var puede = window.filtroPuedeIr;
       if(typeof puede !== 'function'){
@@ -590,15 +508,11 @@
 
     window.addEventListener('resize', actualizarFlechas);
 
-    /* Cuando cambian las etiquetas —agregar una en Config, o cualquier
-       renderChips()— hay que rehacer las cuentas. `navFiltro` ya avisa
-       directo; esto cubre los demás caminos. */
     try{
       new MutationObserver(function(){ actualizarFlechas(); ChipsNav.verActivo(); })
         .observe(carrusel, {childList:true});
-    }catch(e){ /* navegador viejo: quedan resize y el aviso de navFiltro */ }
+    }catch(e){  }
 
-    // La rueda del ratón sigue desplazando la fila (sin cambiar el filtro).
     carrusel.addEventListener('wheel', function(e){
       if(Math.abs(e.deltaY) > Math.abs(e.deltaX)){
         e.preventDefault();
@@ -613,9 +527,6 @@
       }catch(e){ return true; }
     }
 
-    /* Trae el chip activo a la vista si se quedó fuera. Mueve SOLO el
-       carrusel: `scrollIntoView` habría podido desplazar la página entera
-       hacia arriba o abajo, que no es lo que nadie pidió. */
     ChipsNav.verActivo = function(){
       var act = carrusel.querySelector('.chip.active');
       if(!act) return;
@@ -623,7 +534,7 @@
       var d = 0;
       if(r.left < c.left) d = (r.left - c.left) - 8;
       else if(r.right > c.right) d = (r.right - c.right) + 8;
-      if(!d) return;   // ya se ve entera: no se mueve nada
+      if(!d) return;
       var tope = Math.max(0, carrusel.scrollWidth - carrusel.clientWidth);
       carrusel.scrollTo({left: Math.max(0, Math.min(tope, carrusel.scrollLeft + d)),
                          behavior: _suave() ? 'smooth' : 'auto'});
@@ -648,8 +559,6 @@
     return b;
   }
 
-  /* Lo reemplaza _fixChipsScroll al montarse; los huecos evitan que quien
-     llame antes de tiempo se encuentre con un undefined. */
   var ChipsNav = { verActivo: function(){}, actualizarFlechas: function(){} };
   window.ChipsNav = ChipsNav;
 

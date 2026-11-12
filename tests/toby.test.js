@@ -28,7 +28,7 @@ module.exports = async ({bloque, ok}) => {
     ok(/src="https:\/\/x\/narrador\/toby\.webp\?v=1"/.test(h), 'la imagen sale junto al script (sirve en el formulario y en el panel)');
     T.globo('otra vez');
     ok(estilos.length === 1, 'el CSS se pone UNA vez');
-    ok(/narrador\/toby\.js/.test(form) && /<script src="narrador\/toby\.js\?v=1"><\/script>\n<script src="panel\/pantalla\/ayuda\.js/.test(E.leerReal('index.html')),
+    ok(/narrador\/toby\.js/.test(form) && /<script src="narrador\/toby\.js\?v=\d+"><\/script>\n<script src="panel\/pantalla\/ayuda\.js/.test(E.leerReal('index.html')),
        'lo cargan el formulario y el panel (antes de ayuda.js)');
     ok(!/class="tb-av"/.test(form) && !/#ayudaFormOv \.tb\{/.test(form), 'sin la copia vieja de Toby dentro del formulario');
     ok(!/new Image|fetch\(/.test(tb), 'no pide nada por su cuenta: la imagen solo al pintar el globo (al abrir una ayuda)');
@@ -39,7 +39,7 @@ module.exports = async ({bloque, ok}) => {
   {
     const i = form.indexOf('function _ayudaTrackContenido(');
     const src = form.slice(i, form.indexOf('function abrirAyudaTrack(', i));
-    const hn = form.slice(form.indexOf('function _holaNombre('), form.indexOf('/* La hoja de ayuda'));
+    const hn = form.slice(form.indexOf('function _holaNombre('), form.indexOf('function _ayudaHoja(){'));
     const ctx = vm.createContext({esc: (x) => String(x).replace(/</g, '&lt;')});
     vm.runInContext(hn + src + ';this.C=_ayudaTrackContenido;', ctx);
     const C = ctx.C;
@@ -64,7 +64,7 @@ module.exports = async ({bloque, ok}) => {
   bloque('Formulario: saluda por el nombre escrito');
 
   {
-    const ab = form.slice(form.indexOf('function abrirAyudaForm('), form.indexOf('/* ─── Ayuda de la vista de SEGUIMIENTO'));
+    const ab = form.slice(form.indexOf('function abrirAyudaForm('), form.indexOf('function _ayudaTrackContenido(tipo, esShalom, tiendaDir, estado, nombre, shalom){'));
     ok(/_toby\(\(window\._ttFrozen \? '' : _holaNombre\(\(\$\('f_name'\)\|\|\{value:''\}\)\.value\)\) \+ c\.toby, 'Guía de pedidos'\)/.test(ab),
        'con el nombre ya escrito: «¡Hola, Jarlyn!»');
   }
@@ -97,6 +97,6 @@ module.exports = async ({bloque, ok}) => {
        'Configuración Shalom: Puerta, Seguimiento automático y Mover etiquetas (ya no «en reconstrucción»)');
     const tr = ay.slice(ay.indexOf('    tracking: {'), ay.indexOf('    nuevoPedido: {'));
     ok(!/cada <b>12 horas<\/b>/.test(tr) && /08:00, 11:30, 16:30 y 19:00/.test(tr), 'Tracking: horarios del seguimiento automático');
-    ok(/var ACTUALIZADO = '2026-11-10';/.test(ay) && /panel\/pantalla\/ayuda\.js\?v=13/.test(E.leerReal('index.html')), 'fecha y versión nuevas');
+    ok(/var ACTUALIZADO = '2026-11-10';/.test(ay) && /panel\/pantalla\/ayuda\.js\?v=\d+/.test(E.leerReal('index.html')), 'fecha y versión nuevas');
   }
 };

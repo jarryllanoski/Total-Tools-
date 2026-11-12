@@ -1,30 +1,5 @@
-/**
- * panel/shalom/shalom-registro.js — clave de recojo y registro en Shalom (desde el pedido y en Config)
- * =============================================================================================
- * Fase 3 (10/11/2026): el panel en módulos. Antes vivía en config.js.
- * Script CLÁSICO a propósito: sus funciones y variables son globales, igual
- * que cuando estaban en un solo archivo — moverlas no cambió ni una llamada.
- * El orden de los <script> en index.html es el orden de ejecución.
- */
-/* ── CLAVE DE RECOJO ─────────────────────────────────────────────────────
-   Los 4 dígitos que el destinatario necesita para retirar el paquete en la
-   agencia. `POST /account/register` la acepta como `clave`, y es la razón
-   por la que se eligió el endpoint individual y no el masivo: el masivo NO
-   la admite.
-
-   Se genera sola —una menos que inventar por pedido— pero se puede cambiar.
-   Y NO se regenera sola en un pedido que ya tiene guía: la clave que se le
-   dio a Shalom es la que el cliente va a usar, y cambiarla aquí dejaría al
-   cliente con un número que no abre nada. */
 function regenClaveRecojo(){
   const el = $('fShalomClave'); if(!el) return;
-  /* ⚠️ UN ENVÍO YA REGISTRADO NO CAMBIA DE CLAVE. Esos cuatro dígitos ya
-     están en Shalom: generar otros aquí le daría al cliente un número que
-     no abre nada y el paquete se quedaría en la agencia.
-     `_claveAuto` ya lo respetaba; este botón no, y se podía pulsar. Lo vio
-     el dueño en la primera prueba real.
-     Y SE DICE, no se ignora en silencio: un botón que no hace nada y no
-     explica por qué se vuelve a pulsar. */
   const _g = ($('fShalomGuia')||{value:''}).value.trim();
   if(_g || (window.RegistroShalom &&
       RegistroShalom.estaRegistrado({shalomGuia:_g}))){
@@ -37,10 +12,6 @@ function regenClaveRecojo(){
   toast('🔑 Clave nueva: '+el.value);
 }
 
-/* Congela lo que Shalom ya tiene. Se llama al abrir el formulario.
-   La clave y la agencia de destino dejan de poder cambiarse en cuanto hay
-   guía: Shalom las tiene, y que el panel diga una cosa y el paquete vaya a
-   otra es peor que no poder editarlo. */
 function _congelarSiRegistrado(s){
   const reg = window.RegistroShalom ?
     RegistroShalom.estaRegistrado(s||{}) : !!(s&&s.shalomGuia);
@@ -58,40 +29,10 @@ function _congelarSiRegistrado(s){
   }
 }
 
-
-/* ── 🚚 REGISTRAR EN SHALOM, DESDE EL PEDIDO ──────────────────────────────
-   Hasta hoy el registro solo existía desde la consola. Esta es su cara.
-
-   TRES REGLAS QUE NO SE NEGOCIAN, porque Shalom no anula un envío, no tiene
-   clave de idempotencia y cada registro cuesta dinero:
-
-   1. Lo que falta se dice ANTES, en palabras. `window.RegistroShalom.faltantes()` es
-      el MISMO archivo que usa el servidor para decidir, así que lo que lees
-      aquí es exactamente lo que el servidor va a decidir — no una copia que
-      algún día diga otra cosa. Un botón gris sin explicación obliga a probar,
-      y probar aquí cuesta S/ 12.
-   2. El botón se apaga al pulsarlo y NO SE VUELVE A ENCENDER. Ni en éxito, ni
-      en fallo, ni en duda. Dos clics serían dos envíos y dos cobros.
-   3. En duda jamás sale "reintentar". Sale "Recuperar", que solo lee.
-
-   Y la trampa silenciosa: el servidor lee el pedido DE FIRESTORE, no de tu
-   pantalla. Si hay cambios sin subir, registraría con los datos viejos —caja
-   equivocada, o "faltan medidas" con las medidas delante—. Por eso se mira
-   `_dirtyShips` y se te pide guardar primero. Explícito, no magia. */
-
 let _regTimer = null;
 
-/* ── ★ REGISTRAR AL GUARDAR (10/11/2026) ──────────────────────────────────
-   Antes había que guardar, cerrar, volver a abrir y recién ahí registrar.
-   Ahora el bloque mira lo que tienes EN PANTALLA (estado, caja o medidas,
-   clave): si con eso ya se puede, ofrece «Registrar en Shalom al guardar»
-   y el botón Guardar pasa a «Guardar y registrar». Los cambios valen al
-   guardar, como siempre, y el registro va DESPUÉS de que el pedido subió:
-   el servidor registra con lo que hay en la nube.
-   Cero lecturas y cero llamadas para decidir: la lista de lo que falta es la
-   MISMA función del servidor, corriendo aquí. */
 let _regAlGuardar = false;
-let _regFormListo = false;   // el formulario ya cargó los valores de ESTE pedido
+let _regFormListo = false;
 const _REG_CAMPOS = {status:'fStatus', pkgLargo:'fPkgLargo', pkgAncho:'fPkgAncho',
   pkgAlto:'fPkgAlto', pkgPeso:'fPkgPeso', pkgCaja:'fPkgCaja', shalomClave:'fShalomClave'};
 
@@ -103,23 +44,14 @@ function _regBotonGuardar(){
 function regAlGuardarToggle(){
   _regAlGuardar = !_regAlGuardar; _regBotonGuardar(); _pintarRegistroShalom();
 }
-/** Lo guardado + lo que tienes en pantalla en los campos que deciden.
- * @param {Object} ped el pedido guardado
- * @return {Object} el pedido tal como quedaría al guardar */
 function _regBorrador(ped){
   if(!_regFormListo || !ped) return ped;
   const b = Object.assign({}, ped);
   Object.keys(_REG_CAMPOS).forEach(k => {
     const e = $(_REG_CAMPOS[k]); if(e) b[k] = String(e.value || '').trim();
   });
-  // Una guía escrita a mano en pantalla también cuenta: ese ya no se registra.
   const g = ($('fShalomGuia')||{value:''}).value.trim();
   if(g) b.shalomGuia = g;
-  /* ★ LO QUE EL GUARDADO TAMBIÉN DECIDE (11/11/2026). Sin esto, el DNI recién
-     escrito, su nombre de RENIEC o la agencia recién elegida solo contaban
-     después de guardar, cerrar y volver a abrir: «Falta el nombre partido
-     por RENIEC» con el nombre a la vista. Se calculan con las MISMAS reglas
-     que saveShipment (pedido-guardar.js). */
   const d = $('fDni'); if(d) b.dni = String(d.value||'').trim();
   const ph = $('fPhone'); if(ph) b.phone = String(ph.value||'').trim();
   const co = $('fCourier'); if(co && co.value) b.courier = co.value;
@@ -139,7 +71,6 @@ function _regDifiere(a, b){
     JSON.stringify(a.reniec||null) !== JSON.stringify(b.reniec||null);
 }
 
-/* La confirmación ANTES de guardar: cuesta dinero y no se deshace. */
 function _confirmarGuardarYRegistrar(){
   const R = window.RegistroShalom;
   const ped = _editId ? (S.shipments||[]).find(x=>x.id===_editId) : null;
@@ -171,10 +102,6 @@ function _confirmarGuardarYRegistrar(){
   });
 }
 
-/** Espera a que ESTE pedido termine de subir (o se rinde).
- * @param {string} id el pedido
- * @param {number} tope ms como máximo
- * @return {Promise<boolean>} true si ya está en la nube */
 function _esperarSubida(id, tope){
   return new Promise(res => {
     const t0 = Date.now();
@@ -206,7 +133,6 @@ async function _registrarTrasGuardar(id){
     toast('✅ Registrado en Shalom — guía '+(r.campos.shalomGuia||'')+' · pasó a ALISTADO');
     return;
   }
-  // Simulacro, fallo o duda: se reabre el pedido para verlo con sus palabras.
   _regReabrir(id, null, r);
 }
 
@@ -218,9 +144,6 @@ function _regReabrir(id, html, r){
   if(html) _regSalida(html); else _aplicarRegistroShalom(ped, r);
 }
 
-/* ⏰ REGISTRAR DE NUEVO — pasadas 24 h sin dejar el paquete en la agencia.
-   El servidor vuelve a comprobarlo TODO (hora, y que Shalom diga que no
-   entró): si el paquete ya entró, no se registra y no se cobra. */
 function renovarEnvioPanel(){
   const R = window.RegistroShalom;
   const ped = _editId ? (S.shipments||[]).find(x=>x.id===_editId) : null;
@@ -247,22 +170,13 @@ function renovarEnvioPanel(){
   });
 }
 
-/** La config del registro, por la MISMA función que usa el servidor.
- * @return {Object} {agenciaOrigen, instanceId} */
 function _regCfg(){
   return window.RegistroShalom ? window.RegistroShalom.configDe(S)
                                : {agenciaOrigen:null, instanceId:''};
 }
 
-/** Simulacro ENCENDIDO salvo un `false` explícito — la regla del servidor,
- * repetida aquí porque la pantalla tiene que decir la verdad sobre si el
- * próximo clic cuesta dinero.
- * @return {boolean} true si no va a gastar */
 function _regEsSimulacro(){ return S.shalomRegistroSimulacro !== false; }
 
-/** ¿Este pedido tiene cambios que Firestore todavía no tiene?
- * @param {string} id el id del pedido
- * @return {boolean} true si falta subirlo */
 function _regSinSubir(id){
   try{ return !!(id && typeof _dirtyShips!=='undefined' && _dirtyShips.has(id)); }
   catch(e){ return false; }
@@ -278,14 +192,6 @@ function _regLink(txt, fn){
     'cursor:pointer;font-weight:700;white-space:nowrap">'+txt+'</span>';
 }
 
-/* ★ EL RESUMEN DE LA CABECERA. Lo que se lee con el desplegable CERRADO.
-   La clave va aquí a propósito: la necesitas para dictársela al cliente, así
-   que esconderla detrás de un clic sería esconder justo lo que más se mira.
-   Y si falta algo estando en POR ALISTAR —o sea, ahora es cuando se puede
-   hacer algo— la cabecera se pone ámbar: te enteras sin abrir.
-   @param {Object} ped el pedido guardado, o null
-   @param {Array} faltan lo que falta, o null si no aplica
-   @param {boolean} registrado si ya tiene guía */
 function _pintarResumenPaquete(ped, faltan, registrado){
   const h = $('pkgResumen'); if(!h) return;
   const p = ped || {};
@@ -293,9 +199,6 @@ function _pintarResumenPaquete(ped, faltan, registrado){
   const elegida = (R && R.tipoElegido) ? R.tipoElegido(p) : '';
   const caja = elegida ? {etiqueta: elegida === 'SOBRE' ? 'Sobre' : 'Paquete ' + elegida} : ((R && R.clasificar) ?
     R.clasificar(p.pkgLargo, p.pkgAncho, p.pkgAlto, p.pkgPeso) : null);
-  /* La clave en la cabecera: mientras se prepara el registro (para
-     dictársela al cliente) y cuando lo registró Shalom Pro. Con una guía
-     puesta a mano, nada — como antes (10/11/2026). */
   const aMano = !!(R && R.estaRegistrado && R.estaRegistrado(p) &&
     !(R.registradoPorPro && R.registradoPorPro(p)));
   const clave = aMano ? '' : String(p.shalomClave || '').trim();
@@ -309,7 +212,6 @@ function _pintarResumenPaquete(ped, faltan, registrado){
   } else if(faltan && faltan.length){
     trozos.push('<span style="color:#d29922">faltan '+faltan.length+
       (faltan.length === 1 ? ' dato' : ' datos')+'</span>');
-    // Ámbar solo si se puede hacer algo YA: en POR ALISTAR.
     if(['POR ALISTAR','ALISTADO'].indexOf(String(p.status||'').trim().toUpperCase()) >= 0){
       color = 'color:#d29922';
     }
@@ -322,11 +224,9 @@ function _pintarResumenPaquete(ped, faltan, registrado){
   h.style.cssText = color;
 }
 
-/* ★ EL PINTOR. Único sitio que decide qué se ve en ese bloque. */
 function _pintarRegistroShalom(reintento){
   const box = $('shalomRegBlock'); if(!box) return;
   const R = window.RegistroShalom;
-  // Sin título propio: el del desplegable ya dice qué es esto.
   const tit = '';
   const aviso = (ico, txt, col) =>
     '<div style="font-size:11.5px;color:'+(col||'var(--text2)')+';line-height:1.5">'+
@@ -338,30 +238,15 @@ function _pintarRegistroShalom(reintento){
 
   const ped = _editId ? (S.shipments||[]).find(x=>x.id===_editId) : null;
   if(!ped){
-    /* ⚠️ Y LA CABECERA TAMBIÉN SE LIMPIA. Esta puerta de atrás salía sin
-       repintarla, así que al abrir un pedido NUEVO después de editar uno
-       registrado, el desplegable seguía diciendo «PAQUETE L · CLAVE 6277 ·
-       REGISTRADO» del anterior — con el cuerpo justo debajo diciendo
-       «guarda el pedido y vuelve a abrirlo».
-
-       Una pantalla que se contradice consigo misma a dos centímetros de
-       distancia da más miedo que un error: el dueño creyó que el pedido
-       nuevo había nacido registrado. No lo estaba —los campos de verdad sí
-       se limpian— pero eso no se podía saber mirando. */
     _pintarResumenPaquete(null, null, false);
     box.innerHTML = tit + aviso('💾',
       'Guarda el pedido y vuelve a abrirlo para poder registrarlo.');
     return;
   }
 
-  /* YA REGISTRADO: no hay botón. No es que esté deshabilitado — es que no
-     existe, que es la única forma de que un clic no pueda crear un segundo
-     envío con un segundo cobro. */
   if(R.estaRegistrado(ped)){
     _pintarResumenPaquete(ped, null, true);
     _regAlGuardar = false; _regBotonGuardar();
-    /* Guía puesta a mano (o escaneada del ticket): no la registró Shalom Pro
-       desde aquí, así que no se muestra nada de registro — como antes. */
     if(R.registradoPorPro && !R.registradoPorPro(ped)){ box.innerHTML = ''; return; }
     const m = parseFloat(ped.shalomMonto);
     box.innerHTML = tit +
@@ -376,7 +261,6 @@ function _pintarRegistroShalom(reintento){
     return;
   }
 
-  /* Escribiste una guía a mano en pantalla: este pedido no se registra. */
   const bor = _regBorrador(ped);
   if(R.estaRegistrado(bor)){
     _pintarResumenPaquete(bor, null, true);
@@ -389,17 +273,10 @@ function _pintarRegistroShalom(reintento){
   const org = cfg.agenciaOrigen || {};
   let html = tit;
 
-  /* ── TU CUENTA de Shalom Pro: la comprueba y la reconecta sola
-     panel/shalom/shalom-cuenta.js. NO se bloquea el botón si la comprobación
-     falla: un registro sin cuenta válida devuelve 403 y NO crea ni cobra. */
   const cf = (typeof cuentaShalomFila === 'function') ? cuentaShalomFila() :
     {ico: '🔌', txt: 'Shalom Pro'};
   html += _regFila(cf.ico, cf.txt, cf.accion ? _regLink(cf.accion, "goPage('configurar')") : '');
 
-  /* ── TU AGENCIA DE ORIGEN. Se puede cambiar desde aquí, y es UNA sola para
-     todo el negocio: cambiarla «para este envío» cambia todos los
-     siguientes. Eso ya no se repite en pantalla —estaba fijo, ocupando una
-     línea cada vez— y vive en 📖 Ayuda, que es donde se lee una vez. */
   const orgOk = !!(org.agenciaId);
   html += _regFila(orgOk ? '🏢' : '⚠️',
     orgOk ?
@@ -414,7 +291,6 @@ function _pintarRegistroShalom(reintento){
     'background:var(--bg2);border:1px solid var(--bd);border-radius:9px;margin-top:4px;'+
     'max-height:220px;overflow-y:auto;box-shadow:0 8px 24px rgba(0,0,0,.4)"></div></div>';
 
-  /* ── LO QUE FALTA, EN PALABRAS. Mismo archivo que el servidor. */
   const faltan = R.faltantes(bor, cfg);
   _pintarResumenPaquete(bor, faltan, false);
   if(faltan.length){
@@ -425,9 +301,6 @@ function _pintarRegistroShalom(reintento){
       'Falta esto para poder registrar:</div><ul style="margin:0;padding-left:16px;'+
       'font-size:11.5px;color:var(--text2);line-height:1.6">'+
       faltan.map(f=>'<li>'+escH(f)+'</li>').join('')+'</ul>'+
-      /* Esta nota SOLO cuando aplica. Permanente era ruido; con cambios sin
-         subir es justo lo que explica por qué la lista no cuadra con lo que
-         ves en pantalla. */
       (_regSinSubir(ped.id) ?
         '<div style="font-size:10.5px;color:var(--text2);margin-top:6px;font-style:italic">'+
         'Se comprueba lo guardado, y acabas de escribir algo que aún no sube.'+
@@ -437,8 +310,6 @@ function _pintarRegistroShalom(reintento){
     return;
   }
 
-  /* ── TODO LISTO CON LO DE PANTALLA, pero aún no guardado: se ofrece
-     registrar AL GUARDAR. Nada se llama hasta pulsar Guardar. */
   if(_regFormListo && _regDifiere(bor, ped)){
     const sim2 = _regEsSimulacro();
     html += '<div style="background:rgba(63,185,80,.08);border:1px solid rgba(63,185,80,.3);'+
@@ -465,7 +336,6 @@ function _pintarRegistroShalom(reintento){
   }
   _regAlGuardar = false; _regBotonGuardar();
 
-  /* ── TODO LISTO. Antes del botón, la trampa de los datos sin subir. */
   const caja = R.clasificar(ped.pkgLargo, ped.pkgAncho, ped.pkgAlto,
       ped.pkgPeso) || {};
   const queEs = R.contenidoDe(ped) || caja.etiqueta || '—';
@@ -481,11 +351,6 @@ function _pintarRegistroShalom(reintento){
     escH(ped.shalomClave||'—')+'</b>.</div>';
 
   if(sinSubir){
-    /* ⚠️ "Guarda primero" sonaría a reproche cuando acabas de guardar: la
-       subida va con 800 ms de espera más la red, así que hay unos segundos
-       en los que ya pulsaste Guardar y la nube todavía no lo tiene. Se dice
-       lo que de verdad pasa, y el bloque se repinta solo al terminar — sin
-       eso te quedarías mirando un aviso vencido sin saber qué hacer. */
     html += '<div style="margin-top:9px;background:rgba(245,158,11,.08);'+
       'border:1px solid rgba(245,158,11,.3);border-radius:9px;padding:10px 12px;'+
       'font-size:11.5px;color:#f59e0b;line-height:1.5;font-weight:700">'+
@@ -493,11 +358,6 @@ function _pintarRegistroShalom(reintento){
       '<div style="font-weight:400;color:var(--text2);margin-top:4px">Shalom se registra '+
       'con lo que hay en la nube, no con lo que ves en pantalla. El botón aparece '+
       'en cuanto termine de subir.</div></div>';
-    /* ⚠️ ACOTADO. La primera versión se reprogramaba sola sin límite: si la
-       subida no terminaba nunca —sin red, sesión caída— el panel repintaba
-       cada 1,2 s para siempre. Un reintento sin final no es paciencia, es un
-       bucle. A los ~18 s se para y se te da un botón, que además te dice que
-       algo va mal con la subida en vez de fingir que sigue en camino. */
     const n = (reintento || 0) + 1;
     if(n <= 15){
       clearTimeout(_regTimer);
@@ -521,8 +381,6 @@ function _pintarRegistroShalom(reintento){
       '</button>';
   }
 
-  /* ── EL INTERRUPTOR. Hasta hoy solo se podía cambiar subiendo un archivo de
-     configuración: lo único que decide si un clic cuesta S/ 12 era invisible. */
   html += '<div style="margin-top:8px;text-align:right">'+
     _regLink(sim ? 'Apagar simulacro (registrará de verdad)' : 'Encender simulacro',
              'regToggleSimulacro()')+'</div>';
@@ -532,10 +390,6 @@ function _pintarRegistroShalom(reintento){
   box.innerHTML = html;
 }
 
-/* ⏳ / ⏰ El plazo de 24 h de Shalom para dejar el paquete. Dentro del
-   plazo, cuánto queda (urgencia real, no inventada); vencido y sin que
-   Shalom lo haya recibido, la salida: registrar de nuevo. Sin la hora del
-   registro no se dice nada: mejor callar que inventar un plazo. */
 function _regPlazoHtml(ped, R){
   if(!R || !R.plazoVencido || String(ped.trackingStatus||'').trim()) return '';
   const t = Date.parse(String(ped.shalomRegistradoEn||''));
@@ -570,9 +424,6 @@ function regOrigenAbrir(){
 
 function regToggleSimulacro(){
   const sim = _regEsSimulacro();
-  /* Se guarda `false` EXPLÍCITO para apagarlo y `true` para encenderlo: el
-     servidor solo apaga el simulacro con un false explícito, así que dejar
-     el campo ausente lo dejaría encendido y el botón mentiría. */
   S.shalomRegistroSimulacro = sim ? false : true;
   save('config');
   toast(sim ? '⚠️ Simulacro APAGADO — los registros serán reales'
@@ -580,10 +431,6 @@ function regToggleSimulacro(){
   _pintarRegistroShalom();
 }
 
-/* ★ EL CLIC QUE CUESTA DINERO.
-   Todo se vuelve a comprobar aquí, justo antes de llamar: entre que se pintó
-   el bloque y pulsaste pudo cambiar cualquier cosa (otra pestaña, el barrido,
-   tú mismo). Lo pintado es un aviso; lo que manda es esta comprobación. */
 async function registrarEnvioPanel(){
   const R = window.RegistroShalom;
   const ped = _editId ? (S.shipments||[]).find(x=>x.id===_editId) : null;
@@ -618,9 +465,6 @@ async function registrarEnvioPanel(){
     colorSi: sim ? 'var(--blue)' : '#f59e0b',
     trabajando: 'Registrando…',
     alConfirmar: async () => {
-      /* ⚠️ EL BOTÓN SE APAGA ANTES DE LLAMAR Y NO SE VUELVE A ENCENDER.
-         No es un detalle de estilo: dos clics son dos envíos y dos cobros que
-         nadie puede anular. Se le quita hasta el onclick. */
       if(btn){
         btn.disabled = true; btn.onclick = null; btn.style.opacity = '.45';
         btn.style.cursor = 'default'; btn.textContent = '⏳ Registrando…';
@@ -628,27 +472,11 @@ async function registrarEnvioPanel(){
       let r = null;
       try{ r = await window.Shalom.registrarEnvio(ped.id); }catch(e){ r = null; }
       _aplicarRegistroShalom(ped, r);
-      /* NO SE RELANZA NUNCA. `confirmar` vuelve a habilitar SU botón cuando
-         `alConfirmar` lanza, y ofrecer ahí un reintento sería ofrecer un
-         segundo envío. Los tres finales se cuentan abajo, en su sitio. */
     }
   });
 }
 
-/* ★ LOS TRES FINALES. No dos: éxito, fallo y DUDA.
-   Shalom no anula y no tiene clave de idempotencia, así que llamar "fallo" a
-   una duda invita a reintentar — y un reintento sobre un envío que sí se creó
-   es un segundo paquete y un segundo cobro. La duda tiene su propia salida, y
-   es de SOLO LECTURA. */
 function _aplicarRegistroShalom(ped, r){
-  /* ★ EL RASTRO. Un registro cuesta dinero y pasa UNA vez: si la respuesta
-     no queda escrita en algún sitio, lo único que te queda cuando algo sale
-     raro es el recuerdo. Y `forma` —los NOMBRES de los campos que devolvió
-     Shalom, sin un solo valor— es lo que permite cerrar el traductor cuando
-     un campo no llega donde lo esperábamos; pasó con el monto.
-     Se deja fuera `cuerpo`: en simulacro lleva el nombre, el DNI y el
-     teléfono del cliente, y eso no tiene por qué quedar en una consola que
-     cualquiera puede estar mirando por encima del hombro. */
   try{
     console.log('[Registro Shalom]', JSON.stringify({
       ok: r && r.ok, estado: r && r.estado, motivo: r && r.motivo,
@@ -678,7 +506,6 @@ function _aplicarRegistroShalom(ped, r){
   const mot = (r && r.motivo) || 'SIN_RED';
   const txt = (window.Shalom && window.Shalom.textoMotivo) ? window.Shalom.textoMotivo(mot) : mot;
 
-  /* DUDA: se cortó y NO sabemos si el envío llegó a crearse. */
   if(r && r.estado === 'duda'){
     _regSalida('<div style="background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.35);'+
       'border-radius:9px;padding:10px 12px"><b style="color:#f59e0b">⚠️ No sabemos si se creó.</b>'+
@@ -693,8 +520,6 @@ function _aplicarRegistroShalom(ped, r){
     return;
   }
 
-  /* FALLO: Shalom dijo que no. Se dice UNA vez, con sus palabras, y sin
-     ningún botón que invite a volver a intentarlo a ciegas. */
   _regSalida(_regServidorViejo(ped, r)+'<span style="color:var(--red)">❌ '+escH(txt)+'</span>'+
     (r && r.detalle ? '<div style="color:var(--text2);margin-top:3px">'+escH(r.detalle)+'</div>' : '')+
     (r && r.faltan && r.faltan.length ?
@@ -703,11 +528,6 @@ function _aplicarRegistroShalom(ped, r){
   toast('❌ No se registró');
 }
 
-/* ★ LO QUE TRAE EL SERVIDOR, AL PEDIDO (11/11/2026). El servidor de la
-   Fase 1 ya trae la marca de Shalom Pro y la nota privada con la clave. Uno
-   SIN DESPLEGAR no: entonces el panel la completa él mismo —la clave y la
-   guía las tiene a mano— y avisa, para que no quede en silencio que el
-   servidor está atrasado. Pasó de verdad: la nota quedó vacía. */
 function _regAplicarCampos(ped, campos){
   Object.assign(ped, campos);
   if(campos.shalomPor === 'pro') return;
@@ -718,8 +538,6 @@ function _regAplicarCampos(ped, campos){
   toast('⚠️ El servidor no está actualizado — corre «firebase deploy --only functions». La clave se anotó desde el panel.');
 }
 
-/* Un servidor sin la Fase 1 rechaza lo que el panel ya permite (caja sin
-   medidas, ALISTADO). Si el rechazo es ESE, se dice qué hacer. */
 function _regServidorViejo(ped, r){
   const f = (r && r.motivo === 'SIN_DATO' && Array.isArray(r.faltan)) ? r.faltan.join(' ') : '';
   if(!f) return '';
@@ -731,8 +549,6 @@ function _regServidorViejo(ped, r){
     'y vuelve a intentarlo: no se registró nada.</div>' : '';
 }
 
-/* SOLO LEE: busca el envío entre los pendientes de Shalom por clave y destino
-   y rellena la guía. No registra, así que no puede costar ni duplicar. */
 async function recuperarEnvioPanel(){
   const ped = _editId ? (S.shipments||[]).find(x=>x.id===_editId) : null;
   if(!ped || !window.Shalom) return;
@@ -756,9 +572,7 @@ async function recuperarEnvioPanel(){
 
 function _claveAuto(){
   const el = $('fShalomClave'); if(!el) return;
-  if(el.value) return;                       // ya tiene una: no se pisa
-  // Un pedido con guía ya está registrado en Shalom: generarle una clave
-  // nueva aquí sería darle al cliente un número que no abre nada.
+  if(el.value) return;
   if(($('fShalomGuia')||{value:''}).value.trim()) return;
   if(!window.Shalom || typeof Shalom.claveRecojo !== 'function') return;
   el.value = Shalom.claveRecojo();

@@ -127,8 +127,8 @@ module.exports = async ({bloque, ok}) => {
     /* LA REGLA ESTRUCTURAL. Si un solo sitio vuelve a escribir
        `s.dniRecoger || s.dni`, el fallo vuelve entero: basta con que ESE
        sitio sea el que imprime la etiqueta. */
-    const sinCom = (t) => t.replace(/\/\*[\s\S]*?\*\//g, '')
-        .replace(/^\s*\/\/.*$/gm, '');
+    const sinCom = (t) => t
+        ;
     const sueltos = [];
     ['print.js', 'config.js', 'index.html', 'formulario.html'].forEach((f) => {
       const src = sinCom(E.leer(f));
@@ -148,7 +148,7 @@ module.exports = async ({bloque, ok}) => {
   {
     /* Sin comentarios: el de print.js CITA el fallo —`s.dniRecoger || s.dni`—
        y contar una cita como reincidencia es confundir hablar con hacer. */
-    const pr = E.leer('print.js').replace(/\/\*[\s\S]*?\*\//g, '');
+    const pr = E.leer('print.js');
     ok(/_dniDe\(s\)/.test(pr) && !/s\.dniRecoger/.test(pr),
        'la etiqueta y la lista impresa pasan las dos por el lector unico');
     const idx = E.leer('index.html');

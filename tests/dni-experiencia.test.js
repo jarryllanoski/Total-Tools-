@@ -12,7 +12,7 @@ const vm = require('vm');
 module.exports = async ({bloque, ok}) => {
   const form = E.leer('formulario.html');
   const i0 = form.indexOf('function _nrmNom(');
-  const src = form.slice(i0, form.indexOf('/* ★ EL DNI RELLENA EL NOMBRE', i0));
+  const src = form.slice(i0, form.indexOf('function onDniInput(val){', i0));
 
   // Un DOM mínimo para ejecutar el código real.
   const campos = {};
@@ -72,7 +72,7 @@ module.exports = async ({bloque, ok}) => {
     const es = form.slice(form.indexOf('function _dniEscribir('), form.indexOf('var _dniDingHecho'));
     ok(/prefers-reduced-motion: reduce\)'\)\.matches\)\{ fin\(\); return; \}/.test(es), '«reducir movimiento»: de golpe');
     ok(/nom-brilla/.test(es) && /_dniDing\(\)/.test(es), 'se ilumina y suena');
-    const di = form.slice(form.indexOf('function _dniDing('), form.indexOf('/* ★ EL DNI RELLENA EL NOMBRE', form.indexOf('function _dniDing(')));
+    const di = form.slice(form.indexOf('function _dniDing('), form.indexOf('function onDniInput(val){', form.indexOf('function _dniDing(')));
     ok(/if\(_dniDingHecho===dni \|\| document\.hidden\) return;/.test(di), 'el ding suena UNA vez por DNI y nunca en segundo plano');
     ok(/createOscillator/.test(di) && !/new Audio\(|\.mp3|\.wav/.test(di), 'lo genera el navegador: sin descargar archivos');
     ok(/exponentialRampToValueAtTime\(0\.06/.test(di), 'volumen bajo');

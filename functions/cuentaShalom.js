@@ -1,54 +1,12 @@
 "use strict";
 
-/**
- * functions/cuentaShalom.js — LA CUENTA DE SHALOM PRO DEL PANEL
- * ==============================================================
- * Rehecho el 11/11/2026 (reemplaza a instanciaShalom.js y
- * puertaInstancias.js). Dos operaciones, y el navegador no ve nada más:
- *
- *   conectar → con el correo y la contraseña de Shalom Pro (escritos ahora
- *              o los guardados en Secret Manager): encuentra TU instancia,
- *              la crea si no existe, entra solo si hace falta y guarda en
- *              el servidor cuál es.
- *   estado   → ¿la instancia guardada sigue conectada?
- *
- * LA REGLA DE ORO: el panel solo usa la instancia cuyo `username` es TU
- * correo de Shalom Pro. La cuenta de la API puede tener instancias de otros
- * negocios; nunca se elige «la primera», «la única» ni «la conectada». Y el
- * navegador nunca recibe la lista: solo «conectada · tu correo».
- *
- * POR QUÉ SE REHIZO (el fallo del 11/11/2026): la instancia del panel estaba
- * CONECTADA en Shalom, pero el panel tenía guardado otro id. «Conectar»
- * buscaba por un correo fijo en el código, y aunque la encontraba, SIEMPRE
- * volvía a iniciar sesión: ese login falló, y como falló nunca guardaba el id
- * bueno. Ahora, si ya está conectada, solo se guarda su id.
- *
- * Según su documentación, la API guarda las credenciales cifradas en la
- * instancia y vuelve a entrar sola cuando la sesión vence: conectando una
- * vez, se mantiene. Listar, crear, entrar y ver el estado NO consumen cuota.
- *
- * Lógica pura: las llamadas a Shalom y a Firestore llegan en `deps`, para
- * probarla con las respuestas reales sin red.
- */
-
-/** El nombre con el que el panel crea su instancia (si no existe). */
 const NOMBRE = "Total Tools Panel";
 
-/**
- * Texto recortado, o "".
- * @param {*} v valor
- * @return {string} texto
- */
 function _txt(v) {
   return typeof v === "string" ? v.trim() : (typeof v === "number" ?
     String(v) : "");
 }
 
-/**
- * El id de una instancia recién creada, venga donde venga en la respuesta.
- * @param {*} json respuesta de POST /instances
- * @return {string} el id, o ""
- */
 function idDe(json) {
   const j = (json && typeof json === "object") ? json : {};
   const d = (j.data && typeof j.data === "object") ? j.data : {};
@@ -60,13 +18,6 @@ function idDe(json) {
   return "";
 }
 
-/**
- * Cuál de la lista es la TUYA. Solo por tu correo; nunca otra.
- * @param {Array} lista instancias traducidas {id, nombre, usuario, conectada}
- * @param {string} correo tu correo de Shalom Pro
- * @param {string} idGuardado la que el panel tenía guardada, si alguna
- * @return {Object} {estado: una|ninguna, instancia}
- */
 function mia(lista, correo, idGuardado) {
   const L = Array.isArray(lista) ? lista.filter((x) => x && _txt(x.id)) : [];
   const c = _txt(correo).toLowerCase();
@@ -74,11 +25,6 @@ function mia(lista, correo, idGuardado) {
   const tuyas = L.filter((x) => _txt(x.usuario).toLowerCase() === c);
   if (tuyas.length === 1) return {estado: "una", instancia: tuyas[0]};
   if (tuyas.length > 1) {
-    /* Varias con TU correo: TODAS son de tu cuenta de Shalom Pro (p. ej.
-       otra app tuya conectada con el mismo correo), así que usar cualquiera
-       registra en TU cuenta. Nunca se para: se elige siempre igual.
-       Orden: la guardada → la del panel (su nombre) → una conectada → la
-       primera. Entre iguales, por id (estable: siempre la misma). */
     const orden = tuyas.slice().sort((a, b) =>
       _txt(a.id) < _txt(b.id) ? -1 : (_txt(a.id) > _txt(b.id) ? 1 : 0));
     const elegir = [
@@ -93,20 +39,11 @@ function mia(lista, correo, idGuardado) {
       if (hit) return {estado: "una", instancia: hit};
     }
   }
-  /* Una creada por el panel que nunca llegó a entrar no tiene correo: se
-     reconoce por SU nombre y por no tener usuario (nunca una ajena). */
   const huerf = L.filter((x) => !_txt(x.usuario) && _txt(x.nombre) === NOMBRE);
   if (huerf.length === 1) return {estado: "una", instancia: huerf[0]};
   return {estado: "ninguna", instancia: null};
 }
 
-/**
- * Conectar la cuenta.
- * @param {Object} deps {listar, crear, entrar, estado, guardarCuenta}
- * @param {Object} opc {usuario, clave, idGuardado, recienEscritas}
- * @return {Promise<Object>} {ok, conectada, usuario, id} o {ok:false, motivo,
- *   detalle} — nunca la contraseña, nunca otras instancias
- */
 async function conectar(deps, opc) {
   const o = opc || {};
   const usuario = _txt(o.usuario);
@@ -144,14 +81,10 @@ async function conectar(deps, opc) {
     conectada = false;
   }
 
-  /* ★ YA CONECTADA → NO SE VUELVE A ENTRAR. Solo se guarda cuál es.
-     Excepción: si ACABAS de escribir la contraseña, se entra para que
-     Shalom guarde la nueva (y la use al reconectar solo). */
   if (!conectada || o.recienEscritas === true) {
     const en = await deps.entrar(id, usuario, clave);
     if (!en || !en.ok) {
       const m = (en && en.motivo) || "SIN_RED";
-      // Aquí un rechazo es la contraseña, no la clave de la API.
       if (conectada) {
         await deps.guardarCuenta(id, usuario);
         return {ok: true, conectada: true, usuario, id,
@@ -168,7 +101,6 @@ async function conectar(deps, opc) {
     conectada = !!(st && st.ok && st.sesion && st.sesion.conectada);
   }
 
-  // La instancia es TUYA (por correo): se guarda aunque falte confirmar.
   await deps.guardarCuenta(id, usuario);
   if (!conectada) {
     return {ok: false, motivo: "SIN_SESION_SHALOM",
@@ -178,12 +110,6 @@ async function conectar(deps, opc) {
   return {ok: true, conectada: true, usuario, id};
 }
 
-/**
- * ¿Sigue conectada la instancia guardada? Gratis.
- * @param {Object} deps {estado}
- * @param {Object} opc {idGuardado, usuarioGuardado, hayCredenciales}
- * @return {Promise<Object>} {ok, conectada, usuario, motivo}
- */
 async function estado(deps, opc) {
   const o = opc || {};
   const id = _txt(o.idGuardado);

@@ -1,60 +1,18 @@
 "use strict";
 
-/**
- * functions/barrido.js — a quién se consulta, y cuándo
- * =====================================================
- * La parte del barrido programado que se puede probar sin red, sin Firestore
- * y sin esperar a las 11:30: decidir si toca correr, y armar la lista.
- *
- * POR QUÉ EL RELOJ SE MIRA AQUÍ Y NO EN EL CRON
- * Cloud Scheduler dispara cada 30 minutos y esta función decide si le toca.
- * Suena a desperdicio y no lo es: los disparos que no tocan NO consultan nada
- * a Shalom, y a cambio los horarios pasan a ser un texto en Config que se
- * cambia sin volver a desplegar. Cuatro entradas de cron fijas atarían cada
- * cambio de horario a un despliegue.
- *
- * Solo funcionan las horas EN PUNTO y Y MEDIA — es a lo que dispara el cron.
- * Una hora suelta (08:15) se ajusta a la ranura más cercana en vez de no
- * ejecutarse nunca en silencio.
- */
-
-/** Las cuatro de fábrica. */
 const HORAS_POR_DEFECTO = ["08:00", "11:30", "16:30", "19:00"];
 
-/** Zona del negocio. Fija: "8am" es 8am en Perú, sin cuentas con UTC. */
 const ZONA = "America/Lima";
 
-/** Minutos que tienen que pasar para volver a consultar la misma guía.
-    No es un intervalo: es la defensa contra que el Scheduler dispare dos
-    veces la misma ranura (reintentos) y se consulte todo por duplicado. */
 const GRACIA_MIN = 50;
 
-/** Una guía de Shalom: 8 dígitos, o 9 que empiecen por 1.
-    Medido el 13/10: 484 de 487 tenían 8. Pero Shalom numera en orden y en
-    octubre de 2026 pasó el 99.999.999: sus guías nuevas son 100761787,
-    101038480… Con la regla de 8 cada envío nuevo caía en «mal escrita» y el
-    seguimiento automático dejó de mirarlos sin avisar a nadie.
-    9 dígitos que NO empiezan por 1 siguen siendo un error de tipeo —el caso
-    real fue 939726661, un dígito de más—, porque la serie nueva empieza en
-    100.000.000. La MISMA regla está en guias.js (los avisos del panel); una
-    prueba comprueba que las dos dicen lo mismo. */
 const GUIA_OK = /^(?:[0-9]{8}|1[0-9]{8})$/;
 
-// La formula de las etiquetas. La MISMA que usa el panel.
 const etiquetas = require("./etiquetas");
-// Qué significa lo que dice Shalom: la MISMA regla en todos lados (Fase 6).
 const shalomEstado = require("./shalomEstado");
-// ¿Se consulta esta guía? La MISMA regla que el panel (situacion).
 const registroShalom = require("./registroShalom");
-/** Horas sin movimiento tras las que la guía del panel se da por muerta.
-    Sale de la regla única: no hay un segundo número que pueda divergir. */
 const VENCIDA_H = registroShalom.VENCIDA_MS / 3600000;
 
-/**
- * Ajusta una hora a la ranura de 30 minutos más cercana.
- * @param {string} hhmm por ejemplo "8:15"
- * @return {?string} "08:30", o null si no se entiende
- */
 function aSlot(hhmm) {
   const m = /^\s*(\d{1,2})\s*[:.]?\s*(\d{2})?\s*$/.exec(String(hhmm || ""));
   if (!m) return null;
@@ -70,12 +28,6 @@ function aSlot(hhmm) {
   return String(h).padStart(2, "0") + ":" + String(slot).padStart(2, "0");
 }
 
-/**
- * Lee el texto de horas de Config. Devuelve las de fábrica si no hay nada
- * usable: quedarse sin ninguna hora apagaría el barrido en silencio.
- * @param {*} texto "08:00, 11:30, 16:30, 19:00"
- * @return {Array<string>} horas normalizadas, ordenadas y sin repetir
- */
 function parseHoras(texto) {
   const crudas = String(texto === null || texto === undefined ? "" : texto)
       .split(/[,;\s]+/).filter(Boolean);
@@ -88,45 +40,18 @@ function parseHoras(texto) {
   return lista.length ? lista : HORAS_POR_DEFECTO.slice();
 }
 
-/**
- * La hora local del negocio, como "HH:MM".
- * @param {Date} fecha momento
- * @param {string} [zona] zona horaria
- * @return {string} "08:00"
- */
 function horaLocal(fecha, zona) {
   const f = new Intl.DateTimeFormat("es-PE", {
     timeZone: zona || ZONA, hour: "2-digit", minute: "2-digit", hour12: false,
   });
-  // Algunos entornos devuelven "24:00" a medianoche; se normaliza.
   return f.format(fecha).replace(/^24:/, "00:");
 }
 
-/**
- * ¿Le toca correr a esta hora?
- * @param {Array<string>} horas horas configuradas (ya normalizadas)
- * @param {string} hhmm hora local actual
- * @return {boolean} true si toca
- */
 function tocaAhora(horas, hhmm) {
   const s = aSlot(hhmm);
   return !!s && (horas || []).indexOf(s) >= 0;
 }
 
-/**
- * A quién se consulta, y por qué se saltó al resto.
- *
- * Las cuatro razones para NO consultar, en orden de cuánto ahorran:
- *   · Shalom ya dijo ENTREGADO — es la última rama del árbol, no hay nada
- *     después. Preguntar otra vez no puede traer nada nuevo.
- *   · la etiqueta es FINALIZADO — el pedido está cerrado.
- *   · la guía está mal escrita — se sabe de antemano que va a fallar, así que
- *     se lista para corregirla en vez de gastar 4 consultas diarias en ella.
- *   · se consultó hace un momento — defensa contra un disparo repetido.
- * @param {Array<Object>} pedidos todos los pedidos
- * @param {number} ahora Date.now()
- * @return {Object} {consultar, guiasMalas, saltados}
- */
 function aConsultar(pedidos, ahora) {
   const consultar = [];
   const guiasMalas = [];
@@ -150,10 +75,6 @@ function aConsultar(pedidos, ahora) {
     if (shalomEstado.rango(p.trackingStatus) === 3) {
       saltados.yaEntregados++; return;
     }
-    /* ⏰ GUÍA MUERTA: la regla es la ÚNICA de registroShalom.situacion
-       (la misma del botón Consultar y del ticket). Registrada por el panel,
-       sin movimiento y pasadas 72 h: no se dejó en la agencia y Shalom la
-       dio por vencida. Al registrarla de nuevo cambia la hora y vuelve. */
     const sit = registroShalom.situacion(p, t);
     if (sit.tipo === "vencida") {
       saltados.vencidas++; return;
@@ -171,9 +92,6 @@ function aConsultar(pedidos, ahora) {
       nombre: p.name || "",
       guia: guia,
       codigo: String(p.trackingOrderCode || p.shalomCodigo || "").trim(),
-      /* Por dejar: «Shalom no la conoce» es lo esperado (envío pendiente).
-         Con movimiento: Shalom YA la conocía, así que «no la conoce» huele
-         a Shalom caído y cuenta para el interruptor (index.js). */
       porDejar: sit.tipo === "porDejar",
       conMovimiento: !!String(p.trackingStatus || "").trim(),
     });
@@ -182,28 +100,11 @@ function aConsultar(pedidos, ahora) {
   return {consultar, guiasMalas, saltados};
 }
 
-/**
- * Suma los campos de seguimiento que toca escribir para un pedido.
- * No escribe: devuelve lo que HABRIA que escribir, para que el simulacro
- * pueda decidir exactamente igual sin tocar nada. Y por eso vive aqui y no en
- * index.js: una decision que ninguna prueba puede alcanzar es una decision sin
- * red.
- *
- * Si nada cambio, devuelve null y NO se escribe nada — ni siquiera la hora de
- * la consulta. Estampar "te mire y no habia novedad" en 71 pedidos, cuatro
- * veces al dia, es pagar 284 escrituras diarias por no-noticias.
- * @param {Object} pedido datos actuales del pedido
- * @param {Object} res respuesta ya traducida de /track
- * @param {string} modo apagado | semi | auto
- * @return {?Object} {campos, etiqueta} o null si no hay nada que cambiar
- */
 function cambiosDe(pedido, res, modo) {
   if (!pedido || !res || !res.ok || !res.estado) return null;
   const campos = {trackingLastAutoCheck: Date.now()};
   let algo = false;
 
-  /* El texto del seguimiento tampoco desanda el camino. Es la misma guarda
-     que el panel: una respuesta peor no pisa a una buena. */
   const nuevoRango = (typeof res.pasos === "number") ? res.pasos :
     etiquetas.rangoDeTexto(res.estado);
   const viejoRango = etiquetas.rangoDeTexto(pedido.trackingStatus);
@@ -214,8 +115,6 @@ function cambiosDe(pedido, res, modo) {
     const iso = res.fecha || new Date().toISOString();
     const historial = Array.isArray(pedido.trackingHistory) ?
       pedido.trackingHistory.slice() : [];
-    // Mismo formato que escribe el panel (_escribirTracking en tracking.js):
-    // un tercer formato de historial haria ilegible la mitad de las entradas.
     historial.push({date: iso, status: res.estado, message: res.estado,
       source: "shalom"});
     campos.trackingStatus = res.estado;

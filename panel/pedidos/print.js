@@ -1,27 +1,8 @@
-/**
- * panel/pedidos/print.js — imprimir etiquetas
- * Fase 7 (11/11/2026): movido de la raíz a su capa, sin cambiar una línea.
- */
-/**
- * print.js — Módulo de impresión para Total Tools
- * Formatos: Etiqueta (pegar en paquete) · Lista (registro interno)
- * Integración: reemplaza doPrint() en index.html
- */
 
 (function(){
 
-/* ★ EL DNI DEL PEDIDO — UNA SOLA REGLA, Y NO VIVE AQUI.
-   El 13/10/2026 esta etiqueta imprimio el DNI de OTRA PERSONA: el dueño
-   corrigio el destinatario en el panel, el nombre cambio y el documento no.
-   Leia `s.dniRecoger || s.dni`, y el panel al editar solo actualiza `dni`.
-   Mientras tanto el registro en Shalom leia `dni`: la etiqueta pegada al
-   paquete y la guia llevaban documentos distintos, que en la agencia
-   significa que no se lo entregan a nadie.
-   La regla —y por que «vacio» no es lo mismo que «no existe»— esta en
-   functions/dniPedido.js, que leen los nueve sitios. */
 const _dniDe = (s) => (window.DniPedido ? DniPedido.de(s) : (s && s.dni) || '');
 
-/* ── MODAL HTML ─────────────────────────────────────────────────── */
 function _injectModal(){
   if(document.getElementById('printModal')) return;
   const el = document.createElement('div');
@@ -125,8 +106,7 @@ function _injectModal(){
   document.body.appendChild(el);
 }
 
-/* ── ESTADO ─────────────────────────────────────────────────────── */
-let _scope   = 'sel';   // 'sel' | 'all' | 'one' | 'list'
+let _scope   = 'sel';
 let _fmt     = 'etiqueta';
 let _bultos  = 1;
 let _list    = [];
@@ -136,7 +116,6 @@ const TIPS = {
   lista:    '💡 <b>Impresora A4:</b> márgenes normales, orientación horizontal para más columnas · <b>Térmica:</b> no recomendado para este formato',
 };
 
-/* ── API PÚBLICA ─────────────────────────────────────────────────── */
 window.PrintModule = {
 
   open(){
@@ -146,12 +125,9 @@ window.PrintModule = {
 
     const sel = Seleccion.marcados();
 
-    /* Decidir scope inicial. «✨ Nuevos» se retiró el 26/10/2026: cada
-       tarjeta tiene su 🖨️ para imprimir un pedido suelto. Sin selección
-       queda «Todos», que es lo que ya pasaba cuando no había nuevos. */
     _scope = sel.length ? 'sel' : 'all';
     _list  = _scope==='sel' ? sel : S.shipments;
-    _bultos = 1;  // siempre empieza en 1 por impresión (no persistir valor viejo)
+    _bultos = 1;
     _fmt    = localStorage.getItem('print_fmt') || 'etiqueta';
 
     this._renderScope(sel);
@@ -160,7 +136,6 @@ window.PrintModule = {
     this._show();
   },
 
-  // Abre el modal directo con un solo pedido — ignora seleccionados del panel
   openOne(id){
     _injectModal();
     const S = window.S;
@@ -169,9 +144,8 @@ window.PrintModule = {
     if(!ship){ window.toast&&toast('Pedido no encontrado'); return; }
     _scope  = 'one';
     _list   = [ship];
-    _bultos = 1;  // siempre empieza en 1 por impresión (no persistir valor viejo)
+    _bultos = 1;
     _fmt    = localStorage.getItem('print_fmt') || 'etiqueta';
-    // Mostrar chip "1 pedido" sin opciones de scope
     const row = document.getElementById('printScopeRow');
     if(row) row.innerHTML = '<div style="font-size:12px;color:#8b949e;padding:4px 0">📦 1 pedido — <b style="color:#e6edf3">'+esc(ship.name)+'</b></div>';
     this._updateBultos();
@@ -180,9 +154,6 @@ window.PrintModule = {
     this._show();
   },
 
-  // Imprime una LISTA específica de pedidos (por id) — independiente de la
-  // selección del panel (Seleccion). La usa Compartir para imprimir etiquetas
-  // de los envíos vinculados a tokens usados, sin tocar nada de Envíos.
   openList(ids){
     _injectModal();
     const S = window.S;
@@ -247,7 +218,6 @@ window.PrintModule = {
     if(key==='sel') _list = Seleccion.marcados();
     else _list = S.shipments;
 
-    // Actualizar estilos botones
     ['sel','all'].forEach(k=>{
       const btn = document.getElementById('scope_'+k);
       if(!btn) return;
@@ -278,7 +248,6 @@ window.PrintModule = {
   selectFmt(fmt){
     _fmt = fmt;
     localStorage.setItem('print_fmt', fmt);
-    // Estilos opciones
     ['etiqueta','lista'].forEach(f=>{
       const el = document.getElementById('fmt_'+f);
       const chk = el ? el.querySelector('.fmt-check') : null;
@@ -295,7 +264,6 @@ window.PrintModule = {
         chk.style.borderColor = '#30363d';
       }
     });
-    // Tip
     const tip = document.getElementById('printTip');
     if(tip){
       tip.innerHTML = TIPS[fmt]||'';
@@ -306,7 +274,6 @@ window.PrintModule = {
   print(){
     if(!_list.length){ window.toast&&toast('No hay envíos para imprimir'); return; }
     const S = window.S;
-    // Refrescar _list con los datos más recientes de window.S
     const ids = _list.map(x=>x.id);
     _list = S.shipments.filter(x=>ids.includes(x.id));
     if(!_list.length){ window.toast&&toast('No hay envíos para imprimir'); return; }
@@ -323,7 +290,6 @@ window.PrintModule = {
       html = _htmlLista(_list, _bultos, bizName, bizPhone, bizCity, fecha, qrUrl);
     }
 
-    // Blob URL evita document.write síncrono que congela el hilo principal
     let blobUrl;
     try {
       const blob = new Blob([html], {type:'text/html;charset=utf-8'});
@@ -332,16 +298,10 @@ window.PrintModule = {
     const w = blobUrl ? window.open(blobUrl,'_blank') : window.open('','_blank');
     if(!w){ window.toast&&toast('⚠️ Permitir popups para imprimir'); if(blobUrl) URL.revokeObjectURL(blobUrl); return; }
     if(!blobUrl){ w.document.write(html); w.document.close(); }
-    // Limpiar URL del blob tras 2 minutos
     if(blobUrl) setTimeout(()=>URL.revokeObjectURL(blobUrl), 120000);
 
-    // Marcar como impresos
     _list.forEach(s=>{ s.printed = true; });
-    // Lista de ids en UNA llamada: "imprimir todos" puede ser 700 pedidos y
-    // save(id) en bucle reescribe el estado completo cada vez (7,6 s de bloqueo).
     window.save && window.save(_list.map(s=>s.id));
-    // La 🖨️ de cada tarjeta se pinta de azul AHORA, no en la próxima
-    // sincronización; y la campana deja de ofrecer «Imprimir».
     if(typeof window.render === 'function') window.render();
     if(window.NotifyModule && typeof window.NotifyModule.check === 'function') window.NotifyModule.check();
 
@@ -349,61 +309,28 @@ window.PrintModule = {
   }
 };
 
-/* Código de envío para la etiqueta.
-   · Pedidos ANTIGUOS (antes de 2026-08-08): últimos 4 dígitos del id — NO se tocan.
-   · Pedidos de 2026-08-08 en adelante: 6 dígitos (más únicos que 4 y más legibles
-     que un alfanumérico). Determinístico: mismo pedido → mismo código (reimprimir
-     da igual), sin guardar nada nuevo en la base. */
-/* ★ Desde el 26/10/2026: si el pedido tiene N° de factura/boleta, ESE es su
-   código (etiqueta, QR, escáner). Sin número, el de siempre. La regla del
-   número vive en functions/nroComprobante.js. */
 function _nroPrint(s){ return window.NroComprobante ? NroComprobante.de(s) : ''; }
 function _codigoEnvio(s){
   return _nroPrint(s) || _codigoBase(s);
 }
-// El código de antes del N° de factura. El escáner lo sigue aceptando: una
-// etiqueta impresa antes de poner la factura tiene que seguir sirviendo.
 function _codigoBase(s){
   if(!s || !s.id) return '???';
-  /* Fase 6 (11/11/2026): la regla vive en functions/codigoSeguimiento.js,
-     la MISMA del WhatsApp y del link de seguimiento. */
   return window.CodigoSeguimiento ? window.CodigoSeguimiento.de(s.id, s.createdAt)
     : String(s.id).slice(-4).toUpperCase();
 }
-/* ★ ¿SE IMPRIMIÓ? UNA SOLA RESPUESTA. `printed` lo pone print() al generar
-   la etiqueta y viaja a la nube; es lo que contaba «Nuevos» y la campana
-   de impresión. `_printed` era de la campana de notificaciones y dependía
-   del aviso `afterprint`, que casi nunca llega porque la etiqueta se
-   imprime en OTRA pestaña. Se sigue aceptando para los que ya lo tengan. */
 window.PrintModule.impreso = function(s){ return !!(s && (s.printed || s._printed)); };
-// Exponer el código para que el escáner (index.html) identifique el pedido exacto.
 window.PrintModule.codigoEnvio = _codigoEnvio;
 window.PrintModule.codigoBase = _codigoBase;
-/* Valor del QR GRANDE: solo el celular (27/10/2026). Escanearlo hace la
-   búsqueda de siempre: todos los pedidos de ese número. Identificar UN
-   pedido —para ir a él o cambiarlo de etiqueta— es trabajo del QR pequeño
-   del pie, que lleva su id (ver _pieQrPedido). Antes llevaba también
-   «#código»; las etiquetas ya impresas así se siguen leyendo. */
 function _qrValor(s){
   return String(s.phone||'');
 }
 
-// ── ¿A DÓNDE VA ESTE ENVÍO? — un solo dueño de la regla ──────────────
-// Los dos formatos de impresión (etiqueta y lista de despacho) preguntan aquí
-// en vez de repetir el criterio. Cada courier guarda el destino en un sitio
-// distinto: SHALOM/domicilio lo dejan en `address`, y ENCOMIENDA parte el dato
-// en `ciudadDestino` (la ciudad) + `encAgencia` (el nombre de la agencia).
 function _destino(s){ return s.address || s.ciudadDestino || '—'; }
 
-// Nombre de la agencia, venga del formulario (encAgencia) o del modal de guía
-// Shalom (shippingAgency / agencia_nombre).
 function _agenciaNombre(s){
   return String(s.encAgencia || s.shippingAgency || s.agencia_nombre || '').trim();
 }
 
-// Línea "🏪 <agencia>" para la etiqueta. Se omite cuando el nombre YA está
-// dentro del destino: en Shalom `address` suele traer la dirección completa de
-// la agencia, y sin esta guarda saldría repetido en la etiqueta.
 function _agenciaLinea(s, cls){
   var ag = _agenciaNombre(s);
   if(!ag) return '';
@@ -412,14 +339,6 @@ function _agenciaLinea(s, cls){
   return '<div class="'+(cls||'agencia')+'">🏪 '+esc(ag)+'</div>';
 }
 
-/* ── PIE: QR PEQUEÑO DEL PEDIDO ───────────────────────────────────
-   Debajo de toda la etiqueta. Con factura/boleta dice «FACTURA F001-123»;
-   sin ella (links rápidos, pedidos a mano) dice «PEDIDO #307321».
-   El QR lleva el ID del pedido (`TTPED:<id>`), no el número impreso: el
-   número puede repetirse, el id no. Escanearlo en el panel lleva a ESE
-   pedido, solo, y es el ÚNICO que cambia de etiqueta en modo escaneo.
-   Desde el 27/10/2026 lo lleva TODA etiqueta que se imprima, también la
-   de un pedido antiguo: sin él, ese pedido no se podría mover por QR. */
 function _pieQrPedido(s, qrUrl){
   var v = window.NroComprobante ? NroComprobante.valorQrPedido(s) : '';
   if(!v) return '';
@@ -432,15 +351,12 @@ function _pieQrPedido(s, qrUrl){
   '</div>';
 }
 
-/* ── FORMATO 1: ETIQUETA ─────────────────────────────────────────── */
 function _htmlEtiqueta(list, bultos, bizName, bizPhone, bizCity, fecha, qrUrl){
   const cards = [];
   list.forEach(s=>{
     for(let b=0; b<bultos; b++){
       const bLabel = bultos>1 ? ` (${b+1}/${bultos})` : '';
       const addr = _destino(s);
-      // Nota recortada SOLO para la etiqueta (para que no la deforme). La nota
-      // completa se conserva en el pedido, tracking y panel.
       const _noteFull = s.notes ? String(s.notes) : '';
       const _noteShort = _noteFull.length > 140 ? _noteFull.slice(0,140).trim()+'…' : _noteFull;
       const notes = _noteFull ? `<div class="notes">📝 ${esc(_noteShort)}</div>` : '';
@@ -573,7 +489,6 @@ function _htmlEtiqueta(list, bultos, bizName, bizPhone, bizCity, fecha, qrUrl){
 </body></html>`;
 }
 
-/* ── FORMATO 2: LISTA DE DESPACHO ────────────────────────────────── */
 function _htmlLista(list, bultos, bizName, bizPhone, bizCity, fecha, qrUrl){
   const rows = list.map((s,i)=>{
     const addr = _destino(s);
@@ -673,7 +588,6 @@ function _htmlLista(list, bultos, bizName, bizPhone, bizCity, fecha, qrUrl){
 </body></html>`;
 }
 
-/* ── HELPER ─────────────────────────────────────────────────────── */
 function esc(s){
   return String(s||'')
     .replace(/&/g,'&amp;')
@@ -683,7 +597,6 @@ function esc(s){
 }
 window.esc = esc;
 
-  /* ── CAMPANA DE IMPRESIÓN EN HEADER ─────────────────────────────── */
   function _injectPrintBell(){
     var slot = document.getElementById('printBellSlot');
     if(!slot || slot.querySelector('#printBellBtn')) return;
@@ -703,7 +616,6 @@ window.esc = esc;
       '</button>';
   }
 
-  // Exponer updateBadge para que index.html lo llame desde updateStats
   window.PrintModule.updateBadge = function(){
     var S = window.S;
     if(!S || !S.shipments) return;
@@ -723,7 +635,6 @@ window.esc = esc;
     }
   };
 
-  // Inyectar al cargar
   if(document.readyState !== 'complete'){
     document.addEventListener('DOMContentLoaded', _injectPrintBell);
   } else {

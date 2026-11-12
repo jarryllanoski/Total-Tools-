@@ -1,11 +1,3 @@
-/**
- * panel/pedidos/pedido-ui.js — acordeones del pedido, cajas de Shalom y medidas de la barra
- * =================================================================================
- * Fase 3 (10/11/2026): el panel en módulos. Antes vivía en index.html.
- * Script CLÁSICO a propósito: sus funciones y variables son globales, igual
- * que cuando estaban en un solo archivo — moverlas no cambió ni una llamada.
- * El orden de los <script> en index.html es el orden de ejecución.
- */
 updateShareLink();
 
 function toggleDocsAccordion(){
@@ -26,13 +18,9 @@ function togglePkgAccordion(){
   arrow.classList.toggle('open', !isOpen);
 }
 
-/* Lee los 4 campos de medidas y pinta el tipo de caja al instante — sin
-   guardar nada, sin llamar a nadie. Usa la puerta única (Shalom.clasificarPaquete)
-   para que el mismo cálculo sirva acá y en el registro en lote más adelante. */
 function _pkgClasificar(){
   var el = document.getElementById('pkgTipoResultado'); if(!el) return;
   var caja = ($('fPkgCaja')||{value:''}).value;
-  /* Los botones de caja: el elegido encendido, y las medidas solo con 📏. */
   document.querySelectorAll('.pkg-caja').forEach(function(b){
     b.classList.toggle('on', b.getAttribute('data-caja') === caja && (caja !== '' || window._pkgMedir === true));
   });
@@ -56,7 +44,6 @@ function _pkgClasificar(){
   el.style.display = 'block';
 }
 
-/* Un toque elige la caja; 📏 abre las medidas. */
 function pkgElegirCaja(t){
   var c = $('fPkgCaja'); if(!c) return;
   c.value = t || '';
@@ -64,28 +51,19 @@ function pkgElegirCaja(t){
   _pkgClasificar();
 }
 
-// Al abrir el form, cerrar el acordeón por defecto
 var _origOpenForm = typeof openForm === 'function' ? openForm : null;
 
-// Exponer la altura REAL de la barra superior (.hdr) como --hdr-h para que el
-// encabezado de courier (position:sticky) se fije JUSTO debajo y no quede
-// escondido tras la barra. Se recalcula ante cambios de tamaño (rotar, teclado,
-// distintos teléfonos) → sin píxeles hardcodeados.
 function _syncHdrHeight(){
   var h=document.querySelector('.hdr');
   if(h) document.documentElement.style.setProperty('--hdr-h', h.getBoundingClientRect().height+'px');
-  /* Y la de las pestañas, que desde el 26/10/2026 también se quedan fijas.
-     El encabezado de courier se pega debajo de LAS DOS: sin esta medida,
-     las pestañas lo taparían al desplazarse. */
   var t=document.querySelector('.tabs');
   if(t) document.documentElement.style.setProperty('--tabs-h', t.getBoundingClientRect().height+'px');
 }
 window.addEventListener('load', function(){
-  // Asegurar window.S sincronizado
   if(typeof S !== 'undefined') window.S = S;
   if(typeof Tracking !== 'undefined'){
     Tracking.init();
-    render(); // re-render para mostrar bloques tracking
+    render();
   }
   _syncHdrHeight();
   var h=document.querySelector('.hdr');

@@ -1,49 +1,11 @@
-/**
- * panel/datos/fotos.js — la cola de fotos pendientes
- * Fase 7 (11/11/2026): movido de la raíz a su capa, sin cambiar una línea.
- */
-/**
- * fotos.js — los documentos de los pedidos: comprimir, subir, y NO PERDER.
- * ========================================================================
- * ⚠️ EL FALLO QUE CIERRA. Si subir a Storage fallaba (sin internet, sesión
- * vencida), el panel guardaba la foto «en el navegador» como texto base64 y
- * seguía. Pero al subir el pedido a la nube, `slimShipment` cambia a
- * propósito ese texto por «[img]» (un pedido no puede pasar de 1 MB en
- * Firestore). La foto quedaba perdida: en otra PC el documento vacío, y en
- * esta, hasta recargar.
- *
- * Ahora una foto que no se pudo subir queda PENDIENTE:
- *   · en el formulario se ve (vista previa local) con «⏳ se subirá al
- *     guardar»;
- *   · al guardar el pedido entra en una COLA en IndexedDB —sobrevive a
- *     cerrar la pestaña y a reiniciar la PC— y se reintenta sola: al
- *     arrancar, al volver internet y cada minuto;
- *   · cuando sube, se escribe SOLO ese campo del pedido en la nube;
- *   · mientras tanto el pedido NO sube un «[img]» ni nada en su lugar: el
- *     campo se omite (ver slimShipment), así una PC con la marca vieja
- *     nunca pisa el enlace bueno.
- *
- * Y las fotos se COMPRIMEN antes de subir (máx. 1600 px, ~300 KB) con una
- * MINIATURA de ~20 KB para las tarjetas. Antes cada tarjeta descargaba la
- * foto original de 3–8 MB para enseñarla en 52×66 px. Los PDF no se tocan.
- *
- * El núcleo es puro (`crear(deps)`): red, bucket, IndexedDB y canvas
- * entran como dependencias, así que se prueba sin ninguno.
- */
 (function (global) {
   'use strict';
 
   var CAMPO = {guia: 'docGuia', embalado: 'docEmbalado', ticket: 'docTicket'};
   var MAX_LADO = 1600, CALIDAD = 0.82;
   var MINI_LADO = 320, MINI_CALIDAD = 0.7;
-  var NO_TOCAR_BYTES = 400 * 1024;   // ya liviana y chica: se sube tal cual
+  var NO_TOCAR_BYTES = 400 * 1024;
 
-  /** Los pedidos con documentos que NO están en la nube:
-        perdido   «[img]»: la foto nunca llegó (el fallo de antes). No se
-                  puede recuperar: hay que volver a subirla.
-        local     base64 solo en ESTE navegador: todavía se puede salvar
-                  abriendo el pedido y guardándolo.
-      Las fotos pendientes en cola no salen aquí: ya se están subiendo. */
   function documentosPerdidos(pedidos) {
     var etiqueta = {docGuia: 'Guía / Ticket', docEmbalado: 'Embalado', docTicket: 'Boleta / Factura'};
     var out = [];
@@ -64,12 +26,10 @@
 
   function crear(deps) {
     var d = deps || {};
-    var cola = d.cola;           // {poner(item), todos(), quitar(clave)}
+    var cola = d.cola;
     var subiendo = false;
     var avisar = d.avisar || function () {};
 
-    /** ¿Se puede comprimir? Solo lo que un <canvas> sabe leer. HEIC, GIF,
-        SVG y PDF se suben tal cual. */
     function comprimible(t) { return /^image\/(jpeg|jpg|png|webp)$/i.test(String(t || '')); }
 
     async function comprimir(file) {
@@ -77,7 +37,6 @@
       try {
         var r = await d.redimensionar(file, MAX_LADO, CALIDAD);
         if (!r) return file;
-        // Ya era liviana y no hizo falta achicarla: la original, intacta.
         if (file.size <= NO_TOCAR_BYTES && !r.achico) return file;
         if (r.archivo && r.archivo.size < file.size) return r.archivo;
         return file;
@@ -92,8 +51,6 @@
       } catch (e) { return null; }
     }
 
-    /** Sube un documento (comprimido) y su miniatura. La miniatura es una
-        mejora: si falla, el documento sube igual. */
     async function subirDoc(file, shipId, slot) {
       var principal = await comprimir(file);
       var doc = await d.subir(principal, shipId, slot);
@@ -102,14 +59,12 @@
         try {
           var dm = await d.subir(mini, shipId, slot + '_mini');
           if (dm && dm.d) doc.m = dm.d;
-        } catch (e) { /* sin miniatura: la tarjeta usa la grande */ }
+        } catch (e) {  }
       }
       doc.n = (file && file.name) || doc.n;
       return doc;
     }
 
-    /** La marca de un documento que todavía no subió. Vive SOLO en memoria
-        (la vista previa es local) y nunca sube a la nube. */
     function marcaPendiente(file) {
       return {d: d.urlLocal ? d.urlLocal(file) : '', n: file && file.name,
         t: file && file.type, pendiente: true, _archivo: file};
@@ -117,8 +72,6 @@
 
     function esPendiente(doc) { return !!(doc && doc.pendiente && doc._archivo); }
 
-    /** Tras guardar el pedido: lo pendiente entra a la cola PRIMERO (así
-        cerrar la pestaña ya no lo pierde) y luego se intenta subir. */
     async function trasGuardar(shipId) {
       var s = d.pedido(shipId);
       if (!s) return 0;
@@ -136,8 +89,6 @@
       return n;
     }
 
-    /** Intenta subir todo lo pendiente. Uno a la vez; lo que falla se queda
-        para el próximo intento. Devuelve cuántos subieron. */
     async function procesar() {
       if (subiendo) return 0;
       subiendo = true;
@@ -147,21 +98,16 @@
         for (var i = 0; i < items.length; i++) {
           var it = items[i];
           var s = d.pedido(it.shipId);
-          // El pedido ya no existe (se borró): no se resucita con un campo.
           if (!s) { await cola.quitar(it.clave); continue; }
           try {
             var doc = await subirDoc(it.archivo, it.shipId, it.slot);
-            // `forma: 'url'` = el campo guarda solo el enlace (la foto de
-            // entrega del delivery); si no, el documento completo.
             var valor = it.forma === 'url' ? doc.d : doc;
             await d.patch(it.shipId, (function () { var o = {}; o[it.campo] = valor; return o; })());
             await cola.quitar(it.clave);
-            // Solo si en memoria sigue la MISMA marca: si mientras tanto se
-            // cambió o quitó el documento, eso manda.
             var cur = s[it.campo];
             if (!cur || cur.pendiente || it.forma === 'url') s[it.campo] = valor;
             hechos++;
-          } catch (e) { /* sigue en la cola; próximo intento */ }
+          } catch (e) {  }
         }
       } finally {
         subiendo = false;
@@ -171,7 +117,6 @@
       return hechos;
     }
 
-    /** Encolar un archivo suelto para un campo que guarda solo el enlace. */
     async function encolarUrl(shipId, campo, slot, archivo) {
       await cola.poner({clave: shipId + '|' + campo, shipId: shipId, slot: slot, campo: campo,
         forma: 'url', archivo: archivo, nombre: archivo && archivo.name,
@@ -190,10 +135,6 @@
       cuantos: cuantos};
   }
 
-  /* ── EL NAVEGADOR DE VERDAD ─────────────────────────────────────────── */
-
-  /** Cola en IndexedDB. Si no hay (modo privado), en memoria: funciona
-      igual mientras la pestaña siga abierta. */
   function colaIndexedDB() {
     var mem = {};
     var abrir = function () {
@@ -232,7 +173,6 @@
     };
   }
 
-  /** Redimensiona con canvas, respetando la orientación de la cámara. */
   async function redimensionar(file, lado, calidad) {
     var img;
     if (global.createImageBitmap) {
@@ -251,7 +191,7 @@
     var c = document.createElement('canvas');
     c.width = Math.max(1, Math.round(w * k)); c.height = Math.max(1, Math.round(h * k));
     var cx = c.getContext('2d');
-    cx.fillStyle = '#fff'; cx.fillRect(0, 0, c.width, c.height);   // PNG transparente → fondo blanco
+    cx.fillStyle = '#fff'; cx.fillRect(0, 0, c.width, c.height);
     cx.drawImage(img, 0, 0, c.width, c.height);
     var blob = await new Promise(function (ok) { c.toBlob(ok, 'image/jpeg', calidad); });
     if (!blob) return null;
@@ -259,7 +199,6 @@
     return {archivo: new File([blob], nombre, {type: 'image/jpeg'}), achico: k < 1};
   }
 
-  /* Indicador visible: «📤 N fotos por subir». Toca para reintentar. */
   function pintarIndicador(n) {
     var el = document.getElementById('ttFotosPend');
     if (!n) { if (el) el.style.display = 'none'; return; }
@@ -304,7 +243,6 @@
     avisar: function () { M.cuantos().then(pintarIndicador); },
   });
   M.crear = crear;
-  /* Pinta la lista de documentos perdidos (📦 → Documentos perdidos). */
   M.pintarPerdidos = function () {
     var el = document.getElementById('docsPerdidosList'); if (!el) return;
     var l = documentosPerdidos((global.S && global.S.shipments) || []);
@@ -328,8 +266,6 @@
   M.redimensionar = redimensionar;
   global.FotosModule = M;
 
-  // Reintentos: al arrancar (con margen para la sesión), al volver
-  // internet, y cada minuto mientras haya algo pendiente.
   setTimeout(function () { M.procesar(); }, 6000);
   global.addEventListener('online', function () { M.procesar(); });
   setInterval(function () { M.cuantos().then(function (n) { if (n) M.procesar(); }); }, 60000);

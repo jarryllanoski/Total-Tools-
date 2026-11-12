@@ -229,7 +229,7 @@ module.exports = async ({bloque, ok}) => {
   {
     const fidx = E.leer('functions/index.js');
     const track = fidx.slice(fidx.indexOf('async function handleTrack'),
-        fidx.indexOf('// ── Rate limit'));
+        fidx.indexOf('const RATE_LIMITS = {'));
     ok(/aceptaLegado/.test(track),
        'y handleTrack USA esa regla — sin esto, todo lo demas es decoracion');
   }
@@ -361,7 +361,7 @@ module.exports = async ({bloque, ok}) => {
     }
 
     const track = fidx.slice(fidx.indexOf('async function handleTrack'),
-        fidx.indexOf('// ── Rate limit'));
+        fidx.indexOf('const RATE_LIMITS = {'));
     ok(/checkRateLimit\("formApi_track"/.test(track),
        'y handleTrack lo USA (no basta con declararlo)');
 
@@ -506,7 +506,7 @@ module.exports = async ({bloque, ok}) => {
   {
     const fidx = E.leer('functions/index.js');
     const track = fidx.slice(fidx.indexOf('async function handleTrack'),
-        fidx.indexOf('// ── Rate limit'));
+        fidx.indexOf('const RATE_LIMITS = {'));
     ok(!/\.set\(|\.update\(|\.create\(/.test(track),
        'handleTrack no escribe NADA: mirar un pedido no lo modifica, ni para ' +
        'ponerle un token que no tenia');

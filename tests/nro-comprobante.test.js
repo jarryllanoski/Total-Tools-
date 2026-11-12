@@ -23,7 +23,7 @@ const E = require('./_entorno.js');
 function cargarEtiqueta() {
   const win = {PrintModule: {}, NroComprobante: N, DniPedido: DP,
     CodigoSeguimiento: require('../functions/codigoSeguimiento.js')};
-  const src = E.trozo('print.js', '/* Código de envío para la etiqueta.', '/* ── FORMATO 2') +
+  const src = E.trozo('print.js', 'function _nroPrint(s){ return window.NroComprobante ? NroComprobante.de(s) : \'\'; }', 'function _htmlLista(list, bultos, bizName, bizPhone, bizCity, fecha, qrUrl){') +
     E.trozo('print.js', 'function esc(s){', 'window.esc = esc;');
   // eslint-disable-next-line no-new-func
   return new Function('window', 'NroComprobante', 'DniPedido',
@@ -37,9 +37,9 @@ function cargarEtiqueta() {
 function cargarCreate(tokens) {
   const src = E.leer('functions/index.js');
   const campos = src.slice(src.indexOf('const ORDER_FIELDS'),
-      src.indexOf('// ── action=create'));
+      src.indexOf('async function handleCreate(req, res) {'));
   const create = src.slice(src.indexOf('async function handleCreate'),
-      src.indexOf('// ── action=token'));
+      src.indexOf('async function handleToken(req, res) {'));
   const escritos = [];
   const db = {
     doc: (p) => ({
@@ -113,7 +113,7 @@ module.exports = async ({bloque, ok}) => {
 
     // El buscador REAL del panel, ejecutado.
     const src = E.trozo('index.html', 'function visibleShipments(){',
-        '/* ══════');
+        'let _renderPedido = false;');
     const S = {shipments: [
       {id: 'a', name: 'ANA', phone: '911111111', address: 'X', courier: 'SHALOM',
         status: 'NUEVO PEDIDO', nroComprobante: 'F001-00123'},
@@ -253,7 +253,7 @@ module.exports = async ({bloque, ok}) => {
       const crudo = Object.assign({}, N, {de: () => '<b>X</b>'});
       const win = {PrintModule: {}, NroComprobante: crudo, DniPedido: DP,
         CodigoSeguimiento: require('../functions/codigoSeguimiento.js')};
-      const src = E.trozo('print.js', '/* Código de envío para la etiqueta.', '/* ── FORMATO 2') +
+      const src = E.trozo('print.js', 'function _nroPrint(s){ return window.NroComprobante ? NroComprobante.de(s) : \'\'; }', 'function _htmlLista(list, bultos, bizName, bizPhone, bizCity, fecha, qrUrl){') +
         E.trozo('print.js', 'function esc(s){', 'window.esc = esc;');
       // eslint-disable-next-line no-new-func
       const pie = new Function('window', 'NroComprobante', 'DniPedido',
@@ -324,7 +324,7 @@ module.exports = async ({bloque, ok}) => {
 
   {
     const src = E.trozo('index.html', 'function _qrMoveOnScan(raw){',
-        '// Revertir (con confirmación');
+        'let _qrRevertId=null;');
     const ESTADOS = ['NUEVO PEDIDO', 'EN PROCESO', 'POR ALISTAR', 'ALISTADO', 'ENVIADO'];
     const correr = (estadoPedido, objetivo, raw) => {
       const S = {shipments: [

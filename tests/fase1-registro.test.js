@@ -231,7 +231,7 @@ module.exports = async ({bloque, ok}) => {
     // Toby habla de Shalom.
     const i = form.indexOf('function _ayudaTrackContenido(');
     const src = form.slice(i, form.indexOf('function abrirAyudaTrack(', i));
-    const hn = form.slice(form.indexOf('function _holaNombre('), form.indexOf('/* La hoja de ayuda'));
+    const hn = form.slice(form.indexOf('function _holaNombre('), form.indexOf('function _ayudaHoja(){'));
     const ctx = vm.createContext({esc: (x) => String(x).replace(/</g, '&lt;'),
       window: {ShalomEstado: require('../functions/shalomEstado.js')}});
     vm.runInContext(hn + src + ';this.C=_ayudaTrackContenido;', ctx);
@@ -251,7 +251,7 @@ module.exports = async ({bloque, ok}) => {
 
   bloque('Panel: el bloque de registro y «Guardar y registrar»');
 
-  const FUENTE = E.trozo('config.js', '/* ── 🚚 REGISTRAR EN SHALOM, DESDE EL PEDIDO', '\nfunction _claveAuto(){');
+  const FUENTE = E.trozo('config.js', 'let _regTimer = null;', '\nfunction _claveAuto(){');
   function montar(op) {
     op = op || {};
     const ped = op.pedido || Object.assign(PEDIDO_OK(), {status: 'NUEVO PEDIDO'});
@@ -367,7 +367,7 @@ module.exports = async ({bloque, ok}) => {
     ok(/data-caja="" onclick="pkgElegirCaja\(''\)" title="Calcular por medidas"><b>📏<\/b>/.test(p), 'y 📏 para medidas propias');
     const hdr = p.slice(p.indexOf('onclick="togglePkgAccordion()"'), p.indexOf('id="pkgBody"'));
     ok(!/Ayuda/.test(hdr), 'el 📖 ya no está en la cabecera del desplegable');
-    ok(/id="pkgBody">\s*<!--[^>]*-->\s*<div style="text-align:right;margin:-4px 0 8px"><span onclick="if\(window\.Ayuda\)Ayuda\.abrir\('registroShalom'\)"[^>]*>📖 Ayuda<\/span>/.test(p),
+    ok(/id="pkgBody">\s*<div style="text-align:right;margin:-4px 0 8px"><span onclick="if\(window\.Ayuda\)Ayuda\.abrir\('registroShalom'\)"[^>]*>📖 Ayuda<\/span>/.test(p),
        'está adentro, como en Documentos del envío');
     const c = E.leer('config.js');
     ok(/data\.pkgCaja=\(\$\('fPkgCaja'\)\|\|\{value:''\}\)\.value\|\|'';/.test(c), 'la caja elegida se guarda con el pedido');

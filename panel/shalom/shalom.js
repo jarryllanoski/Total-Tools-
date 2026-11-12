@@ -1,83 +1,12 @@
-/**
- * panel/shalom/shalom.js — el cliente de la API de Shalom (por la Cloud Function)
- * Fase 7 (11/11/2026): movido de la raíz a su capa, sin cambiar una línea.
- */
-/**
- * shalom.js — Puerta única a Shalom
- * ==================================
- * TODO lo que habla con Shalom pasa por aquí: consultar una guía, jalar el
- * ticket, traer agencias y registrar pedidos. Un solo dueño, un solo contrato.
- *
- * ══════════════════════════════════════════════════════════════════════════
- * DESCONECTADA A PROPÓSITO — 2026-09-13
- * ══════════════════════════════════════════════════════════════════════════
- * La integración se está rehaciendo desde cero, endpoint por endpoint. Se
- * retiró el cliente entero (functions/shalomApi.js) y los dos endpoints del
- * backend (shalomApi, shalomWebhook). La clave anterior se rota.
- *
- * Y ESTE ARCHIVO ES EL MOTIVO DE QUE NO SE ROMPA NADA. La interfaz —el botón
- * ⟳ de cada tarjeta, el masivo, el extractor de agencias, el ticket, el
- * verificador de sesión— no sabe que Shalom existe: le habla a esta puerta.
- * Con las respuestas en DESCONECTADO, cada pantalla ya sabe qué decir
- * ("Rastreo Shalom en reconstrucción") sin que haya que tocar una línea.
- *
- * RECONECTAR = rellenar los métodos de abajo. Nada más.
- *
- * ══════════════════════════════════════════════════════════════════════════
- *
- * ES I/O PURO: no toca la UI (nada de toasts ni DOM). Devuelve datos; quien
- * llama decide qué mostrar. Así la misma puerta sirve para el botón manual, el
- * auto-check del panel o un Cloud Scheduler, sin acoplarse a ninguno.
- *
- * CÓMO LLEGARÁ A SHALOM (y por qué nunca directo):
- *   navegador → Cloud Function → API de Shalom
- * La API key es un secreto y vive en Secret Manager, del lado del servidor. Si
- * viajara al navegador, cualquiera con F12 la vería y gastaría el plan del
- * negocio. La función además exige que seas administrador y solo permite las
- * operaciones de una lista blanca — no es un proxy ciego.
- *
- * CONTRATO (lo que devolverá cada método; una promesa):
- *   consultarGuia(guia, codigo) → {
- *       ok:true, estado:'En destino', fecha:'2026-08-19T16:10:00Z', pasos:2 }
- *     · estado : texto tal cual de Shalom (se muestra al operador y al cliente)
- *     · pasos  : 0..3 de la barra (0 origen · 1 tránsito · 2 destino · 3 entregado)
- *     · fecha  : ISO del evento, si Shalom la da (opcional)
- *   ticket(guia, codigo)   → { ok:true, url:'https://…' }  |  { ok:true, dataUrl:'data:image/png;…' }
- *   agencias()             → { ok:true, lista:[…] }        (formato del catálogo)
- *   registrar(pedido)      → { ok:true, guia:'…', codigo:'…' }
- *
- *   En error, todos: { ok:false, motivo:CODIGO }
- *     Del lado de SHALOM:
- *       NO_ENCONTRADO · BLOQUEADO (su clave o su plan) · LIMITE (cuota agotada)
- *       · ERROR_SHALOM (tropiezo temporal suyo, no del dato)
- *       · FORMATO_DESCONOCIDO (respondió algo que no reconocemos)
- *     Del lado del PANEL (nada que ver con Shalom, y por eso van aparte):
- *       SIN_SESION (tu sesión venció) · SIN_PERMISO (tu cuenta no está en la
- *       lista de administradores) · SIN_RED · DESCONECTADO · SIN_DATO
- *   Mezclar los dos lados manda a revisar la cuenta de Shalom cuando el
- *   problema es la sesión del panel. Ya pasó una vez; por eso están separados.
- *
- *   REGLA DE ORO: jamás ok:true sin dato real. Sin estado → ok:false. (La
- *   lección más cara: el éxito falso ocultó días de fallo.)
- */
 (function (global) {
   'use strict';
 
-  /* Los métodos que todavía no se han reconstruido responden lo mismo. No es
-     un fallo: es el estado honesto del sistema, y la interfaz lo sabe leer. */
   var OFF = {ok: false, motivo: 'DESCONECTADO'};
   function _off() { return Promise.resolve(OFF); }
 
-  /* ── La única dirección hacia Shalom ────────────────────────────────────
-     El navegador NUNCA habla con api.shalom-api.lat. Habla con esta función,
-     que guarda la clave del lado servidor, exige que seas administrador y
-     solo acepta operaciones de una lista blanca. */
   var FUNCION = 'https://us-central1-total-tools-24ce8.cloudfunctions.net/' +
                 'shalomPuerta';
 
-  /* El token de sesión, refrescado si está por vencer. Sin token no se
-     intenta siquiera: SIN_SESION es del panel, no de Shalom, y confundirlos
-     manda a revisar la cuenta de Shalom cuando lo que venció es tu sesión. */
   function _token() {
     try {
       if (typeof global._authEnsureToken === 'function') {
@@ -91,12 +20,6 @@
     }
   }
 
-  /* ── CACHÉ DE DNI ──────────────────────────────────────────────────────
-     Cada consulta a RENIEC gasta cuota del plan, y los clientes se repiten.
-     Se guarda en localStorage con un tope: sin él, un año de pedidos llenaría
-     la cuota de almacenamiento del navegador y `lsSet` se tragaría el error.
-     Un dato registral no caduca —el nombre de una persona no cambia—, así que
-     no lleva fecha de vencimiento: solo se recorta cuando pasa del tope. */
   var DNI_KEY = 'tt_reniec';
   var DNI_TOPE = 400;
 
@@ -108,9 +31,6 @@
   }
   function _dniCache(n) {
     var p = _dniLeer()[n];
-    // Se exige la forma, no solo que exista: lo guardó una versión anterior
-    // del panel, o quedó a medias, y un nombre a medias en el formulario es
-    // peor que preguntar otra vez.
     return (p && typeof p === 'object' && p.nombres) ? p : null;
   }
   function _dniGuardar(n, persona) {
@@ -119,19 +39,14 @@
       todo[n] = persona;
       var claves = Object.keys(todo);
       if (claves.length > DNI_TOPE) {
-        // Se sueltan los más viejos por orden de inserción, que es el que
-        // conserva Object.keys.
         claves.slice(0, claves.length - DNI_TOPE).forEach(function (k) {
           delete todo[k];
         });
       }
       localStorage.setItem(DNI_KEY, JSON.stringify(todo));
-    } catch (e) { /* sin sitio: se consultará otra vez, no es grave */ }
+    } catch (e) {  }
   }
 
-  /* Una petición a la puerta. Nunca lanza: siempre resuelve con el contrato.
-     Los códigos HTTP son de las barreras; lo que diga Shalom llega en 200
-     dentro del cuerpo. */
   function _pedir(cuerpo) {
     return _token().then(function (tok) {
       if (!tok) return {ok: false, motivo: 'SIN_SESION'};
@@ -157,26 +72,8 @@
 
   var Shalom = {
 
-    /* Interruptor maestro. Lo miran el auto-check y el extractor de agencias
-       para no intentar siquiera.
-       SIGUE EN FALSE aunque `consultarGuia` ya funcione, y es a propósito:
-       el botón ⟳ de cada tarjeta NO mira esta bandera, así que ya se puede
-       usar a mano — que es justo como se calibra, guía por guía, contra lo
-       que muestra la web de Shalom. El barrido automático SÍ la mira, y no
-       se enciende hasta que la calibración esté hecha. Encenderlo antes es
-       soltar 484 consultas confiando en un traductor sin comprobar. */
     DISPONIBLE: false,
 
-    /* ── Los métodos, en el orden en que se van a reconstruir ────────────
-       Cada uno vuelve cuando su endpoint esté medido y probado. Ver el plan
-       en docs/SHALOM.md, que conserva las formas REALES ya medidas de
-       /track y /instances/status — eso no se vuelve a medir. */
-
-    /* ✅ CONECTADO · POST /track — 2026-09-13
-       El árbol de 7 ramas de Shalom traducido al contrato de siempre.
-       → {ok:true, estado, pasos, fecha, demora, recibio, arbol}
-       `demora` viaja como bandera y NUNCA como estado: un paquete entregado
-       no puede volver a mostrarse como "Demora de envíos". */
     consultarGuia: function (guia, codigo) {
       var g = String(guia || '').trim();
       if (!g) return Promise.resolve({ok: false, motivo: 'SIN_DATO'});
@@ -186,11 +83,6 @@
       }});
     },
 
-    /* ✅ CONECTADO · GET /track/voucher — 2026-10-28
-       El SERVIDOR descarga el ticket, lo guarda en Storage y lo apunta en
-       el pedido como «Guía / Ticket». Aquí solo viaja el id del pedido y la
-       guía/código; vuelve el enlace del archivo ya guardado.
-       → {ok:true, doc:{d:url, n, t, storage, path}} | {ok:false, motivo} */
     ticket: function (pedidoId, guia, codigo) {
       var id = String(pedidoId || '').trim();
       if (!id || !String(guia || '').trim() || !String(codigo || '').trim()) {
@@ -199,58 +91,20 @@
       return _pedir({op: 'jalarTicket', datos: {pedidoId: id,
         orderNumber: String(guia).trim(), orderCode: String(codigo).trim()}});
     },
-    registrar: _off,         // 6 · alta de envío
+    registrar: _off,
 
-    /* ✅ CONECTADO · GET /public/agencies — 2026-09-24
-       El catálogo completo, ya mapeado al esquema que usa el buscador.
-       → {ok:true, agencias:[…12 campos…], total, sinId}
-       Va la variante PÚBLICA: misma utilidad y NO CONSUME CUOTA, así que
-       refrescar el catálogo sale gratis. La puerta no le manda la clave.
-       ⚠️ Devuelve `agencias`, no `lista`: es la clave que busca
-       `agencias-extractor.js` y la misma del archivo del catálogo. */
     agencias: function () { return _pedir({op: 'agencies'}); },
 
-    /* ⚠️ REGISTRAR UN ENVIO — LA UNICA OPERACION QUE CUESTA DINERO.
-       Shalom NO tiene endpoint para anular y NO tiene clave de
-       idempotencia: dos llamadas son dos envios y dos cobros.
-
-       Por eso aqui solo viaja el ID DEL PEDIDO. El servidor lo lee de
-       Firestore, comprueba los candados contra lo que hay AHORA, arma el
-       cuerpo y llama. Desde la consola del navegador no se puede falsificar
-       ni un campo ni saltarse un candado.
-
-       ARRANCA EN SIMULACRO: decide todo igual, devuelve el cuerpo exacto
-       que mandaria, y no llama a nadie. Se apaga desde Config.
-       → simulacro: {ok:true, simulacro:true, cuerpo:{…}}
-       → exito:     {ok:true, estado:'exito', campos:{shalomGuia,…}}
-       → fallo:     {ok:false, estado:'fallo', motivo, detalle}
-       → duda:      {ok:false, estado:'duda', detalle} ← NO reintentar
-       → faltan:    {ok:false, motivo:'SIN_DATO', faltan:[textos]} */
-    /* `opc.renovar`: registrar de nuevo una guía vencida (24 h sin dejarse
-       en la agencia). El servidor lo vuelve a comprobar TODO. */
     registrarEnvio: function (pedidoId, opc) {
       var d = {pedidoId: pedidoId};
       if (opc && opc.renovar === true) d.renovar = true;
       return _pedir({op: 'registrarEnvio', datos: d});
     },
 
-    /* Rellenar la guía de un envío que YA está en Shalom. SOLO LEE: busca
-       en pendientes por clave y destino, y rellena. Nunca registra, así que
-       no puede costar nada ni duplicar un envío.
-       Para cuando algo salió a medias y el pedido quedó sin guía. */
     recuperarEnvio: function (pedidoId) {
       return _pedir({op: 'recuperarEnvio', datos: {pedidoId: pedidoId}});
     },
 
-    /* ★ LA CUENTA DE SHALOM PRO (rehecho el 11/11/2026) — la decide el
-       servidor (functions/cuentaShalom.js). El navegador nunca recibe la
-       lista de instancias de la cuenta de la API.
-       conectar(usuario, clave): con datos, van UNA vez a Secret Manager y no
-       vuelven; vacíos, se usan los guardados. Busca TU instancia por tu
-       correo, la crea si no existe y entra solo si hace falta.
-       → {ok:true, conectada:true, usuario, id} | {ok:false, motivo, detalle}
-       estadoCuenta(): ¿sigue conectada? Gratis.
-       → {ok, conectada, usuario, id, hayCredenciales, motivo} */
     conectar: function (usuario, clave) {
       var d = {};
       if (usuario && clave) { d.usuario = usuario; d.clave = clave; }
@@ -258,30 +112,8 @@
     },
     estadoCuenta: function () { return _pedir({op: 'estadoShalom'}); },
 
-    /* ✅ CONECTADO · GET /validate — 2026-09-13
-       Dice si la clave sirve y cuánto se ha consumido. Es el primero a
-       propósito: no toca ni un envío, así que si algo está mal en la
-       autenticación se ve aquí y no a mitad de una consulta masiva.
-       → {ok:true, valida:true, limite, usado, restante, ilimitado}
-       ⚠️ `limite: null` con `ilimitado: true` es PLAN ILIMITADO, no "sin
-       cuota". La documentación muestra 1000; con plan ilimitado llega null. */
     validar: function () { return _pedir({op: 'validate'}); },
 
-    /* ✅ CONECTADO · GET /account/dni/{dni} — 2026-09-26
-       El espejo de RENIEC, con el nombre YA PARTIDO en nombres, apellido
-       paterno y apellido materno — que es justo lo que pide
-       `POST /account/register` y lo que partir a ojo se equivoca.
-       → {ok:true, persona:{dni, nombres, apePaterno, apeMaterno, completo}}
-
-       ⚠️ CON CACHÉ, y no es un lujo: cada consulta gasta cuota del plan, y
-       «lo repetitivo son los mismos clientes» (palabras del dueño). Un DNI ya
-       consultado no se vuelve a preguntar nunca. La caché vive en
-       localStorage, así que es de este dispositivo: en otro se pregunta una
-       vez y ya.
-
-       Solo se guarda lo que respondió BIEN. Cachear un fallo de red
-       convertiría un corte de diez segundos en un DNI que nunca más se puede
-       consultar. */
     dni: function (numero) {
       var n = String(numero || '').replace(/\D/g, '');
       if (n.length !== 8) return Promise.resolve({ok: false, motivo: 'SIN_DATO'});
@@ -293,52 +125,20 @@
       });
     },
 
-    /* Un motivo, en palabras. NUNCA devuelve vacío, y esa es toda la
-       gracia.
-
-       El fallo que obliga a esto: el aviso de RENIEC tenía un `else` que
-       dejaba el mensaje en blanco cuando el motivo no estaba previsto. Salía
-       "Consultando…", desaparecía, y no pasaba nada más — sin error, sin
-       pista. Es justo el patrón que este proyecto lleva semanas cazando:
-       algo falla y nadie se entera.
-
-       Un motivo desconocido sale con su código dentro. Feo, pero dice dónde
-       mirar; un aviso feo vale mil veces más que uno que se desvanece. */
     textoMotivo: function (m) {
       var k = String(m || '').toUpperCase();
       var T = {
         SIN_SESION:    'Tu sesión venció — ingresa de nuevo.',
         SIN_PERMISO:   'Tu cuenta no está autorizada para esto.',
         SIN_RED:       'Sin conexión. Reintenta en un momento.',
-        /* ⚠️ ESTA CLAVE ESTABA DOS VECES EN ESTA MISMA TABLA, y en JavaScript
-           la segunda PISA a la primera sin decir nada: ni un aviso del
-           navegador, ni uno de ESLint, ni una prueba en rojo. La de abajo
-           decía «Faltan datos para registrar. Abajo dice cuáles.», así que
-           consultar una guía sin número contestaba hablando de registrar.
-
-           No se eligió una de las dos: el mismo código sale de dos sitios
-           que no comparten contexto —consultar y registrar—, y una tabla
-           que traduce códigos no sabe de cuál viene. Así que el texto dice
-           lo único cierto en ambos, y la lista de lo que falta —que el
-           registro sí pinta debajo— se explica sola.
-
-           Un barrido por todo el proyecto (14/10/2026) dice que era la
-           única. Hay una prueba que la mantiene única. */
         SIN_DATO:      'Faltan datos.',
         NO_ENCONTRADO: 'Shalom no encontró ese dato.',
-        /* No es un fallo: es el estado normal entre registrar y llevar el
-           paquete. Shalom distingue `registrado` (la guía existe) de
-           `origen` (el paquete entró a la agencia); la puerta ya no las
-           aplasta, así que esta respuesta por fin se puede decir. */
         SHALOM_SIN_RESPUESTA: 'Shalom-API no pudo leer esta guía en Shalom ahora (falla de su lado). Reintenta más tarde.',
         SOLO_REGISTRADO: 'Registrado en Shalom, pero el paquete todavía no entró a la agencia. Déjalo allí: el plazo es de 24 horas.',
         NO_VENCIDA:    'La guía todavía no venció: déjala en la agencia con esa misma guía.',
         YA_EN_AGENCIA: 'Shalom ya recibió este paquete: no se registra de nuevo.',
         NO_VERIFICADO: 'No pudimos confirmar con Shalom que la guía venció. No se registró nada.',
         BLOQUEADO:     'Shalom rechazó la clave de la API, o el plan venció.',
-        /* Medido: con un instanceId malo, Shalom responde 403 "Invalid API
-           Key or instance access". Antes se traducía como BLOQUEADO y
-           mandaba a revisar la clave, que estaba perfecta. */
         VARIAS_INSTANCIAS: 'Hay más de una instancia con tu correo en tu panel de Shalom API. Deja una sola y vuelve a pulsar Conectar.',
         PLAN_LLENO: 'Tu plan de Shalom API llegó al límite de instancias. Libera una en tu panel de Shalom API y vuelve a pulsar Conectar.',
         SIN_SESION_SHALOM: 'Entró, pero Shalom aún no confirma la sesión. Espera un minuto.',
@@ -357,48 +157,25 @@
         SIN_TRADUCTOR: 'Esa operación está desplegada a medias: falta actualizar la función del servidor.'
       };
       if (T[k]) return T[k];
-      // Lo que no está en la lista se dice IGUAL, con su código: callarse
-      // aquí es como se pierde una tarde buscando qué pasó.
       return 'No se pudo consultar' + (k ? ' (' + k + ')' : '') + '.';
     },
 
-    /* La clave de recojo de un envío: 4 dígitos.
-
-       Del generador criptográfico del navegador, NO de `Math.random()`. Esta
-       clave es lo único que separa el paquete de quien no debe llevárselo, y
-       `Math.random` produce una secuencia que se puede adivinar a partir de
-       las anteriores. Con rechazo, para que los 10 000 valores salgan con la
-       misma probabilidad. */
     claveRecojo: function () {
       try {
         var c = global.crypto || (global.msCrypto);
         if (c && c.getRandomValues) {
           var a = new Uint32Array(1);
-          // 429496 * 10000: el múltiplo de 10 000 más alto por debajo de
-          // 2^32. Sin esto, los valores 0000-7295 saldrían más a menudo.
           do { c.getRandomValues(a); } while (a[0] >= 4294960000);
           return String(a[0] % 10000).padStart(4, '0');
         }
-      } catch (e) { /* cae al de abajo */ }
+      } catch (e) {  }
       return String(Math.floor(Math.random() * 10000)).padStart(4, '0');
     },
 
-    /* Diagnóstico: la FORMA de la respuesta de un endpoint, sin un solo
-       valor dentro. Es la herramienta con la que se escribe cada contrato
-       contra lo que la API devuelve de verdad — la documentación y la
-       realidad ya se contradijeron seis veces. */
     esquema: function (de, datos) {
       return _pedir({op: 'esquema', de: de || 'validate', datos: datos});
     },
 
-    /* ── El interruptor, visto desde el panel ────────────────────────
-       El estado real lo lleva el servidor (functions/interruptor.js) y vive
-       en Firestore. Acá solo se lee para mostrarlo y se enciende o apaga a
-       mano. La cuenta de fallos NO se toca desde el navegador: es del motor. */
-
-    /* El texto del estado. Los tres casos dicen cosas distintas a propósito:
-       apagada la decidió el operador, pausada la decidió la puerta sola, y
-       confundirlos haría buscar el arreglo donde no está. */
     textoPuerta: function (estado, ahora) {
       var e = estado || {};
       var t = Number(ahora) || Date.now();
@@ -417,15 +194,6 @@
         texto: 'Abierta — el rastreo de Shalom funciona'};
     },
 
-    /* Catálogo de cajas de Shalom (medidas oficiales de su app, ver
-       docs/SHALOM.md). No son rangos: son cajas fijas, así que la regla
-       correcta es "la más chica en la que el paquete entra" — nunca "el rango
-       donde cae la medida más grande". Las dimensiones se guardan YA
-       ordenadas de mayor a menor: comparar así deja elegir cualquier cara
-       como largo/ancho/alto sin perder el ajuste (una caja no distingue de
-       qué lado la acostás). "Sobre" queda afuera a propósito: es una
-       categoría de contenido (documentos), no un tamaño — no hay umbral
-       numérico que lo distinga de un paquete real. */
     CATALOGO_CAJAS: [
       {tipo: 'XXS', dims: [15, 10, 10], pesoMaxKg: 0.25},
       {tipo: 'XS',  dims: [20, 15, 12], pesoMaxKg: 0.5},
@@ -434,11 +202,6 @@
       {tipo: 'L',   dims: [42, 30, 23], pesoMaxKg: 10}
     ],
 
-    /* Clasifica un paquete por sus medidas y peso.
-       → {tipo:'S', etiqueta:'Paquete S'}      la caja donde entra
-       → {tipo:'OTRA', etiqueta:'Otra Medida'} no entra en ninguna (grande o pesada)
-       → null                                  faltan datos: no se puede clasificar
-       Nunca lanza — datos incompletos o inválidos devuelven null, no un error. */
     clasificarPaquete: function (largo, ancho, alto, peso) {
       var l = parseFloat(largo), a = parseFloat(ancho),
           h = parseFloat(alto), p = parseFloat(peso);

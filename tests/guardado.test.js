@@ -27,11 +27,11 @@ function bloqueCon(marca) {
 const FIREBASE = bloqueCon('window._fbSave =');
 const PERSIST  = E.trozo('index.html', 'let _dirtyShips = new Set();', '_recuperarSucios();');
 const REINTENTO = E.trozo('index.html', 'async function _fbSaveWithRetry(data, attempt){',
-                                        '// Sin modo offline');
+                                        'window._fbStatus = (status) => {');
 const MERGE = E.trozo('index.html', 'window._mergeRemote = (remote) => {',
-                                    '// On Firebase ready');
+                                    'const _initFirebase = async (intento) => {');
 const INIT  = E.trozo('index.html', 'const _initFirebase = async (intento) => {',
-                                    '/* ★ AL ENTRAR, CARGAR.');
+                                    'window._trasEntrar = function(){');
 
 /* ── Un Firestore de mentira ──────────────────────────────────────────────
    Cuenta peticiones, guarda los cuerpos y puede fallar a voluntad: por

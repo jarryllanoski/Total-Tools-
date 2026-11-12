@@ -1,17 +1,3 @@
-/**
- * cliente/seguimiento.js — EL SEGUIMIENTO DEL CLIENTE (seguimiento.html)
- * =====================================================================
- * Fase 2 (10/11/2026). Antes vivía dentro de formulario.html: quien abría
- * su link de seguimiento descargaba el formulario entero. Ahora esta página
- * carga solo lo suyo (+ cliente/comun.js, que comparte con el formulario).
- *
- * Los links viejos (`formulario.html?seg=…`) siguen abriendo: el formulario
- * los redirige aquí ANTES de cargar nada.
- *
- * Lee 1 documento por consulta (action=track). Se refresca cada 30 s solo
- * mientras la pestaña está a la vista, y nunca si el pedido está terminado.
- * La clave de recojo NO llega a esta página (functions/pedidoPublico.js).
- */
 (function(){
 'use strict';
 
@@ -32,18 +18,9 @@ async function loadCfgThenTrack(token){
     if(cfg && !cfg.error) CFG = cfg;
   }catch(e){ console.warn('Config no disponible'); }
   renderTracking(token);
-  if(window.TTFormLoader) TTFormLoader.ready(); // tracking renderizado → ocultar loader del form
+  if(window.TTFormLoader) TTFormLoader.ready();
 }
 
-/* ─── Ayuda de la vista de SEGUIMIENTO (explica los estados) ──────── */
-/* ★ SEGÚN EL TIPO DE ENVÍO DE ESTE PEDIDO, con los nombres que el cliente VE
-   en su pantalla (NUEVO PEDIDO, ENVIADO, LLEGÓ A DESTINO…). Antes era una
-   sola ayuda con nombres inventados («Recibido», «Preparando») que no
-   aparecían en ningún sitio, y le decía «ya puedes recogerlo» a un pedido
-   de delivery.
-   ⚠️ LA CLAVE DE RECOJO NO SE MENCIONA NUNCA: es secreta, no viaja al link
-   (functions/pedidoPublico.js) y no se comparte por aquí.
-   Lógica pura (sin DOM): devuelve {estados, faq} con texto YA escapado. */
 function _ayudaTrackContenido(tipo, esShalom, tiendaDir, estado, nombre, shalom){
   const dir = esc(tiendaDir||'');
   const enTienda = dir ? ' en <b>'+dir+'</b>' : '';
@@ -67,7 +44,6 @@ function _ayudaTrackContenido(tipo, esShalom, tiendaDir, estado, nombre, shalom)
       pago:'Pagas al recoger en tienda.'},
   };
   const t = T[tipo] || T.delivery;
-  // k: los estados del panel que caen en cada fila (para marcar «ESTÁS AQUÍ»).
   const estados = [
     {ico:'🆕', t:'NUEVO PEDIDO · EN PROCESO', d:'Recibimos tu pedido y lo estamos revisando.', k:['NUEVO PEDIDO','EN PROCESO']},
     tipo==='retiro'
@@ -82,15 +58,8 @@ function _ayudaTrackContenido(tipo, esShalom, tiendaDir, estado, nombre, shalom)
   }
   estados.push({ico:'💰', t:'PENDIENTE DE PAGO', d:t.pago, k:['PENDIENTE DE PAGO']});
   estados.push({ico:'🏁', t:'FINALIZADO', d:'Entregado. ¡Gracias por tu compra!', k:['FINALIZADO','ENTREGADO']});
-  /* ★ TOBY habla del estado REAL de este pedido (30/10/2026): lo mismo que
-     dice su fila, con el saludo. Una sola verdad: la fila y Toby salen del
-     mismo texto. Nunca la clave de recojo. */
-  /* Ya en Shalom (10/11/2026): manda el estado de SHALOM, no la etiqueta
-     del panel. `shalom` es {estado} cuando el envío tiene guía; si no, nada. */
   const enShalom = !!(shalom && typeof shalom === 'object');
   let actual = enShalom ? -1 : estados.findIndex(e => e.k.indexOf(String(estado||'').toUpperCase()) >= 0);
-  /* Ya en Shalom: la lista explica las etapas de SHALOM (las del bloque de
-     seguimiento), no las etiquetas del panel, y marca en cuál va. */
   if(enShalom){
     estados.length = 0;
     estados.push({ico:'📦', t:'En origen', d:'Shalom recibió tu paquete en la agencia de salida.', k:[]});
@@ -155,7 +124,6 @@ function abrirAyudaTrack(){
   try{ ov.querySelector('.ay-x').focus({preventScroll:true}); }catch(_){}
 }
 
-/* ─── TRACKING PAGE ─────────────────────────────────────────────── */
 function renderTracking(token){
   clearTrackRefresh();
   setApp(`
@@ -168,34 +136,8 @@ function renderTracking(token){
     ${brandFooterHtml()}
   `);
   buscarPedido(token);
-  // El auto-refresh se decide en buscarPedido: solo si el pedido NO está finalizado
 }
 
-/* ── EL SONDEO NO CORRE CON LA PESTAÑA ESCONDIDA ────────────────────────
-   Esta pagina se refresca sola cada 30 s. Una pestaña olvidada en segundo
-   plano hacia 2.880 peticiones al dia —una invocacion de Cloud Function y
-   una lectura de Firestore cada una— para actualizar algo que nadie estaba
-   mirando. Y encima comia del freno por IP: con el CGNAT de Claro y
-   Movistar, las pestañas olvidadas de varios clientes podian empujar contra
-   el tope a los que SI estaban mirando.
-
-   Parar mientras esta escondida y actualizar al volver da exactamente el
-   mismo servicio: cuando el cliente mira, el dato esta fresco.
-
-   ⚠️ ESTA DECLARACION VA ANTES DE `clearTrackRefresh()`, Y NO ES ESTILO.
-   La puse debajo y ROMPI EL FORMULARIO PUBLICO EN PRODUCCION. `init()`
-   corre al evaluar el script y llama a `renderForm()` -> `clearTrackRefresh()`,
-   que asigna esta variable. Un `let` todavia no inicializado lanza
-   ReferenceError («Cannot access before initialization»), asi que el
-   formulario de pedidos no pintaba nada. En la pagina de SEGUIMIENTO no se
-   veia, porque alli hay un `await` antes y para entonces ya existe — por eso
-   probe el seguimiento, lo vi bien, y el fallo paso.
-
-   ⚠️ 30/10/2026: Y MOVERLA NO BASTABA. Lo que importa no es que esté antes
-   de la FUNCIÓN, sino antes de la LLAMADA, y `init()` está mucho más arriba
-   (corre al evaluar el script). Con `let`, abrir el formulario SIN link
-   (sin ?t=) seguía reventando en «Iniciando fábrica…»: medido en un
-   navegador real. `var` existe desde el primer instante del script. */
 var _trackTokenActivo = '';
 
 function clearTrackRefresh(){
@@ -207,7 +149,6 @@ document.addEventListener('visibilitychange', function(){
   if(!document.hidden && _trackTokenActivo) buscarPedido(_trackTokenActivo, true);
 });
 
-/* ─── SEARCH PEDIDO (por token único, lee 1 documento) ──────────── */
 async function buscarPedido(token, silent){
   const t = (token||'').trim();
   if(!t) return;
@@ -222,13 +163,12 @@ async function buscarPedido(token, silent){
     if(resp && resp.status === 'ok' && resp.order){
       if(window.TTLoader) TTLoader.done();
       renderTrackResult(resp.order, resp.order.code);
-      // ★ Congelar finalizados: si está entregado, no auto-refrescar ni consultar Shalom
       if(resp.order.frozen){
         clearTrackRefresh();
       } else if(!trackRefreshId){
         _trackTokenActivo = t;
         trackRefreshId = setInterval(()=>{
-          if(document.hidden) return; // nadie esta mirando: no se gasta nada
+          if(document.hidden) return;
           buscarPedido(t, true);
         }, 30000);
       }
@@ -236,12 +176,6 @@ async function buscarPedido(token, silent){
     }
     if(window.TTLoader) TTLoader.done();
 
-    /* ⚠️ EL FRENO NO ES UN LINK ROTO, y decirselo asi al cliente lo manda a
-       buscar el problema donde no esta: revisar el link, escribir por
-       WhatsApp, pensar que perdio su pedido. Lo unico que pasa es que hay
-       que esperar un minuto. Misma regla que `Shalom.textoMotivo()`: ningun
-       motivo se calla, y ninguno miente.
-       No se apaga el auto-refresco: el siguiente tiro ya pasa. */
     if(resp && resp.status === 'rate_limited'){
       setTrackContent('<div class="error-box" style="text-align:center">⏳ Demasiadas consultas ahora mismo<br><small style="font-weight:400;opacity:.8">Tu link está bien. Espera un momento y se actualiza solo.</small></div>');
       return;
@@ -266,13 +200,6 @@ function setTrackContent(html){
 
 function notMyOrderBtn(){ return ''; }
 
-/* ── TRACKING SHALOM EN SEGUIMIENTO DEL CLIENTE ─────────────────── */
-/* ★ COPIAR, DE VERDAD. Casi todos los clientes abren el link desde
-   WhatsApp, y su navegador interno a menudo RECHAZA el portapapeles
-   moderno: `writeText` devuelve una promesa que falla, y el try/catch de
-   antes no la veía — decía «✓ Copiado» sin haber copiado nada. Ahora:
-   moderno → si falla, el método clásico → y solo se dice «Copiado» si
-   alguno funcionó. Si ninguno, se enseña el texto para copiarlo a mano. */
 function _copiarClasico(txt){
   try{
     var ta=document.createElement('textarea'); ta.value=txt; ta.setAttribute('readonly','');
@@ -302,10 +229,6 @@ function _copyTrack(txt, btn){
   return Promise.resolve();
 }
 
-/* Guía + código de Shalom, juntos y legibles para pegar en un chat o en la
-   app de Shalom. Se leen de data-* del botón: nada del pedido viaja dentro
-   de un onclick como código. La CLAVE DE RECOJO no está aquí ni en ningún
-   lado de esta página: no viaja al link (functions/pedidoPublico.js). */
 function _textoGuia(guia, codigo){
   guia=String(guia||'').trim(); codigo=String(codigo||'').trim();
   if(guia && codigo) return 'Guía: '+guia+' · Código: '+codigo;
@@ -317,13 +240,6 @@ function _copyGuia(btn){
   return _copyTrack(_textoGuia(btn.getAttribute('data-guia'), btn.getAttribute('data-codigo')), btn);
 }
 
-/* Deriva la fase del recorrido a partir del estado LITERAL de Shalom.
-   El estado se muestra tal cual (exacto); la fase solo define color, icono,
-   posicion en el stepper y si corresponde una pildora de indicacion.
-   ★ Fase 6 (11/11/2026): QUÉ etapa es lo decide functions/shalomEstado.js,
-   la MISMA regla con la que el panel mueve las etiquetas. Aquí solo queda
-   cómo se VE cada etapa. Antes había dos reglas y «En reparto» salía aquí
-   como «en camino» con el panel ya en LLEGÓ A DESTINO. */
 var _FASE_VISTA = [
   {color:'var(--blue)', bg:'rgba(79,142,247,.08)', bd:'rgba(79,142,247,.22)',
     ic:'\ud83d\udce6', sub:'Tu paquete fue recibido por Shalom y ser\u00e1 enviado pronto.', pill:null},
@@ -342,7 +258,6 @@ function _shalomFase(estado){
   }
   var v = Object.assign({idx:f.idx}, _FASE_VISTA[f.idx]);
   if(f.demora) v.sub = 'Tu paquete tuvo una demora, pero sigue en camino a destino.';
-  /* «En reparto»: ya salió de la agencia de destino hacia el cliente. */
   if(f.reparto){
     v.sub = 'Tu paquete sali\u00f3 de la agencia de destino y va en reparto.'; v.pill = null;
   }
@@ -356,15 +271,10 @@ function _shalomTrackingBlock(ship){
   var codigo = ship.trackingOrderCode   || ship.shalomCodigo || '';
   var estado = (ship.trackingStatus || '').trim();
   var ultima = ship.trackingLastUpdate || '';
-  /* ★ UNA SOLA REGLA, en functions/dniPedido.js. Esto leía las copias y se
-     saltaba `dni`, que es el que corrige el panel: a un cliente cuyo pedido
-     se hubiera corregido se le decía que fuera a la agencia con el
-     documento VIEJO. */
   var dni    = (window.DniPedido ? DniPedido.de(ship)
                 : (ship.dni || ship.dniRecoger || ship.dniDestinatario || ''));
   if(!guia && !codigo && !estado) return '';
 
-  // "actualizado hace X" en el header
   var ago = '';
   if(ultima){
     var m = Math.floor((Date.now() - new Date(ultima).getTime())/60000);
@@ -378,7 +288,6 @@ function _shalomTrackingBlock(ship){
   var f = _shalomFase(estado);
   var pasos = ['En origen','En camino','En destino','Entregado'];
 
-  // HERO: el titulo es EXACTAMENTE el estado de Shalom
   var titulo = estado || 'Registrado en Shalom';
   if(!estado && guia){
     f = {idx:-1, color:'var(--purple)', bg:'rgba(167,139,250,.08)', bd:'rgba(167,139,250,.3)',
@@ -399,7 +308,6 @@ function _shalomTrackingBlock(ship){
     +pillHtml
     +'</div></div>';
 
-  // MINI-STEPPER del recorrido (solo si la fase es valida)
   var stepHtml = '';
   if(f.idx >= 0){
     stepHtml = '<div style="display:flex;align-items:flex-start;margin:4px 2px 16px">'
@@ -418,7 +326,6 @@ function _shalomTrackingBlock(ship){
       + '</div>';
   }
 
-  // GUIA + CODIGO
   var guiaHtml = '';
   if(guia || codigo){
     guiaHtml = '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;'
@@ -440,20 +347,6 @@ function _shalomTrackingBlock(ship){
     +'</div>';
 }
 
-/* ★ LO QUE EL NARRADOR NECESITA SABER, PUBLICADO EN LA TARJETA.
-   El narrador (narrador/narrador.js) solo lee el DOM. Esperaba la etapa real
-   de Shalom en `data-shalom-st` y esta página NUNCA la ponía: Delfi leía
-   solo la etiqueta del panel, y con Shalom en «Entregado» y el panel aún
-   en ENVIADO seguía diciendo «ya salió de nuestra tienda».
-     data-tipo        agencia · encomienda · retiro · delivery (misma regla
-                      que el formulario: _tipoEnvioDe).
-     data-shalom-st   SOLO pedidos Shalom con estado visible (si el dueño
-                      apagó «Mostrar en el link del cliente», el servidor no
-                      lo manda y aquí no hay nada). Etapas del narrador:
-                      origen/camino → 2 · destino → 3 · entregado → 4. El
-                      narrador solo la usa si va MÁS adelante que el panel.
-     data-tienda-dir  retiro en tienda: la dirección de Config (campo
-                      «Ciudad»), para decir dónde pasar a recoger. */
 function _datosNarrador(ship){
   const esShalom = !!(ship && /SHALOM/i.test(String(ship.courier||'')));
   const tipo = _tipoEnvioDe(ship && ship.courier);
@@ -462,8 +355,6 @@ function _datosNarrador(ship){
     const f = _shalomFase((ship.trackingStatus||'').trim());
     if(f.idx >= 0 && (ship.trackingStatus||'').trim()){ shalomSt = [2,2,3,4][f.idx]; shalomFase = f.idx; }
   }
-  /* Ya en Shalom (con guía): la etiqueta del panel no se muestra, así que
-     el narrador necesita saberlo por aquí (11/11/2026: Delfi se callaba). */
   const enShalom = esShalom && !!(ship && (ship.shalomGuia || ship.trackingOrderNumber));
   const cc = (CFG && (CFG.config || CFG)) || {};
   const tiendaDir = tipo==='retiro' ? String(cc.city||'').trim() : '';
@@ -471,36 +362,19 @@ function _datosNarrador(ship){
 }
 
 function renderTrackResult(ship, code){
-  /* ★ UNA SOLA FILA DE DNI, y su rotulo deducido del TIPO DE ENVIO.
-     Habia tres filas distintas —una por cada copia del mismo dato— y cada
-     una se pintaba segun que campo estuviera lleno. Un pedido a agencia
-     creado desde el panel nunca tiene `dniRecoger`, asi que al cliente se le
-     decia «DNI» a secas en vez de «DNI para recoger»; y uno corregido en el
-     panel le mostraba el documento VIEJO, que es con el que se habria
-     presentado en la agencia. La regla vive en functions/dniPedido.js. */
   const _dniTk    = window.DniPedido ? DniPedido.de(ship)
     : String(ship.dni||ship.dniRecoger||ship.dniDestinatario||'').trim();
   const _dniTkLbl = window.DniPedido ? DniPedido.etiqueta(ship) : 'DNI';
   const meta   = STATUS_META[ship.status]||{color:'#6b7280',emoji:'🏷️',step:0};
-  /* Con N° de factura/boleta, el código que ve el cliente es ESE —el mismo
-     de su WhatsApp y de la etiqueta—. Sin él, el de siempre. Se filtra
-     igual que en el mensaje: solo letras, números y guion. */
   const _nroTk = String(ship.nroComprobante||'').replace(/[^A-Z0-9-]/g,'').slice(0,20);
   const tc     = _nroTk || codigoSeg(ship.id, ship.createdAt);
 
-  // Bloque de seguimiento Shalom (línea de tiempo propia del courier). El estado
-  // grande (badge) ya comunica el avance para todos, así que no hay barra genérica.
   const shalomBlock = _shalomTrackingBlock(ship);
   const narr = _datosNarrador(ship);
-  // La ayuda «¿Cómo sigo mi pedido?» habla del tipo de envío de ESTE pedido.
   window._trackTipo = narr.tipo;
   window._trackEsShalom = narr.esShalom;
   window._trackEstado = ship.status||'';
   window._trackNombre = ship.name||'';
-  /* ★ YA EN SHALOM → SOLO LOS ESTADOS DE SHALOM (10/11/2026). Con guía, la
-     etiqueta del panel (POR ALISTAR, ALISTADO…) ya no le dice nada útil al
-     cliente y puede contradecir a Shalom: se esconde, y manda el bloque de
-     Shalom. Sin guía, todo como siempre. */
   const _enShalom = narr.esShalom && !!(ship.shalomGuia || ship.trackingOrderNumber);
   window._trackShalom = _enShalom ? {estado: String(ship.trackingStatus||'').trim()} : null;
 
@@ -561,20 +435,14 @@ function renderTrackResult(ship, code){
   `);
 }
 
-/* ─── ARRANQUE ─────────────────────────────────────────────────────────
-   Con token: se busca. Sin token —alguien abrió la página a mano—, al
-   formulario, que es lo que tiene sentido ofrecer. */
 function init(){
   const segTok = new URLSearchParams(location.search).get('seg');
   if(segTok){ loadCfgThenTrack(segTok); return; }
   location.replace('formulario.html' + location.hash);
 }
 
-// Lo que se llama desde un onclick del HTML.
 window.buscarPedido    = buscarPedido;
 window.abrirAyudaTrack = abrirAyudaTrack;
-/* ⚠️ Faltaba: el botón «Copiar» de la guía llamaba a `_copyGuia`, que vivía
-   dentro del formulario sin salir a `window` — el botón no hacía nada. */
 window._copyGuia       = _copyGuia;
 window.cerrarAyudaForm = cerrarAyudaForm;
 

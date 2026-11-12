@@ -1,15 +1,5 @@
-/**
- * cliente/form-fecha.js — los días de envío
- * ==========================================
- * Fase 5 (11/11/2026): el formulario en módulos. Antes era cliente/formulario.js
- * (y antes, el script en línea de formulario.html), envuelto en una función.
- * Script CLÁSICO: sus declaraciones son globales y los módulos se ven entre
- * sí por su nombre, como el panel. El orden de los <script> es el de
- * ejecución, y init() corre en form-arranque.js, cuando ya existe todo.
- */
 'use strict';
 
-/* ─── DATE CHIPS ────────────────────────────────────────────────── */
 function buildDatesChips(dispatch){
   const days         = Array.isArray(dispatch.days) ? dispatch.days : [1,2,3,4,5];
   const cutHour      = dispatch.cutHour||'23:59';
@@ -49,8 +39,6 @@ function buildDatesChips(dispatch){
 }
 
 function selDate(iso, lbl){
-  /* Solo un toque REAL del cliente anima y vibra: el formulario preelige la
-     primera fecha con un clic del programa (isTrusted=false). */
   const ev = window.event;
   const nueva = iso!==selDateIso && !!(ev && ev.isTrusted);
   selDateIso=iso; selDateLbl=lbl;
@@ -58,8 +46,6 @@ function selDate(iso, lbl){
   const el=$('dopt_'+iso);
   if(el) el.classList.add('active');
   $('err_date')&&$('err_date').classList.remove('show');
-  /* ★ La decisión, dicha con todas sus palabras («sale el martes 3 de
-     noviembre»): quita la duda de haber tocado el día equivocado. */
   const ok=$('dateOk');
   if(ok){
     let txt='';
@@ -69,10 +55,8 @@ function selDate(iso, lbl){
   }
   if(nueva){ _ttPop(el); _ttVibrar(); _ttBrillo($('confirmBtn')); }
 }
-/* Microinteracciones compartidas (fecha y sede). */
 function _ttPop(el){ if(!el) return; el.classList.remove('tt-pop'); void el.offsetWidth; el.classList.add('tt-pop'); }
 function _ttBrillo(b){ if(!b) return; b.classList.remove('tt-brillo'); void b.offsetWidth; b.classList.add('tt-brillo'); setTimeout(function(){ b.classList.remove('tt-brillo'); }, 1000); }
-// Vibración corta SOLO al elegir (no en cada toque). Android; iPhone no la tiene.
 function _ttVibrar(){
   try{
     if(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches) return;

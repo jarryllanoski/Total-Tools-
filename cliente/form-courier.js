@@ -1,17 +1,5 @@
-/**
- * cliente/form-courier.js — elegir cómo recibir el pedido
- * ========================================================
- * Fase 5 (11/11/2026): el formulario en módulos. Antes era cliente/formulario.js
- * (y antes, el script en línea de formulario.html), envuelto en una función.
- * Script CLÁSICO: sus declaraciones son globales y los módulos se ven entre
- * sí por su nombre, como el panel. El orden de los <script> es el de
- * ejecución, y init() corre en form-arranque.js, cuando ya existe todo.
- */
 'use strict';
 
-/* ─── COURIER SELECTION ─────────────────────────────────────────── */
-// Tocar una tarjeta: escribe en el <select> oculto y dispara 'change'
-// (misma lógica de siempre + auto-avance del asistente). Solo diseño.
 function pickCourier(name){
   const sel=$('f_courier'); if(!sel) return;
   sel.value=name;
@@ -27,8 +15,6 @@ function pickCourier(name){
 function onCourierChange(name){
   selCourierType = _tipoEnvioDe(name);
   selCourierName=name;
-  // El formulario "publica" el tipo de courier para las capas de presentación
-  // (boleta / narrador), que así no dependen de la visibilidad de los campos.
   window._selCourierType = name ? selCourierType : '';
   $('err_courier')&&$('err_courier').classList.remove('show');
   _gpsLat=null; _gpsLon=null; _dlvReset();
@@ -53,11 +39,7 @@ function onCourierChange(name){
     if(encBox) encBox.style.display='none';
     _dlvConectar();
   }
-  // Siempre: la propia función decide (solo aplica a delivery con dirección
-  // previa). Llamarla en TODOS los casos evita dejar el atajo montado al
-  // cambiar a agencia/retiro — invisible por el padre, pero estado sucio.
   _updateKnownAddrShortcut();
-  // Tarjeta visual con el ícono del courier elegido
   const badge=$('courierBadge');
   if(badge){
     if(name){
@@ -66,10 +48,8 @@ function onCourierChange(name){
                     : selCourierType==='retiro'?'Retiro en tienda'
                     : selCourierType==='encomienda'?'Otras Agencias'
                     : 'Envío a domicilio';
-      // Una línea (solo existe con un único envío): cómo le llegará, sin preguntar.
       badge.style.display='block';
       const lbl=_courierLabel(name, selCourierType);
-      // Sin repetir: «RETIRO EN TIENDA · Retiro en tienda» dice lo mismo dos veces.
       const extra=lbl.toUpperCase().indexOf(tipoTxt.toUpperCase())>=0 ? '' : ` · ${tipoTxt}`;
       badge.innerHTML=`<div class="tt-envio">${ico} <b>Envío: ${esc(lbl)}</b>${extra}</div>`;
     } else {
@@ -78,9 +58,6 @@ function onCourierChange(name){
   }
 }
 
-/* Atajo del cliente recurrente: NO es otro modo — solo rellena el mismo
-   cuadro de dirección. Por eso no hay estado "known" ni pantalla de
-   confirmación que haya que deshacer. */
 function _updateKnownAddrShortcut(){
   const shortcut=$('addrShortcut');
   if(!shortcut) return;
@@ -109,7 +86,6 @@ function usarDireccionDeSiempre(){
   onDireccionInput();
 }
 
-
 function collectExtra(){
   const extra={};
   document.querySelectorAll('[data-extra]').forEach(el=>{extra[el.dataset.extra]=el.value.trim();});
@@ -119,9 +95,6 @@ function collectExtra(){
 function renderAgencyBox(courierName){
   const agBox = $('agencyBox');
   if(!agBox) return;
-  // ★ Couriers con catálogo propio (Shalom, Olva): un solo buscador dinámico,
-  //   la fuente de datos cambia según el courier (AGENCY_SOURCES). Agregar un
-  //   courier nuevo con catálogo = una entrada más ahí, nada se duplica aquí.
   const agKey = _agSourceKey(courierName);
   if(agKey){
     const cfg = AGENCY_SOURCES[agKey];
@@ -189,8 +162,6 @@ function renderAgencyBox(courierName){
     agIniciarAlVer(agKey);
     return;
   }
-  // ★ Agencias sin catálogo propio: entrada manual (el selector antiguo por
-  //   departamento se retiró el 30/10/2026: Shalom y Olva usan el buscador).
   {
     agBox.innerHTML=`<div class="agc-box">
       <span class="agc-lbl">🏢 Escribe la agencia de ${esc(courierName)}</span>
@@ -209,15 +180,12 @@ function renderAgencyBox(courierName){
   }
 }
 
-// Entrada manual de agencia (OLVA y agencias sin base de datos)
 function onAgencyManual(val){
   const txt=(val||'').trim();
   agState = {dept:'', prov:'', dist:'', addr:txt};
   window._agIdent = null; window._agIdentTxt = '';
   if(txt){ $('err_agency')&&$('err_agency').classList.remove('show'); }
 }
-
-
 
 function resetAgency(){
   agState={dept:'',prov:'',dist:'',addr:''};

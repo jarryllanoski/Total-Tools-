@@ -22,7 +22,7 @@ function cuerpoDeFuncion(src, nombre) {
   const resto = src.slice(i);
   const fin = resto.search(/\n\}/);
   const cuerpo = fin < 0 ? resto : resto.slice(0, fin + 2);
-  return cuerpo.replace(/\/\*[\s\S]*?\*\//g, '')
+  return cuerpo
       .replace(/(^|[^:"'`\\])\/\/[^\n]*/g, '$1');
 }
 
@@ -253,7 +253,7 @@ module.exports = async (t) => {
        Así que RENIEC se OFRECE con un botón; nunca reemplaza. */
     const cfg = E.leer('config.js');
     const bloqueDni = cfg.slice(cfg.indexOf('async function _dniReniec'),
-        cfg.indexOf('/* ── LA AGENCIA IDENTIFICADA'));
+        cfg.indexOf('let _agElegida = null;'));
 
     ok(/if\(n\.length !== 8\)/.test(bloqueDni),
        'no se pregunta hasta tener los 8 dígitos: cada consulta gasta cuota ' +
@@ -376,9 +376,9 @@ module.exports = async (t) => {
     const culpables = archivos.filter((a) => {
       if (!E.existe(a)) return false;
       const codigo = E.leer(a)
-          .replace(/\/\*[\s\S]*?\*\//g, '')
-          .replace(/^\s*\/\/.*$/gm, '')
-          .replace(/<!--[\s\S]*?-->/g, '');
+          
+          
+          ;
       return /shalom-api\.lat|api\.shalom|cloudfunctions\.net\/shalom/.test(codigo);
     });
     ok(culpables.length === 0,
@@ -502,7 +502,7 @@ module.exports = async (t) => {
     const src = E.leer('shalom.js');
     const ini = src.indexOf('textoMotivo: function');
     const cuerpo = src.slice(ini, src.indexOf('return T[k]', ini))
-        .replace(/\/\*[\s\S]*?\*\//g, '');
+        ;
     const vistas = {};
     const repes = [];
     (cuerpo.match(/^\s{8}([A-Z_]+):/gm) || []).forEach((l) => {

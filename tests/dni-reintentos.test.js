@@ -62,7 +62,7 @@ module.exports = async ({bloque, ok}) => {
 
   {
     const form = E.leer('formulario.html');
-    const src = form.slice(form.indexOf('var _DNI_TEMPORAL='), form.indexOf('/* Mensaje según la CAUSA'));
+    const src = form.slice(form.indexOf('var _DNI_TEMPORAL='), form.indexOf('function _dniMensajeFalla(motivo){'));
     const correr = async (respuestas, cambiarEn) => {
       let n = 0; const pasos = [];
       const campo = {value: '73483547'};

@@ -13,7 +13,7 @@
 const E = require('./_entorno.js');
 
 const SRC = E.trozo('config.js', "const _LINK_SEL_KEY = 'tt_link_sel';",
-    '/* ── LINKS RÁPIDOS');
+    'let _genBusy=false;');
 
 function montar(op) {
   op = op || {};

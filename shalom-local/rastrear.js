@@ -1,42 +1,11 @@
 "use strict";
 
-/*
- * rastrear.js — Lector LOCAL del seguimiento público de Shalom
- * ============================================================
- * Corre en TU PC (no en la nube), con tu IP residencial, que sí pasa el
- * reCAPTCHA v3 de Shalom. Abre la página PÚBLICA shalom.com.pe/rastrea como lo
- * haría una persona, escribe la guía + código, y lee el estado que Shalom pinta
- * en pantalla (la barra de 4 pasos + el encabezado). No inicia sesión, no
- * descifra nada, no falsifica firmas: lee una página pública, como tú a mano.
- *
- * FASE A (este archivo): SOLO LEER. No toca tu base de datos. Sirve para
- * comprobar lo único que aún no sabemos: si tu PC puede leer Shalom a través
- * del reCAPTCHA. Cuando eso quede probado, la Fase B agrega subir a Firestore.
- *
- * USO:
- *   node rastrear.js --debug 92892656 ABCD
- *      → abre el navegador, busca esa guía, GUARDA el texto y una captura en
- *        ./debug/ y muestra lo que interpretó. Con esto CALIBRAMOS el lector
- *        contra la estructura real antes de confiar en él.
- *
- * Requisitos (una sola vez, en tu PC):
- *   npm install
- *   npx playwright install chromium
- */
-
 const path = require("path");
 const fs = require("fs");
 
 const RASTREA_URL = "https://shalom.com.pe/rastrea";
-const PERFIL_DIR = path.join(__dirname, ".perfil"); // perfil persistente: mejora
-//   la nota de reCAPTCHA con el tiempo (cookies estables) y parece más humano.
+const PERFIL_DIR = path.join(__dirname, ".perfil");
 
-// ── Interpretación del estado ───────────────────────────────────────────────
-// CLAVE: la barra de pasos SIEMPRE trae las 4 palabras (En origen, En tránsito,
-// En destino, Entregado). Buscar una palabra "a secas" agarraría la barra, no el
-// estado real. Pero el ENCABEZADO (el estado actual) aparece SIEMPRE ANTES que
-// la barra en el texto → gana la coincidencia de MENOR posición. Estas claves se
-// afinan con la salida de --debug contra la página real.
 const CANDIDATOS = [
   {estado: "Demora de envíos", claves: ["demora", "retras"]},
   {estado: "Entregado", claves: ["entregado", "recogido", "recepcion del destinatario", "culminado"]},
@@ -48,43 +17,27 @@ const CANDIDATOS = [
 const _norm = (s) => String(s || "").toLowerCase()
     .normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 
-/*
- * Interpreta el TEXTO visible del resultado. Devuelve {ok, estado, fecha, bloqueado}.
- * NUNCA inventa: si no reconoce nada, ok:false (no forzamos un estado).
- * Elige el estado por POSICIÓN (el encabezado va antes que la barra), así la
- * barra de 4 pasos no lo confunde. Exportada aparte para probarla sin navegador.
- */
 function parsearEstado(textoVisible) {
   const crudo = String(textoVisible || "");
   const t = _norm(crudo).replace(/\s+/g, " ");
 
-  // Fecha del evento: "Desde el 22/08/26 a las 16:56"
   let fecha = null;
   const mF = crudo.match(/[Dd]esde el\s+([\d/]+)\s+a las\s+([\d:]+)/);
   if (mF) fecha = mF[1] + " " + mF[2];
 
-  // Bloqueo (reCAPTCHA / login) — NO es "sin estado", es "no me dejaron ver".
   const bloqueado = /inicia sesion para rastrear|para poder rastrear tu envio necesitas/.test(t);
   if (bloqueado) return {ok: false, estado: null, fecha: fecha, bloqueado: true};
 
-  // Guía/código que Shalom no reconoce — texto exacto visto en pantalla real:
-  // "No se encontró la orden de servicio." Es un dato MAL escrito, no un fallo
-  // nuestro ni de Shalom: hay que avisarlo distinto de todo lo demás.
   const noEncontrado = /no se encontro la orden de servicio/.test(t);
   if (noEncontrado) {
     return {ok: false, estado: null, fecha: fecha, bloqueado: false, noEncontrado: true};
   }
 
-  // Tropiezo TEMPORAL del lado de Shalom — texto exacto visto en pantalla real:
-  // "Ups, algo no ha funcionado correctamente. Inténtalo de nuevo pronto."
-  // NO es un dato malo: el número puede estar perfecto. Se avisa distinto para
-  // no mandar a "revisar el número" cuando el problema es de Shalom, no tuyo.
   const errorShalom = /algo no ha funcionado correctamente/.test(t);
   if (errorShalom) {
     return {ok: false, estado: null, fecha: fecha, bloqueado: false, errorShalom: true};
   }
 
-  // Estado = la clave que aparece MÁS TEMPRANO (el encabezado, no la barra).
   let estado = null;
   let mejorIdx = Infinity;
   for (const c of CANDIDATOS) {
@@ -97,13 +50,6 @@ function parsearEstado(textoVisible) {
   return {ok: !!estado, estado: estado, fecha: fecha, bloqueado: false};
 }
 
-/*
- * Abre el navegador con perfil persistente (cookies estables entre corridas:
- * mejora la nota de reCAPTCHA con el tiempo). Quien la abre debe cerrarla
- * (ctx.close()) al terminar. Compartida entre rastrear.js (una guía) y
- * subir.js (varias guías en la misma sesión — más rápido y más "humano" que
- * abrir/cerrar un navegador por cada una).
- */
 async function abrirContexto() {
   const {chromium} = require("playwright");
   return chromium.launchPersistentContext(PERFIL_DIR, {
@@ -113,10 +59,6 @@ async function abrirContexto() {
   });
 }
 
-// ── Driver del navegador ──────────────────────────────────────────────────
-// Si se pasa `opts.ctx` (un contexto ya abierto), lo REUTILIZA y NO lo cierra
-// al terminar — así subir.js puede consultar muchas guías en una sola sesión.
-// Sin `opts.ctx`, abre y cierra su propio contexto (uso suelto / CLI).
 async function rastrear(numero, codigo, opts) {
   opts = opts || {};
   const ctxPropio = !opts.ctx;
@@ -127,7 +69,6 @@ async function rastrear(numero, codigo, opts) {
   try {
     await page.goto(RASTREA_URL, {waitUntil: "domcontentloaded", timeout: 45000});
 
-    // Los dos primeros inputs de texto: N° de Orden y Código.
     const inputs = page.locator("input[type=text], input[type=search], input:not([type])");
     await inputs.first().waitFor({state: "visible", timeout: 20000});
     await inputs.nth(0).fill(String(numero));
@@ -137,22 +78,17 @@ async function rastrear(numero, codigo, opts) {
     if (await btn.count().catch(() => 0)) await btn.click();
     else await inputs.nth(1).press("Enter");
 
-    // Esperamos a que la página pinte algo reconocible (estado o muro de login).
-    // OJO: esta regex corre sobre el texto CRUDO (con tildes) del navegador,
-    // no sobre el normalizado — "encontró" lleva tilde, hay que aceptarla.
     const CLAVE_RE = /en\s*origen|en\s*tr[aá]nsito|en\s*destino|entregado|demora|inicia sesi|no se encontr[oó]|algo no ha funcionado/i;
     await page.waitForFunction(
         (re) => re.test(document.body.innerText), CLAVE_RE, {timeout: 20000},
     ).catch(() => {});
-    await page.waitForTimeout(800); // que termine de asentarse
+    await page.waitForTimeout(800);
 
     const texto = await page.locator("body").innerText().catch(() => "");
     const res = parsearEstado(texto);
     Object.assign(out, res);
-    out.textoBruto = texto; // siempre disponible: permite autodiagnosticar sin
-    //   tener que volver a consultar cuando algo no se reconoce (ver subir.js).
+    out.textoBruto = texto;
 
-    // En modo debug guardamos TODO para calibrar el lector contra la realidad.
     if (opts.debug) {
       const dir = path.join(__dirname, "debug");
       fs.mkdirSync(dir, {recursive: true});
@@ -165,11 +101,10 @@ async function rastrear(numero, codigo, opts) {
   } finally {
     await page.waitForTimeout(opts.debug ? 1500 : 200);
     await page.close().catch(() => {});
-    if (ctxPropio) await ctx.close().catch(() => {}); // solo cerramos lo que abrimos
+    if (ctxPropio) await ctx.close().catch(() => {});
   }
 }
 
-// ── CLI ─────────────────────────────────────────────────────────────────────
 async function main() {
   const args = process.argv.slice(2);
   const debug = args.includes("--debug");
@@ -197,7 +132,6 @@ async function main() {
   if (r.guardadoEn) console.log("   Guardado:", r.guardadoEn);
 }
 
-// Exportamos parsearEstado para poder probarla sin abrir el navegador.
 module.exports = {parsearEstado, rastrear, abrirContexto};
 
 if (require.main === module) {

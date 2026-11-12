@@ -1,20 +1,9 @@
-/**
- * cliente/form-base.js — estado, arranque (init), link de registro, configuración, ayuda y la pantalla del formulario
- * ====================================================================================================================
- * Fase 5 (11/11/2026): el formulario en módulos. Antes era cliente/formulario.js
- * (y antes, el script en línea de formulario.html), envuelto en una función.
- * Script CLÁSICO: sus declaraciones son globales y los módulos se ven entre
- * sí por su nombre, como el panel. El orden de los <script> es el de
- * ejecución, y init() corre en form-arranque.js, cuando ya existe todo.
- */
 'use strict';
 
-/* ─── GLOBAL STATE ──────────────────────────────────────────────── */
 let selCourierName = '';
 let selCourierType = '';
 let selDateIso     = '';
 let selDateLbl     = '';
-// ★ Exponer selDate globalmente desde el inicio para evitar ReferenceError
 window.selDate = function(iso, lbl) {
   selDateIso = iso; selDateLbl = lbl;
   document.querySelectorAll('.date-opt').forEach(function(el){ el.classList.remove('active'); });
@@ -33,19 +22,11 @@ let _prefillLink   = '';
 let _gpsLat        = null;
 let _gpsLon        = null;
 
-/* ─── INIT ──────────────────────────────────────────────────────────
-   ⚠️ Se DECLARA aquí y se LLAMA al final del script (30/10/2026). Antes
-   corría en este punto, cuando aún no existían los `let`/`const` de más
-   abajo: así nació el «Iniciando fábrica…» colgado (TDZ). Llamarla al
-   final cierra esa familia de fallos entera, no solo el caso que se vio. */
 function init(){
-  /* El seguimiento (?seg=) ya se redirigió a seguimiento.html en el <head>. */
 
-  /* Link de registro con token de prefill (?t=TOKEN) */
   const tok = new URLSearchParams(location.search).get('t') || '';
   if(tok){ checkToken(tok); return; }
 
-  /* Fallback: localStorage (último pedido en este dispositivo) */
   const saved = localStorage.getItem('dpanel_order_'+wsId);
   if(saved){
     try{
@@ -57,7 +38,6 @@ function init(){
   loadCfg();
 }
 
-/* ─── TOKEN CHECK (link de registro) ─────────────────────────────── */
 async function checkToken(tok){
   setApp(`<div class="loading-screen"><div class="spin"></div><div class="spin-lbl">Verificando link...</div></div>`);
   try{
@@ -75,14 +55,10 @@ async function checkToken(tok){
       showTokenScreen('❌','Link inválido','Este link no existe o fue eliminado.');
       return;
     }
-    /* Válido — mostrar form con prefill */
     currentToken = tok;
     if(data.prefillName)  _prefillName  = data.prefillName;
     if(data.prefillPhone) _prefillPhone = data.prefillPhone;
     if(data.prefillLink)  _prefillLink  = data.prefillLink;
-    /* La foto de configuración de ESTE link, tal como la guardó el panel en
-       el token. Manda sobre la de la URL: la URL la puede editar el cliente,
-       el token no. Los tokens viejos no la traen y se sigue con la URL. */
     if(data.cfgId) _tokCfgId = String(data.cfgId);
     loadCfg();
   }catch(e){
@@ -100,11 +76,9 @@ function showTokenScreen(icon, title, msg){
     <div class="unconf-ttl">${esc(title)}</div>
     <div class="unconf-sub">${esc(msg).replace(/\n/g,'<br>')}</div>
   </div>`);
-  if(window.TTFormLoader) TTFormLoader.ready(); // pantalla final de link → ocultar loader
+  if(window.TTFormLoader) TTFormLoader.ready();
 }
 
-/* El id de la foto que trae el TOKEN. Vacío si el link es viejo o no hay
-   token: entonces se usa el de la URL, como siempre. */
 var _tokCfgId = '';
 
 async function loadCfg(){
@@ -118,8 +92,6 @@ async function loadCfg(){
       const snap = await withTO(_api('formcfg', {id: cfgId}), 5000);
       if(snap && !snap.error) cfg = snap;
     }
-    // Sin snapshot, snapshot fallido, o snapshot sin teléfono del negocio →
-    // completar con la config en vivo. Garantiza el botón de WhatsApp.
     if(!cfg || !_cfgHasPhone(cfg)){
       const live = await withTO(_api('config'), 5000);
       if(live && !live.error){
@@ -135,13 +107,10 @@ async function loadCfg(){
   }catch(e){
     console.warn('Config no disponible:', e.message);
   }finally{
-    // Config resuelta (o timeout) y form renderizado → recién ahora ocultar el
-    // loader, cubriendo el doble-render por debajo (sin flash ni spinner básico).
     if(window.TTFormLoader) TTFormLoader.ready();
   }
 }
 
-/* Lo que dice Toby y los pasos, según el estado. PURA: se prueba sola. */
 function _ayudaFormContenido(e){
   e=e||{};
   var tipo=e.tipo||'', paso=e.paso||1, retiro=tipo==='retiro';
@@ -216,7 +185,6 @@ function _courierLabel(name, type){
   return name;
 }
 
-// Emoji representativo según el courier (íconos sin imágenes externas)
 function _courierIcon(name, type){
   const u=(name||'').toUpperCase();
   if(u.includes('RETIRO')) return '🏪';
@@ -229,8 +197,6 @@ function _courierIcon(name, type){
   return (type==='agencia') ? '🏢' : '🚚';
 }
 
-/* Ícono SVG por tipo de entrega para las tarjetas de courier. Vectorial:
-   nítido, instantáneo, sin depender de la fuente de emojis (sin parpadeo). */
 function _courierSvg(type){
   const c='#17b3c3';
   const M={
@@ -243,7 +209,6 @@ function _courierSvg(type){
 }
 
 function renderForm(){
-  // Datos del negocio para la etiqueta viva (REMITENTE). Se lee del mismo CFG.
   window._bizInfo = {
     name:  (CFG&&(CFG.name||CFG.config&&CFG.config.name))||'Mi Negocio',
     phone: ((CFG&&(CFG.config&&CFG.config.phone||CFG.phone))||'').toString().trim(),
@@ -251,19 +216,17 @@ function renderForm(){
   };
   _knownClient=null; _gpsLat=null; _gpsLon=null;
   const extraF   = ((CFG&&CFG.extraFields)||[]).filter(f=>f&&f.visible!==false);
-  // Couriers: usar config de Firebase o defaults de tu app
   const couriers = (CFG&&CFG.couriers)||['SHALOM','OLVA COURIER','MARVISUR','DELIVERY','RETIRO EN TIENDA','OTRAS AGENCIAS'];
   const cAct     = (CFG&&CFG.courierActive)||{};
   const cTypes   = (CFG&&CFG.courierTypes)||{};
   const dispatch = (CFG&&CFG.dispatch)||{};
   const active   = couriers.filter(c=>cAct[c]!==false);
-  // Orden por prioridad para el cliente (solo presentación; no toca lógica).
   const _prio=(c)=>{ const u=(c||'').toUpperCase();
     if(u.includes('SHALOM'))    return 1;
     if(u.includes('DELIVERY'))  return 2;
     if(u.includes('OLVA'))      return 3;
     if(u.includes('MARVISUR'))  return 4;
-    if(_isOtrasAg(u))           return 5;   // Otras Agencias
+    if(_isOtrasAg(u))           return 5;
     if(u.includes('RETIRO'))    return 6;
     if(u.includes('DINSIDES'))  return 7;
     return 50; };
@@ -288,9 +251,6 @@ function renderForm(){
       }).join('')
     : '<option value="">Sin couriers configurados</option>';
 
-  // Tarjetas de courier VISIBLES (el cliente elige de un vistazo). El <select>
-  // #f_courier queda oculto como fuente de la verdad: las tarjetas solo lo
-  // escriben y disparan 'change' → misma lógica de siempre.
   const _courierTypeOf=(c)=>{
     const u=(c||'').toUpperCase();
     if(_isOtrasAg(u)) return 'encomienda';
@@ -476,10 +436,8 @@ function renderForm(){
     if(el) el.classList.add('active');
   }
 
-  /* Pre-fill from token */
   if(_prefillName){ const el=$('f_name'); if(el) el.value=_prefillName; }
   if(_prefillPhone){ const el=$('f_phone'); if(el){ el.value=_prefillPhone; onPhoneInput(_prefillPhone); } }
 
-  /* Asistente paso a paso (solo presentación; no cambia la lógica) */
   wzInit();
 }

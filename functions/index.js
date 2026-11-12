@@ -12,22 +12,14 @@ const {getAppCheck} = require("firebase-admin/app-check");
 const {getStorage} = require("firebase-admin/storage");
 const crypto = require("crypto");
 
-// Modulo aislado de extraccion de comprobantes.
 const comprobante = require("./comprobante");
-// Seleccion de datos del cliente recurrente (logica pura, testeable aparte).
 const clienteLookup = require("./clienteLookup");
 const {normalizarOlva} = require("./olvaNormalizar");
-// Puerta unica a la API de Shalom (lista blanca + traduccion).
 const shalomPuerta = require("./shalomPuerta");
-// El interruptor: cuando apagar la puerta y cuando reencenderla (logica pura).
 const interruptor = require("./interruptor");
-// Verificar la firma de los avisos de Shalom (logica pura, sin red).
 const webhook = require("./webhook");
-// A quien consulta el barrido y cuando (logica pura).
 const barrido = require("./barrido");
 const limpieza = require("./limpieza");
-// Que etiqueta le toca a un pedido. LO COMPARTE CON EL PANEL: ver la
-// cabecera de etiquetas.js — dos copias de esta regla divergirian.
 const etiquetas = require("./etiquetas");
 const agencias = require("./agencias");
 const pedidoPublico = require("./pedidoPublico");
@@ -43,56 +35,21 @@ setGlobalOptions({maxInstances: 10});
 initializeApp();
 const db = getFirestore();
 
-// ── Rutas Firestore (deben coincidir exactamente con el panel) ─────────────
 const CFG_DOC = "panel/config";
 const SHIP_COL = "panel/shipments/items";
 
-/* ★ FASE 2 · LA HORA DE CAMBIO (functions/sincro.js). TODA escritura del
-   servidor sobre un pedido pasa por aquí y graba `_mts` con la hora del
-   servidor: es lo que el panel consulta para traer solo lo cambiado. Una
-   escritura que no la grabe sería invisible para el panel hasta su carga
-   completa de seguridad — hay una prueba que recorre este archivo y falla
-   si alguna escritura en SHIP_COL no pasa por `_conMts`. */
 const SYNC_V = 1;
-/**
- * Los mismos campos, más la hora de cambio del servidor.
- * @param {Object} campos lo que se escribe
- * @return {Object} copia con `_mts`
- */
 function _conMts(campos) {
   return Object.assign({}, campos, {_mts: FieldValue.serverTimestamp()});
 }
 const TOK_COL = "panel/tokens/items";
 const FORMCFG_COL = "panel/forms/configs";
 
-// La clave de Shalom vive en Secret Manager. Nunca en el codigo ni en el
-// navegador. Se pone con: firebase functions:secrets:set SHALOM_API_KEY
 const SHALOM_API_KEY = defineSecret("SHALOM_API_KEY");
 
-// El secreto del webhook. `PUT /webhooks` lo devuelve COMPLETO una sola vez;
-// despues queda enmascarado. Se pone con:
-//   firebase functions:secrets:set SHALOM_WEBHOOK_SECRET
 const SHALOM_WEBHOOK_SECRET = defineSecret("SHALOM_WEBHOOK_SECRET");
 
-/* ── LAS CREDENCIALES DE SHALOM PRO ───────────────────────────────────────
-   Viven en Secret Manager, la misma caja fuerte que la clave de la API. El
-   dueño las escribe UNA vez desde el panel; a partir de ahí el servidor
-   entra solo en Shalom — que es lo único que hace que la sesión no se caiga
-   de madrugada sin nadie delante.
-
-   ⚠️ NO CON `defineSecret()`, Y EL MOTIVO ES EL QUE LO HACE FUNCIONAR.
-   Ese fija la versión al DESPLEGAR: si el panel guarda una contraseña
-   nueva, la función seguiría usando la vieja hasta el próximo deploy —
-   justo lo contrario de lo que se quiere. Se lee la versión `latest` en el
-   momento de la petición, con la caché corta de `credenciales.js`.
-
-   De regalo: como ya no van en `secrets: [...]`, un secreto que todavía no
-   existe deja de romper el despliegue. Al dueño le acaba de pasar. */
 let _smCliente = null;
-/**
- * El cliente de Secret Manager, creado una sola vez.
- * @return {Object} el cliente
- */
 function _sm() {
   if (!_smCliente) {
     const {SecretManagerServiceClient} =
@@ -102,34 +59,16 @@ function _sm() {
   return _smCliente;
 }
 
-/**
- * El id del proyecto.
- *
- * ⚠️ SE LO PREGUNTAMOS A LA LIBRERIA, no lo deducimos. Antes esto leia
- * `GCLOUD_PROJECT` / `GCP_PROJECT` / `FIREBASE_CONFIG` a mano, y en
- * Cloud Functions de 2ª generacion —que por dentro es Cloud Run— ninguna
- * de las tres esta garantizada. `getProjectId()` sale de las credenciales
- * con las que la funcion ya esta autenticada: es la misma fuente que usa
- * el cliente para hablar con Google, asi que no puede discrepar.
- * Las variables quedan de respaldo por si la metadata tarda.
- * @return {Promise<string>} el id del proyecto
- */
 async function _proyecto() {
   try {
     const p = await _sm().getProjectId();
     if (p) return String(p);
   } catch (e) {
-    // abajo el respaldo
   }
   return process.env.GCLOUD_PROJECT || process.env.GCP_PROJECT ||
     (JSON.parse(process.env.FIREBASE_CONFIG || "{}").projectId) || "";
 }
 
-/**
- * Lee la versión MÁS NUEVA de un secreto.
- * @param {string} nombre del secreto
- * @return {Promise<string>} su valor
- */
 async function _leerSecreto(nombre) {
   const [v] = await _sm().accessSecretVersion({
     name: `projects/${await _proyecto()}/secrets/${nombre}/versions/latest`,
@@ -137,32 +76,12 @@ async function _leerSecreto(nombre) {
   return v.payload.data.toString("utf8");
 }
 
-/**
- * Escribe una versión nueva. Crea el secreto si es la primera vez.
- *
- * Las versiones viejas se quedan en el historial de Secret Manager: eso es
- * lo que permite volver atrás si el dueño se equivoca de cuenta.
- * @param {string} nombre del secreto
- * @param {string} valor lo que se guarda
- * @return {Promise<void>} nada
- */
 async function _escribirSecreto(nombre, valor) {
   const padre = `projects/${await _proyecto()}`;
-  /* ⚠️ CREAR PUEDE FALLAR Y NO PASA NADA, A PROPÓSITO.
-     Dos motivos, y los dos son normales:
-       · el secreto YA EXISTE — el caso de todas las veces menos la primera;
-       · la cuenta de servicio no tiene permiso para CREAR secretos, porque
-         el dueño le dio los permisos estrechos (añadir versión + leer) en
-         vez de `admin`. Eso es mejor, no peor: así la función nunca puede
-         borrar un secreto, ni el día que alguien se equivoque de línea.
-     Quien manda es `addSecretVersion` de abajo: si de verdad no se puede
-     escribir, falla ahí y el error llega entero. Tragarse este no esconde
-     nada — solo deja de exigir un permiso que no hace falta. */
   try {
     await _sm().createSecret({parent: padre, secretId: nombre,
       secret: {replication: {automatic: {}}}});
   } catch (e) {
-    // ver arriba
   }
   await _sm().addSecretVersion({
     parent: `${padre}/secrets/${nombre}`,
@@ -170,36 +89,13 @@ async function _escribirSecreto(nombre, valor) {
   });
 }
 
-// ⚠️ ESTA LISTA DEBE COINCIDIR CON firestore.rules (funcion esAdmin).
-// Son dos archivos distintos que expresan la misma regla: si se cambian por
-// separado, alguien puede escribir en Firestore pero no hablar con Shalom, o
-// al reves. Al tocar una, tocar la otra.
-// ⚠️ Solo cuentas de Google: esAdminDe exige el correo VERIFICADO, y un
-// registro con contrasena nunca lo esta. Misma regla que firestore.rules.
 const ADMINS = [
   "jarryllanoski@gmail.com",
   "redbolima@gmail.com",
 ];
 
-
-/**
- * EL ÚNICO CAMINO HACIA SHALOM: interruptor → llamada → interruptor.
- *
- * Lo usan el panel (a traves de shalomPuerta) y el barrido programado. Si el
- * barrido tuviera su propia llamada, seria un segundo camino que se salta el
- * interruptor — y entonces una caida de Shalom volveria a costar cientos de
- * consultas, justo de madrugada y sin nadie mirando.
- * @param {string} destino operacion de la lista blanca
- * @param {Object} datos cuerpo para las operaciones POST
- * @param {boolean} [diagnostico] true para `esquema` y `validate`
- * @return {Promise<Object>} {ok:true, json} o {ok:false, motivo, …}
- */
 async function _porLaPuerta(destino, datos, diagnostico) {
   const estado = await _leerPuerta();
-  /* `instances` sondea igual que `validate`: es UNA consulta, no toca
-     ningun envio y no gasta cuota, asi que puede pasar mientras la puerta
-     descansa. Y como cualquier respuesta buena la reabre, apretar
-     "Verificar sesion" es tambien la forma de preguntar "¿ya volvio?". */
   const esSondeo = diagnostico || destino === "validate" ||
       destino === "instances";
   const llave = interruptor.decidir(estado, Date.now(), esSondeo);
@@ -212,16 +108,6 @@ async function _porLaPuerta(destino, datos, diagnostico) {
   return r;
 }
 
-/**
- * El estado de una guía desde el «Seguimiento de envíos» de TU Shalom Pro:
- * el respaldo cuando /track falla del lado de shalom-api. Baja la lista
- * entera (máx. 10 páginas de 20) UNA vez por `memo`: los horarios la piden
- * una sola vez por corrida. Lee la sesión de Pro: no pasa por el buscador
- * público que rechaza a shalom-api.
- * @param {string} guia número de guía
- * @param {Object} [memo] {filas} compartido entre llamadas
- * @return {Promise<?Object>} {ok:true, estado, pasos, fuente} o null
- */
 async function _seguimientoPro(guia, memo) {
   const m = memo || {};
   if (m.filas === undefined) {
@@ -248,15 +134,6 @@ async function _seguimientoPro(guia, memo) {
   return shalomPuerta.deSeguimientoPro(m.filas, guia);
 }
 
-/**
- * ¿Es esta guía un envío PENDIENTE de tu cuenta de Shalom Pro? Una guía
- * pendiente no sale en el rastreo público (/track dice «no la conozco»),
- * pero sí en esta lista. Una consulta por llamada: `memo` la guarda para
- * que la consulta por horarios la pida UNA sola vez por corrida.
- * @param {string} guia número de guía
- * @param {Object} [memo] {lista} compartido entre llamadas
- * @return {Promise<?boolean>} true/false, o null si no se pudo mirar
- */
 async function _esPendiente(guia, memo) {
   const m = memo || {};
   if (m.lista === undefined) {
@@ -277,12 +154,6 @@ async function _esPendiente(guia, memo) {
   return registroShalom.enPendientes(m.lista, guia);
 }
 
-/**
- * Un fallo del servicio que la llamada no pudo ver por sí sola (p. ej.
- * «Shalom no conoce» una guía que YA conocía): cuenta para el interruptor
- * igual que un ERROR_SHALOM.
- * @return {Promise<void>}
- */
 async function _contarFalloDeServicio() {
   const estado = await _leerPuerta();
   const cambios = interruptor.tras(estado, {ok: false,
@@ -290,13 +161,6 @@ async function _contarFalloDeServicio() {
   if (cambios) await _guardarPuerta(cambios);
 }
 
-/**
- * El ticket (binario) por la MISMA puerta: respeta el interruptor —si la
- * puerta está apagada o pausada tras fallos, no se llama— y cuenta como una
- * consulta más para abrirla o cerrarla.
- * @param {Object} datos {orderNumber, orderCode}
- * @return {Promise<Object>} {ok:true, bytes, tipo} o {ok:false, motivo}
- */
 async function _voucherPorLaPuerta(datos) {
   const estado = await _leerPuerta();
   const llave = interruptor.decidir(estado, Date.now(), false);
@@ -309,15 +173,6 @@ async function _voucherPorLaPuerta(datos) {
   return r;
 }
 
-/**
- * Guarda bytes en el bucket con un token de descarga (el MISMO esquema de
- * URL que usa el panel al subir: `…/o/<ruta>?alt=media&token=…`). No usa
- * URLs firmadas: esas piden un permiso de IAM extra a la cuenta de servicio.
- * @param {string} ruta "shipments/<id>/guia.png"
- * @param {Buffer} bytes contenido
- * @param {string} tipo content-type
- * @return {Promise<string>} URL de descarga
- */
 async function _subirAlBucket(ruta, bytes, tipo) {
   const bucket = getStorage().bucket();
   const token = crypto.randomUUID();
@@ -330,20 +185,10 @@ async function _subirAlBucket(ruta, bytes, tipo) {
     "/o/" + encodeURIComponent(ruta) + "?alt=media&token=" + token;
 }
 
-/* ── EL INTERRUPTOR DE LA PUERTA ───────────────────────────────────────────
-   El estado vive en Firestore para que lo compartan todos los dispositivos y
-   sobreviva al reinicio de la funcion. Se cachea unos segundos en memoria
-   para que un barrido de 484 guias no cueste 484 lecturas — y se actualiza a
-   mano tras cada escritura, asi que dentro de un mismo barrido el conteo de
-   fallos es exacto. */
 const PUERTA_DOC = "panel/shalom";
 const PUERTA_FRESCA_MS = 15000;
 let _puerta = {estado: null, ts: 0};
 
-/**
- * El estado de la puerta, de cache o de Firestore.
- * @return {Promise<Object>} estado normalizado
- */
 async function _leerPuerta() {
   const ahora = Date.now();
   if (_puerta.estado && (ahora - _puerta.ts) < PUERTA_FRESCA_MS) {
@@ -354,20 +199,12 @@ async function _leerPuerta() {
     const snap = await db.doc(PUERTA_DOC).get();
     doc = snap.exists ? snap.data() : null;
   } catch (e) {
-    // Si no se pudo leer, NO se bloquea a nadie: normalizar(null) deja la
-    // puerta abierta. Una puerta que se cierra porque no pudo leerse a si
-    // misma es peor que no tener puerta.
     console.warn("puerta: no se pudo leer el estado:", e && e.message);
   }
   _puerta = {estado: interruptor.normalizar(doc), ts: ahora};
   return _puerta.estado;
 }
 
-/**
- * Guarda los cambios del interruptor y refresca la cache.
- * @param {Object} cambios campos a escribir
- * @return {Promise<void>}
- */
 async function _guardarPuerta(cambios) {
   _puerta.estado = interruptor.normalizar(
       Object.assign({}, _puerta.estado, cambios));
@@ -379,7 +216,6 @@ async function _guardarPuerta(cambios) {
   }
 }
 
-// ── CORS ───────────────────────────────────────────────────────────────────
 const ALLOWED_ORIGINS = [
   "https://jarryllanoski.github.io",
   "https://total-tools-24ce8.web.app",
@@ -387,12 +223,6 @@ const ALLOWED_ORIGINS = [
 ];
 const LOCALHOST_ORIGIN_RE = /^http:\/\/localhost(:\d+)?$/;
 
-/**
- * Aplica headers CORS a la respuesta, reflejando el origen solo si está
- * en la lista permitida (o es localhost en cualquier puerto).
- * @param {Object} req request
- * @param {Object} res response
- */
 function setCORS(req, res) {
   const origin = req.get("Origin") || "";
   if (ALLOWED_ORIGINS.includes(origin) || LOCALHOST_ORIGIN_RE.test(origin)) {
@@ -400,29 +230,10 @@ function setCORS(req, res) {
     res.set("Vary", "Origin");
   }
   res.set("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-  /* ⚠️ CADA CABECERA QUE EL NAVEGADOR MANDE TIENE QUE ESTAR AQUÍ, Y ESTO
-     CASI ROMPE EL FORMULARIO ENTERO EL 15/10/2026.
-
-     Añadir `X-Firebase-AppCheck` a las llamadas de la página del cliente
-     convierte un GET simple en uno con preflight: el navegador pregunta
-     primero con OPTIONS y, si la cabecera no está permitida AQUÍ, BLOQUEA
-     la petición de verdad. No la rechaza el servidor — no llega a salir.
-
-     Es decir: desplegar la página sin desplegar antes esta línea deja a
-     TODOS los clientes sin poder pedir. Una medida de seguridad que tumba
-     el negocio no es una medida de seguridad.
-
-     Hay una prueba que compara las cabeceras que el navegador manda con
-     esta lista. Si alguien añade una cabecera y se olvida de ponerla aquí,
-     se pone roja antes de salir de casa. */
   res.set("Access-Control-Allow-Headers",
       "Content-Type, Authorization, X-Firebase-AppCheck");
 }
 
-// ── formApi ────────────────────────────────────────────────────────────────
-/* ⚠️ `secrets` AQUI DESDE EL 15/10/2026. `action=reniec` consulta el espejo
-   de RENIEC de Shalom, y para eso hace falta la clave de la API. El resto de
-   acciones no la tocan: declararla no las cambia en nada. */
 exports.formApi = onRequest(
     {secrets: [SHALOM_API_KEY]},
     async (req, res) => {
@@ -453,10 +264,6 @@ exports.formApi = onRequest(
       }
     });
 
-// ── Whitelist de campos permitidos en order (formulario público) ───────────
-// Refleja exactamente los campos que construye formulario.html.
-// Cualquier campo extra enviado por el cliente se descarta antes de escribir
-// en Firestore — los campos id/status/createdAt/fromForm los pone el backend.
 const ORDER_FIELDS = [
   "id", "name", "phone", "address", "gpsCoords", "referencia",
   "dniRecoger", "ciudadDestino", "dniDestinatario", "encAgencia",
@@ -464,14 +271,9 @@ const ORDER_FIELDS = [
   "docGuia", "docEmbalado", "docComprobante", "links",
   "sel", "chkGuia", "chkEmbalado", "chkComprobante",
   "createdAt", "fromForm", "dni",
-  /* La agencia de destino IDENTIFICADA. Sin estos, registrar un envio en
-     Shalom es imposible: `POST /account/register` pide el `ter_id`, y ese id
-     solo se conoce sin adivinar en el instante en que el cliente elige la
-     agencia de la lista. Si no viajan aqui, ese instante se pierde. */
   "agenciaId", "agenciaNombre", "agenciaGeo", "agenciaCourier",
 ];
 
-// Tamaño máximo por campo de texto — evita payloads gigantes (M-3).
 const FIELD_MAX = {
   name: 120, phone: 20, dni: 12, dniRecoger: 12, dniDestinatario: 12,
   cost: 20, courier: 60, date: 30, status: 60, encAgencia: 200,
@@ -481,12 +283,6 @@ const FIELD_MAX = {
 };
 const DEFAULT_MAX = 600;
 
-/**
- * Devuelve una copia de src con solo las claves de ORDER_FIELDS.
- * Trunca strings que excedan su tamaño máximo permitido.
- * @param {Object} src objeto order crudo del cliente
- * @return {Object} objeto filtrado
- */
 function pickOrderFields(src) {
   const out = {};
   ORDER_FIELDS.forEach((k) => {
@@ -498,14 +294,6 @@ function pickOrderFields(src) {
     }
     out[k] = v;
   });
-  /* La agencia: o entran los CUATRO campos con un id valido, o no entra
-     ninguno. Recortar no basta — `agenciaId: "../x"` recortado sigue siendo
-     basura, y un pedido con id malo y geo buena PARECE identificado sin
-     serlo. Se valida con el MISMO modulo que usa el panel, no con una copia
-     que se desincronice.
-     Y se limpia entero, porque tres campos sin el cuarto es peor que nada:
-     el panel diria "agencia identificada" sobre algo que no se puede
-     registrar, y eso se descubre con un envio pagado. */
   if (!agencias.idValido(out.agenciaId) ||
       !agencias.courierDe(out.agenciaCourier)) {
     agencias.CAMPOS.forEach((k) => delete out[k]);
@@ -513,20 +301,9 @@ function pickOrderFields(src) {
   return out;
 }
 
-/* ★ LA FORMA DE UN ID, ANTES DE TOCAR LA BASE DE DATOS — 30/10/2026.
-   Los ids de link (20 letras/números) y de «foto» de configuración (~16) se
-   pegaban a una ruta sin mirarlos: un id con «/» leía OTRA ruta, y la basura
-   costaba una lectura por intento. Lo que no tiene forma de id se responde
-   ahí mismo, sin leer nada (igual que ya hace el seguimiento). */
 const ID_RE = /^[A-Za-z0-9_-]{2,64}$/;
 
-// ── action=create ──────────────────────────────────────────────────────────
-/**
- * @param {Object} req request
- * @param {Object} res response
- */
 async function handleCreate(req, res) {
-  // Rate limit: máx 10 pedidos/min por IP — evita spam de pedidos falsos.
   if (!(await checkRateLimit("formApi_create", req))) {
     res.status(429).json({
       status: "error",
@@ -546,7 +323,6 @@ async function handleCreate(req, res) {
     return;
   }
 
-  // Re-validar token para evitar carreras: si ya fue usado entre ?t= y submit
   let tokData = null;
   if (tokenId) {
     if (!ID_RE.test(tokenId)) {
@@ -570,39 +346,15 @@ async function handleCreate(req, res) {
   }
 
   const now = Date.now();
-  /* El token del link ya NO es el id. Era `id_` + el reloj, o sea un numero
-     que avanza solo y que cualquiera puede recorrer. Ahora son 128 bits del
-     generador criptografico. Ver functions/enlaceSeguimiento.js. */
   const trackToken = enlace.generar();
 
   const orderToSave = Object.assign({}, pickOrderFields(order), {
     status: order.status || "NUEVO PEDIDO",
     createdAt: order.createdAt || new Date().toISOString(),
     fromForm: true,
-    /* Se guarda en el pedido, no en una tabla aparte: asi la consulta es una
-       sola lectura (indice automatico de Firestore sobre un campo) y el
-       panel puede armar el link SIN CONEXION, porque el token ya viaja con
-       el pedido. Pedirselo al servidor para copiar un link dejaria a Jarry
-       sin poder mandarlo cuando se le cae internet. */
     trackToken,
   });
 
-  /* ★ EL NOMBRE OFICIAL, PUESTO POR EL SERVIDOR Y NUNCA POR EL NAVEGADOR.
-     `POST /account/register` de Shalom pide el nombre en TRES campos
-     (`name`, `firstname`, `lastname`), y partir «JOSE LUIS DE LA CRUZ» a ojo
-     se equivoca. Si el pedido nace con el nombre ya partido, el dueño puede
-     registrarlo sin volver a consultar el DNI.
-
-     ⚠️ SALE DE LA CACHÉ DEL SERVIDOR, NO DE LO QUE MANDE EL FORMULARIO. Si
-     el navegador pudiera mandar `reniec: {...}`, cualquiera podría poner el
-     nombre que quisiera EN UNA ETIQUETA DE ENVÍO REAL. El navegador
-     pregunta; el servidor consultó, guardó, y ahora se acuerda. `reniec`
-     tampoco está en ORDER_FIELDS, así que lo que venga de fuera con ese
-     nombre se tira antes de llegar aquí.
-
-     Y solo si CORRESPONDE AL DNI DEL PEDIDO: el cliente puede consultar un
-     documento y escribir otro. Pegar el nombre del primero sería darle a
-     Shalom el nombre de otra persona — peor que no tener ninguno. */
   try {
     const _d = reniecPublico.normalizar(orderToSave.dni);
     if (_d) {
@@ -618,14 +370,9 @@ async function handleCreate(req, res) {
       }
     }
   } catch (e) {
-    // Un pedido NUNCA se pierde por esto: el nombre partido es una mejora,
-    // no un requisito. Sin él, el panel lo consulta al abrir el pedido.
     console.warn("create: no se pudo adjuntar reniec:", e && e.message);
   }
 
-  // Monto/adelanto vienen del TOKEN (los puso el operador), NO del cliente →
-  // el cliente no los ve ni los puede alterar. Deuda = max(0, monto-adelanto)
-  // se guarda en `cost` (lo leen tarjeta/dashboard/tracking, etc.).
   if (tokData && (tokData.monto || tokData.adelanto)) {
     const monto = Number(tokData.monto) || 0;
     const adelanto = Number(tokData.adelanto) || 0;
@@ -635,26 +382,9 @@ async function handleCreate(req, res) {
     orderToSave.cost = deuda > 0 ? String(deuda) : "";
   }
 
-  /* ★ EL NÚMERO DE FACTURA O BOLETA, DEL TOKEN Y NUNCA DEL CLIENTE.
-     Igual que el monto: lo escribió el dueño al generar el link. No está
-     en ORDER_FIELDS, así que si el formulario manda `nroComprobante` se
-     tira antes de llegar aquí — nadie puede ponerse el número de otra
-     venta. Se vuelve a limpiar aunque lo haya escrito el panel: en el QR
-     de la etiqueta un `#` de más rompe la lectura. */
   const nroComprobante = tokData ? nroComp.de(tokData) : "";
   if (nroComprobante) orderToSave.nroComprobante = nroComprobante;
 
-  /* ★ ESCRITURA EN UNA TRANSACCIÓN, Y CON `create`, NUNCA `set` — 30/10/2026.
-     Dos agujeros que el lote (batch) dejaba abiertos:
-       · CHOQUE DE ID. El id es `id_` + el milisegundo. Dos clientes que
-         confirman en el mismo milisegundo daban el MISMO id, y `set` hacía
-         que el segundo pedido BORRARA al primero sin avisar. Ahora se lee
-         el id dentro de la transacción y se graba con `create` (falla si
-         existe): ocupado → se prueba el milisegundo siguiente. El formato
-         del id no cambia (el panel y los links viejos dependen de él).
-       · LINK USADO DOS VECES. «¿Ya se usó?» se miraba ANTES y fuera: dos
-         pestañas con el mismo link pasaban las dos y nacían dos pedidos.
-         Ahora mirar y marcar son la MISMA operación. */
   const tokRef = tokenId ? db.doc(`${TOK_COL}/${tokenId}`) : null;
   let orderId = "";
   let trackCode = "";
@@ -679,10 +409,6 @@ async function handleCreate(req, res) {
           usedAt: new Date().toISOString(),
         }, {merge: true});
       }
-      // formTs: campo exclusivo del formulario — el panel nunca lo
-      // sobreescribe. ts: señal legacy que el panel también escucha.
-      // syncV: el servidor ya graba `_mts` → el panel puede pedir solo lo
-      // cambiado. Mientras no exista, el panel hace la carga completa.
       tx.set(db.doc(CFG_DOC), {ts: now, formTs: now, syncV: SYNC_V},
           {merge: true});
       return "ok";
@@ -698,19 +424,11 @@ async function handleCreate(req, res) {
   }
   if (!orderId) throw new Error("create: 5 ids seguidos ocupados");
 
-  /* El formulario lo usa como código en el WhatsApp del cliente, para que
-     diga lo mismo que la etiqueta. Solo si existe: los links sin número
-     responden exactamente igual que antes. */
   const resp = {status: "ok", orderId, trackCode, trackToken};
   if (nroComprobante) resp.nroComprobante = nroComprobante;
   res.json(resp);
 }
 
-// ── action=token ───────────────────────────────────────────────────────────
-/**
- * @param {Object} req request
- * @param {Object} res response
- */
 async function handleToken(req, res) {
   const tokenId = (req.query.t || "").trim();
   if (!ID_RE.test(tokenId)) {
@@ -731,15 +449,6 @@ async function handleToken(req, res) {
     res.json({status: "expired"});
     return;
   }
-  /* ★ LA FOTO DE LA CONFIGURACIÓN VIAJA CON EL TOKEN, NO SOLO EN LA URL.
-     Cada link congela al generarse qué días y qué couriers ofrece (la
-     «foto», en FORMCFG_COL). Hasta el 26/10/2026 su id viajaba solo en la
-     URL (`&cfg=…`), y un cliente que editara el enlace podía cambiarlo por
-     el de otro link y ver otros couriers u otros días. Ahora el panel lo
-     guarda también DENTRO del token, y el formulario prefiere este.
-     Los tokens viejos no lo tienen: devuelven "" y el formulario sigue con
-     el de la URL, como antes. Se valida la forma para no devolver basura
-     que el formulario usaría como ruta. */
   const cfgId = /^[A-Za-z0-9_-]{6,40}$/.test(String(d.cfgId || "")) ?
     String(d.cfgId) : "";
   res.json({
@@ -751,16 +460,9 @@ async function handleToken(req, res) {
   });
 }
 
-// ── action=config ──────────────────────────────────────────────────────────
-/**
- * @param {Object} req request
- * @param {Object} res response
- */
 async function handleConfig(req, res) {
   const snap = await db.doc(CFG_DOC).get();
   const d = snap.exists ? snap.data() : {};
-  // Solo campos públicos que el formulario necesita.
-  // NUNCA exponer statusPin, trash, msgTemplates ni labels al público.
   res.json({
     config: configPublica(d.config),
     couriers: d.couriers || [],
@@ -771,36 +473,18 @@ async function handleConfig(req, res) {
   });
 }
 
-// ── action=formcfg ─────────────────────────────────────────────────────────
-/**
- * @param {Object} req request
- * @param {Object} res response
- */
 async function handleFormCfg(req, res) {
   const id = (req.query.id || "").trim();
   if (!ID_RE.test(id)) return res.status(400).json({error: "missing id"});
   const snap = await db.doc(`${FORMCFG_COL}/${id}`).get();
   if (!snap.exists) return res.status(404).json({error: "not found"});
-  // Lista blanca también aquí: la «foto» la arma el panel, pero lo que
-  // sale al público se decide en el servidor, campo por campo.
   res.json(soloCampos(snap.data(), FORMCFG_PUBLICO));
 }
 
-/* ★ LO QUE EL PÚBLICO VE DE LA CONFIGURACIÓN: LISTA BLANCA — 30/10/2026.
-   Antes salía el objeto `config` ENTERO (horarios del barrido,
-   interruptores de Shalom…). Nada era secreto, pero con ese diseño CADA
-   CAMPO NUEVO NACÍA PÚBLICO — el mismo error que sacó la clave de recojo
-   por el seguimiento (OWASP API3:2023). El formulario solo usa estos. */
 const CONFIG_PUBLICA = ["name", "phone", "city"];
 const FORMCFG_PUBLICO = ["name", "city", "phone", "couriers", "courierActive",
   "courierTypes", "dispatch", "extraFields", "createdAt"];
 
-/**
- * Copia con solo las claves permitidas.
- * @param {Object} src objeto completo
- * @param {Array} claves permitidas
- * @return {Object} copia filtrada
- */
 function soloCampos(src, claves) {
   const out = {};
   const o = src || {};
@@ -810,21 +494,10 @@ function soloCampos(src, claves) {
   return out;
 }
 
-/**
- * La parte pública de `config`.
- * @param {Object} c config completa
- * @return {Object} config pública
- */
 function configPublica(c) {
   return soloCampos(c, CONFIG_PUBLICA);
 }
 
-/**
- * ¿El link personalizado `t` (sin usar) es de este celular?
- * @param {string} t id del token
- * @param {string} phone 9 dígitos
- * @return {Promise<boolean>} true si coincide
- */
 async function _tokenDeEseCelular(t, phone) {
   const id = String(t || "").trim();
   if (!ID_RE.test(id)) return false;
@@ -841,23 +514,6 @@ async function _tokenDeEseCelular(t, phone) {
   }
 }
 
-// ── action=client ──────────────────────────────────────────────────────────
-// GET ?action=client&phone=9XXXXXXXX → {name, address} del ultimo pedido, para
-// reconocer al cliente que vuelve y ahorrarle escribir sus datos.
-//
-// PRIVACIDAD — el formulario es publico (se abre sin token), asi que este
-// endpoint podria usarse para averiguar si un numero es cliente y obtener su
-// domicilio. Cuatro barreras lo hacen inviable como via de cosecha:
-//   1. Rate limit por IP (20/min).
-//   2. Se devuelve el MINIMO: nombre y direccion. Nunca DNI, montos, notas,
-//      documentos, historial ni el resto del pedido.
-//   3. Solo pedidos de los ultimos 12 meses.
-//   4. Respuesta IDENTICA ({}) en todos los casos negativos —sin datos, fuera
-//      de ventana, limite alcanzado o error— para no revelar el porque.
-/**
- * @param {Object} req request
- * @param {Object} res response
- */
 async function handleClient(req, res) {
   res.set("Cache-Control", "no-store");
   const vacio = () => res.json({});
@@ -868,9 +524,6 @@ async function handleClient(req, res) {
   if (phone.length !== 9) return vacio();
 
   try {
-    // Sin orderBy: la igualdad usa el indice automatico y no hace falta crear
-    // un indice compuesto. El tope acota el costo; el mas reciente se elige en
-    // memoria (un cliente real no tiene decenas de pedidos abiertos).
     const snap = await db.collection(SHIP_COL)
         .where("phone", "==", phone).limit(50).get();
     if (snap.empty) return vacio();
@@ -880,38 +533,15 @@ async function handleClient(req, res) {
 
     const cli = clienteLookup.elegirCliente(pedidos, Date.now());
     if (!cli) return vacio();
-    /* ★ SIN FUGA POR CELULAR — 30/10/2026. Antes, escribir CUALQUIER
-       celular devolvía el nombre completo y la última dirección de esa
-       persona: un robot con IPs rotando podía recorrer números. Ahora:
-         · link personalizado de ESE MISMO celular → todo, como antes (el
-           dueño ya escribió ese número al generar el link);
-         · cualquier otro caso → solo el primer nombre, para el saludo.
-       El nombre completo lo pone el DNI (RENIEC), que va antes en el paso. */
     if (await _tokenDeEseCelular(req.query.t, phone)) return res.json(cli);
     return res.json({name: String(cli.name || "").split(/\s+/)[0] || "",
       parcial: true});
   } catch (e) {
     console.error("handleClient error:", e);
-    return vacio(); // nunca romper el formulario por esto
+    return vacio();
   }
 }
 
-// ── action=reniec ──────────────────────────────────────────────────────────
-/**
- * ¿Trae esta petición una prueba válida de App Check?
- *
- * ⚠️ SE EXIGE AQUÍ Y NO EN LAS DEMÁS ACCIONES, A PROPÓSITO. `create`,
- * `track` y `client` ya tienen clientes de verdad usándolas: exigirles de
- * golpe una capa nueva dejaría fuera a quien tenga reCAPTCHA caído o un
- * navegador viejo, y perder un pedido real es peor que el ataque del que
- * protege. Esas se MIDEN primero (ver appcheck.js en formulario.html).
- *
- * `reniec` nace hoy. Una puerta que todavía no existe no tiene a nadie a
- * quien dejar fuera, así que nace cerrada — que es la única vez que sale
- * gratis cerrarla.
- * @param {Object} req request de Express
- * @return {Promise<boolean>} true si la prueba es válida
- */
 async function appCheckOk(req) {
   const t = req.get("X-Firebase-AppCheck") || "";
   if (!t) return false;
@@ -919,30 +549,11 @@ async function appCheckOk(req) {
     await getAppCheck().verifyToken(t);
     return true;
   } catch (e) {
-    /* No se dice por qué: a quien no pasa no se le explica cómo pasar. En
-       los registros sí queda, que es donde el dueño lo necesita. */
     console.warn("appCheck rechazado:", (e && e.message) || e);
     return false;
   }
 }
 
-/**
- * El espejo de RENIEC, para la página del cliente.
- *
- * Las cuatro capas y el porqué de cada una están en
- * `functions/reniecPublico.js`. Aquí solo está el ir y venir: leer la
- * caché, contar el día, llamar a Shalom y guardar.
- *
- * ⚠️ ESTO NO TOCA EL INTERRUPTOR DE LA PUERTA. `_porLaPuerta` apunta los
- * fallos y cierra el paso tras cinco seguidos — correcto para el panel, y
- * peligroso aquí: una racha de fallos desde la página pública dejaría al
- * dueño sin poder REGISTRAR ENVÍOS, que es lo que da de comer. La página
- * del cliente no puede apagarle el panel. Lo que acota el gasto aquí es el
- * tope diario, no el interruptor.
- * @param {Object} req request
- * @param {Object} res response
- * @return {Promise<void>}
- */
 async function handleReniec(req, res) {
   res.set("Cache-Control", "no-store");
   const no = (motivo, detalle) =>
@@ -968,9 +579,6 @@ async function handleReniec(req, res) {
     cache = (c && c.exists) ? c.data() : null;
     hoy = (d.exists && Number(d.data().consultas)) || 0;
   } catch (e) {
-    /* Si no se puede leer, se sigue como si no hubiera nada: el tope de
-       abajo y el freno por IP siguen puestos. Un formulario que se cae
-       porque Firestore tosió es peor que una consulta de más. */
     console.warn("reniec: no se pudo leer caché/contador:", e && e.message);
   }
 
@@ -988,10 +596,6 @@ async function handleReniec(req, res) {
       deCache: true});
   }
 
-  /* ⚠️ SE CUENTA ANTES DE LLAMAR, Y NO DESPUÉS DE ACERTAR. Contar solo los
-     aciertos deja el gasto sin tope el día que Shalom conteste mal a todo:
-     cada fallo sería gratis para el contador y caro para la factura. Con el
-     día caído, el cliente escribe su nombre — que es lo que hacía ayer. */
   try {
     await refDia.set({consultas: FieldValue.increment(1), dia: dia},
         {merge: true});
@@ -999,8 +603,6 @@ async function handleReniec(req, res) {
     console.warn("reniec: no se pudo contar:", e && e.message);
   }
 
-  /* UNA consulta → {ok, persona} | {ok:false, motivo} con la causa REAL
-     (ver reniecPublico.resultado: «no encontrado» solo si Shalom lo dice). */
   const intentar = async () => {
     try {
       return reniecPublico.resultado(
@@ -1012,10 +614,6 @@ async function handleReniec(req, res) {
     }
   };
   let x = await intentar();
-  /* ★ UN reintento en el servidor (30/10/2026), solo si la falla es
-     temporal (corte, 5xx, respuesta rara) y no es un «demasiadas»: lo que
-     Shalom tose un instante no debe llegarle al cliente como «no existe».
-     Se cuenta otra vez antes de llamar: el tope diario cubre también esto. */
   if (!x.ok && reniecPublico.esTemporal(x.motivo) && x.motivo !== "LIMITE") {
     await new Promise((z) => setTimeout(z, 600));
     try {
@@ -1043,16 +641,6 @@ async function handleReniec(req, res) {
   return res.json({ok: true, persona: _reniecFuera(guardar)});
 }
 
-/**
- * Lo que sale al navegador. SOLO el nombre, y campo por campo.
- *
- * Devolver el objeto guardado entero enseñaría `cuando` —cuándo se consultó
- * ese DNI por primera vez— que no le hace falta a nadie en la pantalla y le
- * diría a cualquiera si ese documento ya pasó por aquí. Lo que no se copia a
- * mano no se escapa por accidente.
- * @param {Object} p lo guardado
- * @return {Object} lo que ve el navegador
- */
 function _reniecFuera(p) {
   const o = p || {};
   return {
@@ -1063,11 +651,6 @@ function _reniecFuera(p) {
   };
 }
 
-// ── action=track ───────────────────────────────────────────────────────────
-/**
- * @param {Object} req request
- * @param {Object} res response
- */
 async function handleTrack(req, res) {
   const trackToken = (req.query.token || "").trim();
   if (!trackToken) {
@@ -1075,23 +658,12 @@ async function handleTrack(req, res) {
     return;
   }
 
-  /* ── REJA 1: LA FORMA, y antes que nada ────────────────────────────────
-     Lo que no tiene forma de token se responde aqui mismo, SIN tocar la
-     base de datos. Antes, `token=cualquiercosa` costaba una lectura de
-     Firestore: un robot recorriendo valores nos cobraba a nosotros cada
-     intento. Ahora la basura no cuesta nada.
-     De paso cierra algo que no era una fuga pero lo parecia: el token se
-     concatenaba a una ruta (`panel/shipments/items/<token>`) sin validarlo. */
   const tipo = enlace.tipoDe(trackToken);
   if (tipo === "invalido") {
     res.json({status: "not_found"});
     return;
   }
 
-  /* ── REJA 2: EL FRENO, antes de leer ───────────────────────────────────
-     Se responde 429 y no un "no encontrado": decirle a alguien que su link
-     no existe cuando lo que pasa es que hay demasiadas consultas lo manda a
-     buscar el problema donde no esta. La pagina lo traduce a palabras. */
   if (!(await checkRateLimit("formApi_track", req))) {
     res.status(429).json({
       status: "rate_limited",
@@ -1100,16 +672,11 @@ async function handleTrack(req, res) {
     return;
   }
 
-  /* ── REJA 3: BUSCAR, por el camino que toque ───────────────────────────
-     Dos formas de token conviven a proposito: hay mas de mil links ya
-     enviados por WhatsApp y tienen que seguir abriendo para siempre. */
   let snap = null;
   if (tipo === "legado") {
     snap = await db.doc(`${SHIP_COL}/${trackToken}`).get();
     if (!snap.exists) snap = null;
   } else {
-    // Igualdad sobre un campo: usa el indice automatico de Firestore, no
-    // hace falta declarar ninguno (mismo patron que la busqueda por phone).
     const q = await db.collection(SHIP_COL)
         .where("trackToken", "==", trackToken).limit(1).get();
     snap = q.empty ? null : q.docs[0];
@@ -1121,49 +688,17 @@ async function handleTrack(req, res) {
 
   const order = snap.data();
 
-  /* ⚠️ LA PUERTA TRASERA, cerrada aqui.
-     Un pedido nuevo guarda token al azar, pero su id de documento sigue
-     siendo `id_` + el reloj. Sin esta linea, ese pedido se abriria por su
-     id adivinable IGUAL QUE ANTES y el token al azar seria decoracion.
-     Los pedidos de ayer no tienen token, asi que su id les sigue valiendo. */
   if (tipo === "legado" && !enlace.aceptaLegado(order)) {
     res.json({status: "not_found"});
     return;
   }
   const code = (order.id || "").slice(-4).toUpperCase();
-  /* FINALIZADO también: es la etiqueta final de hoy (ENTREGADO es el nombre
-     viejo). Sin él, un pedido terminado se seguía consultando cada 30 s
-     mientras el cliente miraba —una lectura y una llamada cada vez— para
-     algo que ya no cambia. */
   const frozen = ["ENTREGADO", "CANCELADO", "FINALIZADO"]
       .includes(String(order.status || "").trim().toUpperCase());
 
-  /* ★ LISTA BLANCA, no lista negra.
-     Aqui se copiaba el pedido ENTERO y se borraba una lista de campos
-     prohibidos. Con ese diseño CADA CAMPO NUEVO NACE PUBLICO: nadie se
-     acuerda de añadirlo a la lista de borrados, y el fallo no se ve — el
-     dato simplemente viaja.
-
-     Paso de verdad: la clave de recojo (`shalomClave`) se añadio al pedido y
-     empezo a salir en la respuesta de este endpoint sin que nada avisara. Un
-     link de seguimiento se reenvia, se queda en un historial y no caduca; una
-     clave que viaja por ahi deja de proteger el paquete.
-
-     Es OWASP API3:2023 (Broken Object Property Level Authorization), y su
-     remedio documentado es exactamente esto: enumerar lo permitido.
-
-     Lo que el cliente ve se decide en functions/pedidoPublico.js, y hay una
-     prueba que compara esa lista con los campos que el formulario lee de
-     verdad — asi no se puede quedar corta sin que salte. */
   const safe = pedidoPublico.minimizarViejo(
       pedidoPublico.proyectar(order, {code, frozen}), order, Date.now());
 
-  // Estado de Shalom: solo se muestra al cliente si el operador activo la
-  // opcion "Mostrar en el link del cliente". Filtro MOTOR-AGNOSTICO: aplica
-  // sin importar que motor genero el dato (A o B). Si esta apagado, ocultamos
-  // el texto de tracking del link publico (el panel siempre lo ve). Solo
-  // leemos config cuando hay un estado que potencialmente ocultar.
-  // Un pedido viejo ya minimizado no lleva estado de Shalom: no se lee nada.
   if (order.trackingStatus && !safe.minimo) {
     const cfgSnap = await db.doc(CFG_DOC).get();
     const cfg = (cfgSnap.exists && cfgSnap.data().config) || {};
@@ -1175,51 +710,17 @@ async function handleTrack(req, res) {
   res.json({status: "ok", order: safe});
 }
 
-// ── Rate limit básico ──────────────────────────────────────────────────────
-// Contador por IP en Firestore — ventana de 60 s, fail-open si Firestore falla.
-// Ruta: panel/rateLimits/items/{fn_ip_window} — cubierta por rules actuales
 const RATE_LIMITS = {
   agenciasOlva: {windowMs: 60000, max: 100},
   formApi_create: {windowMs: 60000, max: 10},
-  // Consulta de cliente recurrente: 20/min alcanza de sobra para el uso real
-  // (una consulta por pedido) y hace inviable cosechar la cartera.
   formApi_client: {windowMs: 60000, max: 20},
-  /* El link de seguimiento. 120/min y NO 30, que fue mi primer numero.
-     La pagina del cliente se refresca sola cada 30 s —2 peticiones por
-     minuto por pestaña abierta— y en Peru Claro y Movistar meten miles de
-     usuarios detras de una misma IP publica (CGNAT). Un freno de 30 habria
-     bloqueado CLIENTES REALES: un autogol, peor que el problema que
-     resuelve. Con 120 caben 60 pestañas desde una misma IP, muy por encima
-     del uso real, y aun asi recorrer un solo dia de milisegundos le tomaria
-     a un raspador medio año. */
-  /* `memoria: true` desde el 30/10/2026: el freno del seguimiento costaba
-     una lectura + una escritura de Firestore EN CADA RECARGA (cada 30 s por
-     pestaña) — más caro que el seguimiento mismo. Ahora se cuenta en la
-     memoria de cada instancia: gratis. Con `maxInstances: 10` el techo real
-     es 10 × 120/min por IP, y aun así recorrer tokens de 128 bits es
-     imposible: el freno aquí solo corta la avalancha, no protege el secreto. */
   formApi_track: {windowMs: 60000, max: 120, memoria: true},
-  /* La consulta de DNI. 10/min: un cliente escribe UNO, como mucho lo
-     corrige dos veces. Mas bajo que `client` (20) porque esta cuesta dinero
-     de verdad y la otra solo una lectura. Y aun asi el freno por IP aqui es
-     la capa DEBIL —en Peru media ciudad comparte IP publica, y un bot con
-     datos moviles cambia de IP cuando quiere—: quien de verdad acota el
-     daño es el tope diario de reniecPublico.js. */
   formApi_reniec: {windowMs: 60000, max: 10},
 };
 
-/* Contadores en memoria: {clave: {w: ventana, n: cuenta}}. Se vacía al
-   cambiar de ventana para no crecer sin fin. */
 const _frenoMem = new Map();
 let _frenoMemVentana = 0;
 
-/**
- * Freno por IP en la memoria de la instancia (sin Firestore).
- * @param {string} clave nombre|ip
- * @param {number} ventana inicio de la ventana (ms)
- * @param {number} max tope por ventana
- * @return {boolean} true = permitir
- */
 function _frenoMemoria(clave, ventana, max) {
   if (ventana !== _frenoMemVentana) {
     _frenoMem.clear();
@@ -1230,13 +731,6 @@ function _frenoMemoria(clave, ventana, max) {
   return n <= max;
 }
 
-/**
- * Devuelve false si la IP superó el límite en la ventana actual.
- * Fail-open: permite la solicitud si Firestore no está disponible.
- * @param {string} name clave de RATE_LIMITS
- * @param {Object} req request de Express
- * @return {Promise<boolean>} true = permitir, false = rechazar
- */
 async function checkRateLimit(name, req) {
   const cfg = RATE_LIMITS[name];
   const forwarded = req.get("x-forwarded-for") || req.ip || "unknown";
@@ -1251,35 +745,19 @@ async function checkRateLimit(name, req) {
       const snap = await tx.get(ref);
       const count = snap.exists ? (snap.data().count || 0) : 0;
       if (count >= cfg.max) return false;
-      /* `rlExpira`: para que Firestore BORRE SOLO estos registros con una
-         política TTL (consola → Firestore → TTL, grupo `items`, campo
-         `rlExpira`). Nombre propio a propósito: ningún otro documento de un
-         grupo `items` lo tiene, así que la política no toca nada más.
-         Sin la política, el campo no hace nada y todo sigue igual. */
       tx.set(ref, {count: count + 1, windowStart: windowStart,
         rlExpira: new Date(windowStart + 3600 * 1000)}, {merge: true});
       return true;
     });
   } catch (e) {
     console.error("checkRateLimit error:", name, e);
-    return true; // fail-open: nunca bloquear por error de Firestore
+    return true;
   }
 }
 
-// ── FUNCIONES OLVA ───────────────────────────────────────────────────────
-// Mismo patron que Shalom (proxy servidor → JSON local → buscador vivo), pero
-// SIN clave: el endpoint del sitio de Olva es publico y abierto.
-// ──────────────────────────────────────────────────────────────────────────
 const OLVA_STORES_URL =
   "https://www.olvacourier.com/wp-admin/admin-ajax.php?action=get_olva_stores";
 
-/**
- * Trae el catalogo COMPLETO de agencias Olva (publico, sin clave).
- * Desenvuelve el sobre estandar de WordPress AJAX: {success, data}, donde
- * `data` puede venir como array directo o anidado en `data.data` (asi lo
- * maneja el propio script.js de Olva).
- * @return {Promise<Array>} lista de agencias crudas
- */
 async function olvaFetchAll() {
   const r = await fetch(OLVA_STORES_URL, {signal: AbortSignal.timeout(90000)});
   if (!r.ok) {
@@ -1298,8 +776,6 @@ async function olvaFetchAll() {
   return [];
 }
 
-// ── olvaListar ──────────────────────────────────────────────────────────
-// GET → listado completo de agencias Olva. Caller: agencias-extractor.js.
 exports.olvaListar = onRequest(
     {region: "us-central1", timeoutSeconds: 120, memory: "512MiB"},
     async (req, res) => {
@@ -1329,11 +805,6 @@ exports.olvaListar = onRequest(
     },
 );
 
-// ── agenciasOlva ────────────────────────────────────────────────────────
-// GET ?q=TEXTO → filtra en memoria (el endpoint de Olva no soporta busqueda
-// server-side, asi que se filtra aqui sobre el catalogo completo).
-// GET          → listado completo.
-// Caller: formulario.html — buscador publico de agencias (fallback en vivo).
 exports.agenciasOlva = onRequest(
     {region: "us-central1", timeoutSeconds: 60},
     async (req, res) => {
@@ -1356,8 +827,6 @@ exports.agenciasOlva = onRequest(
             a.nombres, a.direccion, a.department, a.province, a.district,
           ].some((f) => String(f || "").toLowerCase().includes(q)));
         }
-        // Se responde en el MISMO formato que data/agencias-olva.json: el
-        // formulario tiene un solo contrato, venga del JSON o de aqui.
         res.set("Cache-Control", "no-store");
         res.json({resultados: lista.map(normalizarOlva)});
       } catch (e) {
@@ -1383,7 +852,6 @@ exports.extraerComprobante = onRequest(
         const pedidoId = (req.query.pedidoId || "").trim();
         const urlDirecta = (req.query.url || "").trim();
 
-        // Ambos modos exigen token de Firebase Auth (solo el panel logueado).
         const authz = req.get("Authorization") || "";
         const bearer = authz.match(/^Bearer\s+(.+)$/i);
         if (!bearer) {
@@ -1397,8 +865,6 @@ exports.extraerComprobante = onRequest(
           return;
         }
 
-        // Modo prueba (?url=): solo lectura, no escribe en Firestore.
-        // Solo baja de apisale (whitelist). Ahora tambien protegido con token.
         if (!pedidoId && urlDirecta) {
           const r = await comprobante.procesarUrl(urlDirecta);
           res.status(r.ok ? 200 : 400).json(r);
@@ -1426,7 +892,6 @@ exports.extraerComprobante = onRequest(
         }
         const urlHash = comprobante.hashUrl(link);
 
-        // Idempotencia: ya procesado con mismo hash y version -> lo guardado.
         const ext = s.extraccion || {};
         if (ext.estado === "procesado" && ext.urlHash === urlHash &&
             ext.parserVersion === PV) {
@@ -1454,7 +919,6 @@ exports.extraerComprobante = onRequest(
           estado: "procesado", urlHash: urlHash, parserVersion: PV,
           procesadoEn: new Date().toISOString(),
         }};
-        // No pisar ediciones: solo escribe cotizItems si el pedido no tenia.
         const tenia = Array.isArray(s.cotizItems) && s.cotizItems.length;
         if (!tenia) write.cotizItems = cotizItems;
         await ref.set(_conMts(write), {merge: true});
@@ -1470,61 +934,9 @@ exports.extraerComprobante = onRequest(
     },
 );
 
-// ── SHALOM · retirado el 2026-09-13, se reconstruye endpoint por endpoint ───
-//
-// Aqui vivian `shalomApi` (intermediario con la API oficial) y `shalomWebhook`
-// (avisos de cambio de estado). Se retiran ENTEROS para rehacer la integracion
-// desde cero: la clave anterior quedo expuesta en capturas y se rota, y hubo
-// dos fallos de traduccion que costaron dias — `statuses.message` pisando el
-// arbol de pasos, y una demora tapando un "Entregado".
-//
-// Lo que NO se tira es lo aprendido: la forma REAL de `/track` y de
-// `/instances/status`, medida contra la API y no supuesta, sigue escrita en
-// docs/SHALOM.md junto al plan de reconstruccion. Volver a medir lo que ya
-// estaba medido seria pagar dos veces.
-//
-// Mientras tanto el panel funciona igual: `shalom.js` es la puerta unica y
-// responde DESCONECTADO, que la interfaz ya sabe mostrar ("Rastreo Shalom en
-// reconstruccion"). Ninguna pantalla se rompe.
-//
-// AL VOLVER A CONECTAR, lo que habia y hay que conservar:
-//   · La clave vive en Secret Manager, nunca en el navegador.
-//   · Tres barreras antes de hablar con Shalom: token de Firebase Auth valido,
-//     correo en la lista de administradores (la misma de firestore.rules), y
-//     lista blanca de operaciones — no un proxy ciego.
-//   · El webhook verifica la firma sobre el CUERPO CRUDO, compara en tiempo
-//     constante y deduplica con un create() atomico.
-//   · La etiqueta del pedido (`status`) no se toca nunca: informar si, decidir
-//     por el operador no.
-//   · Un envio no desanda el camino (ver docs/INVARIANTES.md, 2 bis).
-
-// ── shalomWebhook ─────────────────────────────────────────────────────────
-// LA UNICA PUERTA PUBLICA SIN AUTENTICACION DEL SISTEMA. Cualquiera en
-// internet puede llamarla; lo unico que separa un aviso de Shalom de uno
-// inventado es la firma. Por eso aqui no hay atajos y no se escribe NADA
-// antes de verificarla.
-//
-// ⚠️ ETAPA 4a: MIDE, NO TRADUCE. El webhook habla otro idioma que /track
-// ("IN_TRANSIT" en vez de "En transito") y ese mapa no esta documentado en
-// ninguna parte. Adivinarlo seria repetir el fallo que costo dias, esta vez
-// escribiendo solo y de madrugada. Asi que por ahora: verifica, descarta
-// repetidos, y ANOTA la forma y los codigos. Ningun pedido se toca.
 const WEB_DOC = "panel/webhook";
 const WEB_COL = "panel/webhook/eventos";
 
-// ⏸ APARCADO — 22 de septiembre de 2026.
-// La funcion NO se despliega: el despliegue se retiro a proposito porque
-// Shalom nunca llego a registrar la URL (su formulario devolvia "URL
-// requerida" con el campo lleno), asi que no recibia nada — pero seguia
-// siendo una puerta publica abierta en internet, y cada peticion rechazada
-// le costaba una escritura a Firestore. Cero beneficio, costo real.
-//
-// El codigo y sus pruebas se quedan intactos. Para revivirlo: poner esto en
-// true, ARREGLAR ANTES el contador de rechazos (ver docs/DEUDA.md § 24),
-// registrar la URL con `PUT /webhooks` y guardar el secreto que devuelve.
-//
-// Sin este interruptor, un `firebase deploy --only functions` volveria a
-// crear la funcion sola y la puerta reaparecia sin que nadie se enterara.
 const WEBHOOK_ACTIVO = false;
 
 const _shalomWebhook = onRequest({
@@ -1533,46 +945,33 @@ const _shalomWebhook = onRequest({
   timeoutSeconds: 30,
   memory: "256MiB",
 }, async (req, res) => {
-  // No lo llama un navegador: no hay CORS que dar.
   if (req.method !== "POST") {
     res.status(405).send("no");
     return;
   }
 
   const firma = req.get("X-Shalom-Signature") || "";
-  // req.rawBody son los bytes TAL COMO LLEGARON. Reparsear el JSON y volver a
-  // serializarlo cambia los bytes, y entonces la firma no cuadra nunca.
   const crudo = req.rawBody;
   const v = webhook.verificarFirma(
       firma, crudo, SHALOM_WEBHOOK_SECRET.value(), Date.now());
 
   if (!v.ok) {
     console.warn("webhook rechazado:", v.motivo);
-    // Se anota para poder ver si alguien esta probando la puerta. El cuerpo NO
-    // se guarda: si no esta firmado, no hay razon para creer nada de lo que
-    // trae —ni para darle sitio en la base de datos—.
     try {
       await db.doc(WEB_DOC).set({
         rechazados: FieldValue.increment(1),
         ultimoRechazo: {ts: Date.now(), motivo: v.motivo},
       }, {merge: true});
     } catch (e) {
-      // No vale fallar por no poder anotar.
     }
-    // Respuesta corta y sin detalle: decir QUE fallo ayuda a quien prueba.
     res.status(401).send("no");
     return;
   }
 
-  /* Repetidos. Shalom reintenta si no respondemos rapido, y aplicar dos veces
-     el mismo aviso duplica historiales. `create()` falla si el documento ya
-     existe, asi que la comprobacion y la marca son UNA sola operacion: entre
-     mirar y escribir no cabe un segundo intento. */
   const id = webhook.idDeEvento(firma);
   try {
     await db.doc(WEB_COL + "/" + id).create({recibido: Date.now()});
   } catch (e) {
-    // Ya estaba: es un reintento. 200 para que deje de insistir, y nada mas.
     res.status(200).send("ok");
     return;
   }
@@ -1586,9 +985,6 @@ const _shalomWebhook = onRequest({
   const codigos = webhook.codigos(cuerpo);
   try {
     await db.doc(WEB_COL + "/" + id).set({
-      // La FORMA (tipos, sin valores) y los CODIGOS (MAYUSCULAS, que nunca son
-      // un nombre ni una direccion). Con eso se mide el vocabulario sin
-      // guardar datos de nadie.
       forma: shalomPuerta.forma(cuerpo),
       codigos: codigos,
       bytes: crudo ? crudo.length : 0,
@@ -1606,33 +1002,16 @@ const _shalomWebhook = onRequest({
   res.status(200).send("ok");
 });
 
-// Solo se exporta —y por tanto solo existe en internet— si el interruptor
-// esta en true. Con false, `firebase deploy` ni la ve.
 if (WEBHOOK_ACTIVO) exports.shalomWebhook = _shalomWebhook;
 
-// ── barridoShalom ─────────────────────────────────────────────────────────
-// El seguimiento automatico. Cloud Scheduler dispara CADA 30 MINUTOS y la
-// funcion decide si le toca: asi los horarios viven en Config y se cambian sin
-// volver a desplegar. Los disparos que no tocan no consultan nada a Shalom.
-//
-// Nacio en simulacro (decidia y no escribia) hasta que el informe cuadro.
-// El 26/10/2026 el dueño lo retiro: desde entonces SIEMPRE escribe. Un
-// `config.barrido.simulacro` que quede guardado en la nube se ignora.
 const BARRIDO_DOC = "panel/barrido";
-const PAUSA_MS = 300; // entre consulta y consulta
-const TOPE_MS = 450000; // margen bajo el timeout de 540 s
-const TOPE_DETALLE = 60; // cuantas lineas guarda el informe
+const PAUSA_MS = 300;
+const TOPE_MS = 450000;
+const TOPE_DETALLE = 60;
 
-/**
- * El barrido, en una funcion: lo llaman el horario y el boton "Correr ahora".
- * Dos copias de esto acabarian barriendo distinto segun quien lo dispare.
- * @param {boolean} [forzado] true = saltarse el reloj (boton manual)
- * @return {Promise<?Object>} el informe, o null si no le tocaba
- */
 async function _correrBarrido(forzado) {
   const arranque = Date.now();
 
-  // 1 · ¿toca ahora?
   let cfg = {};
   try {
     const snap = await db.doc(CFG_DOC).get();
@@ -1642,8 +1021,6 @@ async function _correrBarrido(forzado) {
     return null;
   }
   const b = (cfg.config && cfg.config.barrido) || {};
-  // El boton manual se salta el horario, pero NO el interruptor: si el
-  // seguimiento automatico esta apagado, apagado esta.
   if (b.activo === false) return null;
   const horas = barrido.parseHoras(b.horas);
   const ahoraLocal = barrido.horaLocal(new Date());
@@ -1651,7 +1028,6 @@ async function _correrBarrido(forzado) {
 
   const modo = String(b.modo || etiquetas.MODOS.SEMI);
 
-  // 2 · a quien se consulta
   const docs = [];
   try {
     const snap = await db.collection(SHIP_COL).get();
@@ -1666,17 +1042,13 @@ async function _correrBarrido(forzado) {
   });
   const sel = barrido.aConsultar(docs, arranque);
 
-  // 3 · consultar, decidir
   const escrituras = [];
   const detalle = [];
   let consultadas = 0; let fallidas = 0; let cortado = "";
-  const memoPend = {}; // la lista de pendientes, UNA vez por corrida
-  const memoPro = {}; // el Seguimiento de Shalom Pro, UNA vez por corrida
-  let porPro = 0; // estados que salieron del Seguimiento de Shalom Pro
-  let porDejar = 0; // guías del panel que aún no entran a la agencia
-  /* Por que fallaron, no solo cuantas. "6 fallaron" no se puede accionar:
-     no distingue un corte de red de una cuota agotada ni de una clave
-     rechazada, y cada una se arregla en un sitio distinto. */
+  const memoPend = {};
+  const memoPro = {};
+  let porPro = 0;
+  let porDejar = 0;
   const motivos = {};
   for (const item of sel.consultar) {
     if (Date.now() - arranque > TOPE_MS) {
@@ -1686,13 +1058,6 @@ async function _correrBarrido(forzado) {
     const r = await _porLaPuerta("track",
         {orderNumber: item.guia, orderCode: item.codigo});
     consultadas++;
-    /* «Shalom no conoce esta guía» (situacion de registroShalom):
-         · por dejar → lo esperado: el paquete aún no está en la agencia.
-           No es un fallo; se cuenta aparte para verlo en el informe.
-         · con movimiento → Shalom ya la conocía: huele a Shalom caído, y
-           cuenta para el interruptor como un fallo del servicio. Así una
-           caída real se sigue detectando aunque llegue disfrazada. */
-    // shalom-api no pudo leerla: el estado, del Seguimiento de tu Shalom Pro
     const pro = (!r.ok && r.motivo === "SHALOM_SIN_RESPUESTA") ?
       await _seguimientoPro(item.guia, memoPro) : null;
     const sinRastro = !r.ok && r.motivo === "NO_ENCONTRADO";
@@ -1707,8 +1072,6 @@ async function _correrBarrido(forzado) {
       fallidas++;
       const m = r.motivo || "DESCONOCIDO";
       motivos[m] = (motivos[m] || 0) + 1;
-      // La puerta se cerro: seguir seria pedirle a un servicio caido 60 veces
-      // mas que nos diga que sigue caido.
       if (r.motivo === "PUERTA_CERRADA" || r.motivo === "APAGADA") {
         cortado = r.motivo;
         break;
@@ -1735,7 +1098,6 @@ async function _correrBarrido(forzado) {
     await new Promise((res) => setTimeout(res, PAUSA_MS));
   }
 
-  // 4 · escribir
   let escritas = 0;
   if (escrituras.length) {
     for (let i = 0; i < escrituras.length; i += 400) {
@@ -1751,22 +1113,16 @@ async function _correrBarrido(forzado) {
         console.error("barrido: fallo una tanda de escritura:", e);
       }
     }
-    // Que el panel se entere de que hay datos nuevos sin releerlo todo.
     try {
       await db.doc(CFG_DOC).set({ts: Date.now(), syncV: SYNC_V},
           {merge: true});
-    } catch (e) {/* el latido se encargara */}
+    } catch (e) {}
   } else {
-    /* Sin cambios: solo se anuncia que el servidor ya graba `_mts`, para
-       que «▶️ Correr ahora» active la sincronización rápida sin esperar a
-       un pedido. SIN `ts`: no hace recargar a ninguna PC. */
     try {
       await db.doc(CFG_DOC).set({syncV: SYNC_V}, {merge: true});
-    } catch (e) {/* lo anunciara el proximo pedido */}
+    } catch (e) {}
   }
 
-  // 5 · el informe. Es lo unico que se ve desde Config, asi que dice TODO:
-  //     a cuantos no se les pregunto y por que, no solo lo que cambio.
   const informe = {
     ts: Date.now(), hora: ahoraLocal, forzado: !!forzado,
     modo: modo,
@@ -1790,11 +1146,6 @@ async function _correrBarrido(forzado) {
   return informe;
 }
 
-// El horario. Cada 30 min pregunta; _correrBarrido decide si le toca.
-/* ★ LIMPIEZA DIARIA DE LÁPIDAS (Fase 8, 11/11/2026). Ver functions/limpieza.js:
-   ningún equipo usa una lápida de más de 12 h, y se borran las de más de 30
-   días. Una consulta al día que solo lee lo que va a borrar; a las 03:17 de
-   Lima, lejos de las horas del barrido y del trabajo. */
 exports.limpiezaLapidas = onSchedule({
   schedule: "17 3 * * *",
   timeZone: barrido.ZONA,
@@ -1814,17 +1165,11 @@ exports.barridoShalom = onSchedule({
   secrets: [SHALOM_API_KEY],
   timeoutSeconds: 540,
   memory: "512MiB",
-  // Un barrido perdido se recupera en el horario siguiente; uno repetido
-  // consultaria todo dos veces.
   retryCount: 0,
 }, async () => {
   await _correrBarrido(false);
 });
 
-// ── barridoAhora ──────────────────────────────────────────────────────────
-// El mismo barrido, a peticion. Sirve para ver el informe sin esperar a las
-// 19:00, y despues para forzar una actualizacion cuando hace falta.
-// Mismas barreras que la puerta: POST, token valido y correo de administrador.
 exports.barridoAhora = onRequest({
   region: "us-central1",
   secrets: [SHALOM_API_KEY],
@@ -1853,7 +1198,6 @@ exports.barridoAhora = onRequest({
     res.status(401).json({ok: false, motivo: "SIN_SESION"});
     return;
   }
-  // Misma regla que la puerta: el correo solo vale si esta verificado.
   if (!shalomPuerta.esAdminDe(tok, ADMINS)) {
     res.status(403).json({ok: false, motivo: "SIN_PERMISO"});
     return;
@@ -1872,36 +1216,7 @@ exports.barridoAhora = onRequest({
   }
 });
 
-
-// ── shalomPuerta ───────────────────────────────────────────────────────────
-// POST {op}  →  la unica via del panel hacia Shalom.
-//
-// CUATRO BARRERAS, en este orden y todas obligatorias:
-//   1. POST con token de Firebase Auth valido        → si no: SIN_SESION
-//   2. Correo en ADMINS (la misma lista que las reglas) → si no: SIN_PERMISO
-//   3. La operacion esta en la lista blanca          → si no: NO_PERMITIDO
-//   4. Recien entonces se usa la clave, del lado servidor
-//
-// Los codigos HTTP son de las BARRERAS (401/403/405). Lo que pase con Shalom
-// viaja siempre en 200 con {ok:false, motivo}: para el panel, "Shalom dijo que
-// no" no es un error de transporte, y mezclarlos fue lo que hizo que un fallo
-// de sesion se leyera como "tu plan vencio".
-//
-// Operaciones de hoy:
-//   {op:"validate"}                        → {ok, valida, limite, usado, …}
-//   {op:"esquema", de:"validate"}          → la FORMA, sin valores
-//   {op:"esquema", de:"track", datos:{…}}  → idem, para medir /track
-//
-// `track` esta en la lista pero marcado `soloMedir`: se puede medir y todavia
-// no usar. Pedirlo como operacion normal responde SIN_TRADUCTOR.
 exports.shalomPuerta = onRequest(
-    /* ⚠️ LOS TRES SECRETOS TIENEN QUE EXISTIR ANTES DE DESPLEGAR. Una
-       funcion que declara un secreto que no esta en Secret Manager NO
-       DESPLIEGA — y que falle en el deploy es exactamente donde se quiere
-       que falle, no en produccion con el dueño delante. */
-    /* Solo la clave de la API va declarada. Las credenciales de Shalom Pro
-       se leen en el momento de la peticion (ver arriba), asi que un secreto
-       que aun no existe NO rompe el despliegue. */
     {region: "us-central1", secrets: [SHALOM_API_KEY], timeoutSeconds: 120},
     async (req, res) => {
       setCORS(req, res);
@@ -1910,7 +1225,6 @@ exports.shalomPuerta = onRequest(
         return;
       }
 
-      // Las cuatro barreras viven en shalomPuerta.js para poder probarlas.
       const paso = await shalomPuerta.barreras({
         metodo: req.method,
         authorization: req.get("Authorization"),
@@ -1924,12 +1238,6 @@ exports.shalomPuerta = onRequest(
             .json({ok: false, motivo: paso.corte.motivo});
         return;
       }
-      /* ★ REGISTRAR UN ENVIO — no es un reenvio, es una orquestacion.
-         El navegador manda SOLO el id del pedido: aqui se lee de Firestore,
-         se comprueban los candados contra lo que hay AHORA, se arma el
-         cuerpo, se llama y se escribe el resultado. Asi nadie puede
-         falsificar un campo ni saltarse un candado desde la consola.
-         Arranca en SIMULACRO: se enciende desde Config, a conciencia. */
       if (paso.orquestar === "registrarEnvio" ||
           paso.orquestar === "recuperarEnvio") {
         try {
@@ -1943,8 +1251,6 @@ exports.shalomPuerta = onRequest(
               const s2 = await ref.get();
               return s2.exists ? s2.data() : null;
             },
-            // La MISMA funcion que usa el panel para avisarte antes de
-            // gastar una llamada. Dos copias divergen; una no puede.
             leerConfig: async () => registroShalom.configDe(cfgDoc),
             llamar: (c) => _porLaPuerta("register", c),
             pendientes: async () => {
@@ -1954,9 +1260,6 @@ exports.shalomPuerta = onRequest(
               return (pr && pr.ok && pr.json) || null;
             },
             guardar: (campos) => ref.set(_conMts(campos), {merge: true}),
-            /* Solo para «registrar de nuevo» tras 24 h: pregunta a Shalom
-               si la guía vieja entró a alguna agencia. Una consulta, y solo
-               cuando se pide renovar. */
             rastrear: async (guia, codigo) => {
               const rt = await _porLaPuerta("track",
                   {orderNumber: guia, orderCode: codigo || ""});
@@ -1966,9 +1269,6 @@ exports.shalomPuerta = onRequest(
               return shalomPuerta.traducir("track", rt.json);
             },
           };
-          /* `recuperarEnvio` SOLO LEE: busca el envio en pendientes y
-             rellena la guia. Nunca llama a `register`, asi que no tiene
-             simulacro ni puede costar nada. */
           const salida2 = paso.orquestar === "recuperarEnvio" ?
             await registroShalom.recuperarEnvio(paso.datos, depsReg) :
             await registroShalom.orquestar(paso.datos, depsReg,
@@ -1976,8 +1276,6 @@ exports.shalomPuerta = onRequest(
           res.status(200).json(salida2);
         } catch (e) {
           console.error("registrarEnvio:", e);
-          /* ⚠️ Un error AQUI tampoco es "fallo": si revento despues de
-             llamar a Shalom, el envio pudo crearse. Se dice duda. */
           res.status(200).json({ok: false, estado: "duda",
             motivo: "ERROR_SHALOM",
             detalle: "Algo se rompio a mitad y NO SABEMOS si el envio llego " +
@@ -1986,9 +1284,6 @@ exports.shalomPuerta = onRequest(
         return;
       }
 
-      /* ★ JALAR EL TICKET DE SHALOM. El servidor descarga, guarda en el
-         bucket y apunta en el pedido; el navegador recibe solo el enlace.
-         Ver functions/ticketShalom.js. */
       if (paso.orquestar === "jalarTicket") {
         try {
           const pid = String((paso.datos && paso.datos.pedidoId) || "").trim();
@@ -2010,7 +1305,6 @@ exports.shalomPuerta = onRequest(
             subir: _subirAlBucket,
             guardar: async (campos) => {
               await ref.set(_conMts(campos), {merge: true});
-              // Que las otras PCs se enteren, como hace el barrido.
               await db.doc(CFG_DOC).set({ts: Date.now(), syncV: SYNC_V},
                   {merge: true});
             },
@@ -2024,24 +1318,6 @@ exports.shalomPuerta = onRequest(
         return;
       }
 
-      /* ★ CONECTAR LA CUENTA DE SHALOM PRO — crear si hace falta, entrar
-         siempre, comprobar. Una sola operacion idempotente: pulsarla dos
-         veces no crea dos instancias.
-
-         Se entra SIEMPRE aunque ya figure conectada, y no es un descuido:
-         entrar por la API es lo que deja las credenciales guardadas en la
-         instancia, y eso es lo que hace que la sesion se levante sola
-         cuando expira. Sin credenciales guardadas llega el 401 que su
-         propia documentacion llama «el fallo mas repetido de esta API». */
-      /* ★ LA CUENTA DE SHALOM PRO (rehecho el 11/11/2026, ver
-         functions/cuentaShalom.js). Dos operaciones:
-           conectarShalom → {usuario?, clave?}: si llegan, van UNA vez a
-             Secret Manager (nunca vuelven); si no, se usan las guardadas.
-             Encuentra TU instancia por tu correo, la crea si no existe,
-             entra solo si hace falta y guarda en el servidor cuál es.
-           estadoShalom → ¿sigue conectada? Gratis.
-         El navegador recibe «conectada · tu correo» y nada más: ni la
-         contraseña, ni la lista de instancias de la cuenta de la API. */
       if (paso.orquestar === "conectarShalom" ||
           paso.orquestar === "estadoShalom") {
         try {
@@ -2074,7 +1350,6 @@ exports.shalomPuerta = onRequest(
               }
               return shalomPuerta.traducir("instanceStatus", r.json);
             },
-            // El registro de envíos lee la instancia de AQUÍ, no del navegador.
             guardarCuenta: (id, usuario) => db.doc(CFG_DOC).set({
               shalomInstancia: {id: id, nombre: cuentaShalom.NOMBRE,
                 usuario: usuario}}, {merge: true}),
@@ -2097,12 +1372,11 @@ exports.shalomPuerta = onRequest(
             const g = await credenciales.guardar({
               escribir: _escribirSecreto,
               auditar: (a) => db.doc(CFG_DOC).set({shalomCredenciales: {
-                usuario: a.usuario, // el correo SÍ: no es un secreto
+                usuario: a.usuario,
                 cuando: a.cuando,
                 porQuien: paso.correo || "",
               }}, {merge: true}),
             }, {usuario: d.usuario, clave: d.clave});
-            // Sin `clave` en la respuesta, ni aquí ni en el error.
             if (!g || !g.ok) {
               res.status(200).json(g || {ok: false, motivo: "ERROR_SHALOM"});
               return;
@@ -2137,11 +1411,8 @@ exports.shalomPuerta = onRequest(
       const destino = paso.destino;
       const diagnostico = paso.diagnostico;
 
-      // 4 · el interruptor y la llamada, por el camino unico.
       try {
         const r = await _porLaPuerta(destino, paso.datos, diagnostico);
-        /* shalom-api no pudo leer la guía (su buscador público es
-           rechazado): el estado sale del Seguimiento de TU Shalom Pro. */
         if (!r.ok && destino === "track" && !diagnostico &&
             r.motivo === "SHALOM_SIN_RESPUESTA") {
           const pro = await _seguimientoPro(paso.datos &&
@@ -2151,9 +1422,6 @@ exports.shalomPuerta = onRequest(
             return;
           }
         }
-        /* «No la conozco» en /track: ¿es un envío PENDIENTE de tu cuenta?
-           Entonces existe y solo falta dejar el paquete: se dice con
-           certeza (PENDIENTE), no como «revisa la guía». */
         if (!r.ok && destino === "track" && !diagnostico &&
             r.motivo === "NO_ENCONTRADO") {
           const g = paso.datos && paso.datos.orderNumber;
@@ -2174,8 +1442,6 @@ exports.shalomPuerta = onRequest(
           return;
         }
         if (diagnostico) {
-          // Solo tipos, ni un valor: asi se escribe el contrato contra lo que
-          // la API devuelve de verdad sin que salga un dato de nadie.
           res.status(200).json({ok: true, de: destino,
             forma: shalomPuerta.forma(r.json)});
           return;

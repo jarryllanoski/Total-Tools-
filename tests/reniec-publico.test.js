@@ -261,7 +261,7 @@ module.exports = async ({bloque, ok}) => {
     const fn = form.slice(i, i + 3000);
     ok(/_dniOficial=''/.test(fn),
        'y al cambiar el DNI se olvida lo oficial del anterior');
-    ok(/_dniOficial=comp;\s*\n\s*_callar\(\);/.test(fn) && /_dniMarca\(\);\s+\/\/ había un nombre/.test(fn),
+    ok(/_dniOficial=comp;\s*\n\s*_callar\(\);/.test(fn) && /_dniMarca\(\);/.test(fn),
        'cuando sale bien, el aviso bajo el DNI se CALLA y habla la marca: ' +
        'el recuadro verde con el nombre dentro ya no existe');
   }

@@ -135,7 +135,7 @@ module.exports = async ({bloque, ok}) => {
     const copiados = [];
     const win = {MontoPedido: M, copyPhone: (t) => copiados.push(t)};
     const src = 'function _esc(s){ return String(s||\'\').replace(/&/g,\'&amp;\').replace(/</g,\'&lt;\').replace(/>/g,\'&gt;\'); }' +
-      E.trozo('tracking.js', 'function _destinoStack(){', '/* ══════════════════════════════════════════════\n   CSS');
+      E.trozo('tracking.js', 'function _destinoStack(){', 'function _injectCSS() {');
     // eslint-disable-next-line no-new-func
     const api = new Function('document', 'window',
         src + ';return {_tiraDestino, _desplegarMazo, _destinoStack, _quitarTira};',

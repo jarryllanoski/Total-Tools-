@@ -769,3 +769,13 @@ justo en el equipo más lento, que es donde menos se prueba.
 | `DEUDA.md` | Los fallos conocidos y su estado |
 | `PLAN-SEGURIDAD.md` | Auditoría de seguridad y producción |
 | `plan-tracking-atomico.md` | Diseño del escritor atómico de tracking |
+
+## Fase 3 (12/11/2026): código sin comentarios
+
+El código va sin comentarios ni emojis. El porqué de cada decisión vive en
+`docs/` (este archivo, SHALOM.md, INVARIANTES.md) y en `docs/notas-del-codigo.md`,
+que guarda los comentarios que había, con su archivo y línea. Solo quedan las
+directivas `/* global */` que pide ESLint y el aviso de licencia de Lucide.
+En `functions/`, `require-jsdoc` y `valid-jsdoc` están apagadas, y un `catch`
+vacío es válido. Los emojis de los textos de la interfaz se muestran como
+iconos (panel/pantalla/iconos.js).

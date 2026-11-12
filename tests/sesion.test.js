@@ -364,7 +364,7 @@ module.exports = async ({bloque, ok}) => {
 
     const idx = E.leer('index.html');
     const puerta = idx.slice(idx.indexOf('async function _authHeaders('),
-        idx.indexOf('// ── REST helpers'));
+        idx.indexOf('async function fsGet(path){'));
     ok(/headers\['Authorization'\] = 'Bearer ' \+ tok;/.test(puerta),
        'la cabecera se pone SIEMPRE, no dentro de un "si hay token"');
     ok(/throw/.test(puerta),

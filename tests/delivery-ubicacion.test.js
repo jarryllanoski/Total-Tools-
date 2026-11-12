@@ -87,7 +87,7 @@ module.exports = async ({bloque, ok}) => {
     ok(calle.calle === 'Avenida Primavera' && calle.numero === false, 'calle sin número');
     ok(D({address: {road: 'Av. Los Álamos', house_number: '123'}}).numero === true, 'calle con número');
     ok(D(null).calle === '' && D({}).zona === '', 'respuesta vacía no revienta');
-    const sg = trozo('function _dlvSugerirDireccion(', '/* ── EL mapa de delivery');
+    const sg = trozo('function _dlvSugerirDireccion(', 'var _dlvMarca=null, _dlvCirculo=null, _dlvModoAct=\'mirar\';');
     ok(/var mio = !!ta\.value\.trim\(\) && ta\.value!==_dlvTextoAuto;\n    if\(mio\) return;/.test(sg),
        '⚠️ lo escrito por el cliente manda; el texto que puso el punto sí se actualiza');
     ok(/ta\.value=_dlvTextoAuto=_dlvTextoDe\(x\);/.test(sg), 'con punto, la dirección se llena sola');
@@ -115,12 +115,12 @@ module.exports = async ({bloque, ok}) => {
 
   {
     ok(/<div id="dlvPrev" class="dlv-prev" style="display:none"><\/div>/.test(form), '⚠️ tocar el mapa NO abre el ajuste');
-    const ml = trozo('function _dlvMapaListo(', '/* MIRAR:');
+    const ml = trozo('function _dlvMapaListo(', 'function _dlvPintar(salta){');
     ok(/dragging:!_dlvTactil\(\), touchZoom:true/.test(ml), 'mirar: PC con mouse, celular con dos dedos');
     ok(/_mapaDosDedos\(_dlvMapa, \$\('dlvDedos'\)\)/.test(ml), 'aviso «Usa dos dedos» (compartido con sedes)');
-    const pin = trozo('function _dlvPintar(', '/* Cambiar de modo');
+    const pin = trozo('function _dlvPintar(', 'function _dlvModo(modo){');
     ok(/_dlvMarca=L\.marker\(c,\{icon:_agIcono\(true, salta\), interactive:false/.test(pin), 'el pin está en el punto y no se toca');
-    const md = trozo('function _dlvModo(', '/* «◎ Volver');
+    const md = trozo('function _dlvModo(', 'function _dlvVolverVisible(){');
     ok(/if\(aj \|\| !_dlvTactil\(\)\) _dlvMapa\.dragging\.enable\(\); else _dlvMapa\.dragging\.disable\(\);/.test(md),
        'ajustar: se arrastra con un dedo; al volver a mirar, en celular otra vez dos dedos');
     ok(/_dlvMarcasVisibles\(!aj\);/.test(md) && /if\(_dlvCirculo\) _dlvCirculo\.setStyle\(/.test(form),
@@ -134,7 +134,7 @@ module.exports = async ({bloque, ok}) => {
     ok(/onclick="dlvVolver\(\)">◎ Volver a mi punto/.test(form), '«Volver a mi punto» si la vista se alejó');
     const aj = trozo('function dlvAjustar(', 'function dlvAjusteCerrar(');
     ok(/hay\?\[_gpsLat,_gpsLon\]:_DLV_LIMA/.test(aj), 'sin punto previo, el ajuste empieza en Lima');
-    const okf = trozo('function dlvAjusteOk(', '/* ★ ENLACE DE MAPA');
+    const okf = trozo('function dlvAjusteOk(', 'var EnlaceMapa = {');
     ok(/var c=m\.getCenter\(\);/.test(okf) && /_dlvPunto\(c\.lat, c\.lng, \{confirmado:true, salta:true\}\)/.test(okf), 'Entregar aquí: el centro (donde está el pin)');
     ok(/✓ Entregar aquí/.test(form), 'el botón dice lo que gana el cliente');
     const es = trozo('function _dlvEstado(', 'function dlvConfirmar(');

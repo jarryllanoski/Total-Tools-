@@ -1,48 +1,10 @@
-/**
- * panel/shalom/ticket.js — jalar el ticket de Shalom
- * Fase 7 (11/11/2026): movido de la raíz a su capa, sin cambiar una línea.
- */
-/**
- * ticket.js — Jalar ticket de Shalom (PNG) v1
- * ============================================
- * Pide el ticket por la puerta única (shalom.js) con orderNumber + orderCode
- * y lo coloca en el slot GUÍA / TICKET (agencia) del formulario.
- *
- *   orderNumber = trackingOrderNumber / shalomGuia   (campo fShalomGuia)
- *   orderCode   = trackingOrderCode   / shalomCodigo (campo fShalomCodigo)
- *
- * Persistencia (reutiliza el mecanismo de storage.js):
- *   - Pedido EXISTENTE → sube el PNG directo a Firebase Storage (URL https://… persistente)
- *   - Pedido NUEVO     → guarda base64 temporal; storage.js lo migra a Storage al guardar
- *
- * Reglas respetadas:
- *   - SIN MutationObserver (parchea openForm como hace qrtracking.js)
- *   - Archivo independiente: solo agregar <script src="ticket.js"></script> en index.html
- *   - No rompe funcionalidades existentes
- *
- * Orden de carga: DESPUÉS de delivery.js (openForm / refreshSlot / _docs / _editId)
- *                 y DESPUÉS de storage.js (window.StorageModule).
- *
- * ESTADO (2026-10-28): CONECTADO. El servidor descarga el ticket, lo guarda
- * en Storage y lo apunta en el pedido (functions/ticketShalom.js). Aquí solo
- * se pide y se pinta el enlace que vuelve: el navegador no toca el archivo.
- */
 (function (global) {
   'use strict';
 
-  /* Sin CONFIG de red: quién habla con Shalom es shalom.js, la puerta única.
-     Aquí vivía una URL a shalom-api.lat con una ranura para la API key en el
-     navegador ("solo pruebas"). Una ranura así no es una prueba: es la clave
-     del negocio a un descuido de estar en el código que se publica. Y el
-     proxy al que apuntaba la otra rama (`shalomTicket`) ni siquiera existía
-     en el backend, así que ese camino llevaba meses muerto. */
-
-  /* ── HELPERS ─────────────────────────────────────────────────────── */
   function _toast(msg) {
     if (typeof global.toast === 'function') global.toast(msg);
   }
 
-  /* Leer guía + código del formulario, con fallback al pedido en edición */
   function _getOrderData() {
     var g = '', c = '';
     var elG = document.getElementById('fShalomGuia');
@@ -61,7 +23,6 @@
     return { orderNumber: String(g).trim(), orderCode: String(c).trim() };
   }
 
-  /* ── API PÚBLICA ─────────────────────────────────────────────────── */
   var TicketModule = {};
 
   TicketModule.jalar = async function () {
@@ -71,13 +32,11 @@
       return;
     }
 
-    // El servidor guarda el ticket EN el pedido: hace falta que exista.
     var id = (typeof _editId !== 'undefined') ? _editId : null;
     if (!id) { _toast('⚠️ Guarda el pedido primero y luego jala el ticket'); return; }
     if (!global.Shalom || typeof global.Shalom.ticket !== 'function') {
       _toast('⚠️ Recarga la página (falta shalom.js)'); return;
     }
-    // Reemplazar un documento que ya está es una decisión: se pregunta.
     var actual = (typeof _docs !== 'undefined' && _docs) ? _docs.guia : null;
     if (actual && actual.d && typeof global.confirm === 'function' &&
         !global.confirm('Este pedido ya tiene una Guía / Ticket. ¿Reemplazarla por el ticket de Shalom?')) {
@@ -92,8 +51,6 @@
         _toast(TicketModule.textoMotivo(rt));
         return;
       }
-      // Ya está guardado en la nube. Se refleja en el formulario y en el
-      // pedido en memoria (si cierras sin guardar, el ticket sigue ahí).
       if (typeof _docs !== 'undefined' && _docs) _docs.guia = rt.doc;
       if (typeof global.refreshSlot === 'function') global.refreshSlot('guia');
       var s = global.S && global.S.shipments &&
@@ -108,11 +65,9 @@
     }
   };
 
-  /* Qué decir de cada motivo: honesto, nunca mudo. */
   TicketModule.textoMotivo = function (rt) {
     var m = rt && rt.motivo;
     if (m === 'SIN_DATO') return '⚠️ Revisa la guía y el código (guía de 8 o 9 dígitos)';
-    // POR_DEJAR / VENCIDA: la regla única (RegistroShalom.situacion), en el servidor.
     if (m === 'POR_DEJAR') return '📦 El comprobante sale cuando dejes el paquete en la agencia — después jálalo aquí';
     if (m === 'VENCIDA') return '⏰ Esta guía venció sin dejar el paquete — regístrala de nuevo';
     if (m === 'NO_ENCONTRADO') return '⚠️ Shalom aún no tiene el comprobante de esa guía — sale cuando el paquete entra a la agencia; si ya lo dejaste, revisa número y código';
@@ -125,17 +80,14 @@
     if (m === 'PETICION_INVALIDA') return '⚠️ Shalom rechazó la petición del ticket. Avísame con una foto de este mensaje' + (rt && rt.detalle ? ': ' + String(rt.detalle).slice(0, 120) : '');
     if (m === 'LIMITE') return '⏳ Cuota de Shalom agotada — intenta más tarde';
     if (m === 'PUERTA_CERRADA' || m === 'APAGADA') return '🚪 La puerta a Shalom está cerrada (Config)';
-    // Con el detalle (qué llegó: tipo y forma, sin datos del cliente) para
-    // poder adaptarlo sin adivinar. Mándame foto de este mensaje.
     if (m === 'FORMATO_DESCONOCIDO') return '⚠️ Shalom no devolvió un ticket reconocible' + (rt && rt.detalle ? ' — ' + String(rt.detalle).slice(0, 220) : '');
     return '⚠️ No se pudo jalar el ticket' + (rt && rt.detalle ? ': ' + rt.detalle : '');
   };
 
-  /* ── INYECTAR BOTÓN EN EL SLOT GUÍA / TICKET (agencia) ───────────── */
   function _injectBtn() {
     var addBtn = document.getElementById('addBtnGuia');
-    if (!addBtn) return;                               // slot guía aún no existe
-    if (document.getElementById('btnJalarTicket')) return; // ya inyectado
+    if (!addBtn) return;
+    if (document.getElementById('btnJalarTicket')) return;
 
     var b = document.createElement('button');
     b.id          = 'btnJalarTicket';
@@ -147,17 +99,15 @@
       'background:rgba(163,113,247,.15);border:1px solid rgba(163,113,247,.35);color:#a371f7;';
     b.onclick = function () { TicketModule.jalar(); };
 
-    // Insertar justo después del botón "+ Agregar" del slot guía / ticket
     addBtn.parentNode.insertBefore(b, addBtn.nextSibling);
   }
 
-  /* Parchear openForm para asegurar el botón cada vez que se abre (sin MutationObserver) */
   function _patchOpenForm() {
     if (typeof global.openForm !== 'function') return false;
     var _orig = global.openForm;
     global.openForm = function () {
       var ret = _orig.apply(this, arguments);
-      setTimeout(_injectBtn, 30); // el form ya está renderizado
+      setTimeout(_injectBtn, 30);
       return ret;
     };
     return true;
@@ -167,7 +117,7 @@
     var attempts = 0;
     function tryPatch() {
       var ok = _patchOpenForm();
-      _injectBtn(); // por si el slot ya está en el DOM
+      _injectBtn();
       if (!ok && attempts < 30) {
         attempts++;
         setTimeout(tryPatch, 200);

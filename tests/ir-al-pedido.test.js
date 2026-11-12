@@ -33,7 +33,7 @@ const E = require('./_entorno.js');
 
 module.exports = async ({bloque, ok}) => {
   const html = E.leer('index.html');
-  const sinCom = html.replace(/\/\*[\s\S]*?\*\//g, '');
+  const sinCom = html;
 
   bloque('⚠️ La marca se DIBUJA con la tarjeta, no se pega encima');
 

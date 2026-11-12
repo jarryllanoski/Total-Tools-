@@ -1,40 +1,12 @@
-/**
- * panel/datos/respaldo.js — respaldo y restauración
- * Fase 7 (11/11/2026): movido de la raíz a su capa, sin cambiar una línea.
- */
-/**
- * respaldo.js — Módulo de Respaldo y Restauración para Total Tools
- *
- * OBJETIVO: respaldar y restaurar TODO el estado de la app (S) en un archivo
- * JSON, para poder reconstruir el sistema exactamente como estaba.
- *
- * DEPENDENCIAS (globales que ya existen en index.html):
- *   - window.S        → el estado completo de la app
- *   - window.save     → persiste S en localStorage + Firebase
- *   - window.render / window.renderChips → refrescan la UI
- *   - window.toast    → notificación visual (opcional)
- *   - lsGet / lsSet   → acceso a localStorage (opcional, para fecha último respaldo)
- *
- * NO MODIFICA NADA EXISTENTE. Se auto-registra como window.Respaldo.
- * Para desactivar: quitar <script src="respaldo.js"> del index.html
- *
- * Última actualización: 2026-06
- */
 (function(){
   'use strict';
 
-  // Espacio de nombres global (declarado al inicio para poder colgar métodos)
   var Respaldo = {};
   window.Respaldo = Respaldo;
 
-  /* Formato 2 desde el 24/10/2026: añade `recursos`, `agenciaOrigen` y
-     `shalomInstancia`. Los respaldos de formato 1 —los que ya hay
-     descargados— se siguen aceptando: les faltan esos campos y la
-     restauración los deja como están, no los vacía. */
   var FORMATO_VERSION = 2;
-  var LS_LAST_BACKUP  = 'tt_last_backup'; // fecha del último respaldo descargado
+  var LS_LAST_BACKUP  = 'tt_last_backup';
 
-  /* ── Utilidades ──────────────────────────────────────────────────── */
   function _toast(msg){ if(typeof window.toast==='function') window.toast(msg); }
 
   function _lsGet(k){
@@ -55,9 +27,6 @@
     } catch(e){ return '—'; }
   }
 
-  /* ── Construir el objeto de respaldo desde S ─────────────────────── */
-  // Toma una "foto" completa del estado. Clona profundo para no enlazar
-  // referencias con el S vivo.
   function _construirRespaldo(){
     var S = window.S || {};
     var snapshot = {
@@ -78,30 +47,18 @@
       config:        S.config        || {},
       statusPin:     S.statusPin     || '1234',
       trash:         S.trash         || [],
-      /* ★ LO QUE FALTABA, y faltaba sin que nadie lo supiera. El documento de
-         configuración tiene 13 campos y el respaldo guardaba 9: los recursos
-         —tus enlaces a Drive— y la agencia de origen no estaban. El día que
-         hiciera falta, el respaldo no los habría devuelto. */
       recursos:      Array.isArray(S.recursos) ? S.recursos : [],
       agenciaOrigen: S.agenciaOrigen || null,
-      /* Se GUARDA para que quede constancia de qué cuenta se usaba, pero la
-         restauración NO la aplica: ver `_aplicarRestauracion`.
-         `shalomRegistroSimulacro` no se guarda en absoluto: es un interruptor
-         de seguridad, no un dato del negocio. */
       shalomInstancia: S.shalomInstancia || null
     };
-    // Clon profundo para desligar del estado vivo
     return JSON.parse(JSON.stringify(snapshot));
   }
 
-  /* ── Validar integridad de un respaldo antes de restaurar ────────── */
-  // Devuelve {ok:true} o {ok:false, motivo:'...'}
   function _validar(data){
     if(!data || typeof data !== 'object')        return {ok:false, motivo:'El archivo no es un respaldo válido.'};
     if(!data._meta || data._meta.app!=='Total Tools')
       return {ok:false, motivo:'El archivo no es un respaldo de Total Tools.'};
     if(!Array.isArray(data.shipments))           return {ok:false, motivo:'El respaldo no contiene la lista de pedidos.'};
-    // Validar que cada pedido tenga al menos un id (estructura mínima)
     for(var i=0;i<data.shipments.length;i++){
       if(!data.shipments[i] || typeof data.shipments[i]!=='object')
         return {ok:false, motivo:'Hay pedidos con formato inválido en el respaldo.'};
@@ -111,7 +68,6 @@
     return {ok:true};
   }
 
-  /* ── 1. CREAR + DESCARGAR respaldo ───────────────────────────────── */
   Respaldo.crearYDescargar = function(){
     try {
       var snapshot = _construirRespaldo();
@@ -126,7 +82,6 @@
       a.click();
       document.body.removeChild(a);
       setTimeout(function(){ URL.revokeObjectURL(url); }, 1000);
-      // Recordar fecha del último respaldo
       _lsSet(LS_LAST_BACKUP, String(Date.now()));
       _toast('🛡️ Respaldo descargado ('+snapshot.shipments.length+' pedidos)');
       _refrescarFecha();
@@ -136,20 +91,9 @@
     }
   };
 
-  /* ── 2. RESTAURAR respaldo desde archivo ─────────────────────────── */
-  // Lee el archivo, valida, pide confirmación, crea respaldo de seguridad
-  // del estado actual, y aplica.
   Respaldo.restaurarDesdeArchivo = function(input){
     var file = input && input.files && input.files[0];
     if(!file){ return; }
-    /* ⚠️ NO SE RESTAURA ANTES DE QUE LA NUBE CONTESTE.
-       Antes de sincronizar, `save()` queda en espera —eso está bien, es la
-       guarda de la configuración—; pero cuando la nube llega, `_mergeRemote`
-       reemplaza TODO con lo de la nube, y lo restaurado desaparece. Ni los
-       pedidos se salvan: restaurar marca «subir todo», y el rescate del merge
-       solo conserva los pedidos marcados uno a uno.
-       Lo peor no era perderlo: era que el aviso ya había dicho «✅ Respaldo
-       restaurado». Así que se espera, y se dice por qué. */
     if(!window._nubeLista){
       _toast('⏳ Espera a que sincronice con la nube y vuelve a intentarlo');
       input.value = '';
@@ -164,33 +108,29 @@
       var v = _validar(data);
       if(!v.ok){ _toast('⚠️ '+v.motivo); input.value=''; return; }
 
-      // Confirmación antes de restaurar (paso destructivo)
       var resumen = (data.shipments?data.shipments.length:0)+' pedidos · '+
                     (data._meta&&data._meta.fechaLegible?data._meta.fechaLegible:'fecha desconocida');
       _pedirConfirmacion(resumen, function(){
         _aplicarRestauracion(data);
       });
-      input.value=''; // permitir volver a elegir el mismo archivo
+      input.value='';
     };
     reader.onerror = function(){ _toast('⚠️ No se pudo leer el archivo'); input.value=''; };
     reader.readAsText(file);
   };
 
-  /* ── Aplicar la restauración (tras confirmar) ────────────────────── */
   function _aplicarRestauracion(data){
     try {
-      // 5. Respaldo automático de seguridad del estado ACTUAL antes de pisar
       try {
         var seguridad = _construirRespaldo();
         _lsSet('tt_backup_pre_restore', JSON.stringify(seguridad));
-      } catch(e){ /* si falla el de seguridad, igual seguimos pero avisamos */ 
+      } catch(e){ 
         console.warn('[Respaldo] No se pudo crear respaldo de seguridad:', e);
       }
 
       var S = window.S;
       if(!S){ _toast('⚠️ Estado no disponible'); return; }
 
-      // Restaurar cada sección (manteniendo relaciones tal cual estaban)
       S.shipments     = Array.isArray(data.shipments)     ? data.shipments     : [];
       S.suppliers     = Array.isArray(data.suppliers)     ? data.suppliers     : [];
       S.couriers      = Array.isArray(data.couriers)      ? data.couriers      : [];
@@ -203,12 +143,6 @@
       S.statusPin     = data.statusPin || '1234';
       S.trash         = Array.isArray(data.trash)         ? data.trash         : [];
 
-      /* ★ LOS CAMPOS NUEVOS, SOLO SI EL RESPALDO LOS TRAE.
-         Un respaldo de formato 1 no tiene `recursos`. Si aquí se hiciera
-         `S.recursos = data.recursos || []`, restaurar uno de esos —de los que
-         ya hay descargados— BORRARÍA los recursos actuales. «No existe» no es
-         lo mismo que «está vacío»: lo que el respaldo no trae se deja como
-         está; lo que trae vacío, se vacía. Es la misma bisagra que el DNI. */
       if(Object.prototype.hasOwnProperty.call(data, 'recursos')){
         S.recursos = Array.isArray(data.recursos) ? data.recursos : [];
       }
@@ -216,25 +150,15 @@
         S.agenciaOrigen = (data.agenciaOrigen && typeof data.agenciaOrigen === 'object')
           ? data.agenciaOrigen : null;
       }
-      /* ⚠️ Y NUNCA LA CUENTA DE SHALOM NI EL SIMULACRO.
-         · La cuenta ya se murió dos veces (3/10 y 11/10). Restaurar un
-           respaldo de hace un mes pondría un id que ya no existe encima del
-           que funciona, y el registro fallaría sin explicación. Se recupera
-           sola pulsando «Conectar».
-         · El simulacro es un interruptor de seguridad. Con él apagado,
-           registrar un envío COBRA. Un respaldo viejo no puede tener poder
-           para apagarlo. */
       var _cuentaDistinta = !!(data.shalomInstancia && data.shalomInstancia.id &&
         (!S.shalomInstancia || S.shalomInstancia.id !== data.shalomInstancia.id));
 
       window.S = S;
 
-      // Persistir (sube a Firebase como cambio completo) y refrescar UI
-      if(typeof window.save==='function') window.save(); // sin id → guardado completo
+      if(typeof window.save==='function') window.save();
       if(typeof window.render==='function') window.render();
       if(typeof window.renderChips==='function') window.renderChips();
 
-      // Cerrar overlay si está abierto
       _cerrarOverlay();
       _toast('✅ Respaldo restaurado ('+S.shipments.length+' pedidos)' +
         (_cuentaDistinta ? ' · la cuenta de Shalom no se cambió: si hace falta, pulsa Conectar en Config' : ''));
@@ -244,9 +168,7 @@
     }
   }
 
-  /* ── 6. Confirmación visual antes de restaurar ───────────────────── */
   function _pedirConfirmacion(resumen, onConfirm){
-    // Reutiliza el overlay genérico delOverlay si existe; si no, crea uno propio.
     var ov = document.getElementById('delOverlay');
     if(ov){
       var sheet = ov.querySelector('.sheet');
@@ -269,7 +191,6 @@
         return;
       }
     }
-    // Fallback: confirm nativo
     if(window.confirm('¿Restaurar el respaldo?\n\n'+resumen+'\n\nEsto reemplaza todos los datos actuales.')){
       onConfirm();
     }
@@ -282,7 +203,6 @@
     if(ex) ex.classList.remove('open');
   }
 
-  /* ── 4. Mostrar fecha del último respaldo en la UI ───────────────── */
   function _refrescarFecha(){
     var el = document.getElementById('respLastBackup');
     if(el){
@@ -290,11 +210,8 @@
       el.textContent = ts ? ('Último respaldo: '+_fechaLegible(ts)) : 'Aún no has creado un respaldo';
     }
   }
-  // Exponer para que index pueda refrescar al abrir el modal
   Respaldo.refrescarFecha = _refrescarFecha;
 
-  /* ── Restaurar el respaldo de seguridad pre-restauración ─────────── */
-  // Por si el usuario restaura algo equivocado y quiere volver atrás.
   Respaldo.deshacerUltimaRestauracion = function(){
     var raw = _lsGet('tt_backup_pre_restore');
     if(!raw){ _toast('No hay respaldo de seguridad disponible'); return; }
@@ -306,7 +223,6 @@
     } catch(e){ _toast('⚠️ El respaldo de seguridad está dañado'); }
   };
 
-  // Refrescar la fecha al cargar (si el elemento ya existe)
   if(document.readyState!=='complete'){
     document.addEventListener('DOMContentLoaded', _refrescarFecha);
   } else {

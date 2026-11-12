@@ -20,7 +20,7 @@
 const E = require('./_entorno.js');
 
 const REINTENTO = E.trozo('index.html', 'async function _fbSaveWithRetry(data, attempt){',
-    '// Sin modo offline');
+    'window._fbStatus = (status) => {');
 
 function montar(op) {
   op = op || {};
@@ -132,12 +132,12 @@ module.exports = async ({bloque, ok}) => {
     ok(/const _PANTALLAS_NUBE = \['configurar', 'recursos'\]/.test(src),
        'las dos pantallas que escriben en la configuracion estan vetadas');
     const gp = src.slice(src.indexOf('function goPage(id){'),
-        src.indexOf('/* OVERLAYS */'));
+        src.indexOf('function openOverlay(id){$(id).classList.add(\'open\');}'));
     ok(/_pintarEsperaNube\(\)/.test(gp),
        'el velo se decide al entrar a CUALQUIER pantalla: un solo punto, no ' +
        'una guarda en cada una de las cuarenta funciones que escriben');
     const lib = src.slice(src.indexOf('function _liberarPantallasNube'),
-        src.indexOf('/* TABS */'));
+        src.indexOf('function goPage(id){'));
     ok(/loadCfgUI\(\)/.test(lib) && /recRender\(\)/.test(lib),
        '⚠️ y al llegar la nube se REPINTAN: sin esto, Config seguia ' +
        'mostrando las 8 etiquetas fijas del arranque — lo del 21/10');
@@ -154,7 +154,7 @@ module.exports = async ({bloque, ok}) => {
        'entran datos — carga inicial, latido y recarga tras registrar');
     const init = src.slice(src.indexOf('const _initFirebase'),
         src.indexOf('const _initFirebase') + 3000);
-    ok(/CONFIRMÓ que está vacía[\s\S]{0,200}window\._nubeLista = true/.test(init),
+    ok(/\} else \{\s*window\._nubeLista = true;\s*_avisar\('tt:nube-lista'\);\s*const tieneLocal/.test(init),
        'y la nube confirmada VACIA tambien cuenta: es el primer arranque ' +
        'real, el unico en que subir lo local es correcto');
     const cat = init.slice(init.indexOf('} catch(e) {'));

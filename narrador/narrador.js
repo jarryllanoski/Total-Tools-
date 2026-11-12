@@ -1,33 +1,20 @@
-/* ═══════════════════════════════════════════════════════════════════
-   NARRADOR — Heavy (formulario) + Delfi (seguimiento)
-   Capa de presentación OPCIONAL. No toca la lógica del formulario:
-   solo observa el DOM (#app) y muestra a los personajes con globos.
-   · 0 llamadas nuevas a la nube (lee datos ya presentes en el DOM)
-   · Carga diferida, imágenes lazy, animaciones CSS (sin GSAP)
-   · Se auto-desactiva en conexión lenta / ahorro de datos
-   · Si algo falla, el formulario sigue funcionando igual
-   ═══════════════════════════════════════════════════════════════════ */
 (function(){
   'use strict';
 
-  // ── 0. Solo corre en la página del formulario/seguimiento ──────────
   var app = document.getElementById('app');
   if(!app) return;
 
-  // ── 1. Conexión lenta / ahorro de datos → no activar ───────────────
   try{
     var c = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
     if(c && (c.saveData || /(^|-)2g$/.test(c.effectiveType||''))) return;
   }catch(e){}
 
   var BASE = (function(){
-    // carpeta donde vive este script (para las imágenes)
     var s = document.currentScript;
     if(s && s.src) return s.src.replace(/[^/]*$/,'');
     return 'narrador/';
   })();
 
-  // ── 2. Diálogos ────────────────────────────────────────────────────
   var esc = function(t){ return String(t==null?'':t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); };
 
   var HEAVY = {
@@ -43,10 +30,6 @@
       retiro:'Retiro en tienda confirmado. Te avisamos cuando esté listo para recoger. 🏪'
     },
     place:{
-      // El narrador CONFIRMA, no repite: al elegir la sede la dirección ya está
-      // en pantalla tres veces (etiqueta viva, buscador e insignia de agencia).
-      // Volcarla aquí no aportaba nada y el globo tapaba el botón Continuar.
-      // Texto fijo, igual que `delivery` — mismo criterio para los dos.
       agencia:'Ubicación confirmada. Nuestros operadores ya conocen el destino.',
       delivery:'Dirección confirmada. Llevaremos tu herramienta hasta tu puerta.',
       encomienda:function(ci){ return 'Ciudad destino confirmada'+(ci?': '+ci:'')+'. Listo para el envío.'; }
@@ -61,19 +44,12 @@
     welcome:'¡Hola! 👋 Soy Delfi, jefe de logística. Desde ahora te acompaño hasta que recibas tu pedido.',
     s0:'Tu pedido llegó bien y ya está registrado. 📋 Comenzamos a trabajarlo.',
     s1:'Los especialistas están alistando y protegiendo tu herramienta para que llegue en excelentes condiciones. 📦',
-    /* ENVIADO según el tipo de envío. Antes decía a todos «sigo el recorrido
-       en tiempo real», y eso solo es verdad en Shalom: un delivery o una
-       otra agencia no tienen rastreo en vivo. */
     s2:'¡Ya salió de nuestra tienda! 🚚 Tu pedido viaja hacia la agencia de destino.',
     s2_shalom:'¡Ya salió de nuestra tienda! 🚚 Tu pedido viaja con Shalom; mira su recorrido en el bloque de Shalom.',
-    /* Ya en Shalom (11/11/2026). Sin estos, Delfi se callaba: la etiqueta
-       del panel ya no se muestra cuando el envío está en Shalom. */
     s_shalom_registrado:'Tu envío ya está registrado en Shalom. 📦 En cuanto lo reciban en la agencia, aquí verás cada avance.',
     s_shalom_origen:'¡Tu pedido ya está en Shalom! 📦 Lo recibieron en la agencia de salida y pronto viaja hacia tu ciudad.',
     s2_delivery:'¡Ya salió! 🛵 Nuestro motorizado lleva tu pedido hacia tu dirección.',
     s2_encomienda:function(ci){ return 'Dejamos tu pedido en la agencia; ya viaja'+(ci?' a '+ci:'')+'. 📦'; },
-    /* Retiro en tienda: ALISTADO ya significa «pasa a recoger». La dirección
-       es la de Config (campo «Ciudad»), publicada en data-tienda-dir. */
     s_retiro_listo:function(dir){ return '¡Tu pedido ya está listo! 🏪 Ya puedes pasar a recogerlo a nuestra tienda'+(dir?' en '+dir:'')+'. Trae tu DNI.'; },
     s3_agencia:function(a,dir){ return '¡Tu pedido llegó a la agencia'+(a?' '+a:'')+'! Acércate con tu DNI'+(dir?' a '+dir:'')+' para recogerlo. 🏢'; },
     s3_delivery:'Nuestro motorizado está llegando a tu dirección. 🛵 Ten tu DNI a la mano y revisa tu herramienta al recibirla.',
@@ -83,12 +59,7 @@
     notfound:'No encuentro tu pedido con ese código. Escríbenos y lo revisamos enseguida. 💬'
   };
 
-  // ── 3. Estilos (inyectados una vez) ────────────────────────────────
   var css = ''
-  // Sin reserva de espacio abajo. Antes se empujaba el contenido 120 px para que
-  // el narrador no tapara los botones, pero eso dejaba un hueco muerto que se
-  // podía seguir deslizando después del personaje. El globo es fijo y se colapsa
-  // solo, así que no hace falta empujar nada: el contenido termina donde termina.
   + '#tt-narr{position:fixed;left:10px;right:10px;bottom:10px;z-index:9000;display:flex;align-items:flex-end;gap:10px;pointer-events:none;max-width:560px;margin:0 auto;font-family:inherit;opacity:0;transform:translateY(16px);transition:opacity .4s ease,transform .4s ease}'
   + '#tt-narr.on{opacity:1;transform:none}'
   + '@media(prefers-reduced-motion:reduce){#tt-narr{transition:none}}'
@@ -106,7 +77,6 @@
   + '#tt-narr.min .av{width:52px;height:60px}'
   + '#tt-narr .tag{position:absolute;left:0;bottom:-2px;background:#5b9bff;color:#04122c;font-size:8px;font-weight:800;padding:1px 4px;border-radius:5px;pointer-events:none}';
 
-  // ── 4. UI ──────────────────────────────────────────────────────────
   var wrap, imgEl, whoEl, txEl, cur=null, minimized=false, hideTimer=0;
   function build(){
     if(wrap) return;
@@ -116,7 +86,7 @@
       +'<div class="bub"><button class="x" aria-label="cerrar">×</button><span class="who"></span><span class="tx"></span></div>';
     document.body.appendChild(wrap);
     imgEl=wrap.querySelector('img'); whoEl=wrap.querySelector('.who'); txEl=wrap.querySelector('.tx');
-    imgEl.onerror=function(){ wrap.querySelector('.av').style.display='none'; }; // fallback: solo texto
+    imgEl.onerror=function(){ wrap.querySelector('.av').style.display='none'; };
     wrap.querySelector('.av').addEventListener('click',function(){ minimized=!minimized; wrap.classList.toggle('min',minimized); if(!minimized) clearTimeout(hideTimer); });
     wrap.querySelector('.x').addEventListener('click',function(){ hide(); minimized=true; wrap.classList.add('min'); });
   }
@@ -130,17 +100,14 @@
     txEl.innerHTML = esc(text);
     minimized=false; wrap.classList.remove('min');
     requestAnimationFrame(function(){ wrap.classList.add('on'); });
-    // Auto-colapso a avatar de esquina tras unos segundos (no bloquea el botón)
     clearTimeout(hideTimer);
     hideTimer=setTimeout(function(){ minimized=true; wrap.classList.add('min'); }, 6500);
   }
   function hide(){ if(wrap) wrap.classList.remove('on'); }
 
-  // ── 5. Lectura del DOM (sin tocar la lógica) ───────────────────────
   function txt(sel,root){ var e=(root||app).querySelector(sel); return e?(e.textContent||'').trim():''; }
   function has(sel,root){ return !!(root||app).querySelector(sel); }
 
-  // Lee el valor de una fila del tracking por su etiqueta
   function rowVal(label){
     var rows=app.querySelectorAll('.tk-row'), re=new RegExp(label,'i');
     for(var i=0;i<rows.length;i++){
@@ -149,38 +116,23 @@
     }
     return '';
   }
-  // Tipo de envío deducido del DOM visible (funciona en form Y en tracking)
   function tipoEnvio(){
-    // Seguimiento: la página publica el tipo con la MISMA regla que el
-    // formulario (data-tipo). Deducirlo de las filas fallaba: un pedido
-    // Shalom con fila «DNI destinatario» pasaba por «otra agencia».
     var card = app.querySelector('.track-card[data-tipo]');
     if(card){ var dt=card.getAttribute('data-tipo'); if(/^(agencia|encomienda|retiro|delivery)$/.test(dt)) return dt; }
-    // Formulario
     if(has('#f_ciudad')||has('#f_dni_dest')) return 'encomienda';
     if(has('#shalomSelTxt')||has('#f_dni_recoger')) return 'agencia';
-    // Tracking (filas del resultado)
     if(/RETIRO|TIENDA/i.test(rowVal('Courier'))) return 'retiro';
     if(rowVal('Ciudad destino')||rowVal('DNI destinatario')) return 'encomienda';
     if(rowVal('DNI para recoger')||rowVal('Agencia')) return 'agencia';
     return 'delivery';
   }
   function agenciaSel(){
-    // Una agencia es un NOMBRE, no una dirección. No caemos a la fila
-    // "Dirección" (dirección completa de destino) porque se colaba entera en el
-    // mensaje de Delfi ("llegó a la agencia <dirección de 8 líneas>"). Si no hay
-    // nombre de agencia real, se devuelve '' y s3_agencia queda corto y limpio.
     return txt('#shalomSelTxt') || txt('.sel-badge span') || rowVal('Agencia') || '';
   }
-  // Courier del FORMULARIO: el select #f_courier está vacío hasta que el cliente
-  // elige. Los campos existen ocultos, así que el tipo se deduce por sección
-  // VISIBLE. Antes de elegir devuelve '' para no tapar la bienvenida.
   function vis(el){ return !!(el && el.offsetParent!==null); }
   function formCourier(){
     var sel=document.getElementById('f_courier');
-    if(!sel || !sel.value) return '';   // aún no elige → la bienvenida se queda
-    // El formulario publica el tipo autoritativo (robusto aunque el paso esté
-    // oculto en el asistente). Si no está, se deduce por lo visible.
+    if(!sel || !sel.value) return '';
     if(window._selCourierType) return window._selCourierType;
     if(/RETIRO|TIENDA/i.test(sel.value)) return 'retiro';
     if(vis(document.getElementById('f_ciudad'))||vis(document.getElementById('f_dni_dest'))) return 'encomienda';
@@ -188,11 +140,8 @@
     return 'delivery';
   }
 
-  // Etapa de tracking a partir del texto de estado
   function estadoATexto(){
-    // status-badge muestra el estado; lo mapeo a las 5 etapas reales
     var badge = txt('.status-badge').toUpperCase();
-    /* Ya en Shalom: no hay etiqueta del panel; manda la etapa de Shalom. */
     if(!badge){
       var cs = app.querySelector('.track-card[data-en-shalom]');
       if(!cs) return null;
@@ -208,11 +157,6 @@
     else if(/POR ALISTAR/.test(badge))     base={st:1};
     else if(/ALISTADO/.test(badge))        base={st:1, alistado:true};
     else base={st:0};
-    // Seguimiento Shalom: renderTrackResult publica la etapa real de Shalom en
-    // data-shalom-st SOLO cuando va más adelantada que la etiqueta interna
-    // (modo observación). Delfi la lee y narra el estado real, reusando la fase
-    // ya calculada (sin duplicar lógica). Al coincidir/activar etiqueta, el
-    // atributo no se emite y Delfi vuelve a leer el badge.
     var card = app.querySelector('.track-card[data-shalom-st]');
     if(card){
       var ss = parseInt(card.getAttribute('data-shalom-st'), 10);
@@ -221,14 +165,13 @@
     return base;
   }
 
-  // ── 6. Lógica del FORMULARIO (Heavy) ───────────────────────────────
   var heavySeen={};
   function heavyWelcomeOnce(){
     if(heavySeen.w) return; heavySeen.w=1; say('heavy',HEAVY.welcome);
   }
   var deb;
   function onFormInput(e){
-    if(!has('#f_name')) return; // solo si el form está visible
+    if(!has('#f_name')) return;
     clearTimeout(deb);
     deb=setTimeout(function(){
       var id=(e&&e.target&&e.target.id)||'';
@@ -246,14 +189,11 @@
   }
   document.addEventListener('input', onFormInput, true);
 
-  // Courier / agencia / fecha detectados por observación del DOM
   function heavyScanForm(){
     if(!has('#f_name')) return;
     heavyWelcomeOnce();
     var t=formCourier();
     if(t && heavySeen.courier!==t){ heavySeen.courier=t; if(HEAVY.courier[t]) say('heavy',HEAVY.courier[t]); }
-    // `ag` se sigue usando para DISPARAR (solo cuando ya se eligió la sede) y
-    // como clave ANTI-REPETICIÓN. Lo único que cambia es que ya no se imprime.
     var ag=agenciaSel();
     if(ag && heavySeen.ag!==ag){
       heavySeen.ag=ag;
@@ -261,21 +201,15 @@
     }
   }
 
-  // ── 7. Detección de pantallas ──────────────────────────────────────
-  // Tracking tiene .track-card/.status-badge; la pantalla de éxito tiene
-  // el contenedor .success (marcador robusto, independiente del texto).
   function isTracking(){ return has('.track-card')||has('.status-badge'); }
   function isNotFound(){ return /link no disponible|no encuentro tu pedido/i.test(app.textContent||''); }
   function isSuccess(){ return has('.success')||has('.tt-confirmed'); }
 
-  // ── 8. Lógica del SEGUIMIENTO (Delfi) ──────────────────────────────
   function tiendaDir(){
     var c=app.querySelector('.track-card[data-tienda-dir]');
     return c ? (c.getAttribute('data-tienda-dir')||'').trim() : '';
   }
   function esShalom(){ return /SHALOM/i.test(rowVal('Courier')); }
-  /* Qué dice Delfi: etapa × tipo de envío. Pura (sin DOM) y expuesta para
-     las pruebas. ⚠️ Nunca menciona la clave de recojo. */
   function mensajeDelfi(e, t, d){
     d = d || {};
     if(e.registrado) return DELFI.s_shalom_registrado;
@@ -312,21 +246,18 @@
     }));
   }
 
-  // ── 9. Observador central: reacciona a cada cambio de pantalla ─────
   var scanT;
   function scan(){
     clearTimeout(scanT);
     scanT=setTimeout(function(){
       try{
-        // Tracking PRIMERO: si el pedido ya está en seguimiento, manda Delfi.
         if(isTracking()||isNotFound()){ delfiScan(); return; }
         if(isSuccess()){ if(!heavySeen.bye){ heavySeen.bye=1; say('heavy',HEAVY.bye); } return; }
         if(has('#f_name')){ heavyScanForm(); return; }
-      }catch(err){ /* nunca romper el formulario */ }
+      }catch(err){  }
     },180);
   }
   try{ new MutationObserver(scan).observe(app,{childList:true,subtree:true,characterData:true}); }catch(e){}
-  // primer escaneo tras cargar
   if(document.readyState!=='loading') scan(); else document.addEventListener('DOMContentLoaded',scan);
   window.addEventListener('load',scan);
 

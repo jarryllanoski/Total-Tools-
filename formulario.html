@@ -3,11 +3,6 @@
 <head>
 <meta charset="UTF-8">
 <script>
-/* ★ LOS LINKS DE SEGUIMIENTO VIVEN EN seguimiento.html (10/11/2026).
-   Hay miles de `formulario.html?seg=…` enviados por WhatsApp: tienen que
-   seguir abriendo para siempre. Se redirigen AQUÍ, antes de descargar nada
-   del formulario. `replace` no deja esta página en el historial (el botón
-   «atrás» no rebota). */
 (function(){ try{
   if(new URLSearchParams(location.search).has('seg'))
     location.replace('seguimiento.html' + location.search + location.hash);
@@ -16,54 +11,35 @@
 <link rel="icon" href="icono.svg" type="image/svg+xml">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Formulario de Pedido</title>
-<link rel="stylesheet" href="cliente/cliente.css?v=2">
-<!-- ★ APP CHECK EN LA PÁGINA DEL CLIENTE — 15/10/2026.
-     Hasta hoy solo lo cargaba el panel. Esta página llama a `formApi`, que
-     crea pedidos y consulta datos, y cualquiera podía llamarla con `curl`:
-     el token decía QUIÉN eres (aquí nadie, es pública) pero nada decía DESDE
-     DÓNDE. App Check lo dice: la petición viene de esta página de verdad.
-
-     ⚠️ EN OBSERVACIÓN, NO EN BLOQUEO. El servidor todavía NO rechaza a quien
-     no lo manda. Ponerlo a bloquear de golpe dejaría fuera a un cliente con
-     un navegador raro o con reCAPTCHA caído, y perder un pedido de verdad es
-     peor que el ataque del que protege. Se mide primero.
-     Lo NUEVO sí nacerá bloqueado: una puerta que todavía no existe no tiene
-     clientes a los que dejar fuera. Ver `action=reniec`.
-
-     `appcheck.js` falla en silencio por diseño: sin red o sin reCAPTCHA
-     devuelve '' y el formulario sigue funcionando igual que sin este archivo. -->
-<!-- La primera consulta (configuración) va a este servidor: abrir la
-     conexión mientras carga la página ahorra el saludo TLS (cientos de ms
-     en datos móviles). -->
+<link rel="stylesheet" href="cliente/cliente.css?v=3">
 <link rel="preconnect" href="https://us-central1-total-tools-24ce8.cloudfunctions.net" crossorigin>
-<script src="firebase-config.js?v=4"></script>
-<script src="appcheck.js?v=3"></script>
-<script src="functions/agencias.js?v=1"></script>
-<script src="functions/dniPedido.js?v=1"></script>
-<script src="functions/codigoSeguimiento.js?v=1"></script>
+<script src="firebase-config.js?v=5"></script>
+<script src="appcheck.js?v=4"></script>
+<script src="functions/agencias.js?v=2"></script>
+<script src="functions/dniPedido.js?v=2"></script>
+<script src="functions/codigoSeguimiento.js?v=2"></script>
 </head>
 <body>
-<script src="narrador/loader.js?v=2"></script>
+<script src="narrador/loader.js?v=3"></script>
 <div class="container" id="app">
   <div class="loading-screen"><div class="spin"></div><div class="spin-lbl">Cargando...</div></div>
 </div>
 
-<!-- Lo que el formulario comparte con el seguimiento (Fase 2). -->
-<script src="cliente/comun.js?v=2"></script>
-<script src="cliente/form-base.js?v=1"></script>
-<script src="cliente/form-datos.js?v=1"></script>
-<script src="cliente/form-courier.js?v=1"></script>
-<script src="cliente/form-delivery.js?v=1"></script>
-<script src="cliente/form-fecha.js?v=1"></script>
-<script src="cliente/form-enviar.js?v=2"></script>
-<script src="cliente/form-agencias.js?v=2"></script>
-<script src="cliente/form-ubicacion.js?v=1"></script>
-<script src="cliente/form-sedes-mapa.js?v=1"></script>
-<script src="cliente/form-asistente.js?v=1"></script>
-<script src="cliente/form-arranque.js?v=1"></script>
-<script defer src="narrador/etiqueta.js?v=11"></script>
-<script defer src="narrador/narrador.js?v=6"></script>
-<script defer src="narrador/toby.js?v=1"></script>
-<script defer src="panel/pantalla/iconos.js?v=1"></script>
+<script src="cliente/comun.js?v=3"></script>
+<script src="cliente/form-base.js?v=2"></script>
+<script src="cliente/form-datos.js?v=2"></script>
+<script src="cliente/form-courier.js?v=2"></script>
+<script src="cliente/form-delivery.js?v=2"></script>
+<script src="cliente/form-fecha.js?v=2"></script>
+<script src="cliente/form-enviar.js?v=3"></script>
+<script src="cliente/form-agencias.js?v=3"></script>
+<script src="cliente/form-ubicacion.js?v=2"></script>
+<script src="cliente/form-sedes-mapa.js?v=2"></script>
+<script src="cliente/form-asistente.js?v=2"></script>
+<script src="cliente/form-arranque.js?v=2"></script>
+<script defer src="narrador/etiqueta.js?v=12"></script>
+<script defer src="narrador/narrador.js?v=7"></script>
+<script defer src="narrador/toby.js?v=2"></script>
+<script defer src="panel/pantalla/iconos.js?v=2"></script>
 </body>
 </html>

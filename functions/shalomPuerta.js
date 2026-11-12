@@ -1,279 +1,61 @@
 "use strict";
 
-/**
- * functions/shalomPuerta.js — la puerta única a la API de Shalom
- * ===============================================================
- * Se reconstruye endpoint por endpoint. Hoy solo sabe hacer UNA cosa:
- * `GET /validate`. Cada operación entra aquí cuando su forma real está
- * medida contra la API y traducida con pruebas — no antes.
- *
- * POR QUÉ UNA LISTA BLANCA Y NO UN PROXY
- * Un proxy ciego dejaría que cualquiera con sesión ejecutara `DELETE
- * /instances` o `POST /instances/logout` desde la consola del navegador, y
- * eso borra la sesión persistida y mata el auto-login. Solo se puede pedir
- * lo que está en PERMITIDAS, y ahí no hay nada destructivo.
- *
- * POR QUÉ LA CLAVE NO SALE DE AQUÍ
- * Vive en Secret Manager y solo la ve el servidor. Además, todo texto que
- * sale hacia el navegador pasa por `sanear()`: si algún día un mensaje de
- * error de Shalom devolviera la clave, no llega al cliente.
- *
- * Este archivo es lógica pura + una función de red. Se puede `require` desde
- * las pruebas sin levantar nada.
- */
-
-
-// Qué significa un estado de Shalom: la MISMA regla en todos lados.
 const shalomEstado = require("./shalomEstado");
 
 const BASE = "https://api.shalom-api.lat";
 const TIEMPO_MAX_MS = 20000;
-// Hasta dónde baja el diagnóstico. Con 4 se cortaba justo donde hacía falta:
-// `statuses.data.entregado.cliente` salía como "objeto" a secas, y ahí es
-// donde vive quién recibió el paquete. Describir tipos no pesa nada; quedarse
-// corto obliga a otra ronda de despliegue y medición.
 const PROF_MAX = 8;
 
-/**
- * Lo único que se puede pedir. Añadir una entrada aquí es una decisión
- * consciente: implica que su respuesta ya se midió y se tradujo.
- */
 const PERMITIDAS = {
   validate: {metodo: "GET", ruta: "/validate"},
-  // `soloMedir` = se puede consultar con `esquema` pero NO usar todavía: su
-  // respuesta aún no está traducida. Pedirla como operación normal responde
-  // SIN_TRADUCTOR en vez de devolver algo a medio entender. Es el estado
-  // intermedio de cada endpoint: medible antes que conectado.
   track: {metodo: "POST", ruta: "/track"},
-  /* La sesión de Shalom Pro. Se abre en `soloMedir` a propósito: la
-     documentación de esta API y la realidad ya se contradijeron seis veces
-     (ver docs/SHALOM-API.md), así que primero se mira la forma con `esquema`
-     y recién después se escribe el traductor.
-     Va el GET y no el `POST /instances/status` porque el POST exige un
-     `instanceId` que el panel no tiene guardado en ninguna parte, mientras
-     que el GET no pide nada Y DEVUELVE ESE ID — que es además la llave que
-     van a necesitar el ticket y el registro de envíos. No gasta cuota y no
-     puede crear ni borrar nada. */
-  /* ⚠️ `soloServidor` desde el 11/11/2026: la cuenta de la API tiene
-     instancias de otros negocios, y esta lista (con sus correos) llegaba
-     al navegador. Ahora solo la lee el servidor (functions/cuentaShalom.js)
-     y el panel recibe «conectada · tu correo». */
   instances: {metodo: "GET", ruta: "/instances", soloServidor: true},
-  /* El catálogo de agencias. Va la variante PÚBLICA a propósito: devuelve la
-     misma estructura que `/agencies` y NO CONSUME CUOTA, así que refrescar el
-     catálogo sale gratis. `publico` hace que la puerta no mande la clave: una
-     credencial no viaja donde no hace falta.
-     Sigue pasando por aquí y no por el navegador porque su API responde
-     `access-control-allow-origin: https://shalom-api.lat` — medido el
-     22/09/2026 —, así que un fetch desde el panel lo bloquearía CORS.
-     En `soloMedir` hasta medir su forma: la doc dice 552 agencias con 48
-     campos, y la doc de esta API ya se equivocó siete veces. */
   agencies: {metodo: "GET", ruta: "/public/agencies", publico: true},
-  /* RENIEC. Es lo que convierte el registro de envios en algo que no hay que
-     adivinar: `POST /account/register` pide el nombre PARTIDO en nombres,
-     apellido paterno y apellido materno, y partir "JARLYN LLANOS ARTEAGA" a
-     ojo se equivoca con cualquier nombre compuesto. RENIEC ya los da
-     separados.
-
-     ⚠️ EL DNI VA EN LA RUTA, y eso no es un detalle. Un parametro de ruta NO
-     se puede escapar: un "../" ahi no ensucia un valor, CAMBIA EL ENDPOINT al
-     que llamas — `/account/dni/../../instances` seria otra cosa. Por eso
-     `rutaParam` no codifica: EXIGE la forma, y si no cuadra la peticion no
-     sale. La forma es la que documenta su API: 8 digitos, ni uno mas. */
   dni: {metodo: "GET", ruta: "/account/dni/{dni}",
     rutaParam: {dni: /^[0-9]{8}$/}},
-  /* El estado de UNA instancia. Lo que aporta sobre el `GET /instances` que
-     ya tenemos es la `url`: donde quedo parado el navegador headless de
-     Shalom. Si termina en `/login`, se deslogueo — eso es un diagnostico de
-     verdad, no un booleano. Pide el `instanceId` y NADA MAS. */
   instanceStatus: {metodo: "POST", ruta: "/instances/status",
     soloServidor: true, cuerpoCampos: ["instanceId"]},
-  /* ⚠️ EL LOGIN, Y POR QUE SU LISTA DE CAMPOS ESTA VACIA.
-     `POST /instances/login` pide usuario y contraseña de Shalom Pro. El
-     cuerpo de una operacion llega DEL NAVEGADOR (`paso.datos` en
-     functions/index.js), asi que sin esta reja existiria el camino "la
-     contraseña de Jarry viaja por el panel" — aunque hoy nadie lo usara. Y
-     los caminos que existen se acaban usando.
-
-     Con `cuerpoCampos: []` el navegador NO PUEDE mandar nada. Las
-     credenciales las pondra el servidor desde Secret Manager, igual que la
-     clave de la API: nunca tocan el navegador, ni Firestore, ni el respaldo.
-
-     En soloMedir: con cuerpo vacio su API devuelve la forma del error, que
-     es medio contrato gratis — el mismo truco que con `register`. */
-  /* ⚠️ `soloServidor`, NO `soloMedir`. Antes esto era un hueco medido con
-     `cuerpoCampos: []` para que el navegador no pudiera mandar la
-     contraseña. Ahora se usa de verdad, y la reja cambia de forma: el
-     cuerpo lleva los tres campos, pero `soloServidor` hace que la barrera
-     corte la operacion ANTES de mirar nada — el navegador no puede
-     llamarla, ni para medirla. Solo la llama la orquestacion
-     `conectarShalom`, que pone usuario y clave desde Secret Manager.
-
-     Si estuviera aqui como las demas, `{op:"instanceLogin", datos:{…}}`
-     desde la consola dejaria entrar con CUALQUIER credencial. */
   instanceLogin: {metodo: "POST", ruta: "/instances/login",
     soloServidor: true,
     cuerpoCampos: ["instanceId", "username", "password"]},
-  /* ⚠️ CREAR UNA INSTANCIA, y por que tambien es `soloServidor`.
-     Hasta el 3/10/2026 el plan permitia UNA, y crear otra daba 403: el
-     limite nos protegia. Ahora permite 900 y el 403 ya no llega.
-
-     El `name` va en `cuerpoCampos` pero lo pone el SERVIDOR, no tu: con
-     `soloServidor` el navegador no alcanza esta operacion, asi que nadie
-     puede crear una instancia con el nombre que le apetezca desde la
-     consola. Y la orquestacion solo crea si no habia ninguna. */
   instanceCrear: {metodo: "POST", ruta: "/instances",
     soloServidor: true, cuerpoCampos: ["name"]},
-  /* ⚠️ `register` — SOLO EL SERVIDOR, Y NI SIQUIERA SE PUEDE MEDIR.
-     `POST /account/register` CREA UN ENVIO DE VERDAD: se paga, Shalom no
-     tiene endpoint para anularlo y no hay clave de idempotencia.
-
-     Si estuviera aquí como las demás, bastaría con
-     `{op:"esquema", de:"register", datos:{…cuerpo completo…}}` desde la
-     consola del navegador para crear un envío — "medir" lo habría
-     registrado. Y medir tiene que ser gratis SIEMPRE: es la regla sobre la
-     que se construyó toda esta integración.
-
-     Por eso `soloServidor`: la barrera lo corta antes incluso de mirar si
-     es diagnóstico. Lo llama únicamente la orquestación, que lee el pedido
-     de Firestore y arma el cuerpo ella misma — así el navegador no puede
-     falsificar ni un campo.
-
-     La forma del ERROR ya está medida y salió gratis: `medir-registro.js`
-     lo llama con cuerpo vacío y Shalom responde 400 {error, message}. */
   register: {metodo: "POST", ruta: "/account/register", soloServidor: true,
     cuerpoCampos: ["instanceId", "origen", "destino", "documento", "name",
       "firstname", "lastname", "phone", "content", "cantidad", "clave",
       "declaracion_jurada"]},
-  /* Los envios pendientes. Solo LEE, no crea nada, y es la pieza que hace
-     posible el candado de la duda: tras una respuesta dudosa se consulta
-     aqui para saber si el envio llego a crearse, en vez de reintentar.
-     Su forma esta medida (01/10/2026) y llega como OBJETO {"0":…,"1":…},
-     no como array. Va en soloServidor porque solo la orquestacion la usa. */
   pendientes: {metodo: "POST", ruta: "/account/pending-shipments",
     soloServidor: true, cuerpoCampos: ["instanceId"]},
-  /* ★ EL SEGUIMIENTO DE TU SHALOM PRO (medido el 12/11/2026). /track busca
-     en el rastreo PÚBLICO de Shalom, y ese buscador rechaza a shalom-api con
-     algunas guías («Shalom buscar API returned status 403»). Esta lista usa
-     TU sesión de Shalom Pro y trae el `status` de cada envío en camino: es
-     el respaldo (deSeguimientoPro). Solo LEE. Los parámetros del
-     querystring van en `consulta`, con su forma exacta. */
   trackingList: {metodo: "GET", ruta: "/account/tracking-list",
     soloServidor: true,
     consulta: {instanceId: /^[A-Za-z0-9-]{1,64}$/, page: /^[0-9]{1,3}$/}},
-  /* ⚠️ LO QUE NO ESTA, Y ES UNA DECISION:
-
-     · `POST /instances/logout` — su doc dice "borra la sesion Y LAS
-       CREDENCIALES GUARDADAS -> se acaba el auto-login", y dos lineas antes,
-       sobre el 401 por sesion caida: "ese es el fallo mas repetido de esta
-       API". Un boton cuyo unico efecto es recrear el fallo mas comun tiene
-       valor negativo.
-
-     · `POST /instances` (crear) — el boton se llamaria "Obtener instancia" y
-       eso suena a crear, pero ya hay UNA y su `id` sale del `GET /instances`
-       que ya esta traducido. Crear otra devuelve 403 por limite. */
 };
 
-/**
- * Operaciones que NO son un reenvío a Shalom, sino una orquestación del
- * servidor: leer el pedido de Firestore, decidir con `registroShalom.js`,
- * llamar, y escribir el resultado. El navegador manda SOLO el id del
- * pedido — no puede falsificar el cuerpo ni saltarse un candado.
- */
-/* ⚠️ `conectarShalom` ES LA UNICA DE ESTA LISTA QUE PUEDE RECIBIR UN SECRETO
-   DEL NAVEGADOR, y por eso conviene leer esto antes de tocarla:
-
-     · Es WRITE-ONLY. No existe su pareja de lectura, ni aqui ni en
-       PERMITIDAS. Lo que entra no se puede volver a sacar por la puerta.
-     · Lo que guarda va a Secret Manager, NO a Firestore. Firestore se
-       sincroniza al navegador; Secret Manager no sale del servidor.
-     · La respuesta NUNCA devuelve la clave, ni enmascarada. Devolver
-       `****` ya seria confirmar su longitud.
-     · La auditoria registra quien y cuando. El valor no. */
 const ORQUESTADAS = {registrarEnvio: true, recuperarEnvio: true,
   conectarShalom: true, estadoShalom: true, jalarTicket: true};
 
-/**
- * Quita de un texto cualquier cosa con forma de clave antes de devolverlo.
- * @param {*} texto texto de origen (puede no ser string)
- * @return {string} texto saneado y recortado
- */
 function sanear(texto) {
   return String(texto === null || texto === undefined ? "" : texto)
       .replace(/sk_[A-Za-z0-9_-]{6,}/g, "sk_***")
       .slice(0, 300);
 }
 
-/**
- * Traduce el código HTTP de Shalom al vocabulario del panel.
- * Los motivos del lado de Shalom van aparte de los del panel a propósito:
- * mezclarlos manda a revisar la cuenta cuando el problema es la sesión.
- * @param {number} status código HTTP
- * @param {string} [texto] cuerpo crudo, para distinguir 403 que se parecen
- * @return {string} motivo del contrato
- */
 function motivoDeHttp(status, texto) {
-  /* ⚠️ «SHALOM BUSCAR API RETURNED STATUS 403» ES UNA FALLA DE SHALOM-API,
-     NO UNA GUÍA DESCONOCIDA (medido el 11/11/2026). La guía 103379262 se
-     veía «En origen» en shalom.com.pe y a la misma hora su /track daba 500
-     con ese texto; las guías que ya tenían guardadas respondían 200. Es su
-     consulta EN VIVO a Shalom la que es rechazada: falla con guías nuevas.
-     · No es NO_ENCONTRADO: eso mandaba a «revisa número y código».
-     · No es ERROR_SHALOM: no cuenta para el interruptor, porque las guías
-       guardadas siguen respondiendo y pausar la puerta las dejaría sin
-       consultar a todas. Los horarios lo vuelven a intentar solos. */
   if (/buscar[\s\S]*returned status 40[34]/i.test(String(texto || ""))) {
     return "SHALOM_SIN_RESPUESTA";
   }
-  /* ⚠️ UN 403 QUE HABLA DE INSTANCIA NO ES UNA CLAVE BLOQUEADA.
-     Medido el 01/10/2026 con un `instanceId` inventado: Shalom responde
-     403 "Invalid API Key or instance access". Traducirlo a BLOQUEADO hace
-     que el panel diga "tu clave de API no sirve" cuando la clave esta
-     perfecta y lo malo es el id — o sea, manda a revisar el sitio
-     equivocado, que es el fallo que este proyecto persigue.
-     Solo el 403: un 401 si es de credenciales y no se toca. */
   if (status === 403 && /instance/i.test(String(texto || ""))) {
     return "SIN_INSTANCIA_VALIDA";
   }
   if (status === 401 || status === 403) return "BLOQUEADO";
   if (status === 429) return "LIMITE";
   if (status === 404) return "NO_ENCONTRADO";
-  /* ⚠️ UN 400 ES NUESTRA PETICIÓN, NO SHALOM CAÍDO (28/10/2026).
-     Shalom respondió 400 «querystring must have required property
-     'instanceId'» al pedir el ticket. Ese 400 se traducía a ERROR_SHALOM,
-     que el interruptor cuenta como servicio caído: cinco intentos del
-     botón y la puerta se CERRÓ para todo, también el seguimiento. Un 400 o
-     un 422 dicen que el pedido está mal armado: se arregla aquí, no
-     esperando a que Shalom «vuelva». No cuenta para el interruptor. */
   if (status === 400 || status === 422) return "PETICION_INVALIDA";
   return "ERROR_SHALOM";
 }
 
-/**
- * La FORMA de un valor, sin un solo valor dentro. Es la herramienta de
- * diagnóstico: deja escribir el contrato contra lo que la API devuelve de
- * verdad sin que ningún dato de un cliente salga del servidor.
- * @param {*} v valor a describir
- * @param {number} [prof] profundidad actual
- * @return {*} descripción de tipos
- */
-/* Solo dígitos y separadores, empezando por un dígito. Un nombre nunca entra
-   (tiene letras); una fecha o un monto, sí. */
 const _SOLO_NUMEROS = /^[0-9][0-9\-/: .TZ+]*$/;
 
-/**
- * El tipo de un texto — y si parece una fecha o un número, TAMBIÉN su forma,
- * con los dígitos tapados: "2026-08-19 16:10" sale como "####-##-## ##:##".
- *
- * Hace falta: el formato de fecha decide si se puede ordenar y mostrar bien, y
- * no está documentado. Sin esto habría que pedir un valor real — o sea, un
- * dato de un cliente pasando por el chat.
- *
- * Solo se destapa la forma de lo que es puro número: cualquier texto con
- * letras (un nombre, una dirección) sale como "string" a secas.
- * @param {string} s texto
- * @return {string} descripción
- */
 function _formaTexto(s) {
   if (s.length <= 40 && _SOLO_NUMEROS.test(s)) {
     return "string(" + s.replace(/[0-9]/g, "#") + ")";
@@ -281,14 +63,6 @@ function _formaTexto(s) {
   return "string";
 }
 
-/**
- * La FORMA de un valor, sin un solo valor dentro. Es la herramienta de
- * diagnóstico: deja escribir el contrato contra lo que la API devuelve de
- * verdad sin que ningún dato de un cliente salga del servidor.
- * @param {*} v valor a describir
- * @param {number} [prof] profundidad actual
- * @return {*} descripción de tipos
- */
 function forma(v, prof) {
   prof = prof || 0;
   if (v === null) return "null";
@@ -308,32 +82,6 @@ function forma(v, prof) {
   return o;
 }
 
-/**
- * Traduce la respuesta de `GET /validate` al contrato del panel.
- *
- * REGLA DE ORO: jamás ok:true sin dato real. Si `valid` no es un booleano,
- * no sabemos qué nos respondieron y se dice FORMATO_DESCONOCIDO en vez de
- * inventar un éxito.
- *
- * ⚠️ `limite` en null significa PLAN ILIMITADO, no "sin cuota". La
- * documentación muestra `limit: 1000`, pero con plan ilimitado Shalom manda
- * `null` — y `remaining` también (contradicción 5 de SHALOM-API.md, medida el
- * 13 sep 2026 contra la API real). Convertirlo a 0 diría lo contrario.
- *
- * FORMA REAL MEDIDA — seis campos, no los cuatro documentados:
- *   valid:boolean · userId:string · limit:null · currentUsage:number
- *   · remaining:null · message:string
- *
- * `userId` y `message` NO están en la documentación. `message` se devuelve
- * (es lo que Shalom dice de tu clave, y mostrar sus palabras es mejor que
- * inventar las mías). `userId` NO: es un identificador de la cuenta que
- * ninguna pantalla necesita, y lo que no hace falta no viaja al navegador.
- *
- * Los campos que no se reconocen se ignoran a propósito: si Shalom añade uno
- * mañana, esto sigue funcionando en vez de romperse.
- * @param {*} j cuerpo JSON de Shalom
- * @return {Object} respuesta del contrato
- */
 function traducirValidate(j) {
   if (!j || typeof j !== "object" || Array.isArray(j)) {
     return {ok: false, motivo: "FORMATO_DESCONOCIDO"};
@@ -341,8 +89,6 @@ function traducirValidate(j) {
   if (typeof j.valid !== "boolean") {
     return {ok: false, motivo: "FORMATO_DESCONOCIDO"};
   }
-  // Una clave rechazada es una respuesta legítima de Shalom, pero para quien
-  // llama es lo mismo que estar bloqueado: se traduce a su motivo.
   if (!j.valid) return {ok: false, motivo: "BLOQUEADO"};
   const num = (x) => (typeof x === "number" && isFinite(x) ? x : null);
   return {
@@ -356,13 +102,6 @@ function traducirValidate(j) {
   };
 }
 
-/**
- * El cuerpo que de verdad sale, segun lo declarado por la operacion.
- * Sin `cuerpoCampos` va tal cual (las operaciones de siempre no cambian).
- * @param {Object} def la entrada de PERMITIDAS
- * @param {Object} cuerpo lo que llego, que puede venir del navegador
- * @return {Object} solo lo permitido
- */
 function filtrarCuerpo(def, cuerpo) {
   if (!def.cuerpoCampos) return cuerpo || {};
   const dentro = (cuerpo && typeof cuerpo === "object") ? cuerpo : {};
@@ -373,30 +112,13 @@ function filtrarCuerpo(def, cuerpo) {
   return out;
 }
 
-/**
- * Llama a Shalom. Devuelve el JSON crudo o un motivo; NO traduce.
- * Separado a propósito: así la traducción se prueba sin red y la red se
- * prueba sin traducción.
- * @param {string} op nombre de la operación en PERMITIDAS
- * @param {string} clave API key
- * @param {Object} [cuerpo] cuerpo para las operaciones POST
- * @return {Promise<Object>} {ok:true, json} o {ok:false, motivo, detalle}
- */
 async function llamar(op, clave, cuerpo) {
   const def = PERMITIDAS[op];
   if (!def) return {ok: false, motivo: "NO_PERMITIDO"};
-  // Un endpoint público no necesita clave, así que tampoco se le manda: una
-  // credencial no viaja donde no hace falta, ni siquiera a un sitio de
-  // confianza. Y si falta la clave, eso ya no puede bloquear su consulta.
   if (!clave && !def.publico) {
     return {ok: false, motivo: "BLOQUEADO", detalle: "sin clave"};
   }
 
-  /* Los parametros que van DENTRO de la ruta. Se validan contra la forma
-     declarada y se sustituyen; no se codifican. Codificar sirve para un
-     valor —un querystring, un cuerpo—, pero aqui el valor ES parte de la
-     direccion: lo unico seguro es no dejar pasar nada que no tenga la forma
-     exacta que se espera. */
   let ruta = def.ruta;
   if (def.rutaParam) {
     const claves = Object.keys(def.rutaParam);
@@ -411,8 +133,6 @@ async function llamar(op, clave, cuerpo) {
       ruta = ruta.split("{" + k + "}").join(dato);
     }
   }
-  /* El querystring: SOLO los campos declarados en `consulta`, cada uno con
-     su forma exacta, y codificados. Lo que no tenga la forma, no sale. */
   if (def.consulta) {
     const qs = [];
     const ks = Object.keys(def.consulta);
@@ -429,8 +149,6 @@ async function llamar(op, clave, cuerpo) {
     }
     if (qs.length) ruta += "?" + qs.join("&");
   }
-  // Un hueco sin rellenar significa que la declaracion y lo que llego no
-  // coinciden. Antes de llamar a una URL con una llave dentro, no se llama.
   if (ruta.indexOf("{") >= 0 || ruta.indexOf("}") >= 0) {
     return {ok: false, motivo: "SIN_DATO", detalle: "ruta incompleta"};
   }
@@ -444,15 +162,6 @@ async function llamar(op, clave, cuerpo) {
     };
     if (def.metodo === "POST") {
       opciones.headers["Content-Type"] = "application/json";
-      /* LISTA BLANCA DEL CUERPO, donde se declara.
-         Misma idea que `pedidoPublico.CAMPOS` y que `ORDER_FIELDS`: se
-         enumera lo permitido y lo demas no sale. Aqui protege algo muy
-         concreto — que una contraseña mandada desde el navegador no llegue
-         a viajar— y por eso `instanceLogin` la tiene VACIA.
-
-         Solo se aplica donde esta declarada: `track` lleva meses funcionando
-         con su cuerpo y no se toca. Arreglar lo que no esta roto es como se
-         rompen las cosas; extenderla a `track` tiene su propio turno. */
       opciones.body = JSON.stringify(filtrarCuerpo(def, cuerpo));
     }
     r = await fetch(BASE + ruta, opciones);
@@ -481,8 +190,6 @@ async function llamar(op, clave, cuerpo) {
   if (!r.ok) {
     return {
       ok: false,
-      // El texto va a `motivoDeHttp` porque hay 403 que significan cosas
-      // distintas y solo el mensaje los separa. Ver el comentario de allí.
       motivo: motivoDeHttp(r.status,
           (json && (json.message || json.error)) || texto),
       http: r.status,
@@ -495,56 +202,6 @@ async function llamar(op, clave, cuerpo) {
   return {ok: true, json: json};
 }
 
-/* ── /track ───────────────────────────────────────────────────────────────
-   FORMA REAL MEDIDA el 13 sep 2026 con `esquema`:
-
-     statuses.data → registrado · origen · transito · destino
-                     · reparto · entregado · demora
-
-   Cada rama es `null` mientras no ocurre y un objeto con `fecha` cuando
-   ocurre. `transito` trae además `carguero`, `completo` y `cargueros[]`;
-   `entregado` trae `cliente:{nombre,documento}` — QUIÉN recibió el paquete.
-
-   ⚠️ `statuses` es un OBJETO. La documentación lo pinta como array. */
-
-// El orden de esta lista ES el avance del envío. Gana el ÚLTIMO que tenga
-// fecha, no el de número más alto: `destino` y `reparto` comparten pasos:2 y
-// aun así reparto va después.
-//
-// ⚠️ `registrado` NO ESTÁ AQUÍ, por la misma razón que `demora` no está: no es
-// un paso del paquete. Shalom tiene DOS ramas distintas, con dos fechas
-// distintas, y significan cosas distintas:
-//
-//     registrado → la guía fue creada          ← esto lo hacemos NOSOTROS
-//     origen     → el paquete entró a la agencia ← esto es "ya lo dejé"
-//
-// Las dos estaban traducidas al mismo texto y al mismo rango. Aplastarlas
-// costó un pedido real: se registró, nadie dejó el paquete, la primera
-// consulta contestó "En origen" y la etiqueta saltó a ENVIADO con el paquete
-// todavía en la tienda. Medimos bien el esquema y después tiramos la única
-// distinción que importaba.
-//
-// MEDIDO el 3 oct 2026 sobre tres guías reales del flujo viejo (número de
-// guía puesto a mano, después de dejar el paquete en el mostrador):
-//
-//     86069409  registrado=2026-06-26 19:54:00  origen=2026-06-26 19:54:00
-//     86101685  registrado=2026-06-27 12:39:00  origen=2026-06-27 12:39:00
-//     92866322  registrado=2026-08-22 17:38:08  origen=2026-08-22 17:38:08
-//
-// IDÉNTICAS, al segundo: en el mostrador registrar y entregar son el mismo
-// acto. Por eso sacar `registrado` de los pasos no afecta a ningún pedido
-// antiguo — siguen llegando a ENVIADO por `origen`, igual que siempre. En
-// nuestro registro, en cambio, `origen` se queda en null hasta que el
-// paquete llega de verdad. Las dos poblaciones se separan solas.
-//
-// ⚠️ El formato es `YYYY-MM-DD HH:MM:SS` y NO LLEVA ZONA HORARIA. Parsearlo
-// en el servidor (que corre en UTC) lo correría 5 horas hacia adelante y la
-// cuenta atrás diría que te queda tiempo cuando ya venció. Por eso el plazo
-// sale de nuestro propio sello ISO y no de aquí, todavía.
-//
-// Con `registrado` fuera de esta lista, una guía recién nacida no alcanza
-// ningún paso → `ok:false` → nadie mueve nada. Y eso no es que el bug esté
-// arreglado: es que no se puede escribir.
 const PASOS = [
   {clave: "origen", texto: "En origen", pasos: 0},
   {clave: "transito", texto: "En tránsito", pasos: 1},
@@ -553,49 +210,18 @@ const PASOS = [
   {clave: "entregado", texto: "Entregado", pasos: 3},
 ];
 
-/**
- * La fecha de una rama del árbol, o null si esa rama no ha ocurrido.
- * @param {*} rama valor de la rama
- * @return {?string} fecha tal cual la manda Shalom
- */
 function _fechaDe(rama) {
   if (!rama || typeof rama !== "object" || Array.isArray(rama)) return null;
   const f = rama.fecha;
   return (typeof f === "string" && f.trim()) ? f.trim() : null;
 }
 
-/**
- * Traduce `POST /track`.
- *
- * ⚠️ `demora` NO ES UN PASO, y por eso no está en PASOS. Es una bandera que
- * viaja aparte. Aquí está la lección más cara de este proyecto: cuando la
- * demora podía convertirse en el estado, un paquete ENTREGADO se mostraba
- * como "Demora de envíos" — el envío desandaba el camino y había que
- * explicárselo al cliente. Con demora fuera de la lista de pasos, eso no es
- * que esté arreglado: es que no se puede escribir.
- *
- * La fecha se devuelve TAL CUAL la manda Shalom. No se parsea: su formato no
- * está medido todavía, y adivinarlo es como se ordenan mal los historiales.
- * @param {*} j cuerpo JSON de Shalom
- * @return {Object} respuesta del contrato
- */
 function traducirTrack(j) {
   const raro = {ok: false, motivo: "FORMATO_DESCONOCIDO"};
   if (!j || typeof j !== "object" || Array.isArray(j)) return raro;
   const st = j.statuses;
 
-  /* SIN SEGUIMIENTO NO ES LO MISMO QUE NO ENTENDER LA RESPUESTA.
-     Medido con la guía 94578959 (un retorno a origen): Shalom contesta 200 con
-     `statuses: null` y un `search` que solo trae {message, success}, sin
-     `data`. Es una respuesta clara — "de esta guía no sé nada" —, no una que
-     no sepamos leer.
-     La diferencia no es cosmética: FORMATO_DESCONOCIDO manda a revisar la
-     integración, y NO_ENCONTRADO manda a revisar el número de guía. Confundir
-     el lado del panel con el lado de Shalom ya costó días una vez. */
   if (st === null || st === undefined) {
-    // Con `search` delante es la forma medida y la lectura es segura. Sin él
-    // no hay respuesta que reconocer: un cuerpo vacío no dice "no encontrado",
-    // no dice nada, y afirmar lo primero sería inventar.
     const bus = j.search;
     if (!bus || typeof bus !== "object" || Array.isArray(bus)) return raro;
     return {ok: false, motivo: "NO_ENCONTRADO", detalle: sanear(bus.message)};
@@ -605,7 +231,6 @@ function traducirTrack(j) {
     return {ok: false, motivo: "NO_ENCONTRADO", detalle: sanear(st.message)};
   }
   const d = st.data;
-  // Mismo caso un nivel más abajo: el árbol ausente es "no hay seguimiento".
   if (d === null || d === undefined) {
     return {ok: false, motivo: "NO_ENCONTRADO", detalle: sanear(st.message)};
   }
@@ -617,21 +242,9 @@ function traducirTrack(j) {
     const f = _fechaDe(d[p.clave]);
     if (f) {
       arbol[p.clave] = f;
-      alcanzado = p; // el último con fecha manda
+      alcanzado = p;
     }
   });
-  /* REGLA DE ORO: sin un paso real, no hay éxito.
-
-     Y aquí se separan dos "no hay dato" que no son lo mismo:
-
-       SOLO_REGISTRADO → la guía existe y Shalom la reconoce, pero el paquete
-                         no ha entrado a ninguna agencia. Hay un plazo de 24 h
-                         corriendo y el paquete sigue contigo.
-       SIN_DATO        → el árbol entero en null: Shalom aún no la registró.
-
-     Las dos devuelven ok:false, así que ninguna mueve etiquetas ni escribe
-     tracking. La diferencia es lo que se te dice en pantalla, y no es poca
-     cosa: una te manda a la agencia, la otra a revisar la guía. */
   const reg = _fechaDe(d.registrado);
   if (!alcanzado) {
     return reg ?
@@ -650,39 +263,15 @@ function traducirTrack(j) {
   return {
     ok: true,
     estado: alcanzado.texto,
-    // Se llama `pasos` y no `paso` porque ese es el nombre del contrato que ya
-    // existe (ver la cabecera de shalom.js) y el que lee el aplicador de
-    // tracking.js para su guarda de no-retroceso. Dos nombres para lo mismo es
-    // como una guarda deja de guardar.
     pasos: alcanzado.pasos,
     fecha: arbol[alcanzado.clave],
     demora: demora ? {fecha: demora} : null,
-    // Cuándo nació la guía. Viaja aparte —como la demora— porque es un hecho
-    // del papel, no del paquete.
     registrado: reg ? {fecha: reg} : null,
-    // Quién recibió: solo tiene sentido si de verdad se entregó.
     recibio: alcanzado.clave === "entregado" ? recibio : null,
     arbol: arbol,
   };
 }
 
-/**
- * ¿Este usuario es administrador?
- *
- * ⚠️ EL CORREO SOLO VALE SI ESTA VERIFICADO — misma regla que firestore.rules,
- * y por el mismo motivo: Firebase deja que cualquiera cree una cuenta con
- * CUALQUIER correo sin comprobar que sea suyo. Sin esta linea, alguien que
- * sepa uno de estos correos se registra con el, pone su contrasena, y habla
- * con la API de Shalom del negocio.
- *
- * No hay excepciones. Hubo una —una cuenta creada a mano, sin correo
- * verificado— y se retiro el 20 sep 2026 junto con la cuenta: una contrasena
- * de un buzon que no existe no se puede cambiar ni recuperar, asi que no era
- * una llave de emergencia sino una llave perdida.
- * @param {Object} usuario token decodificado
- * @param {Array<string>} admins correos autorizados
- * @return {boolean} true si puede
- */
 function esAdminDe(usuario, admins) {
   const correo = String((usuario && usuario.email) || "").toLowerCase();
   if (!correo) return false;
@@ -691,24 +280,9 @@ function esAdminDe(usuario, admins) {
   return lista.indexOf(correo) >= 0;
 }
 
-/**
- * Las cuatro barreras, en orden y como función pura.
- *
- * Vive aquí y no en index.js para que se pueda PROBAR. Es el límite de
- * seguridad del sistema: si el orden se rompe —por ejemplo, si la lista
- * blanca se mirara antes que la sesión— un desconocido podría averiguar qué
- * operaciones existen. Un límite de seguridad sin pruebas es una intención.
- *
- * `deps.verificar` recibe el token y devuelve el usuario, o lanza. Se inyecta
- * para poder probar sin Firebase.
- * @param {Object} entrada {metodo, authorization, cuerpo}
- * @param {Object} deps {verificar, admins}
- * @return {Promise<Object>} {corte:{http,motivo}} o {ok:true, destino, ...}
- */
 async function barreras(entrada, deps) {
   const cortar = (http, motivo) => ({corte: {http: http, motivo: motivo}});
 
-  // 1 · POST con sesión válida
   if (entrada.metodo !== "POST") return cortar(405, "NO_PERMITIDO");
   const bearer = String(entrada.authorization || "").match(/^Bearer\s+(.+)$/i);
   if (!bearer) return cortar(401, "SIN_SESION");
@@ -719,20 +293,15 @@ async function barreras(entrada, deps) {
     return cortar(401, "SIN_SESION");
   }
 
-  // 2 · administrador. Va ANTES de mirar la operación: a un desconocido no se
-  // le confirma ni qué operaciones existen.
   if (!esAdminDe(usuario, deps.admins, deps.legado)) {
     return cortar(403, "SIN_PERMISO");
   }
   const correo = String((usuario && usuario.email) || "").toLowerCase();
 
-  // 3 · lista blanca
   const cuerpo = (entrada.cuerpo && typeof entrada.cuerpo === "object") ?
     entrada.cuerpo : {};
   const op = String(cuerpo.op || "");
 
-  /* Las orquestaciones salen por aquí: ya pasaron sesión y administrador,
-     y de ellas el navegador solo manda el id del pedido. */
   if (Object.prototype.hasOwnProperty.call(ORQUESTADAS, op)) {
     return {ok: true, orquestar: op, datos: cuerpo.datos, correo: correo};
   }
@@ -742,66 +311,23 @@ async function barreras(entrada, deps) {
   if (!Object.prototype.hasOwnProperty.call(PERMITIDAS, destino)) {
     return cortar(200, "NO_PERMITIDO");
   }
-  /* ⚠️ SOLO-SERVIDOR SE CORTA ANTES QUE NADA, incluido el diagnóstico.
-     `register` crea un envío que se paga y no se anula: si se pudiera
-     "medir" con un cuerpo del navegador, medir costaría dinero. */
   if (PERMITIDAS[destino].soloServidor) {
     return cortar(200, "NO_PERMITIDO");
   }
-  // Medible sí, usable todavía no. Sin esta guarda, un endpoint recién
-  // añadido devolvería su JSON crudo por la puerta de otro traductor.
   if (!diagnostico && PERMITIDAS[destino].soloMedir) {
     return cortar(200, "SIN_TRADUCTOR");
   }
 
-  // 4 · recién ahora quien llama puede usar la clave
   return {ok: true, destino: destino, diagnostico: diagnostico,
     datos: cuerpo.datos, correo: correo};
 }
 
-/**
- * Traduce la respuesta de `GET /instances` al contrato del panel.
- *
- * FORMA REAL MEDIDA (22 sep 2026, contra la API desplegada):
- *   {instances: [{id:string, name:string, username:string,
- *                 createdAt:string(ISO con milisegundos), isLoggedIn:boolean}]}
- *
- * La documentación la pinta PLANA; viene envuelta en `instances`. Una vez más
- * la doc y la realidad no coinciden — por eso se mide antes de traducir.
- *
- * REGLA DE ORO, la de este endpoint en particular: solo se afirma algo cuando
- * `isLoggedIn` es un booleano de verdad. Si Shalom cambia la forma se devuelve
- * FORMATO_DESCONOCIDO y el panel enseña la respuesta cruda, en vez de inventar
- * un "conectado" que haría fallar un lote entero de registros sin decir por
- * qué. Es exactamente lo que faltaba cuando el traductor de /track daba por
- * bueno un formato que ya no existía.
- *
- * ⚠️ NINGUNA instancia y VARIAS instancias son cosas distintas, y ninguna de
- * las dos es "la sesión está caída":
- *   - 0 → no hay cuenta de Shalom Pro que consultar.
- *   - >1 → no se puede saber CUÁL usa el panel, y elegir la primera sería
- *     adivinar. Con dos instancias, una dentro y otra fuera, afirmar por la
- *     primera es una mentira que se paga con un lote de registros fallidos.
- *
- * `url` (dónde quedó parado el robot) NO lo da este endpoint, solo el
- * `POST /instances/status`. Va en null a propósito: el panel no pinta el
- * enlace en vez de inventarse una dirección.
- * @param {*} j cuerpo JSON de Shalom
- * @return {Object} respuesta del contrato
- */
 function traducirInstancias(j) {
   const raro = {ok: false, motivo: "FORMATO_DESCONOCIDO"};
   if (!j || typeof j !== "object" || Array.isArray(j)) return raro;
   const lista = j.instances;
   if (!Array.isArray(lista)) return raro;
 
-  /* ★ LA LISTA SALE SIEMPRE, incluso cuando la respuesta es una negativa.
-     Antes, con varias instancias, esto devolvía solo `VARIAS_INSTANCIAS` y
-     TIRABA los datos — así que el panel ni siquiera podía ofrecerte la
-     elección que le estaba pidiendo. La negativa se queda intacta: lo que
-     se añade es con qué decidir.
-     En el vocabulario del panel y no en el de Shalom: `isLoggedIn` y `name`
-     no cruzan esta frontera, que es la razón de ser de este archivo. */
   const tx = (x) => (typeof x === "string" && x ? x : null);
   const instancias = lista
       .filter((x) => x && typeof x === "object" && !Array.isArray(x))
@@ -814,12 +340,6 @@ function traducirInstancias(j) {
       .filter((x) => x.id);
 
   if (!lista.length) return {ok: false, motivo: "SIN_INSTANCIA", instancias};
-  /* ⚠️ Y CON VARIAS NO SE ELIGE, aunque ahora haya lista. Caso real del
-     01/10/2026: dos instancias conectadas, `Total` y `Yapaitas`, de dos
-     negocios distintos. Elegir "la primera" o "la conectada" habría
-     registrado el envío de un cliente en la cuenta del otro negocio, cobrado
-     a ellos, y nadie se habría enterado hasta que el paquete no apareciera.
-     Quien elige es el dueño, en Config. */
   if (lista.length > 1) {
     return {ok: false, motivo: "VARIAS_INSTANCIAS", instancias};
   }
@@ -834,55 +354,20 @@ function traducirInstancias(j) {
       conectada: it.isLoggedIn,
       usuario: txt(it.username),
       nombre: txt(it.name),
-      // La llave que van a necesitar el ticket y el registro de envíos. No se
-      // guarda en ninguna parte a propósito: pedirla es una consulta que no
-      // gasta cuota, y un id guardado puede quedar viejo si la instancia se
-      // rehace. Menos estado que mantener, y nunca desfasado.
       id: txt(it.id),
       url: null,
-      /* NULO, no `false`, y la diferencia importa: el `GET /instances` no
-         dice dónde quedó parado el navegador de Shalom, así que no lo sabe.
-         Poner `false` sería afirmar "no está en la pantalla de entrar"
-         cuando lo cierto es "no tengo ni idea" — y el panel se lo creería.
-         Para saberlo hace falta `POST /instances/status`. */
       enLogin: null,
     },
     instancias,
   };
 }
 
-/**
- * `POST /instances/status` — el estado de UNA instancia.
- *
- * Forma MEDIDA el 01/10/2026 contra la instancia real:
- *   { isLoggedIn: boolean, username: string|null, url: string }
- *
- * ⚠️ `username` LLEGO NULL con la sesión conectada. La documentación lo
- * listaba como si siempre viniera; medirlo dijo otra cosa. Es el mismo caso
- * que el `apellidoMaterno: null` de RENIEC, y se trata igual: nulo es nulo,
- * nunca el texto "null" ni un inventado.
- *
- * LO QUE ESTE ENDPOINT APORTA sobre el `GET /instances` que ya teníamos es
- * la `url`: dónde quedó parado el navegador headless de Shalom. Si termina
- * en /login, se deslogueó. Eso es un diagnóstico; un booleano solo, no.
- *
- * Devuelve EXACTAMENTE los mismos campos que `traducirInstancias`: dos
- * fuentes de lo mismo que hablaran distinto obligarían al panel a saber de
- * cuál vino, y eso es estado que no hace falta mantener.
- *
- * @param {Object} j JSON crudo de Shalom
- * @return {Object} {ok:true, sesion:{…}} o {ok:false, motivo}
- */
 function traducirInstanceStatus(j) {
   const raro = {ok: false, motivo: "FORMATO_DESCONOCIDO"};
   if (!j || typeof j !== "object" || Array.isArray(j)) return raro;
   if (typeof j.isLoggedIn !== "boolean") return raro;
   const txt = (x) => (typeof x === "string" && x ? x : null);
   const url = txt(j.url);
-  /* Se compara la RUTA, no la url entera, y se le quita la barra final.
-     Buscar "/login" dentro del texto daría por deslogueado un
-     `/panel/logins` o un `/loginata`, y mandaría a volver a entrar cuando el
-     problema es otro. */
   let ruta = "";
   if (url) {
     ruta = url.split("#")[0].split("?")[0].replace(/\/+$/, "");
@@ -893,23 +378,14 @@ function traducirInstanceStatus(j) {
       conocido: true,
       conectada: j.isLoggedIn,
       usuario: txt(j.username),
-      // Este endpoint no los devuelve. Nulo y no inventado: el panel ya sabe
-      // pedirlos al `GET /instances`, que sí los trae.
       nombre: null,
       id: null,
       url: url,
-      // Sin url no se sabe, y no saber se dice: nulo, no `false`.
       enLogin: url ? /\/login$/.test(ruta) : null,
     },
   };
 }
 
-/**
- * El texto de un valor, o "" si no hay. Un número se convierte a texto a
- * propósito — ver `traducirAgencias`.
- * @param {*} v valor
- * @return {string} texto
- */
 function _txt(v) {
   if (v === null || v === undefined) return "";
   if (typeof v === "number") return isFinite(v) ? String(v) : "";
@@ -917,37 +393,9 @@ function _txt(v) {
   return "";
 }
 
-/**
- * Traduce `GET /public/agencies` al esquema común del catálogo — el MISMO que
- * ya usa el buscador del formulario, así no hay que tocarlo.
- *
- * FORMA REAL MEDIDA (24 sep 2026, contra la API desplegada): 34 campos por
- * agencia, no los 48 que dice la documentación para `/agencies`. Faltan
- * `hora_domingo` y `referencia`. Se comprobó que **no las usa nadie** (el
- * formulario lee `ag.horario || ag.hora_atencion`, y `hora_atencion` sí
- * viene), así que se quedan vacías en vez de mentir con un dato inventado.
- * Es la contradicción nº 8 entre la documentación de esta API y la realidad.
- *
- * ⚠️ `ter_id` LLEGA COMO NÚMERO y en el catálogo guardado es TEXTO ("3").
- * Se normaliza a texto aquí, en un solo sitio. Sin esto, el día que se
- * verifique la agencia antes de registrar un envío, `3 !== "3"` fallaría en
- * silencio — y un envío sin agencia verificada es un paquete pagado que puede
- * salir a la ciudad equivocada.
- *
- * ⚠️ No hay campo `distrito`: la API manda `zona`. Es el mismo mapeo que hace
- * `_mapShalom` en el navegador. Antes de reemplazar el catálogo, el extractor
- * compara con el que ya está en uso, así que un cambio masivo de distritos se
- * vería antes de aceptar nada.
- *
- * Una agencia sin id no entra: no sirve para registrar y ensucia el catálogo.
- * Cuántas se descartaron se DICE, no se calla.
- * @param {*} j cuerpo JSON de Shalom
- * @return {Object} respuesta del contrato
- */
 function traducirAgencias(j) {
   const raro = {ok: false, motivo: "FORMATO_DESCONOCIDO"};
   if (!j || typeof j !== "object" || Array.isArray(j)) return raro;
-  // Jamás ok:true sin dato real: si no dice que salió bien, no salió bien.
   if (j.success !== true) return raro;
   if (!Array.isArray(j.data)) return raro;
 
@@ -970,64 +418,28 @@ function traducirAgencias(j) {
       provincia: _txt(a.provincia),
       distrito: _txt(a.zona) || _txt(a.ter_zona),
       direccion: _txt(a.direccion),
-      referencia: "", // no viene en la variante pública
+      referencia: "",
       telefono: _txt(a.telefono),
       horario: _txt(a.hora_atencion),
-      horarioDom: "", // tampoco viene, y no lo usa nadie
+      horarioDom: "",
       latitud: _txt(a.latitud),
       longitud: _txt(a.longitud),
     });
   });
 
-  // 554 agencias que se vuelven 0 no es un catálogo vacío: es que cambió la
-  // forma. Reemplazar el catálogo con eso lo dejaría inservible.
   if (!agencias.length) return raro;
 
   return {ok: true, agencias: agencias, total: agencias.length, sinId: sinId};
 }
 
-/**
- * Traduce `GET /account/dni/{dni}` (espejo de RENIEC) al contrato del panel.
- *
- * FORMA REAL MEDIDA (26 sep 2026, contra la API desplegada):
- *   {success:boolean, message:string, data:{
- *      dni:string(8), nombres:string, apellidoPaterno:string,
- *      apellidoMaterno:string|null, digitoVerificador:number}}
- *
- * La documentacion solo decia "espejo de datos registrales" — ni un campo.
- *
- * POR QUE IMPORTA: `POST /account/register` pide el nombre PARTIDO en tres,
- * y partir "JARLYN LLANOS ARTEAGA" a ojo se equivoca con cualquier nombre
- * compuesto. RENIEC ya los da separados, asi que el registro deja de tener
- * que adivinar.
- *
- * ⚠️ `apellidoMaterno` PUEDE VENIR null. Se midio con un DNI de ejemplo y
- * llego null — si se hubiera medido solo con el del dueño, el traductor
- * habria reventado el dia que le toque un cliente sin apellido materno. Va
- * como "" y se dice que falta; nunca se inventa un apellido.
- *
- * `completo` es SOLO PARA MOSTRAR. El registro usa los tres campos por
- * separado: juntarlos y volver a partirlos seria deshacer lo unico que este
- * endpoint aporta.
- *
- * `digitoVerificador` no se devuelve: el registro no lo pide y lo que no hace
- * falta no viaja al navegador.
- * @param {*} j cuerpo JSON de Shalom
- * @return {Object} respuesta del contrato
- */
 function traducirDni(j) {
   const raro = {ok: false, motivo: "FORMATO_DESCONOCIDO"};
   if (!j || typeof j !== "object" || Array.isArray(j)) return raro;
-  // Jamas ok:true sin dato real. Un `success` que no es exactamente true no
-  // se interpreta: no se ha medido que significa, y suponerlo aqui seria
-  // rellenar el nombre de un cliente con lo que sea.
   if (j.success !== true) return raro;
   const d = j.data;
   if (!d || typeof d !== "object" || Array.isArray(d)) return raro;
   const txt = (x) => (typeof x === "string" ? x.trim() : "");
   const nombres = txt(d.nombres);
-  // Sin nombres no hay nada que autocompletar, y afirmarlo con los apellidos
-  // sueltos daria un nombre a medias en el formulario.
   if (!nombres) return raro;
   const pat = txt(d.apellidoPaterno);
   const mat = txt(d.apellidoMaterno);
@@ -1043,14 +455,6 @@ function traducirDni(j) {
   };
 }
 
-/**
- * Traduce la respuesta cruda del endpoint que sea. Un endpoint sin traductor
- * NO devuelve su JSON: eso es justo lo que hace que una forma mal entendida
- * llegue a la pantalla como si fuera un dato bueno.
- * @param {string} op operación
- * @param {*} json cuerpo devuelto por Shalom
- * @return {Object} respuesta del contrato
- */
 function traducir(op, json) {
   if (op === "validate") return traducirValidate(json);
   if (op === "track") return traducirTrack(json);
@@ -1061,32 +465,11 @@ function traducir(op, json) {
   return {ok: false, motivo: "SIN_TRADUCTOR"};
 }
 
-/* ── GET /track/voucher — el TICKET (comprobante) ─────────────────────────
-   Devuelve un BINARIO (PNG por defecto), no JSON: por eso no pasa por
-   `llamar`, que parsea JSON. La doc de su API trae el ejemplo con
-   `res.json()`, que está mal (ver docs/SHALOM-API.md).
-
-   Cuatro comprobaciones antes de aceptar lo que llega, porque esto termina
-   GUARDADO en el bucket y enseñado al cliente:
-     · guía y código con su forma exacta (nada raro viaja en el querystring);
-     · HTTP 200;
-     · tamaño máximo — un 200 con 40 MB es un error, no un ticket;
-     · los BYTES dicen PNG o PDF (firma del archivo), no solo la cabecera:
-       un 200 con una página HTML de error no se guarda como «ticket». */
-const GUIA_FORMA = /^(?:[0-9]{8}|1[0-9]{8})$/; // = barrido.GUIA_OK
+const GUIA_FORMA = /^(?:[0-9]{8}|1[0-9]{8})$/;
 const CODIGO_FORMA = /^[A-Za-z0-9]{3,8}$/;
-/* El id de la cuenta de Shalom Pro (UUID). Shalom lo EXIGE para el ticket
-   (medido el 28/10/2026: 400 sin él; su doc no lo menciona). Lo pone el
-   servidor desde la configuración guardada al conectar, nunca el
-   navegador: así nadie pide tickets con otra cuenta. */
 const INSTANCIA_FORMA = /^[A-Za-z0-9-]{8,64}$/;
 const VOUCHER_MAX = 3 * 1024 * 1024;
 
-/**
- * Qué es un archivo, por sus primeros bytes.
- * @param {Buffer} b bytes
- * @return {string} "image/png" · "application/pdf" · ""
- */
 function tipoPorFirma(b) {
   if (!b || b.length < 5) return "";
   if (b[0] === 0x89 && b[1] === 0x50 && b[2] === 0x4E && b[3] === 0x47) {
@@ -1104,21 +487,8 @@ function tipoPorFirma(b) {
   return "";
 }
 
-/* ★ MEDIDO EL 28/10/2026: /track/voucher responde 200 y el cuerpo NO es un
-   PNG crudo (la doc dice binario). Antes de saber su forma exacta se
-   aceptan, sin aflojar la validación, las formas habituales:
-     · la imagen cruda (PNG, JPEG, WEBP, GIF) o un PDF;
-     · un JSON que la lleva dentro como `data:…;base64,…` o base64 suelto;
-     · un JSON con la URL https del archivo (se descarga y se valida igual).
-   Lo que se acepta SIEMPRE pasa por `tipoPorFirma`: los bytes mandan. */
 const _B64 = /^[A-Za-z0-9+/=\s]+$/;
 
-/**
- * Busca dentro de un JSON una imagen/PDF en base64 o una URL https.
- * @param {*} v el JSON
- * @param {number} [prof] profundidad
- * @return {Object} {bytes} | {url} | {}
- */
 function buscarArchivo(v, prof) {
   const p = prof || 0;
   if (p > 6 || v === null || v === undefined) return {};
@@ -1144,7 +514,6 @@ function buscarArchivo(v, prof) {
     return {};
   }
   if (typeof v === "object") {
-    // Primero lo que tenga base64 (es el archivo); la URL, de respaldo.
     let url = null;
     const ks = Object.keys(v);
     for (let i = 0; i < ks.length; i++) {
@@ -1157,12 +526,6 @@ function buscarArchivo(v, prof) {
   return {};
 }
 
-/**
- * Descarga el ticket de una guía.
- * @param {string} clave API key (solo servidor)
- * @param {Object} datos {orderNumber, orderCode, instanceId}
- * @return {Promise<Object>} {ok:true, bytes, tipo} o {ok:false, motivo}
- */
 async function descargarVoucher(clave, datos) {
   const d = datos || {};
   const guia = String(d.orderNumber || "").trim();
@@ -1218,7 +581,6 @@ async function descargarVoucher(clave, datos) {
   let tipo = tipoPorFirma(bytes);
   if (tipo) return {ok: true, bytes: bytes, tipo: tipo};
 
-  // ¿Un JSON con el archivo dentro?
   const ct = String((r.headers && r.headers.get &&
     r.headers.get("content-type")) || "");
   let json = null;
@@ -1240,9 +602,6 @@ async function descargarVoucher(clave, datos) {
       if (r2.ok) return r2;
     }
   }
-  /* Nada reconocible: se dice QUÉ llegó —tipo de contenido y la FORMA del
-     JSON (claves y tipos, sin un solo valor)—, para poder adaptarlo sin
-     pedir datos de un cliente. */
   const formaTxt = json !== null ?
     "JSON " + JSON.stringify(forma(json)).slice(0, 220) :
     "inicio «" + bytes.toString("latin1", 0, 8).replace(/[^\x20-\x7E]/g, "·") +
@@ -1253,13 +612,6 @@ async function descargarVoucher(clave, datos) {
       (ct || "sin tipo") + "; " + formaTxt + ")"};
 }
 
-/**
- * Descarga una URL https que devolvió Shalom y valida que sea imagen/PDF.
- * La clave SOLO viaja si la URL es del mismo servidor de la API.
- * @param {string} url https://…
- * @param {string} clave API key
- * @return {Promise<Object>} {ok:true, bytes, tipo} o {ok:false}
- */
 async function _bajarUrl(url, clave) {
   let u;
   try {
@@ -1283,12 +635,6 @@ async function _bajarUrl(url, clave) {
   }
 }
 
-/**
- * Las filas de una lista, vengan donde vengan: array directo, `items`,
- * `data`, `data.items`, o un objeto {"0":…} estilo PHP.
- * @param {*} j respuesta
- * @return {Array} filas (vacío si no hay)
- */
 function filasDe(j) {
   const cands = [j, j && j.items, j && j.data, j && j.data && j.data.items,
     j && j.data && j.data.data];
@@ -1304,28 +650,6 @@ function filasDe(j) {
   return [];
 }
 
-/**
- * ★ EL RESPALDO POR TU SHALOM PRO: el estado de una guía sacado del
- * «Seguimiento de envíos» (GET /account/tracking-list), para cuando /track
- * falla del lado de shalom-api (SHALOM_SIN_RESPUESTA).
- *
- * FORMA MEDIDA el 12/11/2026 (botón «Medir Shalom Pro»):
- *   {success, message, data:{items:[{guideNumber:"#########", code, status,
- *    packageDelivered:boolean, checkSendPackage:boolean, …}], meta, summary:
- *    {en_origen, en_transito, en_reparto, en_destino}}}
- *
- * Se devuelve en el MISMO contrato que /track ({ok, estado, pasos}) y con
- * los textos de siempre, para que el aplicador y el barrido no distingan de
- * dónde vino. Reglas:
- *   · por `guideNumber` EXACTO; si no está → null (no se inventa nada);
- *   · `packageDelivered` → Entregado;
- *   · un estado que hable de REGISTRADO o PENDIENTE NO es un paso (el
- *     paquete no entró a la agencia: es la lección de `registrado`) → null;
- *   · un estado que no se reconoce → null. Mejor sin dato que un dato falso.
- * @param {Array} filas filas de una o varias páginas
- * @param {string} guia número de guía
- * @return {?Object} {ok:true, estado, pasos, fuente} o null
- */
 function deSeguimientoPro(filas, guia) {
   const g = String(guia || "").replace(/\D/g, "");
   if (!g || !Array.isArray(filas)) return null;

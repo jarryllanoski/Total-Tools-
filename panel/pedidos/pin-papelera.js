@@ -1,15 +1,3 @@
-/**
- * panel/pedidos/pin-papelera.js — PIN de la clave y papelera
- * ==================================================
- * Fase 3 (10/11/2026): el panel en módulos. Antes vivía en config.js.
- * Script CLÁSICO a propósito: sus funciones y variables son globales, igual
- * que cuando estaban en un solo archivo — moverlas no cambió ni una llamada.
- * El orden de los <script> en index.html es el orden de ejecución.
- */
-/* ── HTML DE LA SECCIÓN CONFIG ──────────────────────────────────────
- * El HTML del page-configurar permanece en index.html
- * Este módulo solo contiene las funciones JS
- * ──────────────────────────────────────────────────────────────── */
 
 function openPin(cb, msg){
   _pinEntry=''; _pinCallback=cb;
@@ -54,11 +42,10 @@ function onTrashBtnTap(){
 }
 
 function openTrash(){
-  // Auto-purge items older than 30 days
   const now=Date.now();
   const before=S.trash.length;
   S.trash=S.trash.filter(x=>(now-x.deletedAt)<30*24*60*60*1000);
-  if(S.trash.length!==before) save('config'); // auto-purga: solo cambia trash (config)
+  if(S.trash.length!==before) save('config');
 
   if(!S.trash.length){
     $('trashList').innerHTML='<div style="text-align:center;padding:24px;color:var(--text2)">🗑️<br><br>La papelera está vacía</div>';
@@ -83,13 +70,10 @@ function openTrash(){
 
 function restoreTrash(i){
   const item=S.trash[i];if(!item)return;
-  // Restaurar de la papelera NO devuelve la selección: es estado de pantalla,
-  // no del pedido, y vive en seleccion.js. Se limpia el campo por si el
-  // pedido se archivó cuando `sel` todavía se guardaba dentro.
   delete item.shipment.sel;
   S.shipments.push(item.shipment);
   S.trash.splice(i,1);
-  save(item.shipment.id);render();openTrash();toast(`✅ ${item.shipment.name} recuperado`); // recrea ese pedido + trash (config), no los 170
+  save(item.shipment.id);render();openTrash();toast(`✅ ${item.shipment.name} recuperado`);
 }
 
 function emptyTrash(){
@@ -105,7 +89,7 @@ function emptyTrash(){
           await Promise.all(items.map(x=>window._fbDeleteTrashItem(x._id)));
         }
       }catch(e){console.warn('emptyTrash subcol:',e.message);}
-      S.trash=[];save('config');openTrash();toast('🗑️ Papelera vaciada'); // solo config (trash)
+      S.trash=[];save('config');openTrash();toast('🗑️ Papelera vaciada');
     }
   });
 }

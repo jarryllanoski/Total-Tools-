@@ -1,12 +1,3 @@
-/**
- * panel/compartir/excel.js — exportar e importar Excel / CSV
- * ================================================
- * Fase 3 (10/11/2026): el panel en módulos. Antes vivía en config.js.
- * Script CLÁSICO a propósito: sus funciones y variables son globales, igual
- * que cuando estaban en un solo archivo — moverlas no cambió ni una llamada.
- * El orden de los <script> en index.html es el orden de ejecución.
- */
-/* EXCEL EXPORT / IMPORT */
 function exportExcel(){
   if(!S.shipments.length){ toast('Sin envíos para exportar'); return; }
   if(!conXLSX(exportExcel)) return;
@@ -64,13 +55,6 @@ function importExcel(input){
         S.shipments.push({
           id: importedId || 'xl_'+Date.now()+'_'+Math.random().toString(36).slice(2,6),
           name, phone, address,
-          /* ★ EL DNI VA EN `dni`, QUE ES SU CAMPO.
-             Esto escribía SOLO `dniDestinatario`, y el exportador lee `dni`:
-             exportar e importar perdía el documento. El pedido volvía sin
-             DNI, la etiqueta salía sin DNI, y registrarlo en Shalom —que
-             mira `dni`— contestaba «el DNI debe tener 8 dígitos» con el
-             número delante, en la pantalla. `dniDestinatario` se mantiene
-             por si algún Excel viejo se vuelve a importar. */
           dni:             (row['DNI']||'').toString().trim(),
           dniDestinatario: (row['DNI']||'').toString().trim(),
           ciudadDestino:   (row['Ciudad destino']||'').toString().trim(),
@@ -103,7 +87,6 @@ function importExcel(input){
   reader.readAsBinaryString(file);
 }
 
-/* EXPORT CSV */
 function doCSV(){if(!S.shipments.length){toast('Sin envíos');return}const h=['Nombre','Teléfono','Dirección','Courier','Fecha','Estado','Costo','Notas','Factura/Boleta'];const rows=S.shipments.map(s=>[s.name,s.phone,`"${s.address}"`,s.courier,s.date,s.status,s.cost,`"${s.notes}"`,_nroDe(s)]);const csv=[h,...rows].map(r=>r.join(',')).join('\n');const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));a.download=`envios_${new Date().toLocaleDateString('es')}.csv`;a.click();toast('📊 CSV exportado')}
 
 function doPrint(){

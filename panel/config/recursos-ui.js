@@ -1,25 +1,6 @@
-/**
- * panel/config/recursos-ui.js — la pantalla del centro de recursos
- * =========================================================
- * Fase 3 (10/11/2026): el panel en módulos. Antes vivía en index.html.
- * Script CLÁSICO a propósito: sus funciones y variables son globales, igual
- * que cuando estaban en un solo archivo — moverlas no cambió ni una llamada.
- * El orden de los <script> en index.html es el orden de ejecución.
- */
-/* ══ CENTRO DE RECURSOS ══════════════════════════════════════════════════
-   Página propia con la MISMA cara que Envíos: sus clases de panel.css no
-   dicen "envío" en ningún nombre, así que se reutilizan tal cual.
-
-   NO CUESTA NI UNA LECTURA NI UNA ESCRITURA NUEVAS: `S.recursos` viaja en el
-   documento de configuración que el panel ya lee al arrancar, y se guarda con
-   `save('config')` — ESE documento, no los 1169 pedidos.
-
-   ⚠️ La selección vive AQUÍ, en memoria, y NUNCA en `seleccion.js`: ese es el
-   marcado de pedidos, y compartirlo haría que marcar un catálogo marcara un
-   envío —y que el 🗑️ de Envíos borrara lo que marcaste aquí—. */
-let _recCat = '';      // categoría (chips)
-let _recTipo = '';     // tipo de archivo (tarjetas de arriba)
-let _recQ = '';        // búsqueda
+let _recCat = '';
+let _recTipo = '';
+let _recQ = '';
 let _recOrden = 'categoria';
 let _recMosaico = false;
 let _recSel = new Set();
@@ -41,9 +22,6 @@ function recOrdenSig(){
   recRender();
 }
 
-/* El tipo de archivo, para las tarjetas de arriba. Es un eje DISTINTO al de
-   los chips (categoría): "enséñame los videos" y "enséñame los manuales" son
-   dos preguntas, y las dos se hacen. */
 function _recEsTipo(r, t){
   if(!t) return true;
   const e = Recursos.tipoDe(r.u).etiqueta;
@@ -75,8 +53,6 @@ function recRender(){
   const td = $('recChipTodos'); if(td) td.classList.toggle('active', !_recCat);
   const vb = $('recVistaBtn'); if(vb) vb.textContent = _recMosaico ? '☰' : '▦';
 
-  // Los filtros activos se VEN y se quitan de un toque. Un filtro puesto que
-  // no se ve es la causa número uno de "me desaparecieron las cosas".
   const bar = $('recFiltroBar');
   if(bar){
     const act = [];
@@ -104,8 +80,6 @@ function recRender(){
   }
   vis = Recursos.ordenar(vis, _recOrden);
 
-  // Agrupado por categoría solo cuando ese es el orden: con "A–Z" o "más
-  // nuevos" los grupos romperían justo el orden que pediste.
   const grupos = (_recOrden === 'categoria')
     ? Recursos.agrupar(vis)
     : [{cat: _REC_ORDEN_TXT[_recOrden], items: vis}];
@@ -124,9 +98,6 @@ function recRender(){
 }
 function recOrden0(){ _recOrden='categoria'; recRender(); }
 
-/* Una imagen que no carga cae al icono y la tarjeta queda entera. Es lo que
-   permite usar la miniatura de Drive, que NO está garantizada, sin riesgo de
-   que se vea una foto rota. */
 const _REC_ONERR = "this.style.display='none';this.nextElementSibling.style.display='flex'";
 
 function _recFila(r){
@@ -165,19 +136,15 @@ function _recMosaicoCard(r){
     '</div></div>';
 }
 
-/* ── Marcar ──────────────────────────────────────────────────────────── */
 function recMarcar(id){ if(_recSel.has(id)) _recSel.delete(id); else _recSel.add(id); recRender(); }
 function recSelTodo(){
   const vis = Recursos.filtrar(recLista(), _recCat||'Todos', _recQ).filter(r=>_recEsTipo(r,_recTipo));
-  // Marca lo VISIBLE, no la lista entera: marcar cosas que no ves y borrarlas
-  // después es exactamente cómo se pierde algo sin enterarse.
   if(vis.every(r=>_recSel.has(r.id))) vis.forEach(r=>_recSel.delete(r.id));
   else vis.forEach(r=>_recSel.add(r.id));
   recRender();
 }
 function _recMarcados(){ return recLista().filter(r=>_recSel.has(r.id)); }
 
-/* ── Compartir ───────────────────────────────────────────────────────── */
 function recWhatsApp(){
   const sel = _recMarcados();
   if(!sel.length){ toast('☑️ Marca al menos un recurso'); return; }
@@ -195,7 +162,6 @@ function recCopiar(){
   }catch(e){ _copiarFallback(txt, listo); }
 }
 
-/* ── Quitar ──────────────────────────────────────────────────────────── */
 function recQuitar(){
   const sel = _recMarcados();
   if(!sel.length){ toast('☑️ Marca lo que quieras quitar'); return; }
@@ -214,7 +180,6 @@ function recQuitar(){
   });
 }
 
-/* ── Editar / crear ──────────────────────────────────────────────────── */
 function recEditar(id){
   if(!window.Recursos) return;
   _recEditId = id || null;
@@ -257,8 +222,6 @@ async function recSubirPortada(input){
   if(!window.StorageModule || !StorageModule.uploadFile){ _recAviso('No se puede subir ahora. Pega la URL de una imagen.'); return; }
   _recAviso('⏳ Subiendo portada…', '#8b949e');
   try{
-    // El id se fija ANTES de subir: sin él, dos portadas seguidas se pisarían
-    // en Storage por caer en el mismo nombre de archivo.
     const id = _recEditId || ('r_'+Date.now()+'_'+Math.random().toString(36).slice(2,7));
     _recEditId = _recEditId || id;
     const doc = await StorageModule.uploadFile(f, 'portadas', id, 'recursos');
@@ -297,12 +260,9 @@ function recGuardar(){
   if(i >= 0) S.recursos[i] = Object.assign({}, S.recursos[i], datos);
   else S.recursos.push(Object.assign({id: _recEditId || ('r_'+Date.now()+'_'+Math.random().toString(36).slice(2,7)),
     publico:false}, datos));
-  save('config');            // ★ sube SOLO el documento de config
+  save('config');
   closeOverlay('recEditOverlay');
   recRender();
-  // El fallo más probable de todo esto no es el código: es una carpeta de
-  // Drive sin compartir. Quien la abra vería "solicitar acceso" y pensaría
-  // que el panel está roto.
   if(/drive\.google\.com|docs\.google\.com/.test(url))
     toast('✅ Guardado — comprueba que en Drive esté compartido con «cualquiera con el enlace»');
   else toast('✅ Guardado');
@@ -312,8 +272,6 @@ async function _pintarPuertaShalom(){
   const fila = $('shalomPuertaEstado'), tgl = $('tglShalomPuerta');
   if(!fila || !tgl) return;
   const estado = (window._fbLeerPuerta ? await window._fbLeerPuerta() : null) || {};
-  // Sin documento, encendida: un archivo que nadie creó no puede dejar el
-  // negocio sin rastreo.
   tgl.classList.toggle('on', estado.encendida !== false);
   const v = (window.Shalom && Shalom.textoPuerta) ?
     Shalom.textoPuerta(estado, Date.now()) :
@@ -325,13 +283,12 @@ function toggleShalomPuerta(){ _pinShalom(_toggleShalomPuertaHecho); }
 async function _toggleShalomPuertaHecho(){
   const tgl = $('tglShalomPuerta'); if(!tgl) return;
   const on = !tgl.classList.contains('on');
-  tgl.classList.toggle('on', on);   // respuesta inmediata; se confirma abajo
+  tgl.classList.toggle('on', on);
   try{
     await window._fbEncenderPuerta(on);
     toast(on ? '🚪 Puerta a Shalom encendida' :
                '🔌 Puerta a Shalom apagada — el panel sigue funcionando igual');
   }catch(e){
-    // No se pudo guardar: se deshace el toggle en vez de mentir sobre el estado.
     tgl.classList.toggle('on', !on);
     toast('⚠️ No se pudo cambiar el interruptor — reintenta');
   }

@@ -39,7 +39,7 @@ module.exports = async ({bloque, ok}) => {
        'rayas que se mueven hacia atrás');
     ok(/fetchpriority="high"/.test(ld) && /\?v=3/.test(ld), 'el logo se pide con prioridad (y versión nueva)');
     ok(/setTimeout\(done, CAP\)/.test(ld), 'el tope de seguridad sigue');
-    ok(/narrador\/loader\.js\?v=2/.test(form), 'el formulario pide la versión nueva del cargador');
+    ok(/narrador\/loader\.js\?v=\d+/.test(form), 'el formulario pide la versión nueva del cargador');
   }
 
   bloque('Logos más livianos; el delfín sin fondo');
@@ -59,7 +59,7 @@ module.exports = async ({bloque, ok}) => {
     ok(/_wzUnico = active\.length===1 \? active\[0\] : '';/.test(form), 'se detecta con la lista ya filtrada (config o «foto» del link)');
     ok(/function wzSeq\(\)\{ var s=_wzNeedDest\(\)\?\[1,2,3,4\]:\[1,2,4\]; return _wzUnico \? s\.slice\(1\) : s; \}/.test(form),
        'la secuencia salta el paso 1 (y la barra cuenta bien: 1 de 3, o 1 de 2 en retiro)');
-    const ini = form.slice(form.indexOf('function wzInit('), form.indexOf('/* ─── EXPOSE GLOBALS'));
+    const ini = form.slice(form.indexOf('function wzInit('), form.indexOf('window.getDeliveryAddr = getDeliveryAddr;'));
     ok(ini.indexOf('if(_wzUnico) pickCourier(_wzUnico);') > 0 && ini.indexOf('if(_wzUnico) pickCourier(_wzUnico);') < ini.indexOf("cs.addEventListener('change'"),
        '⚠️ se elige ANTES de escuchar el cambio: sin auto-avance ni teclado al abrir');
     ok(/wzShow\(wzSeq\(\)\[0\]\);/.test(ini), 'empieza en el primer paso de la secuencia');

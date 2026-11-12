@@ -173,7 +173,7 @@ module.exports = async ({bloque, ok}) => {
     ok(/id="shalomCercaBtn"/.test(t), 'el botón de siempre va DENTRO: donde no hay nativo, el navegador lo muestra');
     ok(/\.ag-geo\{display:block;width:100%;padding:16px 0;/.test(form),
        '⚠️ ancho 100% con relleno lateral 0: Chrome añade el suyo e ignora box-sizing; si se sale, lo declara inválido');
-    const n = form.slice(form.indexOf('function _ubicNativo('), form.indexOf('/* ── Sedes: el fallo'));
+    const n = form.slice(form.indexOf('function _ubicNativo('), form.indexOf('var _agFallosUbic=0, _agUbicKey=\'\';'));
     ok(/'HTMLGeolocationElement' in window/.test(n), 'detección de soporte');
     ok(/if\(g\.isValid===false\)\{ h\.invalido\(\); return; \}/.test(n), 'si Chrome lo da por inválido, el toque pide por el camino de siempre');
     ok(/addEventListener\('location'/.test(n) && /h\.exito\(g\.position\)/.test(n) && /falla\(c, e\)/.test(n),

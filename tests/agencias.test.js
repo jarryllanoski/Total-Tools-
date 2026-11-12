@@ -306,7 +306,7 @@ module.exports = async ({bloque, ok}) => {
       // eslint-disable-next-line no-new-func
       new Function(...nombres,
           E.trozo('config.js', 'function _pintarOrigen(){',
-              '\n/* `pre` existe para que') +
+              'function onOrigenInput(val, pre){') +
           '\nsalida.p = _pintarOrigen;')(...nombres.map((x) => ctx[x]));
       ctx.salida.p();
       return nodo.innerHTML;
@@ -326,7 +326,7 @@ module.exports = async ({bloque, ok}) => {
     ok(!/config:\s*\{[^}]*agenciaOrigen/.test(sube),
        'y NO metida dentro de `config`');
     const pub = fidx.slice(fidx.indexOf('async function handleConfig'),
-        fidx.indexOf('// ── action=formcfg'));
+        fidx.indexOf('async function handleFormCfg(req, res) {'));
     ok(pub.indexOf('agenciaOrigen') < 0,
        'así que la función pública no la devuelve: el formulario del cliente ' +
        'no la necesita');
@@ -353,7 +353,7 @@ module.exports = async ({bloque, ok}) => {
        'se genera al aparecer el bloque de Shalom, no antes: en un DELIVERY ' +
        'sería un campo con un número que no significa nada');
     {
-      const guardado = cfg.slice(cfg.indexOf('La clave de recojo. Tres condiciones'),
+      const guardado = cfg.slice(cfg.indexOf("if(($('fCourier').value||'').toUpperCase().includes('SHALOM')){"),
           cfg.indexOf("if(_sGuia)  { data.trackingOrderNumber"));
       ok(/includes\('SHALOM'\)/.test(guardado),
          'solo se guarda con courier Shalom: en un DELIVERY sería un número ' +
@@ -383,7 +383,7 @@ module.exports = async ({bloque, ok}) => {
     ok(merge.indexOf('shalomClave') < 0,
        'no está en la lista de campos que se conservan del local: ahí, borrar ' +
        'la clave no se guardaría nunca');
-    const editar = cfg.slice(cfg.indexOf('// Preservar campos tracking al editar'),
+    const editar = cfg.slice(cfg.indexOf('const prev=S.shipments[idx];'),
         cfg.indexOf("'dniDestinatario'].forEach"));
     ok(editar.indexOf('shalomClave') < 0, 'ni en la del editor, por lo mismo');
 
@@ -407,7 +407,7 @@ module.exports = async ({bloque, ok}) => {
        (prueba.length ? ' (' + prueba.map((a) => a.ter_id).join(', ') + ')' : ''));
     const f = E.leer('formulario.html');
     const c = E.leer('config.js');
-    const vf = (/version: '(\d{4}-\d{2}-\d{2})', \/\/ meta\.generado\n\s*jsonPath: '\.\/data\/agencias-shalom\.json'/.exec(f) || [])[1];
+    const vf = (/version: '(\d{4}-\d{2}-\d{2})',\n\s*jsonPath: '\.\/data\/agencias-shalom\.json'/.exec(f) || [])[1];
     const vc = (/const SHALOM_CATALOGO_V='(\d{4}-\d{2}-\d{2})'/.exec(c) || [])[1];
     ok(vf === fecha && vc === fecha,
        '⚠️ la versión del catálogo (formulario ' + vf + ', panel ' + vc + ') = fecha del JSON (' + fecha + '): ' +

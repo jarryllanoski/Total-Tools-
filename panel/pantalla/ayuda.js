@@ -1,30 +1,3 @@
-/**
- * panel/pantalla/ayuda.js — el contenido de la ayuda (📖) y Toby
- * Fase 7 (11/11/2026): movido de la raíz a su capa, sin cambiar una línea.
- */
-/**
- * ayuda.js — Módulo de Ayuda y Documentación centralizada para Total Tools
- *
- * OBJETIVO: que cualquier usuario entienda cómo funciona cada módulo sin
- * depender de memoria ni capacitación. Toda la documentación vive aquí, en
- * un solo lugar, y se muestra con el mismo formato visual del Manual Shalom.
- *
- * USO:
- *   Ayuda.abrir('envios')   → abre la ayuda del módulo "Envíos"
- *   Ayuda.abrir('config')   → abre la ayuda de "Configuración"
- *   ... etc. (ver claves en DOCS abajo)
- *
- * Para agregar/editar ayuda: solo edita el objeto DOCS. No hay que tocar
- * ninguna pantalla — los botones 📖 Ayuda llaman a Ayuda.abrir('clave').
- *
- * DEPENDENCIAS: ninguna obligatoria. Usa document y (si existe) el estilo
- * .trk-manual-step de tracking.js; si no está, inyecta su propio CSS.
- *
- * NO MODIFICA NADA EXISTENTE. Se auto-registra como window.Ayuda.
- * Para desactivar: quitar <script src="ayuda.js"> del index.html
- *
- * Última actualización: 2026-10-30 (Toby en todas las ayudas; contenido al día)
- */
 (function(){
   'use strict';
 
@@ -33,15 +6,6 @@
 
   var ACTUALIZADO = '2026-11-10';
 
-  /* ══════════════════════════════════════════════════════════════════
-     DOCUMENTACIÓN CENTRALIZADA
-     Cada entrada: { titulo, icono, toby, pasos:[], faq:[], tips:[] }
-     - toby:  el consejo clave que Toby dice al abrir (si falta, el 1er tip)
-     - pasos: lista numerada (círculos azules, como el Manual Shalom)
-     - faq:   preguntas frecuentes [{q, a}]
-     - tips:  recomendaciones (lista con viñeta)
-     Usa <b>...</b> para resaltar.
-  ══════════════════════════════════════════════════════════════════ */
   var DOCS = {
 
     envios: {
@@ -179,7 +143,6 @@
         'Límite de 8 MB por archivo.'
       ]
     },
-
 
     cambioEtiquetaQR: {
       titulo: 'Cambiar etiqueta por QR',
@@ -342,12 +305,6 @@
       ]
     },
 
-    /* ★ ESTA SECCIÓN EXISTE PARA VACIAR LA PANTALLA.
-       El formulario del pedido llevaba cuatro explicaciones fijas —qué es la
-       clave, que el origen vale para todos, que se comprueba lo guardado,
-       que crear solo crea si no hay— y entre las cuatro ocupaban más que los
-       campos. Una explicación se lee UNA vez; un dato se mira cada día. Lo
-       que se lee una vez, aquí. */
     registroShalom: {
       titulo: 'Registrar el envío en Shalom',
       icono: '🚚',
@@ -382,15 +339,10 @@
 
   };
 
-  /* ══════════════════════════════════════════════════════════════════
-     RENDERIZADO (mismo formato visual del Manual Shalom)
-  ══════════════════════════════════════════════════════════════════ */
-
   function _esc(s){
     return String(s==null?'':s)
       .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
   }
-  // Permite <b> en los textos de DOCS pero escapa el resto
   function _fmt(s){
     var e = _esc(s);
     return e.replace(/&lt;b&gt;/g,'<b>').replace(/&lt;\/b&gt;/g,'</b>');
@@ -398,8 +350,6 @@
 
   function _injectCSS(){
     if(document.getElementById('ayuda-css')) return;
-    // Si tracking.js ya definió .trk-manual-step, lo reutilizamos. Igual
-    // definimos clases propias .ay-* por si este módulo va solo.
     var css = [
       '.ay-overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:99999;display:none;align-items:flex-end;justify-content:center}',
       '.ay-overlay.open{display:flex}',
@@ -439,18 +389,11 @@
     return ov;
   }
 
-  /* ── Registro de ayuda desde otros módulos ───────────────────────────
-     Permite que cada módulo co-loque su propia documentación (junto a su
-     código) y la registre aquí. Así la ayuda no se desactualiza: vive en el
-     mismo archivo que la función. Ej. (en cotizacion.js):
-        if(window.Ayuda) Ayuda.register('cotizacion', { titulo, icono, pasos, faq, tips, actualizado });
-  ────────────────────────────────────────────────────────────────────── */
   Ayuda.register = function(clave, seccion){
     if(!clave || !seccion) return;
     DOCS[clave] = seccion;
   };
 
-  /* ── Abrir la ayuda de un módulo ─────────────────────────────────── */
   Ayuda.abrir = function(clave){
     var doc = DOCS[clave];
     if(!doc){
@@ -463,8 +406,6 @@
     var sheet = document.getElementById('ayudaSheet');
 
     var html = '';
-    /* ★ TOBY (30/10/2026): saluda con el nombre del negocio y dice el
-       consejo clave de ESTA sección. Sin lecturas: S ya está en memoria. */
     if(window.Toby){
       var neg=''; try{ neg = (typeof S!=='undefined' && S && S.config && S.config.name) || ''; }catch(e){}
       var dice = doc.toby || (doc.tips && doc.tips[0]) || 'Aquí tienes cómo funciona esta sección.';
@@ -473,7 +414,6 @@
     html += '<div class="ay-title">'+_esc(doc.icono||'📖')+' '+_esc(doc.titulo)+'</div>';
     html += '<div class="ay-sub">Guía del módulo · actualizado '+_esc(doc.actualizado||ACTUALIZADO)+'</div>';
 
-    // Pasos
     if(doc.pasos && doc.pasos.length){
       html += '<div class="ay-section">Cómo funciona — paso a paso</div>';
       html += doc.pasos.map(function(p,i){
@@ -481,7 +421,6 @@
       }).join('');
     }
 
-    // FAQ
     if(doc.faq && doc.faq.length){
       html += '<div class="ay-section">Preguntas frecuentes</div>';
       html += doc.faq.map(function(f){
@@ -489,7 +428,6 @@
       }).join('');
     }
 
-    // Tips
     if(doc.tips && doc.tips.length){
       html += '<div class="ay-section">Recomendaciones</div>';
       html += '<div style="display:flex;flex-direction:column;gap:8px">'+
@@ -504,7 +442,6 @@
     ov.classList.add('open');
   };
 
-  /* ── Utilidad: lista de módulos con ayuda disponible ─────────────── */
   Ayuda.modulos = function(){ return Object.keys(DOCS); };
 
 })();

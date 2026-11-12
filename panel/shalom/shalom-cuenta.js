@@ -1,24 +1,9 @@
-/**
- * panel/shalom/shalom-cuenta.js — la cuenta de Shalom Pro, en el panel
- * =====================================================================
- * Rehecho el 11/11/2026. UN solo lugar para todo lo de la cuenta:
- *   · el estado («● Shalom Pro conectada · tu correo»);
- *   · Config: correo + contraseña + «Conectar» (y «cambiar cuenta»);
- *   · la RECONEXIÓN SOLA: al abrir el panel se mira el estado (gratis) y,
- *     si se cayó y hay credenciales guardadas, se reconecta una vez.
- * Lo decide el servidor (functions/cuentaShalom.js): el navegador nunca ve
- * la lista de instancias ni la contraseña después de escribirla.
- * Script CLÁSICO: sus funciones son globales (las llaman los onclick).
- */
 
-/* El estado de la cuenta para toda la pantalla:
-   mirando · conectando · ok · sinCuenta · caida · error */
 let _cuenta = {estado: 'mirando'};
-let _cuentaPedida = false;     // ya se preguntó en esta sesión
-let _cuentaAuto = false;       // ya se intentó reconectar sola
-let _cuentaForm = false;       // «cambiar cuenta» abierto
+let _cuentaPedida = false;
+let _cuentaAuto = false;
+let _cuentaForm = false;
 
-/** El estado actual (lo lee el bloque de registro del pedido). */
 function cuentaShalomEstado(){ return _cuenta; }
 
 function _cuentaPintar(){
@@ -26,15 +11,10 @@ function _cuentaPintar(){
   if(typeof _pintarRegistroShalom === 'function') _pintarRegistroShalom();
 }
 
-/* Recuerda la instancia que dijo el servidor (no se guarda desde aquí:
-   la escribe el servidor). Sirve para que el registro no diga «falta la
-   cuenta» mientras llega la sincronización. */
 function _cuentaRecordarId(id){
   if(id && window.S) S.shalomInstancia = Object.assign({}, S.shalomInstancia, {id: String(id)});
 }
 
-/** Pregunta al servidor si la cuenta sigue conectada. Gratis.
- *  Si se cayó y hay credenciales guardadas, reconecta UNA vez sola. */
 function cuentaShalomRevisar(forzar){
   if(!window.Shalom || typeof Shalom.estadoCuenta !== 'function') return;
   if(_cuentaPedida && !forzar) return;
@@ -62,7 +42,6 @@ function cuentaShalomRevisar(forzar){
   });
 }
 
-/* Conectar (con lo escrito, o vacío = con lo guardado). */
 async function _cuentaConectar(usuario, clave, sola){
   _cuenta = {estado: 'conectando'};
   _cuentaPintar();
@@ -81,20 +60,17 @@ async function _cuentaConectar(usuario, clave, sola){
   return r;
 }
 
-/** El botón «Conectar» de Config. */
 function cuentaShalomConectar(){
   const u = $('credUser'), k = $('credPass');
   const usuario = (u && u.value || '').trim();
   const clave = (k && k.value) || '';
-  if(k) k.value = '';                // la contraseña no se queda en pantalla
+  if(k) k.value = '';
   if(usuario && !clave){ toast('Escribe también la contraseña'); return; }
   _cuentaConectar(usuario, clave, false);
 }
 
-/** «cambiar cuenta»: abre o cierra el formulario. */
 function cuentaShalomCambiar(){ _cuentaForm = !_cuentaForm; _cuentaPintar(); }
 
-/* Lo que se dice cuando no está conectada: palabras, no códigos. */
 function _cuentaTexto(c){
   if(c.detalle) return c.detalle;
   const T = {NO_EXISTE: 'La cuenta guardada ya no existe en Shalom. Pulsa Conectar.',
@@ -103,7 +79,6 @@ function _cuentaTexto(c){
   return T[c.motivo] || ((window.Shalom && Shalom.textoMotivo) ? Shalom.textoMotivo(c.motivo) : c.motivo);
 }
 
-/** La sección de Shalom Pro en Config. */
 function _pintarShalomConfig(){
   const box = $('shalomCfgBloque'); if(!box) return;
   cuentaShalomRevisar();
@@ -139,7 +114,6 @@ function _pintarShalomConfig(){
   const sal = $('shalomCfgSalida'); if(sal){ sal.style.display = 'none'; sal.innerHTML = ''; }
 }
 
-/** La fila «TU CUENTA» del bloque de registro del pedido. */
 function cuentaShalomFila(){
   cuentaShalomRevisar();
   const c = _cuenta;
@@ -151,6 +125,4 @@ function cuentaShalomFila(){
     accion: 'conectar en Config'};
 }
 
-/* Al entrar al panel (cuando llegan los datos, o sea con sesión), se mira
-   la cuenta una vez y se reconecta sola si hace falta. */
 window.addEventListener('tt:nube-sincronizada', function(){ cuentaShalomRevisar(); });

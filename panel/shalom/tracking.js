@@ -1,46 +1,18 @@
-/**
- * panel/shalom/tracking.js — el seguimiento de Shalom en el panel
- * Fase 7 (11/11/2026): movido de la raíz a su capa, sin cambiar una línea.
- */
-/**
- * tracking.js — UI de tracking Shalom en el panel
- * ================================================
- * Tarjeta de tracking, modal de edición de guía, historial, manual, y el
- * vigilante "llegó a destino" (agnóstico al motor). El rastreo en sí (consultar,
- * masivo) pasa por la PUERTA ÚNICA shalom.js, hoy desconectada — ver docs/SHALOM.md.
- * El motor viejo (API paga + worker propio) se retiró: Shalom protege su portal
- * con reCAPTCHA v3 y un servidor nunca saca nota.
- */
 (function(global){
 'use strict';
 
-/* ══════════════════════════════════════════════
-   CONFIGURACIÓN
-══════════════════════════════════════════════ */
 var TRK = {
-  // Únicas palabras clave que sobreviven: las usa detectarEstadoAuto para el
-  // vigilante "llegó a destino" (agnóstico al motor). El motor de rastreo vive
-  // ahora en shalom.js; su lógica vieja se retiró.
   KEYWORDS_ENTREGADO: ['entregado','entrega realizada','entrega completa','recogido','recojo completado','delivered'],
   KEYWORDS_DESTINO:   ['llegó a destino','llego a destino','en agencia destino','disponible para recojo',
                        'disponible para retiro','en agencia de destino','a disposicion',
                        'en destino','en destino -','en la agencia','en destino-'],
 };
 
-/* Los estados TAL COMO los muestra Shalom. El texto se guarda literal (es lo
-   que ve el operador y el cliente); la interpretación la hace el aplicador.
-   El primero vacío = "no cambiar", para que guardar la guía no toque el estado. */
 var ESTADOS_SHALOM = ['', 'En origen', 'En tránsito', 'Demora de envíos',
   'En destino', 'Entregado', 'Retorno a origen'];
 
-/* ══════════════════════════════════════════════
-   HELPER — escapar HTML
-══════════════════════════════════════════════ */
 function _esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
-/* ══════════════════════════════════════════════
-   DETECCIÓN AUTOMÁTICA DE ESTADO
-══════════════════════════════════════════════ */
 function detectarEstadoAuto(estadoTexto) {
   if (!estadoTexto) return null;
   var t = estadoTexto.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
@@ -53,15 +25,6 @@ function detectarEstadoAuto(estadoTexto) {
   return null;
 }
 
-/* ══════════════════════════════════════════════
-   APLICADOR — único dueño de "qué hacer con una respuesta de Shalom"
-══════════════════════════════════════════════ */
-/* Traduce un código de motivo a un aviso en español (honesto, nunca mudo).
-   Cada motivo dice qué pasó Y qué hacer: un aviso que no orienta obliga a
-   adivinar, y adivinar sobre un envío de un cliente sale caro. */
-/* Pega la explicación de Shalom al aviso, si la dio. Se recorta porque un
-   aviso flotante que no se alcanza a leer no sirve, y se limpia el HTML
-   porque el texto viene de afuera. */
 function _conDetalle(detalle){
   var d = String(detalle == null ? '' : detalle).replace(/<[^>]*>/g, '').trim();
   if (!d) return '';
@@ -69,8 +32,6 @@ function _conDetalle(detalle){
   return ' (' + d + ')';
 }
 
-/* "Se pausó solo" sin decir hasta cuándo se lee como "se rompió". Con la hora
-   es una espera; sin ella, un problema. */
 function _reabreEn(reabre){
   var t = Number(reabre);
   if (!t || t <= Date.now()) return '';
@@ -81,26 +42,11 @@ function _reabreEn(reabre){
 function _motivoTexto(motivo, detalle){
   switch (motivo) {
     case 'DESCONECTADO':  return '🔧 Rastreo Shalom en reconstrucción';
-    /* NO ES UN ERROR, y por eso no lleva ⚠️. Shalom reconoce la guía pero
-       todavía no ha entrado a ninguna agencia: el paquete sigue contigo.
-       Antes esto no existía como respuesta —la puerta traducía la guía recién
-       nacida como "En origen"— y la primera consulta movía la etiqueta a
-       ENVIADO con el paquete en la tienda. */
     case 'SOLO_REGISTRADO':
       return '📦 Registrado en Shalom — el paquete aún no entró a la agencia';
     case 'NO_ENCONTRADO': return '⚠️ Shalom no encontró esa guía — verifica número y código';
-    // Estos dos son del PANEL, no de Shalom. Antes los dos caían en BLOQUEADO
-    // y mandaban a revisar la cuenta de Shalom cuando lo único que pasaba era
-    // que la sesión había vencido: media tarde perdida mirando el lugar
-    // equivocado. El aviso tiene que apuntar al arreglo correcto.
     case 'SIN_SESION':    return '🔒 Tu sesión del panel venció — cierra sesión y vuelve a entrar';
     case 'SIN_PERMISO':   return '🚫 Tu cuenta entró bien, pero no está autorizada para consultar Shalom';
-    // De acá para abajo el problema es de Shalom. Cuando Shalom explica por
-    // qué falló, su explicación se repite TAL CUAL entre paréntesis: sin eso,
-    // "error temporal" se ve igual el día que es un tropiezo de un minuto y el
-    // día que su sesión está caída y nada va a andar hasta que vuelvas a
-    // entrar. La misma frase para dos mundos distintos es lo que hace
-    // reintentar veinte veces sin avanzar.
     case 'BLOQUEADO':     return '🔑 Shalom rechazó la clave o el plan venció' +
       _conDetalle(detalle) + ' — revisa tu panel de Shalom API';
     case 'LIMITE':        return '⏳ Se agotó la cuota del plan por ahora — reintenta más tarde';
@@ -108,67 +54,39 @@ function _motivoTexto(motivo, detalle){
       ' — reintenta en un momento';
     case 'ERROR_SHALOM':  return '⚠️ Shalom tuvo un error' + _conDetalle(detalle) +
       ' — reintenta en un momento';
-    /* shalom-api no pudo leer la guía en Shalom (su búsqueda en vivo recibe
-       403). No es la guía ni tu cuenta: en shalom.com.pe se ve bien. */
     case 'SHALOM_SIN_RESPUESTA':
       return '⏳ Shalom-API no pudo leer esta guía ahora (falla de su lado con guías nuevas; en shalom.com.pe sí se ve) — reintenta más tarde, los horarios lo vuelven a intentar solos';
     case 'SIN_RED':       return '📡 Sin conexión — revisa tu internet y reintenta';
-    /* Los dos del INTERRUPTOR. No son fallos: son el sistema protegiéndose.
-       Y son distintos entre sí — uno lo decidió el operador y el otro lo
-       decidió la puerta sola—, así que decirlos igual haría buscar el arreglo
-       en el sitio equivocado. */
     case 'APAGADA':
       return '🔌 El rastreo de Shalom está apagado — enciéndelo en Configuración';
     case 'PUERTA_CERRADA':
       return '⏸️ Shalom falló varias veces seguidas; el rastreo se pausó solo' +
         _reabreEn(detalle) + ' — tus pedidos y el panel siguen funcionando';
-    // La respuesta llegó pero no se reconoció su forma. NO se inventa un
-    // estado: se avisa para poder ajustar el traductor con el dato real.
     case 'FORMATO_DESCONOCIDO':
       return '🔧 Shalom respondió en un formato no reconocido — avísame para ajustarlo';
     default:              return '⚠️ No se pudo consultar Shalom';
   }
 }
 
-/* Escritor atómico del tracking visible: estado + mensaje + hora + historial en
-   una sola pasada. Es IMPOSIBLE dejar un estado sin su hora ni su entrada. */
 function _escribirTracking(ship, estado, fecha, origen){
   var iso = fecha || new Date().toISOString();
   if (!ship.trackingHistory) ship.trackingHistory = [];
-  // origen: 'shalom' (lectura automática) | 'manual' (lo puso el operador).
-  // El historial lo muestra con su distintivo, así se sabe de dónde salió cada dato.
   ship.trackingHistory.push({date: iso, status: estado, message: estado, source: origen || 'shalom'});
   ship.trackingStatus     = estado;
   ship.trackingMessage    = estado;
   ship.trackingLastUpdate = iso;
 }
 
-/* ÚNICO lugar que aplica una respuesta de la puerta a un pedido. Lo usan el
-   botón manual, el masivo y el auto-check. Devuelve:
-     { cambio:true,  resultado:'FINALIZADO'|'EN_DESTINO'|'ENVIADO'|'ok', estado }
-     { cambio:false, motivo }   ← sin dato real: NO toca el pedido (nunca finge)
-   Mueve la etiqueta respetando el modo (off/semi/auto) y sin retroceder jamás. */
 function _aplicarEstadoShalom(ship, resp, origen){
   if (!resp || !resp.ok) {
-    // La hora de consulta se estampa SOLO si la consulta sirvió. Antes se
-    // estampaba en la primera línea, antes de mirar la respuesta: una consulta
-    // fallida también quedaba marcada como "visto", que es decir que se miró
-    // cuando no se pudo ver nada.
-    // `detalle` viaja junto al motivo: cuando Shalom explica el rechazo,
-    // el aviso repite su explicación en vez de inventar una. Si no explicó
-    // nada, va el código HTTP: es poco, pero es un hecho — y un hecho corto
-    // vale más que un "error temporal" que no distingue nada.
     return {cambio: false,
             motivo: (resp && resp.motivo) || 'SIN_DATO',
             detalle: (resp && resp.detalle) ||
                      (resp && resp.http ? 'HTTP ' + resp.http : ''),
-            // el servidor ya miró tus envíos pendientes (y no estaba)
             revisoPendientes: !!(resp && resp.revisoPendientes)};
   }
   ship.trackingLastAutoCheck = Date.now();
 
-  // El estado semántico viene de la barra de pasos (más robusto) o, si no, del
-  // texto. pasos: 0 origen · 1 tránsito · 2 destino · 3 entregado.
   var autoEstado;
   if (typeof resp.pasos === 'number') {
     autoEstado = resp.pasos >= 3 ? 'FINALIZADO' : (resp.pasos === 2 ? 'EN_DESTINO' : null);
@@ -178,23 +96,9 @@ function _aplicarEstadoShalom(ship, resp, origen){
 
   var estadoTexto = (resp.estado || '').trim();
   if (!estadoTexto && autoEstado == null) {
-    return {cambio: false, motivo: 'SIN_DATO'}; // ni texto ni barra → no inventamos
+    return {cambio: false, motivo: 'SIN_DATO'};
   }
 
-  /* ── GUARDA DE NO RETROCESO ────────────────────────────────────────────
-     Un envío no desanda el camino. La etiqueta del pedido ya tenía esta
-     protección; el texto del tracking no, y por eso una respuesta peor podía
-     pisar una buena: una guía Entregada volvió a mostrarse como "Demora de
-     envíos" y otra En destino se quedó en "En tránsito".
-
-     Solo bloquea cuando se puede DEMOSTRAR el retroceso: ambos textos tienen
-     que ser reconocibles y el nuevo estrictamente anterior. Un texto que no
-     sabemos clasificar nunca bloquea — así los pedidos que hoy están mal
-     guardados (por ejemplo, con "Demora de envíos" encima de un Entregado)
-     se pueden corregir con una consulta, en vez de quedar congelados.
-
-     El operador es la excepción: si el estado lo pone a mano (origen
-     'manual'), manda él. La guarda existe para atajar datos, no personas. */
   var rangoNuevo = (typeof resp.pasos === 'number') ? resp.pasos
                                                     : _rangoDeTexto(estadoTexto);
   var rangoViejo = _rangoDeTexto(ship.trackingStatus);
@@ -208,23 +112,12 @@ function _aplicarEstadoShalom(ship, resp, origen){
   var avanzo = (rangoNuevo !== null && rangoViejo !== null &&
                 rangoNuevo > rangoViejo);
 
-  // 1) Tracking visible: se escribe siempre que el texto cambie.
-  //    `escribio` distingue dos cosas que antes se veían idénticas desde
-  //    afuera: que Shalom haya contestado bien, y que algo haya cambiado. Un
-  //    paquete puede pasar días en el mismo estado; sin este dato el operador
-  //    consulta, todo funciona, nada se mueve en pantalla, y parece roto.
   var escribio = false;
   if (estadoTexto && ship.trackingStatus !== estadoTexto) {
     _escribirTracking(ship, estadoTexto, resp.fecha, origen);
     escribio = true;
   }
 
-  /* 2) LA ETIQUETA. Vuelve a moverse (18 sep 2026, decisión del negocio: es la
-        fórmula del manual del panel), y lo hace por el MISMO archivo que usa el
-        barrido del servidor: functions/etiquetas.js. Ahí viven los tres modos,
-        el no-retroceso, la regla de que un pedido con saldo no se cierra, y la
-        de que una etiqueta tuya —RECLAMOS, AVISAR CUANDO LLEGUE— no se toca.
-        Acá no se decide nada: se pregunta y se aplica. */
   var movio = null;
   if (window.Etiquetas && window.Etiquetas.decidirEtiqueta) {
     var _cfg = (window.S && window.S.config) || {};
@@ -238,50 +131,19 @@ function _aplicarEstadoShalom(ship, resp, origen){
   else if (autoEstado === 'FINALIZADO')        resultado = 'FINALIZADO';
   else if (autoEstado === 'EN_DESTINO')        resultado = 'EN_DESTINO';
 
-  // `cambio`   = Shalom contestó con un dato real (se pudo aplicar).
-  // `escribio` = ese dato era distinto al que ya teníamos.
-  // `avanzo`   = el paquete llegó más lejos que la última vez. Es lo que
-  //              decide si hay algo que CONTAR, y no puede depender de
-  //              `escribio`: un envío puede avanzar de "En tránsito" a
-  //              "En destino" con el mismo texto guardado, y ese caso —
-  //              justo el que se nos escapó con la guía 95046118 — se
-  //              anunciaba como "sin cambios".
   return {cambio: true, escribio: escribio, avanzo: avanzo,
     resultado: resultado, estado: estadoTexto, movio: movio};
 }
 
-/* Lee un texto de estado y dice en qué punto del recorrido cae:
-     0 origen · 1 tránsito · 2 destino · 3 entregado · null = no se reconoce
-   "Demora de envíos" devuelve null A PROPÓSITO: una demora no es un punto del
-   recorrido, es algo que le pasa a un envío en camino. Tratarla como punto es
-   lo que hacía que pisara un "Entregado".
-
-   Hubo una copia gemela en el servidor (`_idxDeTexto`), que se fue con la
-   integración el 2026-09-13. Cuando el webhook vuelva, va a necesitar la misma
-   decisión: si se escribe otra copia, las dos tienen que cambiar juntas — y la
-   prueba que las compara vuelve con ella. */
 function _rangoDeTexto(t){
-  /* La regla vive en functions/etiquetas.js porque el barrido del servidor
-     necesita EXACTAMENTE la misma respuesta. Dos copias divergen, y divergir
-     aquí significa que el barrido mueva de madrugada una etiqueta que el panel
-     habría rechazado. Si el archivo no cargó, se devuelve null: no clasificar
-     nunca bloquea ni mueve nada, así que lo peor es no hacer nada. */
   if (window.Etiquetas && window.Etiquetas.rangoDeTexto) {
     return window.Etiquetas.rangoDeTexto(t);
   }
   return null;
 }
 
-/* ══════════════════════════════════════════════
-   ALERTA DE DESTINO
-══════════════════════════════════════════════ */
-/* ── Aviso "llegó a destino" — vigilante AGNÓSTICO AL MOTOR ─────────────────
-   Detecta la TRANSICIÓN de un pedido a destino (por status o por trackingStatus)
-   y avisa UNA sola vez, sin importar el motor (A local o B por Firestore). Se
-   dispara desde render() → Tracking.checkDestinoAlerts. El aviso queda FIJO
-   hasta que lo cierres. */
-var _destinoAvisados = null;   // Set de ids ya avisados (persistido en localStorage)
-var _destinoKeyPrevio = false; // ¿existía la clave? (para sembrar en el rollout sin avalancha)
+var _destinoAvisados = null;
+var _destinoKeyPrevio = false;
 
 function _loadDestinoAvisados(){
   if (_destinoAvisados) return;
@@ -295,24 +157,10 @@ function _saveDestinoAvisados(){
   try { localStorage.setItem('tt_destino_avisados',
     JSON.stringify(Array.from(_destinoAvisados).slice(-500))); } catch(e){}
 }
-// ¿El pedido está "en destino"? Agnóstico al motor y al modo (etiqueta u observación).
-/* ¿SHALOM dice que llegó a destino?
-   Mira SOLO el tracking, nunca la etiqueta. Antes también devolvía true si el
-   pedido estaba en LLEGÓ A DESTINO o PENDIENTE DE PAGO, y eso tenía sentido
-   cuando la etiqueta la movía el sistema: era otro rastro del mismo hecho.
-   Ya no. Desde que el movimiento automático se retiró, la etiqueta es una
-   decisión del operador, así que leerla acá convertía el aviso en un eco: el
-   operador marcaba "LLEGÓ A DESTINO" a mano y la app se lo anunciaba de vuelta
-   —con la tira apareciendo justo debajo de la tarjeta, como si lo hubiera
-   averiguado la consulta— incluso cuando Shalom seguía diciendo "En tránsito".
-   El aviso existe para contar algo que el operador NO sabía. Si lo puso él, ya
-   lo sabía. */
 function _esDestino(s){
   if (!s || s.status === 'FINALIZADO') return false;
   return detectarEstadoAuto(s.trackingStatus || '') === 'EN_DESTINO';
 }
-// Vigilante: avisa los que ENTRARON a destino y no se habían avisado. En el primer
-// arranque (sin clave previa) solo SIEMBRA en silencio → nada de avisos en masa.
 function _checkDestinoAlerts(){
   _loadDestinoAvisados();
   var ships = _getShipments() || [];
@@ -320,27 +168,21 @@ function _checkDestinoAlerts(){
   if (!nuevos.length) return;
   nuevos.forEach(function(s){ _destinoAvisados.add(s.id); });
   _saveDestinoAvisados();
-  if (!_destinoKeyPrevio){ _destinoKeyPrevio = true; return; } // rollout: solo sembrar
-  // Pocos → tiras hacia abajo. Bastantes → resumen que, al tocar "Ver", se
-  // despliega en las tiras de ESOS pedidos apiladas una sobre otra.
+  if (!_destinoKeyPrevio){ _destinoKeyPrevio = true; return; }
   if (nuevos.length <= 3){ nuevos.forEach(_mostrarAlertaDestino); }
   else { _mostrarAlertaResumenDestino(nuevos); }
 }
 
-// La pila vive DENTRO de la página, justo encima de los 4 cuadros de cantidades.
-// Antes flotaba fija sobre la pantalla (position:fixed) y TAPABA el contenido;
-// en el flujo normal lo empuja hacia abajo, así nunca oculta nada.
 function _destinoStack(){
   var s = document.getElementById('trkDestinoStack');
   if (!s){
     s = document.createElement('div');
     s.id = 'trkDestinoStack';
-    // Mismo ancho de siempre (no se toca el tamaño de la tarjeta).
     s.style.cssText = 'display:flex;flex-direction:column;gap:8px;'+
       'width:100%;max-width:340px;margin:0 auto 12px';
     var stats = document.getElementById('statsArea');
     if (stats && stats.parentNode) stats.parentNode.insertBefore(s, stats);
-    else document.body.appendChild(s);   // respaldo si aún no existe
+    else document.body.appendChild(s);
   }
   return s;
 }
@@ -354,8 +196,6 @@ function _btn(txt, css){
   var b = document.createElement('button'); b.textContent = txt; b.style.cssText = css; return b;
 }
 
-// El monto de la tira: regla única para los pedidos de hoy en adelante;
-// los de antes, solo si deben (lo mismo que enseña su tarjeta).
 function _montoTira(ship){
   var M = window.MontoPedido;
   if (!M) return '';
@@ -364,21 +204,13 @@ function _montoTira(ship){
   return e.tipo === 'debe' ? M.html(e) : '';
 }
 
-// Construye la tira de UN pedido (no la inserta). Misma tarjeta de siempre.
-// DOM + addEventListener → el teléfono no va en un onclick inline (cierra el
-// vector XSS del hallazgo #5).
 function _tiraDestino(ship){
-  var phone = String(ship.phone || '').replace(/\D/g, ''); // solo dígitos
+  var phone = String(ship.phone || '').replace(/\D/g, '');
   var d = _destinoCard(); d.setAttribute('data-ship', ship.id);
   var head = document.createElement('div');
   head.innerHTML = '<div style="font-size:12px;font-weight:800;color:#a78bfa;margin-bottom:6px">📍 PEDIDO LLEGÓ A DESTINO</div>'+
     '<div style="font-size:13px;color:#e6edf3;margin-bottom:4px"><b>'+_esc(ship.name)+'</b></div>'+
     '';
-  /* ★ CELULAR Y MONTO EN UNA LÍNEA (26/10/2026). Antes iba la guía, que
-     para avisar al cliente no sirve. El celular se copia al tocarlo —con la
-     misma función que la tarjeta— y a la derecha va lo que debe, con la
-     regla de functions/montoPedido.js. Los pedidos de antes solo enseñan
-     monto si deben, como su tarjeta. */
   var linea = document.createElement('div');
   linea.style.cssText = 'display:flex;justify-content:space-between;align-items:center;gap:10px;font-size:12px;margin-bottom:10px';
   var tel = document.createElement('span');
@@ -395,7 +227,7 @@ function _tiraDestino(ship){
     var mo = document.createElement('span');
     mo.className = 'trk-monto';
     mo.style.cssText = 'color:#e6edf3;font-weight:700;white-space:nowrap';
-    mo.innerHTML = mt;   // solo dígitos, «S/» y <s>: lo arma MontoPedido.html
+    mo.innerHTML = mt;
     linea.appendChild(mo);
   }
   head.appendChild(linea);
@@ -412,8 +244,6 @@ function _tiraDestino(ship){
   return d;
 }
 
-// Quita una tira y, si estaba en un mazo, reordena para que la siguiente pase
-// al frente. Si el mazo queda vacío, se elimina (sin huecos en blanco).
 function _quitarTira(card){
   var mazo = card.parentNode && card.parentNode.classList &&
              card.parentNode.classList.contains('trk-mazo') ? card.parentNode : null;
@@ -425,9 +255,6 @@ function _quitarTira(card){
   _barraCerrarTodos();
 }
 
-// Mazo: una tira DEBAJO de otra, enteras (26/10/2026). Antes se montaban
-// (-62px) y solo se leía la primera: avisar al cliente número 7 obligaba a
-// cerrar las seis de encima.
 function _ordenarMazo(mazo){
   mazo.style.cssText = 'display:flex;flex-direction:column;gap:8px';
   for (var i = 0; i < mazo.children.length; i++){
@@ -437,8 +264,6 @@ function _ordenarMazo(mazo){
   _barraCerrarTodos();
 }
 
-// «Cerrar todos»: solo cuando hay dos o más tiras. Cerrarlas una por una
-// con doce en lista es pesado.
 function _barraCerrarTodos(){
   var stack = document.getElementById('trkDestinoStack');
   if (!stack) return;
@@ -457,18 +282,14 @@ function _barraCerrarTodos(){
   if (stack.firstChild !== bar) stack.insertBefore(bar, stack.firstChild);
 }
 
-// Aviso individual (fijo hasta cerrar).
 function _mostrarAlertaDestino(ship){
   if (!ship || !ship.id) return;
   var stack = _destinoStack();
-  if (stack.querySelector('[data-ship="'+ship.id+'"]')) return; // dedup: ya visible
+  if (stack.querySelector('[data-ship="'+ship.id+'"]')) return;
   stack.appendChild(_tiraDestino(ship));
   _barraCerrarTodos();
 }
 
-// Aviso resumen cuando llegan varios de golpe (fijo hasta cerrar).
-// "Ver" ya no filtra y descarta el aviso: despliega las tiras de ESOS pedidos
-// APILADAS una sobre otra, para avisar cliente por cliente desde ahí mismo.
 function _mostrarAlertaResumenDestino(ships){
   var stack = _destinoStack();
   var d = _destinoCard();
@@ -479,33 +300,28 @@ function _mostrarAlertaResumenDestino(ships){
   bClose.addEventListener('click', function(){ d.remove(); });
   var bVer = _btn('Ver', 'flex:2;background:rgba(167,139,250,.15);border:1px solid rgba(167,139,250,.3);border-radius:8px;color:#a78bfa;padding:8px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit');
   bVer.addEventListener('click', function(){
-    d.remove();                 // el resumen se reemplaza por las tiras
+    d.remove();
     _desplegarMazo(ships);
   });
   row.appendChild(bClose); row.appendChild(bVer);
   d.appendChild(head); d.appendChild(row); stack.appendChild(d);
 }
 
-// Despliega las tiras apiladas una sobre otra.
 function _desplegarMazo(ships){
   var stack = _destinoStack();
   var mazo = document.createElement('div');
   mazo.className = 'trk-mazo';
   (ships || []).forEach(function(ship){
     if (!ship || !ship.id) return;
-    if (stack.querySelector('[data-ship="'+ship.id+'"]')) return; // ya visible
+    if (stack.querySelector('[data-ship="'+ship.id+'"]')) return;
     mazo.appendChild(_tiraDestino(ship));
   });
   if (!mazo.children.length) return;
   _ordenarMazo(mazo);
   stack.appendChild(mazo);
-  _barraCerrarTodos();   // el mazo ya está dentro: ahora sí se cuentan sus tiras
+  _barraCerrarTodos();
 }
 
-
-/* ══════════════════════════════════════════════
-   CSS
-══════════════════════════════════════════════ */
 function _injectCSS() {
   if (document.getElementById('trkCSS')) return;
   var s = document.createElement('style');
@@ -527,7 +343,6 @@ function _injectCSS() {
     '.trk-chip-err {background:rgba(248,113,113,.1);border-color:rgba(248,113,113,.3);color:#f87171}',
     '.trk-spin-inline{display:inline-block;width:12px;height:12px;border:2px solid #30363d;border-top-color:#388bfd;border-radius:50%;animation:trkSpin .7s linear infinite;vertical-align:middle;margin-right:5px}',
     '@keyframes trkSpin{to{transform:rotate(360deg)}}',
-    // overlay historial
     '#trkHistOv{display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:800;align-items:flex-end;justify-content:center}',
     '#trkHistOv.open{display:flex}',
     '#trkHistSheet{background:#161b22;border-radius:16px 16px 0 0;padding:18px;width:100%;max-width:480px;border:1px solid #30363d;animation:trkUp .22s ease;max-height:88vh;overflow-y:auto}',
@@ -535,7 +350,6 @@ function _injectCSS() {
     '.trk-hist-row{display:flex;gap:9px;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.05)}',
     '.trk-hist-row:last-child{border-bottom:none}',
     '.trk-hist-dot{width:7px;height:7px;border-radius:50%;background:#388bfd;flex-shrink:0;margin-top:5px}',
-    // overlay manual
     '#trkManualOv{display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:800;align-items:flex-end;justify-content:center}',
     '#trkManualOv.open{display:flex}',
     '#trkManualSheet{background:#161b22;border-radius:16px 16px 0 0;padding:18px;width:100%;max-width:480px;border:1px solid #30363d;animation:trkUp .22s ease;max-height:88vh;overflow-y:auto}',
@@ -546,9 +360,6 @@ function _injectCSS() {
   document.head.appendChild(s);
 }
 
-/* ══════════════════════════════════════════════
-   OVERLAYS
-══════════════════════════════════════════════ */
 function _injectOverlays() {
   if (document.getElementById('trkHistOv')) return;
 
@@ -588,18 +399,6 @@ function _injectOverlays() {
   document.body.appendChild(ov2);
 }
 
-/* ══════════════════════════════════════════════
-   CHIP DE ESTADO
-══════════════════════════════════════════════ */
-/* EL PLAZO DE 24 H DE SHALOM.
-   Shalom borra la guía que no se deja en la agencia dentro de 24 h —su propio
-   panel muestra la cuenta atrás— y una guía borrada es un envío que no existe.
-   Sin esto, lo único que veías era "Registrado" y nada que te apurara.
-
-   Devuelve null cuando el pedido no trae sello de hora: los envíos
-   recuperados con `recuperarEnvio` no lo tienen a propósito, porque su hora
-   de nacimiento no se puede afirmar. Mejor sin cuenta atrás que con una
-   inventada que te deje tranquilo mientras el plazo se vence. */
 function _plazoShalom(ship, ahora) {
   var t = Date.parse(String((ship && ship.shalomRegistradoEn) || ''));
   if (!isFinite(t)) return null;
@@ -610,7 +409,7 @@ function _plazoShalom(ship, ahora) {
   return {
     queda: resta,
     vencido: resta <= 0,
-    urgente: resta > 0 && resta < 10800000,   // menos de 3 h
+    urgente: resta > 0 && resta < 10800000,
     texto: (resta <= 0 ? 'venció hace ' : 'quedan ') + h + ' h ' + m + ' min'
   };
 }
@@ -618,14 +417,6 @@ function _plazoShalom(ship, ahora) {
 function _estadoChip(ship) {
   var st = ship.trackingStatus;
   if (!st || st === '—') {
-    /* ★ EL HUECO ENTRE REGISTRAR Y RASTREAR.
-       Al registrar en Shalom el envío ya EXISTE —tiene guía, código y
-       monto— pero todavía no se ha movido, así que no hay nada que
-       rastrear. Decir "Sin consultas aún — presiona Consultar" invita a
-       consultar algo que aún no puede responder, y calla lo único que
-       importa: que está registrado y que hay un plazo para dejarlo.
-       En cuanto Shalom lo mueve, manda el rastreo: el estado del
-       transporte es más fresco que "lo registré yo". */
     if (String(ship.shalomEstado || '').toUpperCase() === 'REGISTRADO') {
       var pz = _plazoShalom(ship);
       var cls = 'trk-chip-pend', cola = ' — déjalo en la agencia';
@@ -651,20 +442,9 @@ function _estadoChip(ship) {
   else if (u.includes('ERROR')   || u.includes('NO SE'))       { cls='trk-chip-err';  ico='⚠'; }
   else                                                           { cls='trk-chip-pend'; ico='📦'; }
 
-  /* FECHA DEL CAMBIO, SIEMPRE. Hubo una vuelta acá que conviene no repetir:
-     por un tiempo el chip mostró "visto hace X" (la hora de la última
-     consulta) en lugar de la fecha del cambio. Resolvía una queja real —
-     un paquete puede pasar días en "En tránsito" y presionar Consultar
-     parecía no hacer nada— pero la resolvía tirando el dato: para trabajar
-     sirve saber CUÁNDO se movió el paquete, no cuándo lo miré.
-     Que la consulta se note es trabajo del aviso ("✓ Sin cambios — sigue
-     En tránsito"), que sale en cada clic. La hora de la última consulta
-     sigue guardada y se ve en el Historial, donde hay sitio. */
   var sello = ship.trackingLastUpdate ?
     new Date(ship.trackingLastUpdate).toLocaleString('es-PE',
       {day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}) : '';
-  // Una fecha ilegible es peor que ninguna: si el dato guardado no es una
-  // fecha válida, el chip va sin sello en vez de decir "Invalid Date".
   if (sello && /invalid/i.test(sello)) sello = '';
 
   return '<div class="trk-chip '+cls+'" onclick="Tracking.verHistorial(\''+_esc(ship.id)+'\')">'+
@@ -673,8 +453,6 @@ function _estadoChip(ship) {
     ' <span style="opacity:.4;font-size:9px">↗</span></div>';
 }
 
-/* "hace 3 min" / "hace 2 h" / "hace 4 d". En minutos hasta la hora, porque el
-   caso que importa es el inmediato: acabo de tocar Consultar, ¿pasó algo? */
 function _haceCuanto(ms){
   var min = Math.floor((Date.now() - ms) / 60000);
   if (min < 1)   return 'recién';
@@ -684,19 +462,12 @@ function _haceCuanto(ms){
   return 'hace ' + Math.floor(h / 24) + ' d';
 }
 
-/* ══════════════════════════════════════════════
-   API PÚBLICA: Tracking
-══════════════════════════════════════════════ */
 var Tracking = {};
-Tracking.checkDestinoAlerts = _checkDestinoAlerts; // vigilante "llegó a destino" (hook desde render)
+Tracking.checkDestinoAlerts = _checkDestinoAlerts;
 
-/* ── Helper: obtener shipments desde cualquier fuente ─────────────── */
 function _getShipments() {
-  // 1. window.S (expuesto por index.html)
   if (window.S && window.S.shipments && window.S.shipments.length) return window.S.shipments;
-  // 2. S como variable global (let S en index.html)
   try { if (typeof S !== 'undefined' && S && S.shipments && S.shipments.length) return S.shipments; } catch(e){}
-  // 3. Buscar en todas las variables globales
   for (var key in window) {
     try {
       var v = window[key];
@@ -715,22 +486,17 @@ function _findShip(shipId) {
     console.warn('[Tracking] No se pudo obtener lista de shipments');
     return null;
   }
-  // Búsqueda exacta primero
   var found = list.find(function(x){ return String(x.id) === String(shipId); });
   if (found) return found;
-  // Fallback: buscar por trackingOrderNumber
   found = list.find(function(x){ return x.trackingOrderNumber && x.trackingOrderNumber === shipId; });
   if (found) return found;
-  // Fallback: buscar por shalomGuia
   found = list.find(function(x){ return x.shalomGuia && x.shalomGuia === shipId; });
   if (found) return found;
   console.warn('[Tracking] Pedido no encontrado con ID:', shipId);
   return null;
 }
 
-/* ── renderCardBlock ─────────────────────────────────────────────── */
 Tracking.renderCardBlock = function(s) {
-  // ★ FIX img 404: limpiar referencias a imágenes inválidas
   if (s.docGuia && typeof s.docGuia === 'string' && s.docGuia === '[img]') s.docGuia = null;
   if (s.docTicket && typeof s.docTicket === 'string' && s.docTicket === '[img]') s.docTicket = null;
   var guia   = s.trackingOrderNumber || s.shalomGuia   || '';
@@ -755,7 +521,6 @@ Tracking.renderCardBlock = function(s) {
     '</div>';
 };
 
-/* ── abrirEdicion ────────────────────────────────────────────────── */
 Tracking.abrirEdicion = function(shipId) {
   var ship = _findShip(shipId);
   if (!ship) return;
@@ -771,16 +536,8 @@ Tracking.abrirEdicion = function(shipId) {
     '<input id="trkOrdNum" class="fi" placeholder="Ej: 82037653" style="font-family:monospace" inputmode="numeric" value="'+_esc(ship.trackingOrderNumber||ship.shalomGuia||'')+'"></div>',
     '<div><label style="font-size:10px;font-weight:700;color:#8b949e;letter-spacing:.8px;display:block;margin-bottom:4px">CÓDIGO</label>',
     '<input id="trkOrdCode" class="fi" placeholder="Ej: TT9C" style="font-family:monospace;text-transform:uppercase" oninput="this.value=this.value.toUpperCase()" maxlength="8" value="'+_esc(ship.trackingOrderCode||ship.shalomCodigo||'')+'"></div>',
-    // ESTADO: lo que dice Shalom, puesto a mano. Vale IGUAL que una lectura
-    // automática — pasa por el mismo aplicador, así que escribe historial y
-    // mueve la etiqueta según tu modo. Pensado para el celular, donde el
-    // rastreo automático (que corre en la PC) no puede llegar.
     '<div><label style="font-size:10px;font-weight:700;color:#8b949e;letter-spacing:.8px;display:block;margin-bottom:4px">ESTADO EN SHALOM</label>',
     '<select id="trkEstado" class="fs">',
-    // Se preselecciona el estado actual (si coincide con uno de la lista) para
-    // que veas dónde está el pedido sin tener que abrir el historial. Aun así,
-    // guardar sin tocarlo no reescribe nada: el aplicador ignora el estado
-    // repetido, así que no ensucia el historial con entradas duplicadas.
     ESTADOS_SHALOM.map(function(e){
       var sel = (e && e === (ship.trackingStatus || '')) ? ' selected' : '';
       return '<option value="'+_esc(e)+'"'+sel+'>'+(e ? _esc(e) : '— No cambiar —')+'</option>';
@@ -794,13 +551,9 @@ Tracking.abrirEdicion = function(shipId) {
     '</div>',
   ].join('');
   ov.classList.add('open');
-  // Avisos del número de guía (formato y repetida). Va DESPUÉS del innerHTML:
-  // el modal se reconstruye entero cada vez que se abre, así que el campo que
-  // había antes ya no existe.
   if (window.Guias) window.Guias.vigilar('trkOrdNum', shipId);
 };
 
-/* ── _guardarEdicion ─────────────────────────────────────────────── */
 Tracking._guardarEdicion = function(shipId) {
   var ship = _findShip(shipId);
   if (!ship) return;
@@ -817,38 +570,23 @@ Tracking._guardarEdicion = function(shipId) {
   ship.shalomCodigo        = code;
   ship.shippingCourier = 'Shalom';
 
-  // Si cambió la guía, resetear estado
   if (guiaAnterior && guiaAnterior !== num) {
     ship.trackingStatus    = '';
     ship.trackingMessage   = '';
     ship.trackingLastUpdate= '';
     ship.shalomEstado      = '';
-    /* La guía nueva no la registró Shalom Pro desde aquí: sin su marca ni
-       su hora, no hay plazo de 24 h ni «registrar de nuevo» que ofrecer. */
     ship.shalomPor          = '';
     ship.shalomRegistradoEn = '';
   }
 
-  // Guardar la guía NO mueve la etiqueta: conserva la que tenía. Es la primera
-  // consulta (manual o automática) la que la pasa a ENVIADO. Antes esto forzaba
-  // ENVIADO en cada guardado, así que un pedido ya en LLEGÓ A DESTINO retrocedía
-  // a ENVIADO al entrar solo a corregir la guía — el "a veces cambia de etiqueta
-  // y se regresa solo" que buscábamos.
-
-  // ESTADO puesto a mano: entra por el MISMO aplicador que el automático, así
-  // que hace exactamente lo mismo (historial + etiqueta según el modo). Vacío =
-  // no cambiar. Se marca como 'manual' para distinguirlo en el historial.
   var rEstado = null;
   if (estado) rEstado = _aplicarEstadoShalom(ship, {ok: true, estado: estado}, 'manual');
 
   if (typeof window.save   === 'function') window.save(ship.id);
-  // ★ Subida INMEDIATA: para que el link del cliente lo vea al instante.
   if (typeof window._fbSaveShipmentNow === 'function') window._fbSaveShipmentNow(ship);
   if (typeof window.render === 'function') window.render();
   document.getElementById('delOverlay').classList.remove('open');
   if (typeof window.toast === 'function') {
-    // El aviso informa lo que dice Shalom y, cuando toca, sugiere la acción.
-    // Ya no anuncia cambios de etiqueta: la etiqueta la mueves tú.
     window.toast(
       !rEstado ? '✅ Tracking guardado' :
       rEstado.resultado === 'FINALIZADO' ? '✅ ' + estado + ' — puedes finalizarlo' :
@@ -858,8 +596,6 @@ Tracking._guardarEdicion = function(shipId) {
   }
 };
 
-/* Consulta un pedido por la puerta y aplica el resultado. Devuelve el objeto
-   del aplicador. No toca UI global (lo hace el llamador). */
 async function _consultarYAplicar(ship){
   var guia = ship.trackingOrderNumber || ship.shalomGuia || '';
   var codigo = ship.trackingOrderCode || ship.shalomCodigo || '';
@@ -868,18 +604,8 @@ async function _consultarYAplicar(ship){
   return _aplicarEstadoShalom(ship, resp);
 }
 
-/* El aviso de una consulta, en un solo sitio.
-
-   EL ORDEN IMPORTA, y es la parte que estaba mal: antes lo primero que se
-   preguntaba era si el TEXTO había cambiado, y si no, se decía "sin cambios"
-   y se acababa ahí. Eso tapaba el caso que de verdad importa — el paquete
-   avanzó pero Shalom lo redacta igual. Pasó con la guía 95046118: llegó a
-   destino a las 08:34, el panel lo supo (pasos = 2) y respondió "sin cambios".
-   Ahora se pregunta primero si AVANZÓ. */
 function _avisoConsulta(ship, r){
   var estado = ship.trackingStatus || '—';
-  // Un retroceso bloqueado no es un fallo ni un cambio: se dice lo que hay y
-  // lo que se rechazó, para que nunca sea una decisión silenciosa.
   if (r.retroceso) {
     return '🛡️ Sigue ' + estado + ' — Shalom devolvió "' +
            (r.intento || '—') + '", que es anterior; no se aplicó';
@@ -892,16 +618,11 @@ function _avisoConsulta(ship, r){
   return '✓ Sin cambios — sigue ' + estado;
 }
 
-/* La situación de la guía: la ÚNICA regla (functions/registroShalom.js →
-   situacion), la misma que usan el ticket y la consulta por horarios. */
 function _situacion(ship){
   var R = window.RegistroShalom;
   return (R && R.situacion) ? R.situacion(ship, Date.now()) : {tipo: 'normal', venceEn: null};
 }
 
-/* «Shalom no conoce esta guía» (NO_ENCONTRADO) o «solo registrada»
-   (SOLO_REGISTRADO), dicho según la situación. No es un error: con la guía
-   del panel por dejar es justo lo esperado. */
 function _textoSinRastro(ship, r){
   var sit = _situacion(ship);
   var pendiente = r && r.motivo === 'PENDIENTE';
@@ -913,16 +634,13 @@ function _textoSinRastro(ship, r){
     return (pendiente ? '📦 Registrada en tu Shalom Pro — pendiente: falta dejar el paquete en la agencia' :
       '📦 Registrado — aún no entra a la agencia') + cuando;
   }
-  /* El servidor ya miró tus envíos pendientes y no está: no es «normal». */
   if (r && r.revisoPendientes) {
     return '⚠️ Shalom no tiene esta guía (ni en su rastreo ni en tus pendientes) — revisa número y código';
   }
   return '📦 Shalom aún no tiene esta guía en su rastreo — si no dejaste el paquete, es normal; si ya lo dejaste, revisa número y código';
 }
-/* PENDIENTE: el servidor la encontró entre los envíos pendientes de tu cuenta. */
 function _esSinRastro(motivo){ return motivo === 'NO_ENCONTRADO' || motivo === 'SOLO_REGISTRADO' || motivo === 'PENDIENTE'; }
 
-/* ── consultarAhora: botón ⟳ por tarjeta ─────────────────────────── */
 Tracking.consultarAhora = async function(shipId) {
   var ship = _findShip(shipId);
   if (!ship) {
@@ -934,7 +652,6 @@ Tracking.consultarAhora = async function(shipId) {
     if (window.toast) window.toast('⚠️ Primero guarda el número de orden');
     return;
   }
-  // Vencida (72 h sin movimiento): no se gasta una consulta en ella.
   if (_situacion(ship).tipo === 'vencida') {
     if (window.toast) window.toast('⏰ Esta guía venció sin dejar el paquete — regístrala de nuevo');
     return;
@@ -945,29 +662,20 @@ Tracking.consultarAhora = async function(shipId) {
 
   var r = await _consultarYAplicar(ship);
   if (r.cambio) {
-    // La hora de consulta se guarda siempre, haya cambiado el estado o no: es
-    // lo que permite que el chip muestre "visto hace un momento" y que tocar
-    // el botón se note aunque el paquete lleve días quieto.
     if (window.save) window.save(ship.id);
-    if (window._fbSaveShipmentNow) window._fbSaveShipmentNow(ship); // subida inmediata
+    if (window._fbSaveShipmentNow) window._fbSaveShipmentNow(ship);
     if (window.render) window.render();
     if (window.toast) window.toast(_avisoConsulta(ship, r));
   } else {
     if (window.toast) {
-      // PUERTA_CERRADA trae `reabre` (una hora) en vez de `detalle` (un texto).
       var extra = (r.motivo === 'PUERTA_CERRADA') ? r.reabre : r.detalle;
       window.toast(_esSinRastro(r.motivo) ? _textoSinRastro(ship, r) : _motivoTexto(r.motivo, extra));
     }
   }
-  // Se restaura SIEMPRE, en los dos caminos. Antes solo se hacía en el de
-  // error: el otro confiaba en que render() redibujara la tarjeta, y si el
-  // pedido quedaba fuera del filtro activo o render fallaba, el botón se
-  // quedaba en "Consultando…" para siempre.
   var btn2 = document.getElementById('btn-consult-' + shipId);
   if (btn2) { btn2.innerHTML = '⟳ Consultar'; btn2.disabled = false; }
 };
 
-/* ── bulkTrack: masivo desde el ícono 🔄 con selección ───────────── */
 Tracking.bulkTrack = async function(ids) {
   var ships = (ids || []).map(_findShip).filter(Boolean).filter(function(s){
     var isShalom = s.courier && String(s.courier).toUpperCase().indexOf('SHALOM') >= 0;
@@ -981,9 +689,6 @@ Tracking.bulkTrack = async function(ids) {
     var r = await _consultarYAplicar(ships[i]);
     if (r.cambio) {
       ok++;
-      // Solo se marca para guardar lo que realmente cambió: un retroceso
-      // bloqueado no escribió nada, y marcarlo sucio sería una escritura
-      // en Firestore por un pedido que quedó igual.
       if (r.escribio) changed.push(ships[i].id);
       if (r.avanzo || r.resultado === 'EN_DESTINO' ||
           r.resultado === 'FINALIZADO') avanzaron++;
@@ -995,7 +700,6 @@ Tracking.bulkTrack = async function(ids) {
   if (changed.length && window.save) window.save(changed);
   if (window.render) window.render();
   if (window.toast) {
-    // Si NINGUNO respondió, di el motivo (p.ej. desconectado); si algunos sí, resume.
     if (!ok && !porDejar && ultimoMotivo) window.toast(_motivoTexto(ultimoMotivo, ultimoDetalle));
     else window.toast('✅ ' + ok + ' consultado' + (ok!==1?'s':'') +
       (avanzaron ? ' · 📍 ' + avanzaron + ' avanzó' + (avanzaron!==1?'n':'') : '') +
@@ -1004,7 +708,6 @@ Tracking.bulkTrack = async function(ids) {
   }
 };
 
-/* ── verHistorial ────────────────────────────────────────────────── */
 Tracking.verHistorial = function(shipId) {
   var ship = _findShip(shipId);
   var ov   = document.getElementById('trkHistOv');
@@ -1020,7 +723,6 @@ Tracking.verHistorial = function(shipId) {
     '<div style="font-family:Syne,sans-serif;font-weight:800;font-size:16px;margin-bottom:4px">📋 Historial</div>',
     '<div style="font-size:12px;color:#8b949e;margin-bottom:14px">'+_esc(ship.name)+' · '+_esc(ship.trackingOrderNumber||'—')+'</div>',
 
-    // Estado actual
     ship.trackingStatus&&ship.trackingStatus!=='—' ? [
       '<div style="background:rgba(56,139,253,.08);border:1px solid rgba(56,139,253,.2);border-radius:9px;padding:10px 12px;margin-bottom:12px">',
       '<div style="font-size:10px;font-weight:700;color:#388bfd;letter-spacing:.8px;margin-bottom:4px">ESTADO ACTUAL</div>',
@@ -1028,13 +730,10 @@ Tracking.verHistorial = function(shipId) {
       ship.trackingOrigen  ? '<div style="font-size:11px;color:#8b949e;margin-top:4px">🏙 Origen: '+_esc(ship.trackingOrigen)+'</div>' : '',
       ship.trackingDestino ? '<div style="font-size:11px;color:#8b949e">📍 Destino: '+_esc(ship.trackingDestino)+'</div>' : '',
       ship.trackingLastUpdate ? '<div style="font-size:10px;color:#8b949e;margin-top:4px">Actualizado: '+new Date(ship.trackingLastUpdate).toLocaleString('es-PE')+'</div>' : '',
-      // La hora de la última consulta vive acá y no en el chip: en el chip
-      // desplazaba a la fecha del cambio, que es el dato con el que se trabaja.
       ship.trackingLastAutoCheck ? '<div style="font-size:10px;color:#8b949e">Última consulta: '+_esc(_haceCuanto(Number(ship.trackingLastAutoCheck)))+'</div>' : '',
       '</div>'
     ].join('') : '',
 
-    // Historial Shalom (estados de la API)
     histS.length ? [
       '<div style="font-size:10px;font-weight:800;color:#8b949e;letter-spacing:.8px;margin-bottom:8px">ESTADOS SHALOM</div>',
       '<div style="background:#1c2333;border:1px solid #30363d;border-radius:9px;padding:4px 12px;margin-bottom:12px">',
@@ -1047,16 +746,11 @@ Tracking.verHistorial = function(shipId) {
       '</div>'
     ].join('') : '',
 
-    // Log de consultas
     hist.length ? [
       '<div style="font-size:10px;font-weight:800;color:#8b949e;letter-spacing:.8px;margin-bottom:8px">CONSULTAS REALIZADAS</div>',
       '<div style="background:#1c2333;border:1px solid #30363d;border-radius:9px;padding:4px 12px">',
       hist.slice().reverse().map(function(h){
         var fecha = h.date ? new Date(h.date).toLocaleString('es-PE',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}) : '';
-        // AUTO = lo leyó el lector de la PC ('shalom', 'shalom-local', 'auto');
-        // MANUAL = lo puso el operador a mano. Antes cualquier cosa que no
-        // dijera 'auto' salía como MANUAL, así que las lecturas automáticas se
-        // mostraban mal.
         var srcBadge = (h.source !== 'manual')
           ? '<span style="background:rgba(167,139,250,.15);color:#a78bfa;border:1px solid rgba(167,139,250,.3);border-radius:6px;padding:1px 6px;font-size:9px;font-weight:700;margin-left:5px">AUTO</span>'
           : '<span style="background:rgba(56,139,253,.15);color:#388bfd;border:1px solid rgba(56,139,253,.3);border-radius:6px;padding:1px 6px;font-size:9px;font-weight:700;margin-left:5px">MANUAL</span>';
@@ -1073,19 +767,14 @@ Tracking.verHistorial = function(shipId) {
   ov.classList.add('open');
 };
 
-/* ── abrirManual ─────────────────────────────────────────────────── */
 Tracking.abrirManual = function() {
   var ov = document.getElementById('trkManualOv');
   if (ov) ov.classList.add('open');
 };
 
-/* ── copiarLink ──────────────────────────────────────────────────── */
 Tracking.copiarLink = function(id) {
   var base = typeof getSeguimientoLink === 'function' ? getSeguimientoLink()
     : window.location.origin + window.location.pathname.replace(/\/[^\/]*$/, '/seguimiento.html');
-  /* El token, no el id — ver functions/enlaceSeguimiento.js. Un pedido de
-     ayer no tiene token y se cae a su id, que es justo lo que queremos: su
-     link ya enviado sigue abriendo. */
   var _ped = (window.S && S.shipments || []).filter(function(x){ return x && x.id === id; })[0];
   var url = base + '?seg=' + (window.EnlaceSeguimiento
     ? EnlaceSeguimiento.tokenDe(_ped || {id: id}) : id);
@@ -1101,28 +790,14 @@ Tracking.copiarLink = function(id) {
   }
 };
 
-/* ── Auto-check al abrir el panel — APAGADO A PROPÓSITO ──────────────
-   Esto consultaba TODOS los pedidos Shalom pendientes cada vez que abrías el
-   panel. Antes no se notaba porque estaba gateado en Shalom.DISPONIBLE, que
-   era false; al conectar la API oficial se habría despertado solo y, con ~60
-   pedidos en cola, habría disparado ~60 consultas en cada apertura.
-
-   Se deja apagado por dos razones:
-     1. Fase 1 es para VALIDAR con el botón ⟳ Consultar, de a una guía. Un
-        barrido masivo antes de comprobar que el traductor lee bien la
-        respuesta multiplicaría un error por sesenta.
-     2. Los webhooks de la Fase 2 hacen innecesario preguntar: Shalom avisa
-        cuando algo cambia. Este ciclo desaparece entonces.
-
-   Para reactivarlo temporalmente: poner AUTO_CHECK_ACTIVO en true. */
 var AUTO_CHECK_ACTIVO = false;
 var _autoRunning = false;
 async function autoTrackingCheck() {
-  if (!AUTO_CHECK_ACTIVO) return;                           // ver nota de arriba
-  if (!(window.Shalom && window.Shalom.DISPONIBLE)) return; // puerta desconectada
+  if (!AUTO_CHECK_ACTIVO) return;
+  if (!(window.Shalom && window.Shalom.DISPONIBLE)) return;
   if (_autoRunning) return;
   var cfg = (window.S && window.S.config) || {};
-  if (cfg.shalomAutoTrack === false) return;               // el operador lo apagó
+  if (cfg.shalomAutoTrack === false) return;
   var ships = _getShipments();
   if (!ships) return;
   var ahora = Date.now();
@@ -1140,7 +815,7 @@ async function autoTrackingCheck() {
   var ok = 0, changed = [];
   for (var i = 0; i < pend.length; i++) {
     try { var r = await _consultarYAplicar(pend[i]); if (r.cambio) { ok++; changed.push(pend[i].id); } }
-    catch (e) { /* la puerta ya devuelve {ok:false}; no rompemos el ciclo */ }
+    catch (e) {  }
     if (i < pend.length - 1) await new Promise(function(res){ setTimeout(res, 700); });
   }
   if (changed.length && window.save) window.save(changed);
@@ -1149,11 +824,9 @@ async function autoTrackingCheck() {
   _autoRunning = false;
 }
 
-/* ── init ────────────────────────────────────────────────────────── */
 Tracking.init = function() {
   _injectCSS();
   _injectOverlays();
-  // Sincronizar S con window.S con reintento
   function _syncS() {
     try {
       if (typeof S !== 'undefined' && S && S.shipments) {
@@ -1167,7 +840,7 @@ Tracking.init = function() {
     if (!_syncS()) {
       setTimeout(function(){ _syncS(); autoTrackingCheck(); }, 2000);
     } else {
-      autoTrackingCheck(); // no-op mientras Shalom.DISPONIBLE sea false
+      autoTrackingCheck();
     }
   }, 2000);
 };

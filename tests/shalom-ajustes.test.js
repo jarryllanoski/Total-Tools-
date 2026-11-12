@@ -71,7 +71,7 @@ module.exports = async ({bloque, ok}) => {
     const src = E.leer('functions/index.js');
     const fn = src.slice(src.indexOf('async function _correrBarrido'),
         src.indexOf('exports.barridoShalom'));
-    ok(!/simulacro/.test(fn.replace(/\/\/.*$/gm, '').replace(/\/\*[\s\S]*?\*\//g, '')),
+    ok(!/simulacro/.test(fn),
        'el servidor ya no lee `simulacro`: aunque quede guardado, se ignora');
     ok(/if \(escrituras\.length\) \{/.test(fn),
        'y escribe siempre lo que encuentra');
@@ -92,7 +92,7 @@ module.exports = async ({bloque, ok}) => {
 
   {
     const src = E.trozo('index.html', 'function _cfgBarrido(){',
-        '/* Por qué fallaron');
+        'const _MOTIVO_HUMANO = {');
     const pedidas = [];
     const guardados = [];
     const avisos = [];

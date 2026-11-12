@@ -1,21 +1,7 @@
-/**
- * panel/pedidos/notify.js — la campana de avisos
- * Fase 7 (11/11/2026): movido de la raíz a su capa, sin cambiar una línea.
- */
-/**
- * notify.js — Campana de notificaciones para Total Tools v2
- * ==========================================================
- * - Notifica pedidos nuevos del formulario (últimas 2h)
- * - Botón 👁 Ver → scroll hasta la card del cliente + resaltar
- * - Botón 🖨️ Imprimir → abre modal de impresión con pedido preseleccionado
- * - Flag _printed en Firebase → sincronizado en todos los dispositivos
- * - Badge morado con contador de no impresos
- */
 (function(){
 
   var _notifs = [];
 
-  /* ── CSS ─────────────────────────────────────────────────────────── */
   var style = document.createElement('style');
   style.textContent = `
     #notifyBtn {
@@ -91,7 +77,6 @@
   `;
   document.head.appendChild(style);
 
-  /* ── INYECTAR CAMPANA ────────────────────────────────────────────── */
   function _inject(){
     var slot = document.getElementById('notifyBellSlot');
     if(!slot || slot.querySelector('#notifyBtn')) return;
@@ -121,30 +106,22 @@
     });
   }
 
-  /* ¿Se imprimió? La misma respuesta que la tarjeta y el panel de
-     impresión (PrintModule.impreso): antes la campana solo miraba
-     `_printed`, que casi nunca se ponía, y ofrecía «Imprimir» de pedidos
-     ya impresos. */
   function _impreso(s){
     if(window.PrintModule && typeof window.PrintModule.impreso === 'function') return window.PrintModule.impreso(s);
     return !!(s && (s.printed || s._printed));
   }
 
-  /* N° de factura/boleta, leído del PEDIDO al pintar, no copiado en la
-     notificación: si se corrige en «Editar», la campana dice el nuevo. */
   function _nroDe(shipId){
     if(!window.NroComprobante || !shipId || !window.S || !S.shipments) return '';
     var s = S.shipments.find(function(x){ return x && x.id === shipId; });
     return s ? NroComprobante.de(s) : '';
   }
 
-  /* ── RENDER ──────────────────────────────────────────────────────── */
   function _render(){
     var list  = document.getElementById('notifyList');
     var badge = document.getElementById('notifyBadge');
     if(!list) return;
 
-    // Badge = pedidos nuevos SIN imprimir
     var sinImprimir = _notifs.filter(function(n){ return !n.printed; }).length;
     if(badge){
       badge.textContent = sinImprimir;
@@ -161,7 +138,6 @@
         ? '<button class="notify-btn notify-btn-printed" disabled>✅ Impreso</button>'
         : '<button class="notify-btn notify-btn-print" onclick="NotifyModule.imprimir('+i+')">🖨️ Imprimir</button>';
 
-      // Link del pedido (mismo estilo de pastilla .link-chip del panel), clickeable
       var linkHtml = n.link
         ? '<a href="' + n.link.replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;') + '" target="_blank" rel="noopener" class="link-chip" onclick="event.stopPropagation()">🔗 Link</a>'
         : '';
@@ -186,7 +162,6 @@
     }).join('');
   }
 
-  /* ── HELPERS ─────────────────────────────────────────────────────── */
   function _timeAgo(ts){
     var d = Date.now() - ts;
     var m = Math.floor(d/60000);
@@ -205,41 +180,26 @@
     if(panel) panel.classList.remove('open');
   }
 
-  /* ── VER: scroll hasta la card ───────────────────────────────────── */
   function _verShipment(id){
     _closePanel();
 
-    /* "Ver" es navegación determinista: llevar a la ETIQUETA donde vive el
-       pedido y destrabar lo que pudiera ocultarlo (búsqueda + filtros
-       avanzados), para que SIEMPRE aparezca.
-
-       ESTA LÓGICA YA NO VIVE AQUÍ. Vivía solo aquí, y el camino de crear un
-       pedido tenía su propia versión —peor— que fallaba cuando el filtro ya
-       estaba puesto en el estado del pedido nuevo: `setFilt` no repintaba y
-       la tarjeta no llegaba al DOM. Dos caminos para lo mismo y uno roto.
-       Ahora es uno: `irAlPedido()` en index.html, que es ESTE código
-       promovido tal cual. Ver el comentario de allí. */
     if(typeof window.irAlPedido === 'function') window.irAlPedido(id);
     else if(typeof window.render === 'function') window.render();
   }
 
-  /* ── IMPRIMIR ────────────────────────────────────────────────────── */
   function _imprimirShipment(id, notifIdx){
     _closePanel();
 
     var ship = window.S && window.S.shipments && window.S.shipments.find(function(s){ return s.id===id; });
     if(!ship) return;
 
-    // openOne imprime solo este pedido sin tocar los seleccionados del panel
     if(window.PrintModule && window.PrintModule.openOne){
       window.PrintModule.openOne(id);
     }
 
-    // Marcar como impreso tras confirmación del navegador
     var _onAfterPrint = function(){
       window.removeEventListener('afterprint', _onAfterPrint);
       ship._printed = true;
-      // Con id: sube SOLO este pedido. Sin id subiría los ~700.
       if(typeof window.save === 'function') window.save(ship.id);
       if(_notifs[notifIdx]) _notifs[notifIdx].printed = true;
       _render();
@@ -249,7 +209,6 @@
     setTimeout(function(){ window.removeEventListener('afterprint', _onAfterPrint); }, 30000);
   }
 
-  /* ── OBSERVAR NUEVOS PEDIDOS ─────────────────────────────────────── */
   var _seenIds = {};
 
   function _checkNewShipments(){
@@ -258,7 +217,6 @@
 
     S.shipments.forEach(function(s){
       if(_seenIds[s.id]) {
-        // Actualizar estado impreso si cambió en Firebase
         var existing = _notifs.find(function(n){ return n.shipId === s.id; });
         if(existing && _impreso(s) && !existing.printed){
           existing.printed = true;
@@ -268,9 +226,6 @@
       }
       _seenIds[s.id] = true;
 
-      // Notificar pedidos nuevos recientes (últimas 2 horas): tanto los del
-      // formulario público como los creados a mano (+ azul). Cada dispositivo
-      // deriva la notificación del pedido ya sincronizado → aparece en todos.
       var ts = s.createdAt ? new Date(s.createdAt).getTime() : 0;
       if(!ts || Date.now() - ts > 2*60*60*1000) return;
       if(s.fromForm || s.status==='NUEVO PEDIDO'){
@@ -287,11 +242,9 @@
     });
   }
 
-  /* ── API PÚBLICA ─────────────────────────────────────────────────── */
   window.NotifyModule = {
 
     add: function(opts){
-      // Evitar duplicados
       if(_notifs.find(function(n){ return n.shipId === opts.shipId; })) return;
       _notifs.unshift({
         icon:    opts.icon    || '🔔',
@@ -333,7 +286,6 @@
       if(!panel) return;
       panel.classList.toggle('open');
       if(panel.classList.contains('open')){
-        // Actualizar tiempos al abrir
         _notifs.forEach(function(n){ n.time = _timeAgo(n.ts); });
         _render();
       }
@@ -342,7 +294,6 @@
     check: _checkNewShipments
   };
 
-  /* ── INIT ────────────────────────────────────────────────────────── */
   function init(){
     _inject();
     var _origRender = window.render;

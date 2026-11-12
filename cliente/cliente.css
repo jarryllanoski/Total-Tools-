@@ -1,23 +1,17 @@
-/* cliente/cliente.css — estilos del formulario y del seguimiento (Fase 2,
-   10/11/2026). Antes iban dentro de formulario.html; ahora las dos páginas
-   comparten este archivo, y el navegador lo guarda una sola vez. */
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{--bg:#080810;--card:#0f0f1a;--card2:#13131f;--bd:#1e1e30;--blue:#4f8ef7;--green:#22c55e;--red:#f87171;--purple:#a78bfa;--text:#f0f0f8;--text2:#6b7280}
 body{background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,sans-serif;min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:0 0 40px}
 .container{width:100%;max-width:460px;padding:0 16px}
 
-/* HEADER */
 .biz-header{padding:20px 0 12px;text-align:center}
 .biz-name{font-size:22px;font-weight:700;margin-bottom:2px}
 .biz-city{font-size:13px;color:var(--text2)}
 
-/* PROGRESS DOTS */
 .prog-dots{display:flex;gap:8px;justify-content:center;padding:12px 0 20px}
 .pdot{width:10px;height:10px;border-radius:50%;background:var(--bd);transition:background .25s,transform .25s}
 .pdot.active{background:var(--blue);transform:scale(1.2)}
 .pdot.done{background:var(--blue);opacity:.5}
 
-/* WIZARD CONTAINER */
 .wizard{position:relative;overflow:hidden}
 .wstep{display:none;animation:slideIn .25s ease}
 .wstep.active{display:block}
@@ -25,14 +19,11 @@ body{background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,
 @keyframes slideBack{from{opacity:0;transform:translateX(-24px)}to{opacity:1;transform:translateX(0)}}
 .wstep.back{animation:slideBack .25s ease}
 
-/* STEP HEADER */
 .step-head{margin-bottom:20px}
 .step-ttl{font-size:20px;font-weight:700;margin-bottom:4px}
 .step-sub{font-size:13px;color:var(--text2)}
 
-/* FIELDS */
 .fg{margin-bottom:14px}
-/* ★ DNI Y NOMBRE (30/10/2026): escanear, aparecer, iluminarse. */
 #f_dni.dni-escanea{background-image:linear-gradient(90deg,transparent,rgba(79,142,247,.28),transparent);background-size:40% 100%;background-repeat:no-repeat;animation:dniEscanea 1s linear infinite}
 @keyframes dniEscanea{from{background-position:-60% 0}to{background-position:160% 0}}
 .dni-buscando{font-size:12.5px;color:var(--blue);font-weight:700}
@@ -59,20 +50,11 @@ body{background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,
 textarea.fi{resize:vertical;line-height:1.5}
 .fi.err{border-color:var(--red)}
 .fi.sel{background:var(--card);background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%236b7280' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 16px center;padding-right:40px;padding-top:16px;padding-bottom:16px;cursor:pointer;font-weight:600}
-/* 3 opciones por fila. La rejilla es de 6 columnas y cada tarjeta ocupa 2:
-   así las que sobran en la última fila se pueden CENTRAR (con 3 columnas
-   reales no se puede, harían falta medias columnas). */
 #courierCards{display:grid;grid-template-columns:repeat(6,1fr);gap:10px}
 .cour-card{grid-column:span 2;position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:7px;background:var(--card2);border:2px solid #626274;border-radius:14px;padding:16px 10px;min-height:106px;cursor:pointer;font-family:inherit;color:var(--text);transition:border-color .15s,background .15s,transform .05s}
-/* ★ «ESTOY ENCIMA» en las tarjetas de envío (30/10/2026): con mouse se
-   elevan y se iluminan; con el dedo se hunden al presionar. */
 .cour-card.sel{border-color:#12a5b4;background:rgba(18,165,180,.10)}
-/* Sobrantes de la última fila: CENTRADOS, del mismo tamaño que el resto.
-   Estirar la última a todo el ancho (como se hacía con 2 columnas) miente
-   sobre la jerarquía: parecería la opción importante. Funciona con cualquier
-   número de couriers, que el operador activa y desactiva desde el panel. */
-.cour-card:last-child:nth-child(3n+1){grid-column:3 / span 2}      /* sobra 1 */
-.cour-card:nth-last-child(2):nth-child(3n+1){grid-column:2 / span 2} /* sobran 2 */
+.cour-card:last-child:nth-child(3n+1){grid-column:3 / span 2}
+.cour-card:nth-last-child(2):nth-child(3n+1){grid-column:2 / span 2}
 .cour-card .cc-ic{display:flex;align-items:center;justify-content:center}
 .cour-card .cc-ic svg{width:30px;height:30px;display:block}
 .cour-card .cc-body{display:flex;flex-direction:column;gap:2px;min-width:0;width:100%}
@@ -83,12 +65,6 @@ textarea.fi{resize:vertical;line-height:1.5}
 .ferr{font-size:12px;color:var(--red);margin-top:5px;display:none}
 .ferr.show{display:block}
 
-/* COURIER GRID */
-
-/* ★ «ESTOY ENCIMA» — UN estilo, UNA clase (.tocando), para envíos, días y
-   sedes (30/10/2026). En PC la pone el mouse al pasar por encima; en celular
-   (no hay «pasar por encima») la pone el dedo al apoyarse. Mismo efecto en
-   todos los dispositivos, sin duplicar reglas por :hover / :active. */
 .cour-card,.date-opt{transition:border-color .15s,background .15s,transform .15s,box-shadow .15s;-webkit-tap-highlight-color:transparent}
 .ag-item{-webkit-tap-highlight-color:transparent}
 .cour-card.tocando{transform:translateY(-2px);border-color:#12a5b4;box-shadow:0 6px 18px rgba(18,165,180,.28)}
@@ -98,17 +74,12 @@ textarea.fi{resize:vertical;line-height:1.5}
 .cour-card:focus-visible,.date-opt:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
 @media(prefers-reduced-motion:reduce){.cour-card.tocando,.date-opt.tocando{transform:none}}
 
-/* DATE CHIPS */
 .dates-scroll{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px;scrollbar-width:none;-ms-overflow-style:none}
 .dates-scroll::-webkit-scrollbar{display:none}
 .date-opt{background:var(--card);border:1.5px solid var(--bd);border-radius:12px;padding:10px 14px;text-align:center;cursor:pointer;transition:border-color .15s,background .15s;user-select:none;flex-shrink:0;min-width:60px}
 .date-opt.active{border-color:var(--blue);background:#1b3466}
-/* ★ TOCAR Y ELEGIR SE SIENTE (30/10/2026). Microinteracciones breves
-   (≤0,3 s), UNA vez por elección; vibración solo al ELEGIR (Android). */
 .date-opt{position:relative}
 .date-opt.active::after{content:"✓";position:absolute;top:2px;right:2px;width:14px;height:14px;border-radius:50%;background:var(--blue);color:#fff;font-size:9px;font-weight:900;display:flex;align-items:center;justify-content:center}
-/* El dedo apoyó: respuesta AL INSTANTE (el navegador demora :active en
-   filas que se deslizan). Si el dedo se mueve, se quita y no elige. */
 .tt-pop{animation:ttPop .3s cubic-bezier(.34,1.56,.64,1)}
 @keyframes ttPop{0%{transform:scale(.94)}60%{transform:scale(1.06)}100%{transform:scale(1)}}
 .dates-wrap{position:relative}
@@ -133,46 +104,29 @@ textarea.fi{resize:vertical;line-height:1.5}
 .d-mon{font-size:10px;color:var(--text2)}
 .date-opt.active .d-day,.date-opt.active .d-mon{color:var(--blue)}
 
-/* AGENCY CASCADE */
 .agc-box{padding:14px;background:var(--card2);border:1px solid var(--bd);border-radius:12px}
 .agc-lbl{font-size:11px;font-weight:700;color:var(--text2);letter-spacing:.6px;text-transform:uppercase;margin-bottom:10px;display:block}
 .ag-ubic{background:rgba(79,142,247,.08);border:1.5px solid rgba(79,142,247,.35);border-radius:14px;padding:12px;margin:2px 0 12px}
-/* ★ El BOTÓN NATIVO <geolocation> (Chrome 144+). Chrome dibuja su texto e
-   ícono y limita el estilo; IGNORA box-sizing y añade relleno lateral
-   propio: con width:100% + ese relleno se sale de la pantalla y Chrome lo
-   declara inválido («intersection_out_of_viewport_or_clipped») y NO
-   responde al toque. Por eso relleno lateral 0. Medido en Chromium 153. */
 .ag-geo{display:block;width:100%;padding:16px 0;border:0;border-radius:12px;background:var(--blue);color:#fff;font-size:16px;font-weight:800;font-family:inherit}
 .ag-ubic-btn{width:100%;min-height:52px;border:none;border-radius:12px;background:var(--blue);color:#fff;font-size:15.5px;font-weight:800;font-family:inherit;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px}
 .ag-ubic-btn:disabled{opacity:.8;cursor:progress}
 .ag-ubic-sub{font-size:11.5px;color:var(--text2);line-height:1.45;margin-top:8px;text-align:center}
 .ag-ubic.ag-ubic-error{background:rgba(234,179,8,.08);border-color:rgba(234,179,8,.35)}
 .ag-ubic-sub a{color:var(--blue);font-weight:700;cursor:pointer;text-decoration:underline;white-space:nowrap}
-/* ★ «LLÉVAME A LA LUPA» (30/10/2026): si la ubicación sigue bloqueada, no
-   se repite el error; el buscador se ilumina y queda listo para escribir. */
-/* El encabezado del buscador SIEMPRE dice qué buscar. Cuando el cliente
-   llega aquí porque la ubicación no se pudo, se enciende (azul + 👇). */
 #agLupaHint{font-size:12px;font-weight:700;color:var(--text2);margin:0 0 6px;letter-spacing:.02em}
 #agLupaHint .ag-lh-ic::before{content:"🔍 "}
 #agLupaHint.on{color:var(--blue);font-size:12.5px}
 #agLupaHint.on .ag-lh-ic::before{content:"👇 "}
 .ag-buscar-foco .fi{border-color:var(--blue);animation:agFoco 1s ease-in-out 2}
 @keyframes agFoco{0%,100%{box-shadow:0 0 0 0 rgba(91,155,255,0)}50%{box-shadow:0 0 0 6px rgba(91,155,255,.35)}}
-/* ★ En el paso de la sede la etiqueta de arriba no se ve (30/10/2026): una
-   pantalla, una tarea. Vuelve en el paso 4 ya con la sede en DESTINO. */
 body.wz-sede #tt-lbl{display:none!important}
 @media(prefers-reduced-motion:reduce){.ag-buscar-foco .fi{animation:none}}
 .ag-mapa-wrap{position:relative;margin-bottom:6px}
 .ag-mapa{height:230px;border-radius:12px;overflow:hidden;border:1.5px solid var(--bd);background:#0d1117}
 @media(min-width:700px){.ag-mapa{height:280px}}
 .ag-mapa .leaflet-container,.ag-mapa.leaflet-container{cursor:grab}
-/* ★ «TÚ ESTÁS AQUÍ» QUE LATE (30/10/2026): el mismo punto azul con halo de
-   Google Maps o Waze. El cliente ya lo conoce: se reconoce al instante y ve
-   las sedes rojas a su alrededor. Solo CSS: ni batería ni red. */
 .ag-yo-halo{animation:agHalo 2s ease-out infinite}
 @keyframes agHalo{0%{stroke-width:2;stroke-opacity:.7}100%{stroke-width:30;stroke-opacity:0}}
-/* La lupa late mientras no hay sede elegida: invita sin gritar. Al escribir
-   o elegir se queda quieta (lo que late siempre se termina ignorando). */
 .ag-lupa{position:absolute;left:14px;top:50%;transform:translateY(-50%);font-size:15px;opacity:.75;pointer-events:none;animation:agLupa 1.8s ease-in-out infinite}
 .ag-buscar.quieto .ag-lupa{animation:none;opacity:.6}
 @keyframes agLupa{0%,100%{transform:translateY(-50%) scale(1)}50%{transform:translateY(-50%) scale(1.22)}}
@@ -185,9 +139,6 @@ body.wz-sede #tt-lbl{display:none!important}
 .ag-item{display:flex;align-items:flex-start;gap:10px;padding:12px;border-bottom:1px solid var(--bd);cursor:pointer}
 .ag-item:last-child{border-bottom:none}
 .ag-item{transition:background .15s,box-shadow .15s}
-/* ★ «ESTOY ENCIMA» (30/10/2026): con mouse se ilumina al pasar; con el
-   dedo (no hay «pasar por encima») se hunde al presionar, como un botón
-   físico. Cada toque responde en menos de 0,1 s: se siente instantáneo. */
 .ag-item-sel{background:rgba(34,197,94,.08);box-shadow:inset 0 0 0 2px var(--green)}
 .ag-item-ic{font-size:16px;line-height:1.2;flex-shrink:0;color:var(--text2)}
 .ag-item-sel .ag-item-ic{color:var(--green)}
@@ -205,13 +156,11 @@ body.wz-sede #tt-lbl{display:none!important}
 .sel-badge{display:inline-flex;align-items:center;gap:8px;background:#12203d;border:1px solid var(--blue);border-radius:10px;padding:8px 12px;font-size:13px;margin-top:8px;width:100%}
 .sel-badge .clr-btn{background:none;border:none;color:var(--text2);cursor:pointer;font-size:16px;padding:0;line-height:1;margin-left:auto}
 
-/* BUTTONS */
 .btn-main{width:100%;background:linear-gradient(135deg,#1d4ed8,var(--blue));color:#fff;border:none;border-radius:14px;font-family:inherit;font-size:16px;font-weight:600;padding:15px;cursor:pointer;transition:opacity .15s,transform .1s;margin-top:4px}
 .btn-main:hover{opacity:.9}
 .btn-main:active{transform:scale(.98)}
 .btn-main:disabled{opacity:.5;cursor:not-allowed}
 .btn-sec{width:100%;background:var(--card);color:var(--text);border:1.5px solid var(--bd);border-radius:14px;font-family:inherit;font-size:15px;font-weight:500;padding:13px;cursor:pointer;margin-top:10px}
-/* ★ CONFIRMACIÓN (30/10/2026) */
 .btn-main.tt-registrando{position:relative;overflow:hidden;opacity:1}
 .tt-reg-bar{position:absolute;left:0;top:0;bottom:0;width:0;background:rgba(255,255,255,.18);animation:ttReg 1.6s ease-out forwards}
 @keyframes ttReg{to{width:88%}}
@@ -242,7 +191,6 @@ body.wz-sede #tt-lbl{display:none!important}
 .tt-wa-sub{font-size:13px;color:var(--text2);text-align:center;margin-top:10px;line-height:1.5}
 .tt-wa-sub b{color:var(--text)}
 .tt-wa-vuelta{margin-top:12px;font-size:13.5px;color:#eab308;font-weight:700;text-align:center}
-/* Lo amarillo ENTRA (no aparece de golpe) y la mano señala el botón sin parar. */
 .tt-wa-vuelta.tt-asoma{animation:ttAsoma .45s cubic-bezier(.2,1.2,.5,1) both}
 @keyframes ttAsoma{from{opacity:0;transform:translateY(8px) scale(.96)}to{opacity:1;transform:none}}
 .tt-dedo{display:inline-block;animation:ttDedo 1.1s ease-in-out infinite}
@@ -253,7 +201,6 @@ body.wz-sede #tt-lbl{display:none!important}
 .btn-wa{width:100%;background:linear-gradient(135deg,#128c7e,#25d366);color:#fff;border:none;border-radius:14px;font-family:inherit;font-size:16px;font-weight:600;padding:15px;cursor:pointer;margin-top:10px;text-decoration:none;display:flex;align-items:center;justify-content:center;gap:8px}
 .btn-purple{width:100%;background:linear-gradient(135deg,#3730a3,var(--purple));color:#fff;border:none;border-radius:14px;font-family:inherit;font-size:15px;font-weight:600;padding:13px;cursor:pointer;margin-top:10px}
 
-/* SUCCESS */
 .success{text-align:center;padding:8px 0}
 .success-icon{font-size:64px;margin-bottom:12px}
 .success-ttl{font-size:24px;font-weight:700;margin-bottom:6px}
@@ -265,7 +212,6 @@ body.wz-sede #tt-lbl{display:none!important}
 .sum-lbl{color:var(--text2);min-width:72px;font-size:11px;font-weight:700;text-transform:uppercase;padding-top:1px;letter-spacing:.4px}
 .sum-val{color:var(--text);flex:1;line-height:1.5}
 
-/* TRACKING PAGE */
 .track-back{font-size:13px;color:var(--text2);padding:12px 0;cursor:pointer;background:none;border:none;font-family:inherit;display:flex;align-items:center;gap:6px}
 .track-card{background:var(--card);border:1px solid var(--bd);border-radius:14px;padding:18px;margin-bottom:12px}
 .tk-section{margin-bottom:18px}
@@ -273,39 +219,30 @@ body.wz-sede #tt-lbl{display:none!important}
 .tk-lbl{font-size:11px;font-weight:700;color:var(--text2);letter-spacing:.6px;text-transform:uppercase;margin-bottom:8px}
 .status-badge{display:inline-flex;align-items:center;gap:6px;border-radius:10px;padding:8px 14px;font-size:14px;font-weight:600}
 
-
-/* TRACK ROWS */
 .tk-row{display:flex;gap:8px;align-items:flex-start;margin-bottom:7px;font-size:13px}
 .tk-row:last-child{margin-bottom:0}
 .tk-row-lbl{color:var(--text2);font-size:11px;font-weight:700;text-transform:uppercase;min-width:72px;padding-top:1px;letter-spacing:.4px}
 .tk-row-val{color:var(--text);flex:1;line-height:1.5}
 
-/* SPINNERS / LOADING */
 .loading-screen{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:60vh;gap:16px}
 .spin{width:44px;height:44px;border:3px solid var(--bd);border-top-color:var(--blue);border-radius:50%;animation:spin .7s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
-/* Pin "buscando ubicación": late/rebota mientras geolocaliza (feedback en el botón, no abajo) */
 .geo-pin{display:inline-block;animation:geoPulse 1s ease-in-out infinite}
 @keyframes geoPulse{0%,100%{transform:translateY(0) scale(1);opacity:1}50%{transform:translateY(-3px) scale(1.25);opacity:.55}}
 @media(prefers-reduced-motion:reduce){.geo-pin{animation:none}}
 .spin-lbl{color:var(--text2);font-size:14px}
 
-
-/* ERROR */
 .error-box{background:rgba(248,113,113,.08);border:1px solid rgba(248,113,113,.3);border-radius:12px;padding:14px;font-size:13px;color:var(--red);margin-bottom:12px}
 
-/* UNCONFIGURED */
 .unconf{text-align:center;padding:60px 20px}
 .unconf-icon{font-size:48px;margin-bottom:12px}
 .unconf-ttl{font-size:18px;font-weight:700;margin-bottom:8px;color:var(--text2)}
 .unconf-sub{font-size:13px;color:var(--text2);line-height:1.6}
 
-/* REFRESH ROW */
 .refresh-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
 .refresh-lbl{font-size:12px;color:var(--text2)}
 .refresh-btn{background:var(--card2);border:1px solid var(--bd);border-radius:8px;padding:6px 12px;font-size:12px;color:var(--text2);cursor:pointer;font-family:inherit}
 
-/* SMALL LINK */
 .small-link{background:none;border:none;font-family:inherit;font-size:12px;color:var(--text2);cursor:pointer;text-align:center;display:block;margin:16px auto 0;opacity:.6;text-decoration:underline}
 .small-link:hover{opacity:1}
 
@@ -320,10 +257,8 @@ body.wz-sede #tt-lbl{display:none!important}
 .brand-foot .bf-soc .bf-item{font-size:11px;opacity:.85}
 .used-note{text-align:center;font-size:12px;color:var(--text2);margin-top:14px;padding:10px 14px;background:rgba(107,114,128,.06);border:1px solid var(--bd);border-radius:10px;line-height:1.5}
 
-/* Section divider */
 .section-ttl{font-size:11px;font-weight:700;color:var(--text2);letter-spacing:.7px;text-transform:uppercase;margin-bottom:10px}
 
-/* DELIVERY ADDRESS OPTIONS */
 .addr-opts{display:flex;flex-direction:column;gap:8px;margin-bottom:10px}
 .addr-opt{display:flex;align-items:center;gap:12px;background:var(--card);border:1.5px solid var(--bd);border-radius:12px;padding:14px;text-align:left;cursor:pointer;transition:border-color .15s,background .15s;user-select:none}
 .addr-opt.active{border-color:var(--blue);background:#12203d}
@@ -334,13 +269,10 @@ body.wz-sede #tt-lbl{display:none!important}
 .addr-opt.active .addr-opt-lbl{color:var(--blue)}
 .addr-result{background:var(--card2);border:1px solid var(--blue);border-radius:10px;padding:10px 12px;font-size:13px;color:var(--text);margin-bottom:8px;display:none;line-height:1.5}
 .addr-result.show{display:block}
-/* Botón de ayuda: rellena el cuadro de dirección, no lo reemplaza */
 .addr-gps-btn{width:100%;display:flex;align-items:center;justify-content:center;gap:8px;background:rgba(79,142,247,.12);border:1px solid rgba(79,142,247,.3);border-radius:10px;color:var(--blue);padding:11px;font-size:13.5px;font-weight:700;cursor:pointer;font-family:inherit;margin-bottom:8px}
 .addr-gps-btn:disabled{cursor:progress}
-/* Chip: coordenadas adjuntas, quitables por el cliente */
 .addr-pin-chip{display:flex;align-items:center;gap:8px;background:rgba(34,197,94,.10);border:1px solid rgba(34,197,94,.3);border-radius:9px;padding:8px 10px;margin-top:8px;font-size:12px;color:var(--green);font-weight:600}
 .addr-pin-chip a{color:var(--blue);text-decoration:none;font-weight:700}
-/* ★ DELIVERY CON MAPA (30/10/2026): el punto se VE y se puede corregir. */
 .ag-geo.dlv-geo{margin-bottom:8px}
 .dlv-msg{font-size:12.5px;color:var(--text2);line-height:1.5;margin-bottom:8px}
 .dlv-msg a{color:var(--blue);font-weight:700;cursor:pointer;text-decoration:underline;white-space:nowrap}
@@ -354,13 +286,6 @@ body.wz-sede #tt-lbl{display:none!important}
 .dlv-si{background:var(--green);border:none;color:#04120a}
 .dlv-aj{background:none;border:1.5px solid var(--blue);color:var(--blue)}
 .dlv-link{background:none;border:none;color:var(--blue);font-weight:700;font-size:12.5px;cursor:pointer;font-family:inherit;padding:4px 0;text-decoration:underline}
-/* ★ UN mapa de delivery, DOS modos (30/10/2026):
-     · MIRAR: el pin queda fijo en el punto; mover la vista no lo mueve.
-       Mismo tamaño que el mapa de sedes. Celular: dos dedos (un dedo baja
-       la página). PC: mouse.
-     · AJUSTAR (solo con el botón «Ajustar punto»): pin fijo al centro y se
-       mueve el mapa. PC: en el MISMO recuadro, al mismo tamaño. Celular:
-       pantalla completa (ahí un dedo arrastra sin atascar la página). */
 .dlv-prev{position:relative;height:230px;border-radius:12px;overflow:hidden;border:1.5px solid var(--bd);background:#0d1117;margin-bottom:8px}
 @media(min-width:700px){.dlv-prev{height:280px}}
 .dlv-mapa{position:absolute;inset:0}

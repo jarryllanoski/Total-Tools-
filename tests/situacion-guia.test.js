@@ -112,7 +112,7 @@ module.exports = async ({bloque, ok}) => {
     ok(sel.consultar.find((x) => x.id === 'p3').guia === '103373623', 'la del panel se consulta por shalomGuia');
 
     const idx = fs.readFileSync(path.join(__dirname, '..', 'functions', 'index.js'), 'utf8');
-    const loop = idx.slice(idx.indexOf('const sel = barrido.aConsultar'), idx.indexOf('// 4 · escribir'));
+    const loop = idx.slice(idx.indexOf('const sel = barrido.aConsultar'), idx.indexOf('let escritas = 0;'));
     ok(/sinRastro && \(item\.porDejar \|\|\s*await _esPendiente\(item\.guia, memoPend\) === true\)\)\s*\{\s*porDejar\+\+;[\s\S]*?continue;/.test(loop),
        'por dejar (del panel, o hallada en tus pendientes) + «no la conoce»: aparte, NO como fallida');
     ok(/const memoPend = \{\}/.test(idx), 'la lista de pendientes se pide UNA vez por corrida');
@@ -292,7 +292,7 @@ module.exports = async ({bloque, ok}) => {
     const gen = idx.slice(idx.indexOf('const r = await _porLaPuerta(destino, paso.datos, diagnostico);'));
     ok(/r\.motivo === "SHALOM_SIN_RESPUESTA"\) \{\s*const pro = await _seguimientoPro\([\s\S]{0,80}\);\s*if \(pro\) \{\s*res\.status\(200\)\.json\(pro\);\s*return;/.test(gen),
        'Consultar: si shalom-api no puede leerla, va al Seguimiento de tu Shalom Pro');
-    const loop = idx.slice(idx.indexOf('const sel = barrido.aConsultar'), idx.indexOf('// 4 · escribir'));
+    const loop = idx.slice(idx.indexOf('const sel = barrido.aConsultar'), idx.indexOf('let escritas = 0;'));
     ok(/_seguimientoPro\(item\.guia, memoPro\)/.test(loop) && /const traducido = pro \|\|/.test(loop) && /if \(!r\.ok && !pro\)/.test(loop),
        'los horarios también, y una guía rescatada NO cuenta como fallida');
     ok(/const memoPro = \{\}/.test(idx) && /pg <= 10/.test(idx), 'la lista se baja UNA vez por corrida (máx. 10 páginas)');

@@ -176,7 +176,7 @@ module.exports = async ({bloque, ok}) => {
   {
     const fidx = E.leer('functions/index.js');
     const track = fidx.slice(fidx.indexOf('async function handleTrack'),
-        fidx.indexOf('// ── Rate limit'));
+        fidx.indexOf('const RATE_LIMITS = {'));
     ok(/pedidoPublico\.proyectar\(order, \{code, frozen\}\)/.test(track),
        '`handleTrack` proyecta con la lista blanca');
     ok(!/Object\.assign\(\{\}, order/.test(track),

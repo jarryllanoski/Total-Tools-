@@ -1,35 +1,19 @@
-/**
- * auth.js — Módulo de autenticación para Total Tools
- * Usa Firebase Authentication (Email/Password)
- * Para desactivar: quitar <script src="auth.js"> del index.html
- */
 
 (function(){
 
-  /* ── CONFIG ─────────────────────────────────────────────────────── */
   var FB_API_KEY = (window.FBConfig && window.FBConfig.KEY) || 'AIzaSyBkbY-CFtNHfbaG864sXVnaAwBKZGW6SRI';
   var AUTH_URL   = 'https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key='+FB_API_KEY;
   var IDP_URL    = 'https://identitytoolkit.googleapis.com/v1/accounts:signInWithIdp?key='+FB_API_KEY;
   var REFRESH_URL= 'https://securetoken.googleapis.com/v1/token?key='+FB_API_KEY;
 
-  /* Identificador público de la app ante Google (NO es un secreto: viaja en
-     cualquier botón "Entrar con Google" del mundo). Sale de la consola de
-     Firebase al activar Google como proveedor. Mientras esté vacío, el botón
-     de Google no se muestra y el ingreso con contraseña sigue igual: así
-     activar esto nunca puede dejar a nadie afuera. */
   var GOOGLE_CLIENT_ID = (window.FBConfig && window.FBConfig.GOOGLE_CLIENT_ID) || '';
   var TOKEN_KEY  = 'tt_auth_token';
   var EXPIRY_KEY = 'tt_auth_expiry';
   var EMAIL_KEY  = 'tt_auth_email';
   var INICIO_KEY = 'tt_auth_inicio';
 
-  /* Duración máxima de una sesión. Hasta ahora la sesión NO vencía nunca: el
-     token se renovaba solo indefinidamente, así que una laptop robada con el
-     panel abierto seguía abierta para siempre. Doce horas cubre una jornada
-     completa —se entra una vez al día— sin dejar la puerta abierta de noche. */
   var SESION_MAX_MS = 12 * 60 * 60 * 1000;
 
-  /* ── CSS ─────────────────────────────────────────────────────────── */
   var style = document.createElement('style');
   style.textContent = `
     #authOverlay {
@@ -90,12 +74,7 @@
   `;
   document.head.appendChild(style);
 
-  /* ── HTML ────────────────────────────────────────────────────────── */
   function _showLogin(){
-    /* IDEMPOTENTE A LA FUERZA. Dos pantallas de login con el mismo id es lo
-       que dejó a alguien tecleando su contraseña una y otra vez: entraba bien,
-       se quitaba una, y seguía mirando la otra. Que no puedan existir dos no
-       depende de que nadie llame dos veces — depende de aquí. */
     _hideOverlay();
     var ov = document.createElement('div');
     ov.id = 'authOverlay';
@@ -123,22 +102,14 @@
     `;
     document.body.appendChild(ov);
     _montarGoogle();
-    // Focus al campo de email
     setTimeout(function(){
       var el = document.getElementById('authEmail');
       if(el) el.focus();
     }, 100);
   }
 
-  /* ── ENTRAR CON GOOGLE ────────────────────────────────────────────
-     Es más seguro que un código enviado al correo: un código se puede pedir
-     por teléfono haciéndose pasar por soporte, y la víctima lo dicta sin
-     darse cuenta. El flujo de Google no se puede dictar — y si la cuenta
-     tiene verificación en dos pasos, ese factor ya está incluido.
-     Convive con el ingreso por contraseña a propósito: si algo del lado de
-     Google no está configurado, siempre queda la puerta que ya funcionaba. */
   function _montarGoogle(){
-    if(!GOOGLE_CLIENT_ID) return;           // sin configurar: ni se muestra
+    if(!GOOGLE_CLIENT_ID) return;
     var zona = document.getElementById('authGoogleZona');
     if(!zona) return;
     zona.innerHTML =
@@ -161,16 +132,13 @@
             document.getElementById('authGoogleBtn'),
             {theme:'filled_black', size:'large', width:312,
              text:'signin_with', shape:'pill'});
-      } catch(e){ /* si Google falla, queda el ingreso por contraseña */ }
+      } catch(e){  }
     };
     var poner = function(){ document.head.appendChild(s); };
     if(typeof window.requestIdleCallback === 'function') window.requestIdleCallback(poner, {timeout: 2000});
     else setTimeout(poner, 300);
   }
 
-  /* Canjea el identificador de Google por una sesión de Firebase. Desde acá
-     todo sigue igual que con contraseña: mismo token, mismo almacenamiento,
-     mismas reglas de Firestore. */
   async function _entrarConGoogle(credencial){
     if(!credencial){ _showErr('No se pudo leer la cuenta de Google'); return; }
     var load = document.getElementById('authLoading');
@@ -196,8 +164,6 @@
         _alEntrar();
         return;
       }
-      // Autenticó con Google pero Firebase lo rechazó. Se muestra el correo:
-      // sin ese dato, "no autorizado" obliga a adivinar con cuál entró.
       var motivo = (d.error && d.error.message) || '';
       _showErr(motivo.indexOf('OPERATION_NOT_ALLOWED') >= 0
         ? 'Falta activar Google como proveedor en Firebase'
@@ -208,23 +174,18 @@
     if(load) load.style.display = 'none';
   }
 
-  /* ── AUTH ────────────────────────────────────────────────────────── */
   function _saveSession(token, expiry, email){
-    localStorage.setItem(TOKEN_KEY,  token);     // refreshToken para renovar
+    localStorage.setItem(TOKEN_KEY,  token);
     localStorage.setItem(EXPIRY_KEY, String(expiry));
     localStorage.setItem(EMAIL_KEY,  email);
-    // El inicio se marca UNA vez, al entrar de verdad. Renovar el token no lo
-    // reinicia: si lo hiciera, la sesión volvería a no vencer nunca, que es
-    // justo lo que se está corrigiendo.
     if(!localStorage.getItem(INICIO_KEY)){
       localStorage.setItem(INICIO_KEY, String(Date.now()));
     }
   }
 
-  /* ¿Pasaron ya las 12 horas desde que entró? */
   function _sesionVencida(){
     var inicio = parseInt(localStorage.getItem(INICIO_KEY)||'0');
-    if(!inicio) return false;   // sesión vieja, sin marca: no se expulsa
+    if(!inicio) return false;
     return (Date.now() - inicio) > SESION_MAX_MS;
   }
   function _saveIdToken(idToken){
@@ -234,19 +195,8 @@
     return localStorage.getItem('tt_id_token')||'';
   }
 
-  /* Borra la sesión Y los datos del negocio que quedan cacheados en el
-     navegador. Antes solo borraba las claves de sesión: los ~950 pedidos
-     —con nombres, teléfonos, DNI y direcciones— seguían en localStorage
-     después de cerrar sesión, legibles con F12 por cualquiera que se sentara
-     en la PC. La sesión cerrada daba una sensación de seguridad que los datos
-     no respaldaban.
-     El modo sin conexión se conserva mientras la sesión está viva, que es
-     cuando de verdad hace falta; al cerrarla no queda rastro. */
   var CLAVES_DATOS = ['dpanel', 'dpanel_pending', 'dpanel_last_sync', 'dpanel_dirty'];
 
-  /* ¿Quedó algo sin subir a la nube? Se mira el registro que deja save():
-     si hay ids ahí, son cambios que viven SOLO en este navegador.
-     Devuelve -1 cuando el registro dice "subir todo" y no se puede contar. */
   function _pendientes(){
     try {
       var raw = localStorage.getItem('dpanel_dirty');
@@ -261,24 +211,14 @@
     localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem(EXPIRY_KEY);
     localStorage.removeItem(EMAIL_KEY);
-    localStorage.removeItem(INICIO_KEY);   // sin esto, el próximo ingreso
-    localStorage.removeItem('tt_id_token'); // heredaría la hora vieja y
-                                            // vencería al instante: bucle.
-    if(conservarDatos) return;   // ver _expulsar()
+    localStorage.removeItem(INICIO_KEY);
+    localStorage.removeItem('tt_id_token');
+    if(conservarDatos) return;
     CLAVES_DATOS.forEach(function(k){
       try { localStorage.removeItem(k); } catch(e){}
     });
   }
 
-  /* SESIÓN VENCIDA A MITAD DE TRABAJO — no es lo mismo que cerrar sesión.
-     Cerrar sesión es una decisión: se borra todo, incluidos los datos de
-     clientes cacheados. Vencer es un accidente, y la misma persona va a
-     volver a entrar en diez segundos. Si aquí se borrara el respaldo, un
-     cambio que no alcanzó a subir desaparecería sin que nadie lo decidiera.
-
-     Por eso los datos se conservan SOLO si hay algo pendiente. Si no hay
-     nada pendiente son una copia sin valor y se borran, que es lo que
-     protege la privacidad cuando alguien se sienta en la PC. */
   function _expulsar(msg){
     _clearSession(_pendientes() !== 0);
     _showLogin();
@@ -286,17 +226,6 @@
   }
   window._authExpulsar = _expulsar;
 
-  /* ── ENTRÓ, PERO NO TIENE ACCESO ──────────────────────────────────────
-     Un 403 de Firestore puede significar dos cosas MUY distintas:
-       · tu sesión venció  → vuelve a entrar y listo;
-       · tu cuenta no está autorizada → volver a entrar no arregla nada.
-     Desde el 403 no se pueden distinguir. Y tratar la segunda como la primera
-     manda al usuario a un bucle: entra bien, se le dice "tu sesión venció",
-     vuelve a entrar, y otra vez. Sin entender nunca qué pasa.
-
-     Así que no se adivina: se dice lo que SÍ se sabe —con qué correo entró— y
-     se le dan las dos salidas. El correo es el dato que resuelve el problema:
-     casi siempre entró con la cuenta equivocada. */
   function _sinAcceso(correo){
     _hideOverlay();
     var ov = document.createElement('div');
@@ -327,15 +256,10 @@
   }
   window._authSinAcceso = _sinAcceso;
 
-  /* El correo con el que se entró. Es lo único accionable cuando algo falla
-     por permisos: casi siempre se entró con la cuenta equivocada. */
   window._authCorreo = function(){
     try { return localStorage.getItem(EMAIL_KEY) || ''; } catch(e){ return ''; }
   };
 
-  /* ¿HABÍA una sesión? Es la pregunta que convierte un 403 en un diagnóstico.
-     Un 403 de Firestore significa "tu sesión venció" solo si existía una. Sin
-     token guardado es el estado normal de quien todavía no ha entrado. */
   window._authHaySesion = function(){
     try { return !!localStorage.getItem('tt_id_token'); } catch(e){ return false; }
   };
@@ -346,11 +270,6 @@
     return !!(token && Date.now() < expiry);
   }
 
-  /* Devuelve 'ok' | 'rechazado' | 'sin_red'.
-     La distinción importa: si el servidor RECHAZA el token, la sesión murió de
-     verdad y hay que limpiar. Si simplemente no hubo red, la sesión puede
-     seguir siendo válida — borrar ahí dejaría sin modo sin conexión justo
-     cuando hace falta, que es cuando no hay internet. */
   async function _refreshToken(){
     var token = localStorage.getItem(TOKEN_KEY);
     if(!token) return 'rechazado';
@@ -362,7 +281,7 @@
         body:'grant_type=refresh_token&refresh_token='+encodeURIComponent(token)
       });
     } catch(e){
-      return 'sin_red'; // no se pudo preguntar: no se concluye nada
+      return 'sin_red';
     }
     if(!r.ok) return 'rechazado';
     try {
@@ -371,53 +290,32 @@
         var expiry = Date.now() + (parseInt(d.expires_in||3600)*1000);
         var email  = localStorage.getItem(EMAIL_KEY)||'';
         _saveSession(d.refresh_token||token, expiry, email);
-        _saveIdToken(d.id_token); // guardar nuevo idToken
+        _saveIdToken(d.id_token);
         return 'ok';
       }
     } catch(e){}
     return 'rechazado';
   }
 
-  /* ── API PÚBLICA ─────────────────────────────────────────────────── */
   window.AuthModule = {
 
     async init(){
-      // Sesión de más de 12 h: se cierra, PERO solo si hay red para volver a
-      // entrar. Expulsar sin conexión sería lo peor de los dos mundos: no
-      // podría iniciar sesión (el login necesita internet) y encima perdería
-      // los datos locales justo durante el corte. Sin red se deja seguir y se
-      // vuelve a evaluar cuando la conexión regrese.
-      // ★ Por _expulsar(), no por _clearSession() a secas: si quedó algo sin
-      //   subir, el respaldo se conserva. Vencer la sesión con el panel
-      //   cerrado y perder por eso un cambio que nunca llegó a la nube sería
-      //   una pérdida que nadie decidió.
       if(_sesionVencida() && navigator.onLine !== false){
         _expulsar('Tu sesión venció. Ingresa de nuevo.');
         return;
       }
-      // Si ya tiene sesión válida, mostrar app directamente
       if(_isValidSession()){
         _hideOverlay();
         return;
       }
-      // Intentar refrescar token guardado
       var res = await _refreshToken();
       if(res === 'ok'){
         _hideOverlay();
-        // La sesión revivió renovando el token: la carga del arranque pudo
-        // haber fallado antes de que eso terminara.
         if(typeof window._trasEntrar === 'function'){
           try{ window._trasEntrar(); }catch(e){}
         }
         return;
       }
-      // El servidor rechazó el token: la sesión murió de verdad, así que no
-      // deben quedar datos del negocio en el navegador. Si en cambio fue falta
-      // de red ('sin_red'), NO se borra nada: puede ser una sesión sana sin
-      // internet, y ese es justo el caso en que el modo sin conexión sirve.
-      // Misma regla que en _expulsar(): si hay algo sin subir, el respaldo se
-      // conserva. Un token rechazado mata la sesión, no el trabajo de quien la
-      // tenía — y esa persona va a volver a entrar.
       if(res === 'rechazado') _clearSession(_pendientes() !== 0);
       _showLogin();
     },
@@ -447,13 +345,11 @@
         var d = await r.json();
 
         if(d.idToken){
-          // Login exitoso — guardar idToken para requests y refreshToken para renovar
           var expiry = Date.now() + (parseInt(d.expiresIn||3600)*1000);
           _saveSession(d.refreshToken||d.idToken, expiry, email);
           _saveIdToken(d.idToken);
           _alEntrar();
         } else {
-          // Error de Firebase
           var msg = 'Correo o contraseña incorrectos';
           if(d.error){
             var code = d.error.message||'';
@@ -473,9 +369,6 @@
     },
 
     logout(){
-      /* Cerrar sesión BORRA el respaldo local, y con él lo que no alcanzó a
-         subir. Antes se hacía en silencio: un cambio hecho sin conexión se
-         perdía por cerrar sesión, sin aviso y sin forma de recuperarlo. */
       var n = _pendientes();
       if(n !== 0){
         var cuantos = n < 0 ? 'Hay cambios' :
@@ -498,65 +391,35 @@
   }
 
   function _hideOverlay(){
-    // querySelectorAll y no getElementById: éste devuelve SOLO la primera, y
-    // dejar una segunda escondida detrás es exactamente el bug que hubo.
     var ovs = document.querySelectorAll('#authOverlay');
     for(var i = 0; i < ovs.length; i++){
       try { ovs[i].remove(); } catch(e){}
     }
   }
 
-  /* ── TOKEN VÁLIDO PARA REQUESTS ─────────────────────────────────── */
-  /* Devuelve el MOTIVO: 'ok' | 'vencida' | 'rechazado' | 'sin_red'.
-     Un booleano no alcanza. "No tengo token" tiene tres causas con tres
-     arreglos distintos —esperar a que vuelva internet, volver a entrar, o
-     nada porque pasaron las 12 h— y decirle a alguien "revisa tu conexión"
-     cuando lo que murió fue su sesión es lo que hace perder una tarde. */
   async function _motivoToken(){
-    // Si la sesión ya cumplió sus 12 h, no se renueva más. Sin esto, alguien
-    // trabajando sin parar la extendería indefinidamente y el límite no
-    // existiría en la práctica.
     if(_sesionVencida()) return 'vencida';
     var expiry = parseInt(localStorage.getItem(EXPIRY_KEY)||'0');
-    var margin = 5 * 60 * 1000; // 5 minutos antes de vencer
-    if(Date.now() < expiry - margin) return 'ok'; // token válido
-    return await _refreshToken(); // 'ok' | 'rechazado' | 'sin_red'
+    var margin = 5 * 60 * 1000;
+    if(Date.now() < expiry - margin) return 'ok';
+    return await _refreshToken();
   }
 
-  // Renovar token automáticamente si está por vencer (menos de 5 min)
   async function _ensureValidToken(){
-    // El contrato de acá es booleano y tiene 5 consumidores, así que se
-    // traduce el motivo en vez de devolverlo crudo — un texto no vacío sería
-    // siempre verdadero y "sin red" pasaría por token renovado.
     return (await _motivoToken()) === 'ok';
   }
 
-  /* ★ LA PUERTA. Devuelve el idToken listo para usar, o LANZA.
-     Nunca devuelve vacío, y ese es todo el punto. Antes cada sitio que
-     necesitaba el token hacía su propia versión de «lo intento y si no sale,
-     mando la petición igual»: la petición salía SIN IDENTIFICAR, las reglas
-     la rechazaban con 403, y nada avisaba. Se podía trabajar una hora entera
-     sin que subiera nada, con el punto en verde.
-     El error lleva `.auth` con el motivo, para que quien lo atrape pueda
-     decir cuál de los tres problemas es en vez de "sin conexión" a todo. */
   async function _tokenODetenerse(){
     var motivo = await _motivoToken();
     var tok = '';
     try { tok = localStorage.getItem('tt_id_token') || ''; } catch(e){}
     if(motivo === 'ok' && tok) return tok;
-    // Motivo 'ok' pero sin token guardado: la sesión dice estar viva y no hay
-    // con qué firmar. Es el mismo agujero, así que la misma negativa.
     var causa = (motivo === 'ok') ? 'sin_token' : motivo;
     var e = new Error('sesion:' + causa);
     e.auth = causa;
     throw e;
   }
 
-  /* Las palabras las decide UN SOLO SITIO. Si cada pantalla escribe su
-     propia versión, tarde o temprano una dice "revisa tu conexión" ante una
-     sesión vencida y manda a buscar el problema donde no está.
-     Devuelve '' si el error no es de sesión, para que quien llama use su
-     propio mensaje sin tener que saber de motivos. */
   function _textoMotivo(e){
     var m = e && e.auth;
     if(!m) return '';
@@ -565,19 +428,11 @@
       : '🔒 Tu sesión venció. Tus cambios están guardados aquí; ingresa de nuevo para subirlos';
   }
 
-  // Exponer para que index.html la use antes de cada request
   window._authEnsureToken  = _ensureValidToken;
   window._authMotivoToken  = _motivoToken;
   window._authToken        = _tokenODetenerse;
   window._authTextoMotivo  = _textoMotivo;
 
-  /* ── INIT AUTOMÁTICO ─────────────────────────────────────────────── */
-  // Esperar a que el DOM esté listo
-  /* `window.AuthModule.init()` y no `AuthModule.init()`. En el navegador las
-     dos funcionan —una propiedad de window es un nombre global—, pero apoyarse
-     en eso ya salió caro dos veces en este proyecto: `save` declarado con
-     const que no llegaba a window, y `Seleccion` usado sin prefijo desde el
-     repintado. Escribirlo explícito cuesta siete letras. */
   var _listo = new Promise(function(r){
     if(document.readyState === 'complete') r();
     else document.addEventListener('DOMContentLoaded', function(){ r(); });

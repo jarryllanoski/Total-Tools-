@@ -45,12 +45,13 @@ module.exports = async ({bloque, ok}) => {
     ok(!/renderTrackResult|_shalomTrackingBlock|loading-screen\.js/.test(fo), 'el formulario ya no trae el seguimiento');
     ok(!/appcheck\.js|firebase-config\.js|agencias\.js|narrador\/loader\.js|narrador\/etiqueta\.js/.test(se),
        'el seguimiento no trae App Check (reCAPTCHA), ni el buscador de sedes, ni el telón del formulario');
-    ok(/<script src="loading-screen\.js\?v=1"><\/script>\s*<div class="container" id="app">/.test(se),
+    ok(/<script src="loading-screen\.js\?v=\d+"><\/script>\s*<div class="container" id="app">/.test(se),
        'su telón de carga va síncrono, antes del contenido');
     const orden = ['cliente/comun.js', 'cliente/seguimiento.js'].map((f) => se.indexOf('<script src="' + f));
     ok(orden[0] > se.indexOf('id="app"') && orden[0] < orden[1], 'comun.js después de #app y antes de seguimiento.js');
-    const cf = fo.indexOf('<script src="cliente/comun.js');
-    ok(cf > fo.indexOf('id="app"') && cf < fo.indexOf('cliente/form-base.js'),
+    const foReal = E.leerReal('formulario.html');
+    const cf = foReal.indexOf('<script src="cliente/comun.js');
+    ok(cf > foReal.indexOf('id="app"') && cf < foReal.indexOf('cliente/form-base.js'),
        'en el formulario, comun.js también antes de su script');
     const vcss = (h) => (/<link rel="stylesheet" href="cliente\/cliente\.css\?v=(\d+)">/.exec(h) || [])[1];
     ok(vcss(fo) && vcss(fo) === vcss(se),

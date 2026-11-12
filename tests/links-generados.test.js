@@ -17,7 +17,7 @@ const E = require('./_entorno.js');
    fetch de mentira que apunta qué se pidió. */
 function capaDatos(respuestas) {
   const pedidos = [];
-  const src = E.trozo('index.html', 'async function fsQuery(padre', '  // Latido de salud') +
+  const src = E.trozo('index.html', 'async function fsQuery(padre', 'window._fbLeerSalud = async () => {') +
     E.trozo('index.html', '  const _tokConId', '  window._fbDelTok = ');
   const fromFs = (v) => ('stringValue' in v) ? v.stringValue :
     ('booleanValue' in v) ? v.booleanValue : null;
@@ -112,7 +112,7 @@ module.exports = async ({bloque, ok}) => {
   {
     const cfg = E.leer('config.js');
     const desde = cfg.indexOf('let _tokRecientes');
-    const hasta = cfg.indexOf('// Pinta la lista desde _tokCache');
+    const hasta = cfg.indexOf('function _renderTokList(){');
     const src = cfg.slice(desde, hasta);
     const llamadas = {rec: 0, ant: [], todo: 0};
     let fallaRec = false;

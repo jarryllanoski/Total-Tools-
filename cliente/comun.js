@@ -1,36 +1,11 @@
-/**
- * cliente/comun.js — LO QUE COMPARTEN EL FORMULARIO Y EL SEGUIMIENTO
- * ===================================================================
- * Fase 2 (10/11/2026). El seguimiento vivía dentro de formulario.html y
- * cada cliente que solo quería ver su pedido descargaba el formulario
- * entero (~240 KB). Ahora son dos páginas, y esto es lo que las dos usan:
- *   · la puerta a la Cloud Function (`_api`), con App Check;
- *   · la configuración pública del negocio (`CFG`);
- *   · la cabecera, el pie de marca y la hoja de ayuda con Toby;
- *   · el código de seguimiento y el tipo de envío (una sola regla).
- *
- * ⚠️ SCRIPT CLÁSICO A PROPÓSITO, SIN ENVOLVER. Sus declaraciones son
- * globales y así el código de cada página las usa por su nombre, igual que
- * cuando estaban en el mismo archivo — moverlas no cambió ni una llamada.
- * `let CFG` es global de script: la página que la carga la asigna.
- * Va al FINAL del <body>: `app` necesita que #app ya exista.
- */
 'use strict';
 
-/* ─── CLOUD FUNCTION (proxy seguro: el público ya no toca Firestore directo) ─── */
 const FORM_API = 'https://us-central1-total-tools-24ce8.cloudfunctions.net/formApi';
 
 async function _api(action, params, opts){
   let url = FORM_API + '?action=' + encodeURIComponent(action);
   if(params){ for(const k in params){ url += '&' + k + '=' + encodeURIComponent(params[k]); } }
   const o = Object.assign({}, opts || {});
-  /* ★ LA PRUEBA DE QUE ESTO VIENE DE ESTA PÁGINA.
-     Se adjunta a TODAS las llamadas, no solo a las nuevas: así el panel de
-     Firebase puede medir qué porcentaje del tráfico real llega verificado
-     antes de que nadie piense en bloquear. Si no hay token —sin red,
-     reCAPTCHA caído, navegador viejo— se manda la petición IGUAL y sin la
-     cabecera: hoy el servidor no la exige, y el cliente no se queda sin
-     pedir por una capa que es de medición. */
   try{
     if(typeof window._appCheckToken === 'function'){
       const t = await window._appCheckToken();
@@ -38,17 +13,13 @@ async function _api(action, params, opts){
     }
   }catch(e){}
   const r = await fetch(url, o);
-  /* El 429 NO es un error tecnico: es el freno por IP haciendo su trabajo, y
-     trae en el cuerpo el motivo en palabras. Reventar aqui lo convertiria en
-     un "Error al buscar: API 429" que no le dice nada a nadie. */
   if(r.status === 429){ return r.json().catch(()=>({status:'rate_limited'})); }
   if(!r.ok){ throw new Error('API ' + r.status); }
   return r.json();
 }
 
-const wsId = 'panel'; // Tu app usa ruta fija
+const wsId = 'panel';
 
-/* ─── STATUS MAP ────────────────────────────────────────────────── */
 const STATUS_META = {
   'NUEVO PEDIDO':    {color:'#f59e0b',emoji:'🆕',step:0},
   'EN PROCESO':      {color:'#f97316',emoji:'⚠️',step:1},
@@ -58,7 +29,6 @@ const STATUS_META = {
   'LLEGÓ A DESTINO': {color:'#06b6d4',emoji:'📍',step:4},
   'PENDIENTE DE PAGO':{color:'#eab308',emoji:'💰',step:4},
   'FINALIZADO':      {color:'#22c55e',emoji:'🏁',step:5},
-  // aliases minúsculas para compatibilidad con pedidos viejos
   'Nuevo pedido':    {color:'#f59e0b',emoji:'🆕',step:0},
   'En proceso':      {color:'#f97316',emoji:'⚠️',step:1},
   'Por alistar':     {color:'#3b82f6',emoji:'📦',step:2},
@@ -69,7 +39,6 @@ const STATUS_META = {
   'Finalizado':      {color:'#22c55e',emoji:'🏁',step:5},
 };
 
-/* ─── COURIER EMOJI ─────────────────────────────────────────────── */
 function courierEmoji(name, type){
   if(type==='agencia') return '🏢';
   const u = (name||'').toUpperCase();
@@ -83,10 +52,6 @@ function courierEmoji(name, type){
   return '🏢';
 }
 
-/* "Encomienda" se renombró a "Otras Agencias" en la interfaz.
-   La clave interna y los campos siguen siendo 'encomienda' (sin migración
-   de datos ni cambios en formApi). Detectamos ambos nombres para ser
-   compatibles con configuraciones (panel) que aún digan "Encomienda". */
 function _isOtrasAg(name){
   const u=(name||'').toUpperCase();
   return u.includes('ENCOMIENDA')||u.includes('OTRAS AGENCIA')||u.includes('OTRA AGENCIA');
@@ -94,7 +59,6 @@ function _isOtrasAg(name){
 
 let CFG            = null;
 
-/* ─── DOM HELPERS ───────────────────────────────────────────────── */
 const app = document.getElementById('app');
 
 function $ (id){ return document.getElementById(id); }
@@ -105,19 +69,12 @@ function esc(s){ return s==null?'':String(s).replace(/&/g,'&amp;').replace(/</g,
 
 function isoDate(d){ return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
 
-/* ─── LOAD CONFIG (vía Cloud Function) ───────────────────────────── */
 function _cfgHasPhone(c){ return !!(c && (c.phone || (c.config && c.config.phone))); }
 
-/* ─── HEADER HTML ───────────────────────────────────────────────── */
 function headerHtml(ayudaTipo){
-  // Tu app guarda name y phone directo en CFG (no en CFG.config)
   const bizName = (CFG&&(CFG.name||CFG.config&&CFG.config.name)) || 'Mi Negocio';
   const bizCity = (CFG&&(CFG.city||CFG.config&&CFG.config.city)) || '';
-  // ayudaTipo: 'track' = ayuda de seguimiento, cualquier otro = ayuda del formulario
   const ayudaFn = ayudaTipo==='track' ? 'abrirAyudaTrack()' : 'abrirAyudaForm()';
-  // En el FORMULARIO la marca y la dirección ya van en el REMITENTE de la etiqueta
-  // viva → aquí se omiten (evita duplicar) y la etiqueta sube. En SEGUIMIENTO no
-  // hay etiqueta → se muestran marca + dirección como siempre.
   const isTrack = ayudaTipo==='track';
   const brand = isTrack
     ? `<div class="biz-name">${esc(bizName)}</div>${bizCity?`<div class="biz-city">📍 ${esc(bizCity)}</div>`:''}`
@@ -125,16 +82,6 @@ function headerHtml(ayudaTipo){
   return `<div class="biz-header" style="position:relative${isTrack?'':';min-height:34px'}">${brand}<div onclick="${ayudaFn}" style="position:absolute;top:2px;right:0;display:flex;align-items:center;gap:4px;background:rgba(167,139,250,.12);border:1px solid rgba(167,139,250,.3);color:#a78bfa;border-radius:8px;padding:5px 10px;cursor:pointer;font-size:12px;font-weight:700" title="Ayuda">📖 Ayuda</div></div>`;
 }
 
-/* ─── Ayuda del formulario: TOBY, con el formato de Heavy ────────────
-   30/10/2026. La guía anterior describía otro formulario (nombre primero,
-   «Confirmar abre WhatsApp», «si no envías el WhatsApp no lo procesamos»).
-   Era falso: el pedido queda REGISTRADO al confirmar, y WhatsApp solo trae
-   el link de seguimiento. Ahora la ayuda sale del estado real:
-     · los pasos que ESTE cliente ve (retiro en tienda no tiene destino);
-     · el paso donde está, resaltado;
-     · Toby explica lo de ESE paso y ESE tipo de envío.
-   Solo presentación: no lee ni escribe nada en la nube. Si la imagen no
-   carga, queda el globo de texto. */
 function _ayudaFormCss(){
   if(document.getElementById('ayudaCss')) return;
   var st=document.createElement('style'); st.id='ayudaCss';
@@ -166,13 +113,10 @@ function _ayudaFormCss(){
   document.head.appendChild(st);
 }
 
-/* Toby (narrador/toby.js, compartido con el seguimiento y el panel). Sin el
-   script —falla de red— queda el texto en una nota. `texto` ya escapado. */
 function _toby(texto, rol){
   return window.Toby ? Toby.globo(texto, rol) : '<div class="ay-d" style="margin-bottom:12px">'+texto+'</div>';
 }
 
-/* El primer nombre, escapado, para saludar («¡Hola, Jarlyn!»). */
 function _holaNombre(n){
   var p=String(n||'').trim().split(/\s+/)[0]||'';
   if(!p) return '';
@@ -180,7 +124,6 @@ function _holaNombre(n){
   return '¡Hola, '+esc(p)+'! ';
 }
 
-/* La hoja de ayuda: UNA para el formulario y el seguimiento. */
 function _ayudaHoja(){
   _ayudaFormCss();
   let ov = document.getElementById('ayudaFormOv');
@@ -207,9 +150,6 @@ function cerrarAyudaForm(){
   document.body.classList.remove('tt-ayuda-on');
 }
 
-/* Pie de marca (mismo en formulario, éxito y seguimiento). Solo diseño.
-   Iconos como SVG en línea (vectoriales, instantáneos): no dependen de la
-   fuente de emojis ni de la red → sin parpadeo/cuadros al cargar. */
 function brandFooterHtml(){
   const web='<svg class="bf-ic" viewBox="0 0 496 512" fill="#12a5b4" aria-hidden="true"><path d="M336.5 160C322 70.7 287.8 8 248 8s-74 62.7-88.5 152h177zM152 256c0 22.2 1.2 43.5 3.3 64h185.3c2.1-20.5 3.3-41.8 3.3-64s-1.2-43.5-3.3-64H155.3c-2.1 20.5-3.3 41.8-3.3 64zm324.7-96c-28.6-67.9-86.5-120.4-158-141.6 24.4 33.8 41.2 84.7 50 141.6h108zM177.2 18.4C105.8 39.6 47.8 92.1 19.3 160h108c8.7-56.9 25.5-107.8 49.9-141.6zM487.4 192H372.7c2.1 21 3.3 42.5 3.3 64s-1.2 43-3.3 64h114.6c5.5-20.5 8.6-41.8 8.6-64s-3.1-43.5-8.5-64zM120 256c0-21.5 1.2-43 3.3-64H8.6C3.2 212.5 0 233.8 0 256s3.2 43.5 8.6 64h114.6c-2-21-3.2-42.5-3.2-64zm35.4 96c14.5 89.3 48.7 152 88.5 152s74-62.7 88.5-152h-177zm159.4 141.6c71.4-21.2 129.4-73.7 158-141.6h-108c-8.8 56.9-25.6 107.8-50 141.6zM19.3 352c28.6 67.9 86.5 120.4 158 141.6-24.4-33.8-41.2-84.7-50-141.6h-108z"/></svg>';
   const fb='<svg class="bf-ic" viewBox="0 0 448 512" fill="#1877F2" aria-hidden="true"><path d="M400 32H48A48 48 0 0 0 0 80v352a48 48 0 0 0 48 48h137.25V327.69h-63V256h63v-54.64c0-62.15 37-96.48 93.67-96.48 27.14 0 55.52 4.84 55.52 4.84v61h-31.27c-30.81 0-40.42 19.12-40.42 38.73V256h68.78l-11 71.69h-57.78V480H400a48 48 0 0 0 48-48V80a48 48 0 0 0-48-48z"/></svg>';
@@ -229,24 +169,17 @@ function brandFooterHtml(){
     </div>`;
 }
 
-/* Código de seguimiento — la regla vive en functions/codigoSeguimiento.js, la
-   MISMA que usa la etiqueta impresa (Fase 6, 11/11/2026): el código del
-   WhatsApp, del seguimiento y de la etiqueta salen de un solo sitio. */
 function codigoSeg(id, createdAt){
   return window.CodigoSeguimiento ? window.CodigoSeguimiento.de(id, createdAt)
     : String(id||'').slice(-4).toUpperCase();
 }
 
-/* El TIPO de envío de un courier: agencia · encomienda · retiro · delivery.
-   Una sola regla para el formulario (al elegir) y el seguimiento (la ayuda
-   y el narrador hablan según el tipo del pedido que se mira). */
 function _tipoEnvioDe(name){
   const cTypes=(CFG&&CFG.courierTypes)||{};
   const configType=name?(cTypes[name]||''):'';
   const u=(name||'').toUpperCase();
   const isEncomienda=_isOtrasAg(u);
   const isRetiro=!isEncomienda&&u.includes('RETIRO');
-  // Name-based RETIRO/OTRAS AGENCIAS takes priority over stored configType
   const isKnownAgency=['SHALOM','OLVA','MARVISUR','DINSIDES'].some(n=>u.includes(n));
   const isAgencia=!isRetiro&&!isEncomienda&&(configType==='agencia'||isKnownAgency);
   return isAgencia    ? 'agencia'

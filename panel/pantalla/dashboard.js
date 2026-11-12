@@ -1,16 +1,6 @@
-/**
- * panel/pantalla/dashboard.js — métricas del negocio
- * Fase 7 (11/11/2026): movido de la raíz a su capa, sin cambiar una línea.
- */
-/**
- * dashboard.js — Panel de métricas Total Tools
- * Activación: doble-tap en el nombre del negocio (hdrName)
- * Lee S.shipments desde memoria — cero llamadas a Firebase
- */
 (function(global){
 'use strict';
 
-/* ── CSS ─────────────────────────────────────────────────────────── */
 function _injectCSS(){
   if(document.getElementById('dashCSS')) return;
   var s = document.createElement('style');
@@ -58,7 +48,6 @@ function _injectCSS(){
   document.head.appendChild(s);
 }
 
-/* ── Overlay ─────────────────────────────────────────────────────── */
 function _injectOverlay(){
   if(document.getElementById('dashOv')) return;
   var ov = document.createElement('div');
@@ -68,7 +57,6 @@ function _injectOverlay(){
   document.body.appendChild(ov);
 }
 
-/* ── Helpers ─────────────────────────────────────────────────────── */
 function _esc(str){
   return String(str||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
@@ -85,7 +73,6 @@ function _extractProvincia(s){
   return '';
 }
 
-/* ── Barra CSS ───────────────────────────────────────────────────── */
 var ST_COLORS={
   'NUEVO PEDIDO':'#d29922','EN PROCESO':'#d29922','POR ALISTAR':'#388bfd',
   'ALISTADO':'#388bfd','ENVIADO':'#a371f7','LLEGÓ A DESTINO':'#3fb950',
@@ -105,7 +92,6 @@ function _renderBars(items, maxVal, colorFn){
   }).join('');
 }
 
-/* ── Cómputo de métricas ─────────────────────────────────────────── */
 function _compute(){
   var all = (typeof S!=='undefined' && Array.isArray(S.shipments)) ? S.shipments : [];
   var now = new Date();
@@ -117,9 +103,6 @@ function _compute(){
 
   var total=0;
   var conCosto=0, sinCosto=0, finalizados=0, pendPago=0, conMonto=0;
-  // ── Contabilidad (estándar): Facturado = Cobrado + Por cobrar ──────────
-  // monto = venta; adelanto = pagado a cuenta; cost = deuda (max(0,monto-adel)).
-  // Finalizado = cobrado por completo. Pedidos viejos sin monto: cost = venta.
   var facturado=0, facturadoMes=0, facturadoPrevMes=0;
   var cobrado=0,   cobradoMes=0,   cobradoPrevMes=0;
   var porCobrar=0, conDeuda=0, cxcListo=0, cxcPorVencer=0, cxcFuturo=0;
@@ -128,8 +111,8 @@ function _compute(){
 
   all.forEach(function(s){
     total++;
-    var deuda = parseFloat(s.cost)||0;                 // lo que aún se debe
-    var monto = parseFloat(s.monto); if(!(monto>0)) monto = deuda; // viejos: cost=venta
+    var deuda = parseFloat(s.cost)||0;
+    var monto = parseFloat(s.monto); if(!(monto>0)) monto = deuda;
     var adel  = parseFloat(s.adelanto)||0;
     var esFin = (s.status==='FINALIZADO');
     if(monto>0) conMonto++;
@@ -139,18 +122,15 @@ function _compute(){
     var enMes = fecha && fecha.slice(0,7)===thisMon;
     var enPrev= fecha && fecha.slice(0,7)===prevMon;
 
-    // Facturado (venta)
     facturado += monto;
     if(enMes)  facturadoMes     += monto;
     if(enPrev) facturadoPrevMes += monto;
 
-    // Cobrado (efectivo recibido): finalizado = venta completa; activo = adelanto
     var cobradoOrden = esFin ? monto : adel;
     cobrado += cobradoOrden;
     if(enMes)  cobradoMes     += cobradoOrden;
     if(enPrev) cobradoPrevMes += cobradoOrden;
 
-    // Por cobrar (CxC): solo activos con deuda. Aging por etapa.
     if(!esFin && deuda>0){
       porCobrar += deuda; conDeuda++;
       if(s.status==='PENDIENTE DE PAGO')                          cxcListo += deuda;
@@ -158,7 +138,6 @@ function _compute(){
       else                                                        cxcFuturo += deuda;
     }
 
-    // Actividad temporal — usa createdAt si existe, si no date
     var refD = s.createdAt ? new Date(s.createdAt) : (fecha ? new Date(fecha+'T12:00:00') : null);
     if(refD && !isNaN(refD)){
       if(refD.toISOString().slice(0,10)===todayStr) hoy++;
@@ -166,17 +145,14 @@ function _compute(){
       if(_monthKey(refD)===thisMon) mes++;
     }
 
-    // Estado
     var st=s.status||'Sin estado';
     statusMap[st]=(statusMap[st]||0)+1;
     if(st==='PENDIENTE DE PAGO') pendPago++;
     if(st==='FINALIZADO') finalizados++;
 
-    // Courier
     var co=s.courier||'Sin courier';
     courierMap[co]=(courierMap[co]||0)+1;
 
-    // Cliente (agrupa por teléfono)
     var ph=(s.phone||'').trim();
     if(ph){
       if(!clientMap[ph]) clientMap[ph]={name:s.name||'—',phone:ph,count:0};
@@ -184,7 +160,6 @@ function _compute(){
       if(s.name && clientMap[ph].name==='—') clientMap[ph].name=s.name;
     }
 
-    // Provincia
     var prov=_extractProvincia(s);
     if(prov) provMap[prov]=(provMap[prov]||0)+1;
   });
@@ -207,7 +182,6 @@ function _compute(){
   };
 }
 
-/* ── Render HTML ─────────────────────────────────────────────────── */
 function _render(d){
   var facMesDiff = d.facturadoMes - d.facturadoPrevMes;
   var facDiffTxt = (facMesDiff>=0?'+':'')+_money(facMesDiff);
@@ -219,7 +193,6 @@ function _render(d){
 
   var html = '';
 
-  /* HEADER */
   html += '<div class="dash-hdr">'+
     '<div>'+
       '<div class="dash-ttl">Dashboard</div>'+
@@ -228,7 +201,6 @@ function _render(d){
     '<button class="dash-close" onclick="DashBoard.cerrar()">✕ Cerrar</button>'+
   '</div>';
 
-  /* RESUMEN FINANCIERO (contable): Facturado = Cobrado + Por cobrar */
   html += '<div class="dash-sec">'+
     '<div class="dash-sec-ttl">Resumen financiero</div>'+
     '<div class="dash-grid2">'+
@@ -242,7 +214,6 @@ function _render(d){
     '</div>'+
   '</div>';
 
-  /* CUENTAS POR COBRAR (antigüedad / aging) */
   html += '<div class="dash-sec">'+
     '<div class="dash-sec-ttl">Cuentas por cobrar</div>'+
     '<div class="dash-grid2">'+
@@ -253,7 +224,6 @@ function _render(d){
     '</div>'+
   '</div>';
 
-  /* ACTIVIDAD TEMPORAL */
   html += '<div class="dash-sec">'+
     '<div class="dash-sec-ttl">Actividad</div>'+
     '<div class="dash-time-grid">'+
@@ -264,19 +234,16 @@ function _render(d){
     '</div>'+
   '</div>';
 
-  /* PIPELINE POR ESTADO */
   html += '<div class="dash-sec">'+
     '<div class="dash-sec-ttl">Pipeline por estado</div>'+
     _renderBars(d.statusList, maxSt, function(k){ return ST_COLORS[k]||'#58a6ff'; })+
   '</div>';
 
-  /* POR COURIER */
   html += '<div class="dash-sec">'+
     '<div class="dash-sec-ttl">Por courier / agencia</div>'+
     _renderBars(d.courierList, maxCo, function(){ return '#388bfd'; })+
   '</div>';
 
-  /* TOP 10 CLIENTES */
   html += '<div class="dash-sec">'+
     '<div class="dash-sec-ttl">Top 10 clientes</div>'+
     (d.clientList.length ? d.clientList.map(function(c,i){
@@ -291,7 +258,6 @@ function _render(d){
     }).join('') : '<div class="dash-empty">Sin datos</div>')+
   '</div>';
 
-  /* TOP 10 PROVINCIAS */
   html += '<div class="dash-sec">'+
     '<div class="dash-sec-ttl">Top 10 provincias / ciudades</div>'+
     (d.provList.length ?
@@ -299,7 +265,6 @@ function _render(d){
       '<div class="dash-empty">Las direcciones no tienen formato de provincia</div>')+
   '</div>';
 
-  /* ALERTAS */
   html += '<div class="dash-sec">'+
     '<div class="dash-sec-ttl">Alertas</div>'+
     '<div class="dash-alert-row"><span class="dash-alert-lbl">Pendientes de pago</span><span class="dash-alert-'+(d.pendPago?'cnt':'ok')+'">'+d.pendPago+'</span></div>'+
@@ -310,7 +275,6 @@ function _render(d){
   document.getElementById('dashSheet').innerHTML = html;
 }
 
-/* ── API Pública ─────────────────────────────────────────────────── */
 var DashBoard = {};
 
 DashBoard.abrir = function(){

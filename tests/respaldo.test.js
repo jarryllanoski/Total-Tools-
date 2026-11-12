@@ -74,7 +74,7 @@ module.exports = async ({bloque, ok}) => {
     ok(/agenciaOrigen:/.test(cuerpo), 'y la agencia de origen');
     ok(/shalomInstancia:/.test(cuerpo),
        'y la cuenta de Shalom, para que quede constancia');
-    ok(!/shalomRegistroSimulacro/.test(cuerpo.replace(/\/\*[\s\S]*?\*\//g, '')),
+    ok(!/shalomRegistroSimulacro/.test(cuerpo),
        '⚠️ pero NO el simulacro: es un interruptor de seguridad, no un dato');
     ok(/var FORMATO_VERSION = 2;/.test(src), 'formato 2');
   }

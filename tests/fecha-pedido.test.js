@@ -58,7 +58,7 @@ module.exports = async ({bloque, ok}) => {
   bloque('El filtro real del panel');
 
   {
-    const src = E.trozo('index.html', 'function visibleShipments(){', '/* ══════');
+    const src = E.trozo('index.html', 'function visibleShipments(){', 'let _renderPedido = false;');
     const S = {shipments: [
       {id: 'a', name: 'A', phone: '1', address: '', courier: 'X', status: 'NUEVO PEDIDO',
         date: '2026-10-28', createdAt: '2026-10-27T01:00:00.000Z'},
@@ -102,7 +102,7 @@ module.exports = async ({bloque, ok}) => {
 
   {
     const src = E.trozo('index.html', 'function _advVacio(){', 'function updateAdvBar(){') +
-      E.trozo('index.html', 'function updateAdvBar(){', '/* BULK STATUS CHANGE */');
+      E.trozo('index.html', 'function updateAdvBar(){', 'function bulkChangeStatus(){');
     const campos = {};
     const nodo = (id) => campos[id] || (campos[id] = {id, value: '', innerHTML: '',
       style: {}, _c: new Set(),
@@ -137,7 +137,7 @@ module.exports = async ({bloque, ok}) => {
     ok(api.adv().campo === 'envio' && campos.asDateFrom.value === '' && !api.activo(),
        '«Limpiar todo» vuelve a fecha de envío y vacía las fechas');
 
-    const ord = E.trozo('index.html', '// Ordenamiento (los filtros avanzados', '} else {');
+    const ord = E.trozo('index.html', 'if(_advActive){\n    const _tsReg', '} else {');
     ok(/_adv\.campo==='registro' && \(_adv\.sort==='oldest'\|\|_adv\.sort==='newest'\)/.test(ord),
        'con fecha de registro, más reciente/antiguo ordena por cuándo entró');
     ok(/functions\/fechaPedido\.js/.test(E.leer('index.html')), 'el panel carga el módulo');

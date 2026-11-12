@@ -33,8 +33,8 @@ module.exports = async ({bloque, ok}) => {
   await fetch('http://' + EMU + '/emulator/v1/projects/demo-alta/databases/(default)/documents', {method: 'DELETE'});
 
   const src = E.leer('functions/index.js');
-  const campos = src.slice(src.indexOf('const ORDER_FIELDS'), src.indexOf('// ── action=create'));
-  const create = src.slice(src.indexOf('async function handleCreate'), src.indexOf('// ── action=token'));
+  const campos = src.slice(src.indexOf('const ORDER_FIELDS'), src.indexOf('async function handleCreate(req, res) {'));
+  const create = src.slice(src.indexOf('async function handleCreate'), src.indexOf('async function handleToken(req, res) {'));
   // El reloj CONGELADO: todos los pedidos nacen en el mismo milisegundo.
   let T = 1793350000000;
   class Reloj extends Date {

@@ -1,21 +1,3 @@
-/* ═══════════════════════════════════════════════════════════════════
-   ETIQUETA EN VIVO — el cliente "construye" su etiqueta de envío mientras
-   llena el formulario (la misma que irá pegada a su paquete).
-   Capa de presentación OPCIONAL y DESACOPLADA (mismo patrón que la boleta
-   anterior y los personajes): observa el DOM del formulario, no toca la
-   lógica de guardado.
-   · 0 llamadas a la nube · 0 cambios a formApi · solo lectura del DOM
-   · Solo en el formulario (si hay ?seg=, no aplica)
-   · Fuentes del sistema (sin CDN) — funciona en cualquier internet
-   · QR cacheado local (narrador/qr-negocio.svg) — NO se genera por número
-   · Actualización INCREMENTAL: la estructura se arma una sola vez y luego
-     solo se edita el TEXTO de cada campo en su sitio (sin parpadear). No
-     reescribe el HTML en cada tecla → no dispara bucles ni molesta a otros
-     módulos (el narrador) que también observan #app.
-   · No se escribe SOBRE la etiqueta, pero tocarla es un ATAJO: baja al primer
-     campo vacío del formulario y le abre el teclado (antes no hacía nada y el
-     cliente creía que la app estaba rota).
-   ═══════════════════════════════════════════════════════════════════ */
 (function(){
   'use strict';
   if(new URLSearchParams(location.search).has('seg')) return;
@@ -26,21 +8,10 @@
   var val=function(id){ var e=document.getElementById(id); return e?(e.value||'').trim():''; };
   var visible=function(id){ var e=document.getElementById(id); return !!(e&&e.offsetParent!==null); };
 
-  // ── Estilos (etiqueta de envío: papel blanco, bordes negros) ────────
   var st=document.createElement('style');
   st.textContent=''
-   /* ★ LA ESCALA DE LA ETIQUETA, EN UN SOLO SITIO.
-      El dueño la quiso más pequeña: ocupaba media pantalla de móvil antes
-      del primer campo. No se tocó ni una medida a mano —eso habría sido
-      reescribir la tabla de tamaños y perder las proporciones— sino que
-      cada `font-size` pasó a ser `calc(Npx * var(--tt-s))`. Cambiar este
-      número cambia la etiqueta entera sin que nada se descuadre.
-      Las medidas ORIGINALES siguen escritas: se lee lo que era y lo que es.
-      ⚠️ Esto es la VISTA PREVIA del formulario, no el rótulo que se imprime.
-      El que se pega al paquete lo hace print.js y no pasa por aquí. */
    +'#tt-lbl{--tt-s:.78;margin:2px 0 10px;filter:drop-shadow(0 8px 14px rgba(0,0,0,.45))}'
    +'#tt-lbl .card{background:#fff;color:#111;border:1.6px solid #111;border-radius:7px;padding:calc(14px * var(--tt-s)) calc(15px * var(--tt-s));font-family:Arial,Helvetica,sans-serif;line-height:1.35}'
-   // PARA (cliente) + QR
    +'#tt-lbl .para{min-width:0}'
    +'#tt-lbl .rem-info{flex:1;min-width:0}'
    +'#tt-lbl .seclbl{font-size:calc(10px * var(--tt-s));font-weight:700;text-transform:uppercase;letter-spacing:1.2px;color:#666;margin-bottom:3px}'
@@ -51,40 +22,29 @@
    +'#tt-lbl .qr{flex-shrink:0;text-align:center;width:calc(74px * var(--tt-s))}'
    +'#tt-lbl .qr img{display:block;width:calc(74px * var(--tt-s));height:calc(74px * var(--tt-s))}'
    +'#tt-lbl .qr .qrnum{font-size:calc(9.5px * var(--tt-s));color:#555;margin-top:2px;white-space:nowrap}'
-   // DESTINO
    +'#tt-lbl .dest{margin-top:11px;padding-top:10px;border-top:1px solid #111}'
    +'#tt-lbl .dest-addr{font-size:calc(13px * var(--tt-s));color:#111;word-break:break-word;white-space:pre-wrap}'
    +'#tt-lbl .dest-addr.ghost{color:#bbb}'
-   // Envío (courier · fecha)
    +'#tt-lbl .envio{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:10px;padding-top:9px;border-top:1.6px solid #111}'
    +'#tt-lbl .courier{font-size:calc(13px * var(--tt-s));font-weight:800;text-transform:uppercase;letter-spacing:.8px;color:#111}'
    +'#tt-lbl .fecha{font-size:calc(12.5px * var(--tt-s));font-weight:700;color:#333}'
-   // REMITENTE (al pie)
    +'#tt-lbl .rem{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:10px;padding-bottom:9px;border-bottom:1px dashed #999}'
    +'#tt-lbl .rem-name{font-size:calc(13px * var(--tt-s));font-weight:700;color:#111}'
    +'#tt-lbl .rem-sub{font-size:calc(11.5px * var(--tt-s));color:#444;margin-top:1px}'
-   // Nota de revisión (sutil, fuera de la tarjeta)
    +'#tt-lbl .revisa{text-align:center;font-size:calc(10px * var(--tt-s));letter-spacing:1px;color:#8a8a8a;text-transform:uppercase;margin-top:7px}'
-   // La tarjeta es un ATAJO al formulario: tocarla lleva al campo que falta.
    +'#tt-lbl .card{cursor:pointer}'
-   // Resalte de "mira aquí" para el grupo de elección al tocar la etiqueta.
-   // Con box-shadow (no borde ni outline) para que no desplace nada.
    +'@keyframes ttMira{0%,100%{box-shadow:0 0 0 0 rgba(18,165,180,0)}40%{box-shadow:0 0 0 3px rgba(18,165,180,.5)}}'
    +'.tt-mira{border-radius:14px;animation:ttMira 1.1s ease-out 2}'
    +'@media(prefers-reduced-motion:reduce){.tt-mira{animation:none;box-shadow:0 0 0 3px rgba(18,165,180,.5)}}'
    +'@media(prefers-reduced-motion:reduce){#tt-lbl *{animation:none!important}}';
   document.head.appendChild(st);
 
-  // ── Datos del negocio (REMITENTE) — expuestos por el formulario ─────
   function bizInfo(){
     var b=window._bizInfo||{};
     return { name:b.name||'', phone:b.phone||'', city:b.city||'' };
   }
 
-  // ── Lectura de los campos del cliente (mismos getters que la boleta) ─
   function getName(){ var v=val('f_name'); return v?v.toUpperCase():''; }
-  // Sin prefijo: en la etiqueta se muestra el numero tal cual. Lo que se guarda
-  // en el pedido y lo que va al WhatsApp no pasa por aqui, no cambian.
   function getPhone(){ return val('f_phone').replace(/\D/g,''); }
   function getDni(){ return val('f_dni')||''; }
   function getCourier(){
@@ -95,14 +55,13 @@
     var e=app.querySelector('.date-opt.active');
     return e?(e.textContent||'').replace(/\s+/g,' ').trim():'';
   }
-  // DESTINO: reúso EXACTO de la lógica de la boleta (sin fuga de dirección)
   function getDestino(){
     var t=window._selCourierType;
     if(t){
       if(t==='agencia')    return txt('#shalomSelTxt')||txt('.sel-badge span')||'';
       if(t==='encomienda'){ var c=val('f_ciudad'), a=val('f_agencia'); return c?(c+(a?' — '+a:'')):''; }
       if(t==='delivery'){ var d=(window.getDeliveryAddr?window.getDeliveryAddr():val('addrManualInput')); var r=val('f_ref'); return d?(d+(r?' ('+r+')':'')):''; }
-      return ''; // retiro en tienda: sin destino
+      return '';
     }
     var ag=txt('#shalomSelTxt')||txt('.sel-badge span'); if(ag) return ag;
     if(visible('f_ciudad')){ var c2=val('f_ciudad'), a2=val('f_agencia'); return c2?(c2+(a2?' — '+a2:'')):''; }
@@ -111,11 +70,10 @@
     return '';
   }
 
-  // ── Construcción (una sola vez) ─────────────────────────────────────
   var box, el={};
   function build(){
     if(document.getElementById('tt-lbl')){ box=document.getElementById('tt-lbl'); return; }
-    remDone=false;   // tarjeta nueva → REMITENTE se repinta (p. ej. al cargar CFG)
+    remDone=false;
     box=document.createElement('div'); box.id='tt-lbl';
     box.innerHTML=''
       +'<div class="card">'
@@ -160,40 +118,23 @@
       remCity:box.querySelector('.rem-city'),
       revisa: box.querySelector('.revisa')
     };
-    // REMITENTE se pinta una sola vez (dato del negocio, no cambia)
     paintRemitente();
     box.querySelector('.card').addEventListener('click', irAlFormulario);
   }
 
-  /* ── Atajo: tocar la etiqueta lleva al campo que falta ───────────────
-     El cliente ve SU NOMBRE en grande arriba del todo y lo toca esperando
-     escribir ahí. Antes no pasaba nada y parecía que la app estaba rota.
-     Ahora ese toque hace justo lo que quería: bajar al primer campo vacío
-     y abrirle el teclado.
-
-     ACCESIBILIDAD: esto es un ATAJO, no la única vía — los campos siguen
-     alcanzándose con el tabulador. Por eso la tarjeta NO se marca como
-     role="button" (haría que un lector de pantalla anunciara la etiqueta
-     entera como un botón) ni se mete en el orden de tabulación.
-
-     Sigue sin tocar la lógica de guardado: solo lee el DOM y enfoca. */
   function campoQueFalta(){
     var campos=app.querySelectorAll('input,select,textarea');
     var primero=null;
     for(var i=0;i<campos.length;i++){
       var c=campos[i];
       if(c.disabled||c.readOnly||c.type==='hidden') continue;
-      if(c.offsetParent===null) continue;              // de otro paso: no visible
+      if(c.offsetParent===null) continue;
       if(!primero) primero=c;
-      if(!String(c.value||'').trim()) return c;        // el primero VACÍO
+      if(!String(c.value||'').trim()) return c;
     }
-    return primero;                                     // todo lleno
+    return primero;
   }
 
-  // Un paso puede no tener NINGÚN campo: el de "¿cómo quieres recibir tu
-  // pedido?" son botones y su <select> real está oculto, así que campoQueFalta
-  // no encontraba nada y el toque se quedaba mudo justo ahí. Un grupo de
-  // elección sin responder también es "lo que falta".
   function grupoSinResponder(){
     var grupos=app.querySelectorAll('[role="radiogroup"]');
     for(var i=0;i<grupos.length;i++){
@@ -204,24 +145,17 @@
     return null;
   }
   function irAlFormulario(e){
-    // No robarle el toque a nada que ya sea interactivo dentro de la tarjeta.
     if(e.target&&e.target.closest&&e.target.closest('a,button,input,select,textarea')) return;
     var destino=campoQueFalta() || grupoSinResponder();
     if(!destino) return;
     var suave=!(window.matchMedia&&window.matchMedia('(prefers-reduced-motion:reduce)').matches);
     try{ destino.scrollIntoView({behavior:suave?'smooth':'auto',block:'center'}); }
     catch(_e){ destino.scrollIntoView(); }
-    // Grupo de elección: se SEÑALA, no se elige. Elegir un courier avanza solo
-    // de paso, así que hacerlo desde aquí sacaría al cliente de la pantalla por
-    // un toque que quizá solo era para leer la etiqueta. La decisión sigue
-    // siendo suya, con un toque directo en la tarjeta que quiera.
     if(destino.getAttribute && destino.getAttribute('role')==='radiogroup'){
       destino.classList.add('tt-mira');
       setTimeout(function(){ destino.classList.remove('tt-mira'); }, 2400);
       return;
     }
-    // El teclado solo se abre si el campo está VACÍO. Si ya estaba lleno, el
-    // cliente solo quería ver dónde se edita — no le tapamos la pantalla.
     if(!String(destino.value||'').trim()){
       try{ destino.focus({preventScroll:true}); }catch(_e2){ destino.focus(); }
     }
@@ -231,14 +165,13 @@
   function paintRemitente(){
     if(remDone) return;
     var b=bizInfo();
-    if(!b.name && !b.phone && !b.city) return; // aún sin CFG: reintenta luego
+    if(!b.name && !b.phone && !b.city) return;
     el.remName.textContent=b.name||'—';
     if(b.phone){ el.remTel.textContent='Tel: '+b.phone; el.remTel.style.display=''; }
     if(b.city){ el.remCity.textContent=b.city; el.remCity.style.display=''; }
     remDone=true;
   }
 
-  // ── Actualización: solo cambia texto, sin reescribir estructura ─────
   function setRow(node, wrap, value){
     if(value){ node.textContent=value; if(wrap) wrap.style.display=''; else node.style.display=''; }
     else{ node.textContent=''; if(wrap) wrap.style.display='none'; else node.style.display='none'; }
@@ -263,37 +196,13 @@
     el.courier.textContent=courier||'';
     el.fecha.textContent=fecha||'';
 
-    // Pie: "revisa que estén correctos" solo tiene sentido cuando YA hay algo
-    // que revisar. Con la etiqueta aún en blanco era una orden imposible de
-    // cumplir —y señalaba a la tarjeta, que no se edita—, así que el cliente
-    // la tocaba y creía que la app estaba rota. Se decide con los MISMOS
-    // valores que se acaban de pintar: una sola verdad, sin volver a leer el
-    // DOM y sin poder desincronizarse de lo que se ve.
     el.revisa.textContent=(name&&dest)
       ? 'Revisa que tus datos estén correctos'
       : 'Así se verá tu etiqueta';
 
-    /* ★ LA ETIQUETA NO SE VE HASTA QUE TIENE ALGO TUYO DENTRO.
-       Al entrar, el cliente veía una tarjeta EN BLANCO ocupando el primer
-       tercio del móvil, antes de poder hacer nada. Una etiqueta vacía no
-       enseña nada: es el sitio donde va a estar lo que todavía no existe.
-
-       ⚠️ LA REGLA MIRA EL CONTENIDO, NO EL PASO. Lo fácil habría sido
-       «ocúltala en el paso 1», y habría quedado mal el día que los pasos se
-       muevan —que es hoy mismo: el courier acaba de pasar a ser el primero—.
-       Así la regla sigue siendo cierta sola, sin saber nada del asistente.
-
-       Y el REMITENTE no cuenta. Es el único dato que está desde el segundo
-       cero, porque es del negocio y no del cliente: contarlo haría que la
-       etiqueta se viera siempre, que es justo lo que se vino a quitar.
-
-       Se decide con los mismos valores que se acaban de pintar, como el pie
-       de aquí arriba: una sola verdad, recalculada, sin poder
-       desincronizarse de lo que se ve. */
     box.style.display = (name||phone||dni||dest||courier) ? '' : 'none';
   }
 
-  // ── Montaje en el formulario (después de la cabecera) ───────────────
   function place(){
     if(!document.getElementById('f_name')) return false;
     build();
@@ -307,11 +216,10 @@
   }
   function removeBox(){ if(box&&box.parentNode){ box.parentNode.removeChild(box); box=null; el={}; remDone=false; } }
 
-  // ── Observadores: reacciona a lo que el cliente llena ──────────────
   var deb;
   document.addEventListener('input', function(){ clearTimeout(deb); deb=setTimeout(update,120); }, true);
   document.addEventListener('change', function(){ setTimeout(update,60); }, true);
-  document.addEventListener('click', function(){ setTimeout(update,120); }, true); // chips fecha / opciones
+  document.addEventListener('click', function(){ setTimeout(update,120); }, true);
 
   var scanT;
   function scan(){
@@ -320,13 +228,11 @@
       try{
         var isTrack=app.querySelector('.track-card')||app.querySelector('.status-badge');
         var isSuccess=app.querySelector('.success');
-        if(isTrack||isSuccess){ removeBox(); return; } // en seguimiento/éxito no aplica
+        if(isTrack||isSuccess){ removeBox(); return; }
         place();
-      }catch(e){ /* nunca romper el formulario */ }
+      }catch(e){  }
     },140);
   }
-  // El observador IGNORA las mutaciones de la propia etiqueta (evita bucle
-  // de auto-disparo y no perturba a otros módulos que observan #app).
   try{
     new MutationObserver(function(recs){
       for(var i=0;i<recs.length;i++){

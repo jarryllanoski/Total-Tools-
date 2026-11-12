@@ -1,25 +1,5 @@
-/**
- * panel/shalom/shalom-origen.js — agencia de origen y cuenta de Shalom Pro
- * =================================================================
- * Fase 3 (10/11/2026): el panel en módulos. Antes vivía en config.js.
- * Script CLÁSICO a propósito: sus funciones y variables son globales, igual
- * que cuando estaban en un solo archivo — moverlas no cambió ni una llamada.
- * El orden de los <script> en index.html es el orden de ejecución.
- */
-/* ── TU AGENCIA DE ORIGEN ─────────────────────────────────────────────────
-   `POST /account/register` pide `origen`, y también es un `ter_id`. Como es
-   siempre la misma, se elige UNA VEZ aquí en vez de en cada envío.
-
-   Se guarda con el MISMO `Agencias.elegida()` que el destino: una segunda
-   forma de guardar un ter_id acabaría aceptando aquí lo que allá se rechaza.
-
-   Vive en `S.agenciaOrigen`, HERMANA de `config` y no dentro: ese objeto lo
-   devuelve entero la función pública, y aunque tu agencia de despacho no sea
-   un secreto, la regla se comprueba antes de guardar, no después. */
 let _orTimer = null;
 
-/* El origen, en UNA línea. El buscador estaba siempre abierto ocupando un
-   campo para algo que se elige una vez al año; ahora sale con «cambiar». */
 function cfgOrigenAbrir(){
   const c = $('cfgOrigenCaja'); if(!c) return;
   const abierto = c.style.display !== 'none';
@@ -51,10 +31,6 @@ function _pintarOrigen(){
     enlace('quitar', 'quitarOrigen()')+'</div>';
 }
 
-/* `pre` existe para que el MISMO buscador sirva en Config y en el pedido.
-   La alternativa era copiarlo, y una copia habría divergido: dos buscadores
-   escribiendo sobre la MISMA `S.agenciaOrigen` con reglas distintas es como
-   se despacha desde la agencia equivocada sin que nadie lo note. */
 function onOrigenInput(val, pre){
   pre = pre || 'cfg';
   const drop = $(pre+'OrigenDrop'); if(!drop) return;
@@ -85,8 +61,6 @@ function onOrigenInput(val, pre){
 function pickOrigen(i, pre){
   pre = pre || 'cfg';
   const ag = (window._origenCache||[])[i]; if(!ag) return;
-  // SHALOM fijo, no el courier del formulario: esta es TU agencia de
-  // despacho, y el registro que la va a usar es el de Shalom.
   const el = window.Agencias ? Agencias.elegida(ag, 'SHALOM') : null;
   if(!el){ toast('⚠️ Esa agencia no tiene un id utilizable'); return; }
   S.agenciaOrigen = el;
@@ -96,8 +70,6 @@ function pickOrigen(i, pre){
   const caja = $('regOrigenCaja'); if(caja) caja.style.display='none';
   const caja2 = $('cfgOrigenCaja'); if(caja2) caja2.style.display='none';
   _pintarOrigen();
-  // El bloque del pedido depende de esto: sin repintar, seguiría diciendo
-  // "sin agencia de origen" con la agencia ya elegida.
   if(typeof _pintarRegistroShalom==='function') _pintarRegistroShalom();
   toast('🏢 Origen: '+el.agenciaNombre);
 }

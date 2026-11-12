@@ -1,12 +1,3 @@
-/**
- * panel/config/proveedores.js — proveedores y su stock
- * =============================================
- * Fase 3 (10/11/2026): el panel en módulos. Antes vivía en index.html.
- * Script CLÁSICO a propósito: sus funciones y variables son globales, igual
- * que cuando estaban en un solo archivo — moverlas no cambió ni una llamada.
- * El orden de los <script> en index.html es el orden de ejecución.
- */
-/* SUPPLIERS */
 let _suppId=null;
 
 function globalSuppSearch(raw){
@@ -32,7 +23,6 @@ function globalSuppSearch(raw){
   extracted.forEach(q=>{
     S.suppliers.forEach(sup=>{
       (sup.items||[]).forEach((it,i)=>{
-        // Get just the code part (before first space)
         const itemCode=it.text.trim().split(/\s+/)[0].toLowerCase();
         const searchCode=q.toLowerCase();
         if(itemCode===searchCode&&!it.done){
@@ -45,21 +35,19 @@ function globalSuppSearch(raw){
   });
 
   if(marked>0){
-    touched.forEach(id=>save('supp:'+id)); // solo los proveedores realmente tocados
-    // Force full re-render of suppliers panel
+    touched.forEach(id=>save('supp:'+id));
     const area=$('suppStatsArea');
     if(area) area.innerHTML='';
     render(); 
     toast(`✅ ${marked} ítem${marked>1?'s':''} marcado${marked>1?'s':''}`); 
   }
 
-  // Clear silently
   const inp=$('suppGlobalSearch'); if(inp) inp.value='';
 }
 
 function renderSuppliersPanel(){
   if(!S.suppliers) S.suppliers=[];
-  if(window.Cotizacion&&Cotizacion.ensureTienda) Cotizacion.ensureTienda(); // 🏬 Tienda fija
+  if(window.Cotizacion&&Cotizacion.ensureTienda) Cotizacion.ensureTienda();
   return`<div class="supp-panel">
     <div class="supp-panel-hdr">
       <div class="supp-panel-ttl">🏭 Proveedores</div>
@@ -94,14 +82,12 @@ function renderSuppliersPanel(){
   </div>`;
 }
 
-/* Orden persistente de proveedores (campo .orden). Asigna a los que no tengan. */
 function _sortSupp(){
   if(!S.suppliers) return;
   S.suppliers.forEach((s,i)=>{ if(typeof s.orden!=='number') s.orden=i; });
   S.suppliers.sort((a,b)=>(a.orden||0)-(b.orden||0));
 }
 
-/* Administrar proveedores (agregar / editar / borrar / reordenar) — desde el icono 🏭 */
 function openSuppManage(){
   if(window.Cotizacion&&Cotizacion.ensureTienda) Cotizacion.ensureTienda();
   _sortSupp();
@@ -132,8 +118,8 @@ function _manageMove(id,dir){
   const i=S.suppliers.findIndex(x=>x.id===id); if(i<0) return;
   const j=i+dir; if(j<0||j>=S.suppliers.length) return;
   const a=S.suppliers[i], b=S.suppliers[j];
-  const ao=a.orden; a.orden=b.orden; b.orden=ao;      // intercambia el orden persistente
-  save('supp:'+a.id); save('supp:'+b.id);             // incremental: solo los dos movidos
+  const ao=a.orden; a.orden=b.orden; b.orden=ao;
+  save('supp:'+a.id); save('supp:'+b.id);
   render(); renderSuppManage();
 }
 function _manageEdit(id){
@@ -154,11 +140,10 @@ function openSupplier(id){
   renderSuppItems(sup);
   $('suppNewItem').value='';
   const srch=$('suppSearch'); if(srch) srch.value='';
-  const delBtn=$('suppDelBtn'); if(delBtn) delBtn.style.display=esTienda?'none':'block'; // la Tienda no se borra
+  const delBtn=$('suppDelBtn'); if(delBtn) delBtn.style.display=esTienda?'none':'block';
   openOverlay('suppOverlay');
 }
 
-/* Excel de stock del proveedor (o de la tienda). Reusa la API de Cotización. */
 function renderSuppStock(sup){
   const area=$('suppStockArea'); if(!area) return;
   const st=(window.Cotizacion&&Cotizacion.stock)?Cotizacion.stock.get(sup.id):null;
@@ -206,8 +191,6 @@ function delSuppStock(id){
   toast('🗑️ Excel de stock eliminado');
 }
 
-/* Vista DERIVADA: ítems de cotización asignados a esta fuente (tienda o proveedor).
-   No se copian: se calculan desde los pedidos → siempre en sync. */
 function renderSuppCotiz(sup){
   const area=$('suppCotizDerived'); if(!area) return;
   const items=(window.Cotizacion&&Cotizacion.itemsDeFuente)?Cotizacion.itemsDeFuente(sup.id):[];
@@ -228,7 +211,6 @@ function renderSuppCotiz(sup){
     </div>`).join('')}`;
 }
 
-/* Quitar la asignación de un ítem (desde la ficha de la fuente). */
 function quitarAsignacion(pedidoId, codigo){
   if(window.Cotizacion&&Cotizacion.asignar) Cotizacion.asignar(pedidoId, codigo, null);
   const sup=S.suppliers.find(x=>x.id===_suppId); if(sup) renderSuppCotiz(sup);
@@ -245,8 +227,8 @@ function delSupplier(id){
     alConfirmar: () => {
       S.suppliers=S.suppliers.filter(x=>x.id!==id);
       if(window.Cotizacion&&Cotizacion.stock) Cotizacion.stock.del(id);
-      if(window._fbDeleteSupplier) window._fbDeleteSupplier(id); // borra el doc en Firestore
-      save('config'); render(); closeOverlay('suppOverlay'); // bump ts para otros dispositivos
+      if(window._fbDeleteSupplier) window._fbDeleteSupplier(id);
+      save('config'); render(); closeOverlay('suppOverlay');
       if($('suppManageOverlay').classList.contains('open')) renderSuppManage();
       toast('🗑️ Proveedor eliminado');
     }
@@ -274,7 +256,6 @@ function filterSuppItems(){
 function bulkVerifySupp(){
   const sup=S.suppliers.find(x=>x.id===_suppId); if(!sup||!sup.items||!sup.items.length) return;
   const q=($('suppSearch').value||'').toLowerCase().trim();
-  // If searching, only verify filtered items; otherwise all
   const allDone=q
     ? sup.items.filter(it=>it.text.toLowerCase().includes(q)).every(x=>x.done)
     : sup.items.every(x=>x.done);
@@ -366,7 +347,7 @@ function delSuppItem(suppId,idx){
 function moveAllToPorAlistar(){
   openPin(()=>{
     const count=S.shipments.filter(x=>x.status==='EN PROCESO').length;
-    S.shipments.forEach(x=>{ if(x.status==='EN PROCESO'){ x.status='POR ALISTAR'; save(x.id); } }); // incremental: solo los movidos
+    S.shipments.forEach(x=>{ if(x.status==='EN PROCESO'){ x.status='POR ALISTAR'; save(x.id); } });
     render();
     toast(`🔵 ${count} pedido${count>1?'s':''} → POR ALISTAR`);
   });
@@ -376,7 +357,6 @@ function sendSuppList(suppId){
   const sup=S.suppliers.find(x=>x.id===suppId); if(!sup) return;
   if(!sup.phone){ toast('⚠️ Sin número de teléfono'); return; }
   const pending=(sup.items||[]).filter(x=>!x.done);
-  // Vista derivada: ítems de cotización asignados a este proveedor.
   const cotiz=(window.Cotizacion&&Cotizacion.itemsDeFuente)?Cotizacion.itemsDeFuente(suppId):[];
   if(!pending.length && !cotiz.length){ toast('✅ Nada para enviar'); return; }
   let msg=`Hola! 👋 Te paso la lista de lo que necesito:\n\n`, n=0;
@@ -392,7 +372,6 @@ function saveNewSupplier(){
   if(!name){toast('⚠️ Ingresa el nombre');return}
   const tipoEl=document.querySelector('input[name="suppTipo"]:checked');
   const tipo=(tipoEl&&tipoEl.value==='tienda')?'tienda':'proveedor';
-  // Tienda exclusiva: si marcás esta como tienda, la anterior pasa a proveedor.
   if(tipo==='tienda'){ (S.suppliers||[]).forEach(x=>{ if(x.tipo==='tienda'){ x.tipo='proveedor'; save('supp:'+x.id); } }); }
   const _ns={id:(tipo==='tienda'?'sup_tienda_'+Date.now():'sup_'+Date.now()),name,phone,items:[],tipo,orden:(S.suppliers?S.suppliers.length:0)};
   S.suppliers.push(_ns);
@@ -480,9 +459,6 @@ function loadCotiz(input){
   if(file.size>10*1024*1024){toast('⚠️ Máximo 10MB');return}
   const sup=S.suppliers.find(x=>x.id===_suppId); if(!sup){input.value='';return}
   input.value='';
-  // ★ Subir a Firebase Storage (URL que sincroniza en todos los dispositivos).
-  //   Antes se guardaba solo base64 → slimSupplier lo volvía [img] → no se veía
-  //   en otros equipos. Fallback a base64 si Storage falla.
   if(window.StorageModule && StorageModule.uploadFile){
     toast('⏳ Subiendo cotización...');
     StorageModule.uploadFile(file, sup.id, 'cotiz').then(function(docObj){
@@ -522,7 +498,6 @@ function saveEditSupplier(){
   if(!name){toast('⚠️ Ingresa el nombre');return}
   sup.name=name; sup.phone=phone;
   save('supp:'+sup.id); render();
-  // Update header in suppOverlay
   $('suppName').textContent='🏭 '+name;
   $('suppPhone').innerHTML=`📞 ${phone} <button onclick="window.open('https://wa.me/51${phone}','_blank')" style="background:rgba(46,160,67,.15);border:1px solid rgba(46,160,67,.3);color:var(--green);border-radius:7px;padding:4px 10px;font-size:12px;font-weight:700;cursor:pointer">💬 WhatsApp</button>`;
   closeOverlay('suppEditOverlay');
@@ -544,12 +519,12 @@ function openPrivateNote(id){
 function savePvtNote(){
   const s=S.shipments.find(x=>x.id===_pvtNoteId); if(!s) return;
   s.privateNote=$('pvtNoteInput').value.trim();
-  save(s.id); render(); closeOverlay('pvtNoteOverlay'); // ★ incremental
+  save(s.id); render(); closeOverlay('pvtNoteOverlay');
   toast('🔒 Nota privada guardada');
 }
 function deletePvtNote(){
   const s=S.shipments.find(x=>x.id===_pvtNoteId); if(!s) return;
   s.privateNote='';
-  save(s.id); render(); closeOverlay('pvtNoteOverlay'); // ★ incremental
+  save(s.id); render(); closeOverlay('pvtNoteOverlay');
   toast('🗑️ Nota eliminada');
 }

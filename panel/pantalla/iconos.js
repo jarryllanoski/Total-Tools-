@@ -1,6 +1,4 @@
-/**
- * panel/pantalla/iconos.js — iconos de Lucide (ISC, https://lucide.dev) en lugar de emojis.
- */
+// Lucide (ISC) https://lucide.dev
 (function(){
   'use strict';
   var D = {

@@ -46,8 +46,7 @@ module.exports = async ({bloque, ok}) => {
     ok(p.every((x, k) => x > 0 && (k === 0 || x > p[k - 1])), 'los módulos del formulario se cargan todos y en orden (comun.js primero)');
     const fm = fs.readdirSync(path.join(E.RAIZ, 'cliente')).filter((f) => /^form-.*\.js$/.test(f));
     ok(fm.length === ORDEN.length - 1, 'no sobra ni falta ningún módulo form-*.js (' + fm.length + ')');
-    fm.forEach((f) => ok(new RegExp('^/\\*\\*\\n \\* cliente/' + f.replace('.', '\\.') + ' — ').test(E.leerReal('cliente/' + f)),
-      f + ' dice qué es en su cabecera'));
+    fm.forEach((f) => ok(!/^\s*\/[*/]/.test(E.leerReal('cliente/' + f)), f + ' sin comentarios de cabecera (Fase 3)'));
     const arr = E.leerReal('cliente/form-arranque.js');
     ok(/\ninit\(\);\s*$/.test(arr), 'init() corre al final del último módulo, cuando ya existe todo');
     ok(fm.filter((f) => f !== 'form-arranque.js').every((f) => !/^window\.[\w$]+\s*=\s*[\w$]+;/m.test(E.leerReal('cliente/' + f))),
@@ -68,7 +67,7 @@ module.exports = async ({bloque, ok}) => {
     mods.forEach((f) => {
       ok(pos(f) > 0, f + ' se carga');
       const t = E.leerReal('panel/' + f);
-      ok(new RegExp('^/\\*\\*\\n \\* panel/' + f.replace('.', '\\.') + ' — ').test(t), f + ' dice qué es en su cabecera');
+      ok(!/^\s*\/\*\*/.test(t), f + ' sin comentarios de cabecera (Fase 3)');
     });
     const orden = (a, b) => ok(pos(a) > 0 && pos(a) < pos(b), a + ' antes que ' + b);
     orden('nube.js', 'estado.js');            // estado.js usa _fbSave/_fbLoad
@@ -105,7 +104,7 @@ module.exports = async ({bloque, ok}) => {
        nadie (dashboard.js y delivery.js pueden tener cada uno su `_esc`).
        Solo cuentan los módulos de nivel superior. */
     const encapsulado = (t) => {
-      const codigo = t.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
+      const codigo = t
           .replace(/^\s*['"]use strict['"];?\s*$/m, '').trim();
       return /^;?\s*\(\s*function\s*\(/.test(codigo) && /\}\s*\)\s*\([^)]*\)\s*;?\s*$/.test(codigo);
     };

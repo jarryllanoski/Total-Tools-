@@ -90,7 +90,7 @@ module.exports = (t) => {
 
   bloque('El código desplegado congela los ids una sola vez');
   {
-    const del = E.trozo('index.html', 'function delSelected', '\n/* PIN */');
+    const del = E.trozo('index.html', 'function delSelected', 'let _pinEntry=\'\', _pinCallback=null;');
     ok(/const ids=new Set\(sel\.map/.test(del), 'delSelected congela los ids');
     ok(!/filter\(x=>!x\.sel\)/.test(del), 'no vuelve a preguntar por el flag al confirmar');
     ok(/aBorrar\.length\} movidos/.test(del), 'el mensaje cuenta lo que de verdad se borró');
@@ -101,7 +101,7 @@ module.exports = (t) => {
     ok(/function toggleSel\(id\)\{ Seleccion\.alternar\(id\); \}/.test(idx),
         'toggleSel ya no llama a saveLocal() ni a render()');
     const sa = E.trozo('index.html', 'function selAll', '\n}')
-        .replace(/\/\/.*$/gm, '').replace(/\/\*[\s\S]*?\*\//g, '');
+        ;
     ok(!/render\(\)/.test(sa) && !/saveLocal\(\)/.test(sa), 'selAll tampoco');
   }
 };

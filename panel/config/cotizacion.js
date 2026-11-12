@@ -1,72 +1,38 @@
-/**
- * panel/config/cotizacion.js — cotizaciones de proveedores
- * Fase 7 (11/11/2026): movido de la raíz a su capa, sin cambiar una línea.
- */
-/* ═══════════════════════════════════════════════════════════════════════
-   COTIZACIÓN — módulo aislado (Fase 1)
-   ---------------------------------------------------------------------------
-   Captura la boleta/cotización de un pedido: subís un PDF (o pegás el texto),
-   se extrae { código · descripción · cantidad } en una lista EDITABLE y se
-   guarda en el pedido (shipment.cotizItems).
-
-   Aislamiento: todo vive en window.Cotizacion. Reusa los globales existentes
-   (save, render, toast, $, escH) igual que config.js — sin monkey-patch. El
-   panel se auto-inyecta en el DOM desde aquí (no ensucia el <body>).
-
-   Fase 2 (cruce con Excel de proveedores + volcado a Proveedores) y Fase 3
-   (OCR de imágenes) se enchufan después sin reescribir esto: el parser
-   (parseTexto) y el modelo (cotizItems) ya quedan listos.
-   ═══════════════════════════════════════════════════════════════════════ */
 (function(){
   'use strict';
 
-  // pdf.js se baja del CDN sólo la primera vez que se abre el panel.
   var PDFJS_SRC    = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
   var PDFJS_WORKER = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
   var _pdfLoading  = null;
 
-  var _curId = null; // pedido abierto en el panel
+  var _curId = null;
 
-  // ── STOCK: API por FUENTE (tienda o proveedor) ──────────────────────────
-  // Cada fuente guarda su catálogo bajo 'tt_stock_<id>'. La UI NUNCA toca el
-  // almacenamiento directo: usa esta API. Así el backend es intercambiable
-  // (localStorage hoy; IndexedDB si el volumen crece) sin tocar la UI —
-  // "funciona con cualquier carga de trabajo".
   var STOCK_PREFIX = 'tt_stock_';
-  var TIENDA_ID    = 'sup_tienda';   // fuente fija: mi tienda (stock propio)
+  var TIENDA_ID    = 'sup_tienda';
   function _stockKey(pid){ return STOCK_PREFIX + pid; }
   var Stock = {
     get: function(pid){ try{ var r=localStorage.getItem(_stockKey(pid)); return r?JSON.parse(r):null; }catch(e){ return null; } },
     set: function(pid,data){ try{ localStorage.setItem(_stockKey(pid), JSON.stringify(data)); return true; }catch(e){ return false; } },
     del: function(pid){ try{ localStorage.removeItem(_stockKey(pid)); }catch(e){} },
-    // Lookup O(1) por código.
     find: function(pid,cod){ var s=this.get(pid); if(!s||!s.catalog||!cod) return null; return s.catalog[String(cod).trim().toUpperCase()]||null; },
-    // Parsea el Excel (array-of-arrays) y lo guarda. Devuelve nº de productos.
     importAOA: function(pid,aoa,fileName){ var res=_detectAndBuild(aoa); if(!res||!res.meta.count) return 0; this.set(pid,{catalog:res.catalog,meta:res.meta,fileName:fileName||'',ts:Date.now()}); return res.meta.count; }
   };
-  // Migración única del stock global viejo → stock de tienda.
   try{ if(!localStorage.getItem(_stockKey(TIENDA_ID))){ var _old=localStorage.getItem('tt_cotiz_stock'); if(_old){ localStorage.setItem(_stockKey(TIENDA_ID), _old); localStorage.removeItem('tt_cotiz_stock'); } } }catch(e){}
 
-  // Id real de la fuente "tienda" (por si se creó con otro id vía el formulario).
   function _tiendaProvId(){ var t=((window.S&&S.suppliers)||[]).find(function(x){ return x.tipo==='tienda'; }); return t?t.id:TIENDA_ID; }
-  function _tiendaStock(){ return Stock.get(_tiendaProvId()); }         // stock de tienda (Excel del panel 🧾)
-  function _stockFind(cod){ return Stock.find(_tiendaProvId(), cod); }  // ¿está en tienda?
+  function _tiendaStock(){ return Stock.get(_tiendaProvId()); }
+  function _stockFind(cod){ return Stock.find(_tiendaProvId(), cod); }
   function _provs(){ return ((window.S&&S.suppliers)||[]).filter(function(x){ return x.tipo!=='tienda'; }); }
   function _provName(id){ var p=((window.S&&S.suppliers)||[]).find(function(x){ return x.id===id; }); return p?(p.name||'proveedor'):'proveedor'; }
-  // Proveedores para el selector por ítem: primero los que YA tienen ese
-  // código en su Excel (destino más probable), luego el resto. Una sola
-  // fuente de verdad para el orden — la usa el selector de cada fila.
   function _provsOrdenados(codigo){
     var conStock=[], sinStock=[];
     _provs().forEach(function(pv){ (Stock.find(pv.id, codigo) ? conStock : sinStock).push(pv); });
     return conStock.concat(sinStock);
   }
-  // ¿hay alguna fuente de stock cargada (tienda o algún proveedor)?
   function _haySources(){
     if(_tiendaStock()) return true;
     return _provs().some(function(pv){ return !!Stock.get(pv.id); });
   }
-  // Clasifica un ítem: 🏬 en tienda / 🏭 en proveedor(es) / ⚠️ faltante.
   function _clasificarItem(r){
     if(r.enTienda || _stockFind(r.codigo)) return { tipo:'tienda' };
     var enProvs=_provs().filter(function(pv){ return !!Stock.find(pv.id, r.codigo); });
@@ -74,22 +40,13 @@
     return { tipo:'faltante' };
   }
 
-  // Helpers seguros (por si el global no existe en algún contexto)
   function _esc(s){ return (typeof escH==='function') ? escH(s) : String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
   function _toast(m){ if(typeof toast==='function') toast(m); }
   function _find(id){ return (window.S&&S.shipments||[]).find(function(x){return x.id===id;}); }
 
-  /* ── PARSER (núcleo, testeable) ──────────────────────────────────────────
-     Máquina de estados por líneas sobre el texto de la boleta:
-       · Detecta un CÓDIGO (ej. THT1320503, o "THT1320801 - Prensa ...").
-       · Acumula la DESCRIPCIÓN en las líneas siguientes.
-       · Cierra el ítem al ver la línea de CANTIDAD ("2  UND  12.50  25.00").
-     Tolera el código y la descripción juntos o separados. Devuelve:
-       [{ codigo, desc, cant }]
-  */
-  var RE_CODIGO = /^([A-Z]{2,5}[-]?\d{4,})\b\s*[-–—]?\s*(.*)$/;   // código al inicio (+ resto opcional)
-  var RE_CANT   = /^(\d{1,5})\s*(?:UND|UNID|U|PZA|PZS|PCS)\b/i;   // "2 UND ..."
-  var RE_SOLO_NUM = /^\d[\d.,]*$/;                                // línea de solo números (precios)
+  var RE_CODIGO = /^([A-Z]{2,5}[-]?\d{4,})\b\s*[-–—]?\s*(.*)$/;
+  var RE_CANT   = /^(\d{1,5})\s*(?:UND|UNID|U|PZA|PZS|PCS)\b/i;
+  var RE_SOLO_NUM = /^\d[\d.,]*$/;
 
   function parseTexto(raw){
     var out = [];
@@ -105,19 +62,16 @@
       var ln = lines[i];
       var mCant = ln.match(RE_CANT);
       if(mCant && cur){
-        // Línea de cantidad → cierra el ítem actual.
         cur.cant = parseInt(mCant[1],10) || 1;
         push();
         continue;
       }
       var mCod = ln.match(RE_CODIGO);
       if(mCod){
-        // Nuevo código → cierra el anterior (si quedó sin cantidad) y abre uno nuevo.
         push();
         cur = { codigo: mCod[1].toUpperCase(), desc: (mCod[2]||'').trim(), cant: 1 };
         continue;
       }
-      // Línea intermedia: parte de la descripción (ignora líneas de solo precios).
       if(cur && !RE_SOLO_NUM.test(ln) && !/^(SUBTOTAL|I\.?G\.?V|TOTAL|MONTO|SON:|CANT|P\.?UNIT|IMPORTE|FORMA DE PAGO|CAJERO|CLIENTE|DIRECC|DNI|RUC|BOLETA|FECHA|GRACIAS)/i.test(ln)){
         cur.desc = (cur.desc ? cur.desc+' ' : '') + ln;
       }
@@ -126,44 +80,29 @@
     return out;
   }
 
-  /* ── DETECTOR DE COLUMNAS DEL EXCEL DE STOCK ─────────────────────────────
-     Recibe la hoja como array-of-arrays (SheetJS header:1). Auto-detecta:
-       · CÓDIGO: la columna con más celdas tipo código (letras+dígitos).
-       · DESCRIPCIÓN: encabezado 'desc/nombre/producto' o la columna de texto
-         más larga.
-       · PRECIO: encabezado 'precio/pvp/costo/importe' (usa la ÚLTIMA, que suele
-         ser la de distribuidor) o la última columna numérica con decimales.
-       · STOCK: encabezado 'stock/cantidad/disponible'.
-     Tolera encabezados en cualquier fila (usa la fila anterior al primer código).
-     Devuelve { catalog, meta } o null si no hay columna de código.            */
   var CODE_RE = /^[A-Z]{2,6}[-]?\d{3,}/i;
   function _detectAndBuild(aoa){
     if(!aoa || !aoa.length) return null;
     var nCols = aoa.reduce(function(m,r){ return Math.max(m, (r||[]).length); }, 0);
     var v = function(r,c){ return (aoa[r] && aoa[r][c]!=null) ? String(aoa[r][c]).trim() : ''; };
 
-    // Columna de código = la de más coincidencias
     var codeCol=-1, best=0;
     for(var c=0;c<nCols;c++){ var cnt=0; for(var r=0;r<aoa.length;r++){ if(CODE_RE.test(v(r,c))) cnt++; } if(cnt>best){ best=cnt; codeCol=c; } }
     if(codeCol<0 || best===0) return null;
 
-    // Primera fila de datos y fila de encabezados (la anterior)
     var firstData=0; for(var r2=0;r2<aoa.length;r2++){ if(CODE_RE.test(v(r2,codeCol))){ firstData=r2; break; } }
     var header = firstData>0 ? (aoa[firstData-1]||[]).map(function(h){ return String(h==null?'':h).trim(); }) : [];
     var hkw = function(c,kw){ return new RegExp(kw,'i').test(header[c]||''); };
 
-    // Descripción
     var descCol=-1;
     for(var c3=0;c3<nCols;c3++){ if(c3!==codeCol && hkw(c3,'desc|nombre|producto|articul|detalle')){ descCol=c3; break; } }
     if(descCol<0){ var bl=0; for(var c4=0;c4<nCols;c4++){ if(c4===codeCol) continue; var tot=0,n=0; for(var r4=firstData;r4<aoa.length;r4++){ var s=v(r4,c4); if(s && isNaN(Number(s.replace(/[^\d.,-]/g,'')))){ tot+=s.length; n++; } } var avg=n?tot/n:0; if(avg>bl){ bl=avg; descCol=c4; } } }
 
-    // Precio (última columna candidata)
     var precioCols=[];
     for(var c5=0;c5<nCols;c5++){ if(c5===codeCol||c5===descCol) continue; if(hkw(c5,'precio|pvp|costo|importe|valor')) precioCols.push(c5); }
     if(!precioCols.length){ for(var c6=0;c6<nCols;c6++){ if(c6===codeCol||c6===descCol) continue; var num=0,tn=0; for(var r6=firstData;r6<aoa.length;r6++){ var raw=v(r6,c6); if(raw){ tn++; if(/\d/.test(raw)&&/[.,]/.test(raw)) num++; } } if(tn && num/tn>0.5) precioCols.push(c6); } }
     var precioCol = precioCols.length ? precioCols[precioCols.length-1] : -1;
 
-    // Stock
     var stockCol=-1;
     for(var c7=0;c7<nCols;c7++){ if(c7===codeCol) continue; if(hkw(c7,'stock|cantidad|dispon|exist|saldo')){ stockCol=c7; break; } }
 
@@ -188,7 +127,6 @@
     else { info.textContent='🏬 Sin stock de tienda cargado'; }
   }
 
-  /* ── CARGA PEREZOSA DE pdf.js ────────────────────────────────────────── */
   function _ensurePdfjs(){
     if(window.pdfjsLib) return Promise.resolve(window.pdfjsLib);
     if(_pdfLoading) return _pdfLoading;
@@ -207,7 +145,6 @@
     return _pdfLoading;
   }
 
-  // Extrae todo el texto de un PDF (ArrayBuffer) usando pdf.js.
   function _pdfToText(arrayBuffer){
     return _ensurePdfjs().then(function(pdfjs){
       return pdfjs.getDocument({data:arrayBuffer}).promise.then(function(pdf){
@@ -217,13 +154,12 @@
           return chain.then(function(acc){
             return pdf.getPage(p).then(function(page){
               return page.getTextContent().then(function(tc){
-                // Reconstruir líneas por su posición Y (pdf.js entrega items sueltos).
                 var rows={};
                 tc.items.forEach(function(it){
                   var y=Math.round((it.transform&&it.transform[5])||0);
                   (rows[y]=rows[y]||[]).push({x:(it.transform&&it.transform[4])||0, s:it.str});
                 });
-                var ys=Object.keys(rows).map(Number).sort(function(a,b){return b-a;}); // arriba→abajo
+                var ys=Object.keys(rows).map(Number).sort(function(a,b){return b-a;});
                 var txt=ys.map(function(y){
                   return rows[y].sort(function(a,b){return a.x-b.x;}).map(function(o){return o.s;}).join(' ');
                 }).join('\n');
@@ -236,14 +172,11 @@
     });
   }
 
-  /* ── PANEL (auto-inyectado) ──────────────────────────────────────────── */
   function _ensurePanel(){
     if(document.getElementById('cotizOverlay')) return;
     var ov=document.createElement('div');
     ov.id='cotizOverlay';
     ov.className='overlay';
-    // OJO: sin display:none inline — la clase .overlay ya lo oculta y .overlay.open
-    // lo muestra; un estilo inline le ganaría a la clase y el panel quedaría invisible.
     ov.innerHTML=''
       + '<div class="sheet" onclick="event.stopPropagation()" style="max-height:88vh;display:flex;flex-direction:column">'
       +   '<div class="sheet-handle"></div>'
@@ -277,17 +210,14 @@
       +   '</div>'
       +   '<button id="cotizSendBtn" onclick="Cotizacion._guardarYEnviar()" style="width:100%;margin-top:8px;padding:12px;background:rgba(56,139,253,.15);border:1.5px solid rgba(56,139,253,.4);border-radius:12px;color:var(--blue);font-weight:700;font-size:13px;cursor:pointer;font-family:inherit">📤 Enviar faltantes a proveedor</button>'
       + '</div>';
-    // Cerrar sólo al tocar el fondo (no dentro del panel). El listener nativo de
-    // fondo se engancha al cargar, y este overlay se inyecta después → lo ponemos acá.
     ov.addEventListener('click', function(e){ if(e.target===ov) Cotizacion.cerrar(); });
     document.body.appendChild(ov);
   }
 
-  var _rows = []; // estado de edición: [{codigo, desc, cant, enTienda}]
-  var _envioId=null, _envioItems=[]; // estado del diálogo "enviar a proveedor" (Fase 2b)
-  var _readonly = false; // modo SOLO LECTURA (desde "Links generados"): ver, no editar/enviar
+  var _rows = [];
+  var _envioId=null, _envioItems=[];
+  var _readonly = false;
 
-  // Muestra/oculta los controles que MUTAN según el modo. En lectura solo se ve.
   function _applyReadonlyUI(){
     var ro=_readonly;
     var els={cotizDesc:'block',cotizInputRow:'flex',cotizStockBar:'flex',cotizBtnRow:'flex',cotizSendBtn:'block'};
@@ -304,7 +234,6 @@
     var el=document.getElementById('cotizList'); if(!el) return;
     var cnt=document.getElementById('cotizCount'); if(cnt) cnt.textContent=_rows.length?(_rows.length+' ítem'+(_rows.length>1?'s':'')):'';
     if(!_rows.length){ el.innerHTML='<div style="text-align:center;color:var(--text2);font-size:12px;padding:18px">'+(_readonly?'Sin ítems en el comprobante.':'Sin ítems todavía. Subí un PDF o pegá el texto.')+'</div>'; return; }
-    // SOLO LECTURA: código · descripción · cantidad, sin inputs ni acciones.
     if(_readonly){
       el.innerHTML=_rows.map(function(r){
         return '<div style="border:1px solid var(--bd);border-radius:8px;padding:8px 10px;margin-bottom:6px;display:flex;gap:8px;align-items:center">'
@@ -317,7 +246,6 @@
     }
     var html='';
     var hay=_haySources();
-    // Resumen multi-fuente (sólo si hay alguna fuente de stock cargada)
     if(hay){
       var cls=Cotizacion.clasificar(_rows);
       html+='<div style="font-size:11px;color:var(--text2);margin-bottom:8px;line-height:1.6">'
@@ -337,9 +265,6 @@
         var m=_stockFind(r.codigo);
         if(m && (m.precio||m.stock)) stockLine='<div style="font-size:10.5px;color:var(--green,#2ea043);margin-top:5px;padding-left:2px">🏬'+(m.precio?(' '+_esc(m.precio)):'')+(m.stock?(' · stock '+_esc(m.stock)):'')+'</div>';
       }
-      // Selector de destino: 🏬 Tienda, cada 🏭 proveedor (el que ya tiene ese
-      // código en su Excel va primero, con ✓), o sin asignar. Un solo lugar
-      // para elegir a dónde va el ítem — reemplaza el toggle binario de antes.
       var provsOrd=_provsOrdenados(r.codigo);
       var destino='<option value=""'+(!r.enTienda&&!r.proveedor?' selected':'')+'>— Elegir —</option>'
         + '<option value="tienda"'+(r.enTienda?' selected':'')+'>🏬 Tienda</option>'
@@ -366,47 +291,33 @@
     el.textContent=msg||''; el.style.color=color||'var(--text2)';
   }
 
-  // Persiste _rows en el pedido (sin cerrar el panel). Devuelve el shipment.
   function _persist(){
     var s=_find(_curId); if(!s) return null;
     var items=_rows
       .map(function(r){ return { codigo:(r.codigo||'').trim().toUpperCase(), desc:(r.desc||'').trim(), cant:parseInt(r.cant,10)||1, enTienda:!!r.enTienda, proveedor:(r.enTienda?null:(r.proveedor||null)), ean:r.ean||'' }; })
       .filter(function(r){ return r.codigo || r.desc; });
     s.cotizItems=items;
-    if(typeof save==='function') save(s.id); // incremental
+    if(typeof save==='function') save(s.id);
     return s;
   }
 
-  /* ── EXTRACCIÓN ON-DEMAND DESDE EL COMPROBANTE (Fase 2) ────────────────────
-     Al abrir el 🧾: si el pedido tiene link apisale y aún no fue procesado,
-     llama la Cloud Function (con el token del panel) una sola vez y rellena los
-     productos. Si ya está procesado, no llama (muestra lo guardado).           */
   var FUNC_EXTRAER = 'https://us-central1-total-tools-24ce8.cloudfunctions.net/extraerComprobante';
   function _apisaleLink(s){
     var arr=(s&&s.links)||[];
     for(var i=0;i<arr.length;i++){ var u=(arr[i]&&arr[i].u)||''; if(/apisale\.institucional\.pe/i.test(u)) return u; }
     return '';
   }
-  /* ★ PUERTA. Antes devolvía '' cuando no había sesión y la llamada salía sin
-     cabecera: la función respondía 401 y acá se veía «Error al leer el
-     comprobante — subí el PDF a mano», mandando a resolver a mano algo que se
-     arreglaba volviendo a entrar. Ahora rechaza con el motivo. */
   function _getToken(){
     if(typeof window._authToken !== 'function'){
       return Promise.reject(new Error('auth.js no está cargado'));
     }
     return window._authToken();
   }
-  // Estados donde SÍ se jala automáticamente al abrir (fase de preparación).
   var _AUTO_STATES = ['NUEVO PEDIDO', 'EN PROCESO', 'POR ALISTAR'];
-  // Botón manual: hay link apisale y todavía no hay ítems (aunque un intento
-  // previo haya quedado "procesado" pero vacío → vuelve a ofrecer jalar).
   function _puedeJalar(s){
     return !!_apisaleLink(s) &&
       !(Array.isArray(s.cotizItems) && s.cotizItems.length);
   }
-  // Auto-jalar (una sola vez): solo si aún no fue procesado, para no re-jalar
-  // solo en cada apertura si un PDF genuinamente no tiene productos.
   function _puedeAuto(s){
     return _puedeJalar(s) &&
       !(s.extraccion && s.extraccion.estado==='procesado');
@@ -417,14 +328,11 @@
       ? '<button onclick="Cotizacion._jalarAhora()" style="width:100%;margin-bottom:10px;padding:11px;background:rgba(56,139,253,.15);border:1.5px solid rgba(56,139,253,.4);border-radius:12px;color:var(--blue);font-weight:700;font-size:13px;cursor:pointer;font-family:inherit">📥 Jalar del comprobante</button>'
       : '';
   }
-  // Al abrir: si va a auto-jalar (estado de preparación), va directo a extraer
-  // (muestra ⏳) sin dibujar el botón ni un instante; si no, muestra el manual.
   function _maybeExtraer(s){
     if(!s || !window.fetch) return;
     if(_puedeAuto(s) && _AUTO_STATES.indexOf(s.status)>=0){ _extraer(s); return; }
     _renderJalarBox(s);
   }
-  // Llama la Cloud Function y rellena los productos.
   function _extraer(s){
     if(!s || !window.fetch) return;
     var box=document.getElementById('cotizJalarBox'); if(box) box.innerHTML='';
@@ -433,7 +341,7 @@
       var headers = tok ? {'Authorization':'Bearer '+tok} : {};
       return fetch(FUNC_EXTRAER+'?pedidoId='+encodeURIComponent(s.id), {headers:headers});
     }).then(function(r){ return r.json(); }).then(function(data){
-      if(_curId!==s.id) return;                                    // el usuario cambió de pedido
+      if(_curId!==s.id) return;
       if(data && data.ok && Array.isArray(data.cotizItems)){
         s.cotizItems=data.cotizItems;
         s.extraccion=s.extraccion||{}; s.extraccion.estado='procesado';
@@ -448,8 +356,6 @@
     }).catch(function(err){
       if(_curId!==s.id) return;
       _renderJalarBox(s);
-      // Que el aviso diga la causa: "subí el PDF a mano" es un mal consejo
-      // cuando lo único que pasa es que hay que volver a entrar.
       var esSesion = err && err.auth;
       _setStatus(esSesion
         ? (err.auth === 'sin_red'
@@ -459,7 +365,6 @@
     });
   }
 
-  /* ── PANEL "ENVIAR A PROVEEDOR" (Fase 2b, auto-inyectado) ──────────────── */
   function _ensureEnvioPanel(){
     if(document.getElementById('cotizEnvioOverlay')) return;
     var ov=document.createElement('div');
@@ -482,11 +387,10 @@
   }
 
   function _openEnvio(s, aEnviar, sups){
-    Cotizacion.cerrar(); // cerrar el panel de cotización si estaba abierto
+    Cotizacion.cerrar();
     _envioId=s.id; _envioItems=aEnviar;
     _ensureEnvioPanel();
-    // ¿qué proveedor tiene cada ítem? + sugerir el que cubre más.
-    var cobertura={}; // supId → nº de ítems que tiene
+    var cobertura={};
     aEnviar.forEach(function(r){
       sups.forEach(function(pv){ if(Stock.find(pv.id, r.codigo)){ cobertura[pv.id]=(cobertura[pv.id]||0)+1; } });
     });
@@ -510,11 +414,10 @@
     var sel=document.getElementById('cotizEnvSup');
     if(!sups.length){ sel.innerHTML='<option value="">Sin proveedores — agregá uno en Proveedores</option>'; }
     else { sel.innerHTML=sups.map(function(su){ return '<option value="'+_esc(su.id)+'">'+_esc(su.name||su.id)+'</option>'; }).join(''); }
-    if(sel && sugerido) sel.value=sugerido.id; // preselecciona el sugerido
+    if(sel && sugerido) sel.value=sugerido.id;
     if(typeof openOverlay==='function') openOverlay('cotizEnvioOverlay');
   }
 
-  /* ── API pública ─────────────────────────────────────────────────────── */
   var Cotizacion = {
     parseTexto: parseTexto,
 
@@ -534,17 +437,15 @@
       if(typeof openOverlay==='function') openOverlay('cotizOverlay');
       else document.getElementById('cotizOverlay').style.display='flex';
       if(_readonly){
-        // Solo lectura: si aún no hay ítems y tiene link, extrae UNA vez (sin botón).
         if(_puedeJalar(s)) _extraer(s);
       } else {
-        _maybeExtraer(s);   // on-demand: si tiene comprobante apisale y no fue procesado
+        _maybeExtraer(s);
       }
     },
-    // Vista SOLO LECTURA (desde "Links generados"): ver sin editar ni enviar.
     ver: function(id){ return this.abrir(id, true); },
 
     cerrar: function(){
-      var o=document.getElementById('cotizOverlay'); if(!o) return; // aún no inyectado
+      var o=document.getElementById('cotizOverlay'); if(!o) return;
       if(typeof closeOverlay==='function') closeOverlay('cotizOverlay'); else o.classList.remove('open');
     },
 
@@ -592,9 +493,6 @@
     _addRow: function(){ _rows.push({codigo:'',desc:'',cant:1,enTienda:false}); _renderRows();
       var el=document.getElementById('cotizList'); if(el) el.scrollTop=el.scrollHeight; },
 
-    // Selector de destino por ítem: 'tienda' | id de proveedor | '' (sin
-    // asignar). Exclusivos entre sí. Persiste al toque para que la ficha del
-    // proveedor y la vista de Tienda queden siempre en sync (modelo relacional).
     _elegirDestino: function(i, val){
       if(!_rows[i]) return;
       if(val==='tienda'){ _rows[i].enTienda=true; _rows[i].proveedor=null; }
@@ -604,11 +502,9 @@
       if(typeof render==='function') render();
     },
 
-    // ── STOCK: API pública (usada por el panel 🧾 y por la UI de Proveedores) ─
-    stock: Stock,          // Cotizacion.stock.get/set/del/find/importAOA(pid,...)
+    stock: Stock,
     TIENDA_ID: TIENDA_ID,
 
-    // Asegura (en memoria) que exista la fuente fija "🏬 Tienda" en S.suppliers.
     ensureTienda: function(){
       if(!window.S) return null;
       if(!S.suppliers) S.suppliers=[];
@@ -617,7 +513,6 @@
       return t;
     },
 
-    // importarAOA (panel 🧾): carga el Excel como STOCK DE TIENDA. Testeable.
     importarAOA: function(aoa, fileName){
       var n=Stock.importAOA(_tiendaProvId(), aoa, fileName);
       if(!n) return 0;
@@ -625,10 +520,6 @@
       return n;
     },
 
-    // ── VISTAS DERIVADAS (modelo relacional) ──────────────────────────────
-    // Todos los ítems de cotización (de todos los pedidos) asignados a una
-    // fuente. fuente tienda → enTienda=true; proveedor → proveedor===id.
-    // Se calcula al vuelo (no se copia) → siempre en sync.
     itemsDeFuente: function(fuenteId){
       var f=((window.S&&S.suppliers)||[]).find(function(x){ return x.id===fuenteId; });
       var esTienda = f && f.tipo==='tienda';
@@ -641,14 +532,13 @@
       });
       return out;
     },
-    // Reasignar un ítem (pedido+código) a: 'tienda' | providerId | null (quitar).
     asignar: function(pedidoId, codigo, dest){
       var s=((window.S&&S.shipments)||[]).find(function(x){ return x.id===pedidoId; }); if(!s) return;
       var it=(s.cotizItems||[]).find(function(x){ return x.codigo===codigo; }); if(!it) return;
       if(dest==='tienda'){ it.enTienda=true; it.proveedor=null; }
       else if(dest){ it.enTienda=false; it.proveedor=dest; }
       else { it.enTienda=false; it.proveedor=null; }
-      if(typeof save==='function') save(s.id);   // incremental
+      if(typeof save==='function') save(s.id);
     },
     _onStock: function(input){
       var file=input && input.files && input.files[0]; if(!file) return;
@@ -670,7 +560,6 @@
       reader.readAsArrayBuffer(file);
       input.value='';
     },
-    // clasificar (Fase B): agrupa los ítems en tienda / proveedor / faltante.
     clasificar: function(items){
       var res={ tienda:[], proveedor:[], faltante:[] };
       (items||[]).forEach(function(r){
@@ -681,7 +570,6 @@
       });
       return res;
     },
-    // comparar (compat): faltantes según el stock de tienda.
     comparar: function(items){
       var faltantes=(items||[]).filter(function(r){ return !r.enTienda; });
       var enStock=[], sinStock=[];
@@ -690,27 +578,22 @@
     },
     getStock: function(){ return _tiendaStock(); },
 
-    // Botón manual "📥 Jalar del comprobante" (estados no automáticos).
     _jalarAhora: function(){ var s=_find(_curId); if(s) _extraer(s); },
 
-    // ── ENVIAR A PROVEEDOR (Fase 2b) ──────────────────────────────────────
-    // Compara los faltantes con el Excel; abre el diálogo para elegir proveedor.
     enviarProveedor: function(id){
       var s=_find(id); if(!s){ _toast('Pedido no encontrado'); return; }
       var items=Array.isArray(s.cotizItems)?s.cotizItems:[];
-      // Faltantes = lo que NO tenés en tienda (por marca 🏬 o por el Excel de tienda).
       var aEnviar=items.filter(function(r){ return _clasificarItem(r).tipo!=='tienda'; });
       if(!aEnviar.length){ _toast('Todo está en tienda — no hay faltantes'); return; }
-      _openEnvio(s, aEnviar, _provs()); // proveedores secundarios (no la Tienda)
+      _openEnvio(s, aEnviar, _provs());
     },
 
-    // Hook: se llama al cambiar el estado de un pedido. Sólo actúa en EN PROCESO.
     onEstado: function(id, st){
       if(!/PROCESO/i.test(st||'')) return;
       var s=_find(id); if(!s || !Array.isArray(s.cotizItems) || !s.cotizItems.length) return;
       var faltantes=s.cotizItems.filter(function(r){ return !r.enTienda; });
-      if(!faltantes.length) return;       // nada que conseguir → no molesta
-      this.enviarProveedor(id);           // abre el diálogo (con confirmación)
+      if(!faltantes.length) return;
+      this.enviarProveedor(id);
     },
 
     _closeEnvio: function(){
@@ -724,13 +607,11 @@
       var supId=sel?sel.value:'';
       var sup=((window.S&&S.suppliers)||[]).find(function(x){ return x.id===supId; });
       if(!sup){ _toast('Elegí un proveedor (o agregá uno en Proveedores)'); return; }
-      // Modelo relacional: NO se copia texto al proveedor. Solo se asigna el
-      // ítem (fuente única). La ficha del proveedor deriva su lista de acá.
       _envioItems.forEach(function(r){
         var ci=(s.cotizItems||[]).find(function(p){ return p.codigo===r.codigo; });
         if(ci){ ci.proveedor=sup.id; ci.enTienda=false; }
       });
-      if(typeof save==='function') save(s.id);  // incremental: solo el pedido
+      if(typeof save==='function') save(s.id);
       if(typeof render==='function') render();
       this._closeEnvio();
       _toast('📤 '+_envioItems.length+' ítem(s) asignados a '+(sup.name||'proveedor')+'. Míralo en su ficha.');
@@ -744,25 +625,17 @@
       _toast('💾 Cotización guardada ('+n+' ítem'+(n!==1?'s':'')+')');
     },
 
-    // Guarda y abre el diálogo de envío a proveedor (botón del panel).
     _guardarYEnviar: function(){
       var s=_persist(); if(!s){ _toast('Pedido no encontrado'); return; }
       if(typeof render==='function') render();
       this.enviarProveedor(s.id);
     },
 
-    // Para la tarjeta: ¿cuántos ítems tiene la cotización de este pedido?
     count: function(id){ var s=_find(id); return (s&&Array.isArray(s.cotizItems))?s.cotizItems.length:0; }
   };
 
   window.Cotizacion = Cotizacion;
 
-  /* ══════════════════════════════════════════════════════════════════════
-     AYUDA (co-locada con el módulo — se auto-registra en window.Ayuda).
-     ⚠️ IMPORTANTE: si cambiás el flujo de Cotización, actualizá TAMBIÉN este
-     bloque y su fecha `actualizado`. La ayuda vive acá, junto al código, para
-     que no se desactualice.
-     ══════════════════════════════════════════════════════════════════════ */
   var AYUDA_COTIZ = {
     titulo: 'Cotización',
     icono: '🧾',
@@ -794,9 +667,6 @@
   };
   if(window.Ayuda && window.Ayuda.register) window.Ayuda.register('cotizacion', AYUDA_COTIZ);
 
-  /* Ayuda de PROVEEDORES — co-locada acá porque la lógica de stock (Excel por
-     proveedor / tienda) vive en este módulo. ⚠️ Actualizá este bloque y su fecha
-     si cambiás el flujo de proveedores/stock. */
   var AYUDA_PROVEEDORES = {
     titulo: 'Proveedores y stock',
     icono: '🏭',
