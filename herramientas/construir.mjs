@@ -52,6 +52,14 @@ async function construir() {
   fs.rmSync(SALIDA, {recursive: true, force: true});
   const usadas = referencias();
   const lista = publicables(usadas);
+  const sinVersion = [];
+  for (const p of PAGINAS) {
+    const t = leer(p).toString('utf8');
+    for (const m of t.matchAll(/(?:src|href)="([^"#]+\.(?:js|css))(\?[^"]*)?"/g)) {
+      if (!/^https?:/.test(m[1]) && !/[?&]v=/.test(m[2] || '')) sinVersion.push(p + ': ' + m[1]);
+    }
+  }
+  if (sinVersion.length) throw new Error('Scripts o estilos sin ?v= (quedarian un año en cache): ' + sinVersion.join(', '));
   const faltan = [...usadas].filter((u) => !lista.includes(u));
   if (faltan.length) throw new Error('Las paginas usan archivos que no se publican: ' + faltan.join(', '));
   const hechos = new Map();
