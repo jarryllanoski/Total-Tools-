@@ -70,7 +70,7 @@
     .auth-input:focus { border-color:#388bfd; }
     #authBtn {
       width:100%;margin-top:20px;padding:14px;
-      background:#388bfd;border:none;border-radius:12px;
+      background:#1f6feb;border:none;border-radius:12px;
       color:#fff;font-weight:700;font-size:15px;
       font-family:'Syne',sans-serif;cursor:pointer;
       transition:opacity .15s;
@@ -146,7 +146,7 @@
         '<div style="flex:1;height:1px;background:#30363d"></div>' +
         '<span style="font-size:11px;color:#8b949e">o</span>' +
         '<div style="flex:1;height:1px;background:#30363d"></div>' +
-      '</div><div id="authGoogleBtn"></div>';
+      '</div><div id="authGoogleBtn" style="min-height:44px"></div>';
 
     var s = document.createElement('script');
     s.src = 'https://accounts.google.com/gsi/client';
@@ -163,7 +163,9 @@
              text:'signin_with', shape:'pill'});
       } catch(e){ /* si Google falla, queda el ingreso por contraseña */ }
     };
-    document.head.appendChild(s);
+    var poner = function(){ document.head.appendChild(s); };
+    if(typeof window.requestIdleCallback === 'function') window.requestIdleCallback(poner, {timeout: 2000});
+    else setTimeout(poner, 300);
   }
 
   /* Canjea el identificador de Google por una sesión de Firebase. Desde acá

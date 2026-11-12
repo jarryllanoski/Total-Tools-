@@ -198,7 +198,7 @@ function openCourierEdit(i){
     <div class="fg"><label class="fl">Nombre</label><input class="fi" id="editCourierInp" value="${v}" maxlength="40"></div>
     <div class="confirm-btns">
       <button class="cbtn-no" onclick="closeOverlay('delOverlay')">Cancelar</button>
-      <button class="cbtn-yes" style="background:var(--blue)" onclick="S.couriers[${i}]=document.getElementById('editCourierInp').value.trim()||S.couriers[${i}];save('config');loadCfgUI();closeOverlay('delOverlay');toast('✅ Guardado')">Guardar</button>
+      <button class="cbtn-yes" style="background:var(--blue-fill)" onclick="S.couriers[${i}]=document.getElementById('editCourierInp').value.trim()||S.couriers[${i}];save('config');loadCfgUI();closeOverlay('delOverlay');toast('✅ Guardado')">Guardar</button>
     </div>`;
   openOverlay('delOverlay');
 }
@@ -212,7 +212,7 @@ function openExtraEdit(i){
     <div class="fg"><label class="fl">Nombre</label><input class="fi" id="editExtraInp" value="${v}" maxlength="40"></div>
     <div class="confirm-btns">
       <button class="cbtn-no" onclick="closeOverlay('delOverlay')">Cancelar</button>
-      <button class="cbtn-yes" style="background:var(--blue)" onclick="S.extraFields[${i}]=document.getElementById('editExtraInp').value.trim()||S.extraFields[${i}];save('config');loadCfgUI();closeOverlay('delOverlay');toast('✅ Guardado')">Guardar</button>
+      <button class="cbtn-yes" style="background:var(--blue-fill)" onclick="S.extraFields[${i}]=document.getElementById('editExtraInp').value.trim()||S.extraFields[${i}];save('config');loadCfgUI();closeOverlay('delOverlay');toast('✅ Guardado')">Guardar</button>
     </div>`;
   openOverlay('delOverlay');
 }

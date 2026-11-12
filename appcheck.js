@@ -82,6 +82,13 @@
 
   // Arranca en cuanto el archivo carga; el token queda listo (cacheado, con
   // auto-refresco) antes de que la primera petición lo pida.
-  _init();
+  function _enLogin() {
+    try { return !!document.getElementById('authOverlay'); } catch (e) { return false; }
+  }
+  function _cuandoLibre(fn) {
+    if (typeof global.requestIdleCallback === 'function') global.requestIdleCallback(fn, {timeout: 4000});
+    else setTimeout(fn, 1500);
+  }
+  if (!_enLogin()) _cuandoLibre(_init);
 
 })(window);

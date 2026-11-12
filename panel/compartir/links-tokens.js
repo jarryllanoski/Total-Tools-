@@ -103,7 +103,7 @@ function _pintarLinkSel(){
           'white-space:normal;word-break:break-word;text-align:center;'
         : 'flex-shrink:0;padding:7px 11px;font-size:12px;white-space:nowrap;') +
       'border-radius:9px;font-weight:700;cursor:pointer;font-family:inherit;' +
-      (on ? 'background:var(--blue);border:1px solid var(--blue);color:#fff'
+      (on ? 'background:var(--blue-fill);border:1px solid var(--blue);color:#fff'
           : 'background:var(--bg3);border:1px solid var(--bd);color:var(--text2)') +
       '">'+escH(txt)+'</button>';
   };

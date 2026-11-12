@@ -2,11 +2,12 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<link rel="icon" href="icono.svg" type="image/svg+xml">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Mi Panel de Envíos</title>
 <script defer fetchpriority="high" src="panel/datos/errores.js?v=1"></script>
 <script defer fetchpriority="high" src="firebase-config.js?v=4"></script>
-<script defer fetchpriority="high" src="auth.js?v=12"></script>
+<script defer fetchpriority="high" src="auth.js?v=13"></script>
 <!-- errores.js va PRONTO: engancha window.onerror, así que cuanto antes
      cargue, más fallos atrapa. No depende de nada. -->
 <!-- seleccion.js TAMBIÉN va pronto, y no por gusto: el script en línea de
@@ -39,15 +40,15 @@
 <script defer src="functions/nroComprobante.js?v=2"></script>
 <script defer src="functions/montoPedido.js?v=1"></script>
 <script defer src="functions/fechaPedido.js?v=1"></script>
-<script defer src="appcheck.js?v=2"></script>
+<script defer src="appcheck.js?v=3"></script>
 <!-- FIREBASE via REST API — sin SDK, funciona en Brave/Chrome/Firefox/Safari -->
 <script defer src="panel/datos/nube.js?v=5"></script>
 <script defer src="panel/datos/copia-local.js?v=1"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@400;500;600&display=swap" media="print" onload="this.media='all'">
-<link rel="stylesheet" href="panel.css?v=12">
-<style>#arranque{position:fixed;inset:0;z-index:99998;display:flex;align-items:center;justify-content:center;flex-direction:column;padding:24px;background:#0d1117;color:#e6edf3;font-family:'DM Sans',system-ui,sans-serif;text-align:center}#arranque .ic{font-size:48px;margin-bottom:8px}#arranque .nm{width:100%;max-width:340px;font-family:'Syne',system-ui,sans-serif;font-weight:800;font-size:26px;letter-spacing:1px}#arranque .sb{font-size:12px;color:#8b949e;margin-top:6px}</style>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@400;500;600&display=optional" media="print" onload="this.media='all'">
+<link rel="stylesheet" href="panel.css?v=13">
+<style>#arranque{position:fixed;inset:0;z-index:99998;display:flex;align-items:center;justify-content:center;flex-direction:column;padding:24px;background:#0d1117;color:#e6edf3;font-family:'DM Sans',system-ui,sans-serif;text-align:center}#arranque .ic{font-size:48px;margin-bottom:8px}#arranque .nm{width:100%;max-width:340px;font-family:'Syne',system-ui,sans-serif;font-weight:800;font-size:26px;letter-spacing:1px}#arranque .sb{font-size:12px;color:#8b949e;margin-top:6px}body:has(#arranque)>:not(#arranque):not(#authOverlay),body:has(#authOverlay)>:not(#authOverlay):not(#arranque){visibility:hidden}</style>
 </head>
 <body>
 <div id="arranque" role="status" aria-live="polite"><div class="ic" aria-hidden="true">📦</div><div class="nm">TOTAL TOOLS</div><div class="sb">Cargando...</div></div>
@@ -219,7 +220,7 @@
       <option value="30">Vence en 30 días</option>
     </select>
     <button onclick="genToken('copy', this)" style="width:100%;padding:13px;background:var(--bg2);border:1.5px solid var(--bd);border-radius:12px;color:var(--text);font-weight:600;font-size:14px;cursor:pointer;font-family:inherit;margin-bottom:8px">📋 Generar y copiar link</button>
-    <button onclick="genToken('share', this)" style="width:100%;padding:15px;background:var(--blue);border:none;border-radius:12px;color:#fff;font-weight:700;font-size:15px;cursor:pointer;font-family:inherit">🔑 Generar y compartir link</button>
+    <button onclick="genToken('share', this)" style="width:100%;padding:15px;background:var(--blue-fill);border:none;border-radius:12px;color:#fff;font-weight:700;font-size:15px;cursor:pointer;font-family:inherit">🔑 Generar y compartir link</button>
   </div>
 
   <!-- LINKS RÁPIDOS -->
@@ -1093,14 +1094,14 @@
 <script defer src="panel/pedidos/pedido-guardar.js?v=1"></script>
 <script defer src="panel/compartir/xlsx.js?v=1"></script>
 <script defer src="panel/compartir/excel.js?v=2"></script>
-<script defer src="panel/compartir/links-tokens.js?v=1"></script>
-<script defer src="panel/config/configuracion.js?v=1"></script>
+<script defer src="panel/compartir/links-tokens.js?v=2"></script>
+<script defer src="panel/config/configuracion.js?v=2"></script>
 <script defer src="panel/pedidos/print.js?v=22"></script>
 <script defer src="panel/pedidos/notify.js?v=8"></script>
 <script defer src="panel/shalom/shalom.js?v=39"></script>
 <script defer src="panel/shalom/tracking.js?v=28"></script>
 <script defer src="panel/pantalla/floatpanel.js?v=5"></script>
-<script defer src="panel/pedidos/delivery.js?v=10"></script>
+<script defer src="panel/pedidos/delivery.js?v=11"></script>
 <script defer src="panel/shalom/qrtracking.js?v=4"></script>
 <script defer src="panel/shalom/ticket.js?v=10"></script>
 <script defer src="panel/shalom/agencias-extractor.js?v=12"></script>
@@ -1110,7 +1111,7 @@
 <script defer src="panel/config/recursos.js?v=2"></script>
 <script defer src="panel/pantalla/dashboard.js?v=3"></script>
 <script defer src="panel/pantalla/voz.js?v=4"></script>
-<script defer src="panel/config/cotizacion.js?v=4"></script>
+<script defer src="panel/config/cotizacion.js?v=5"></script>
 <script defer src="panel/pedidos/pedido-ui.js?v=2"></script>
 </body>
 </html>

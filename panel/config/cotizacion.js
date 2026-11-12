@@ -262,7 +262,7 @@
       +   '</div>'
       +   '<div id="cotizPasteBox" style="display:none;margin-bottom:10px">'
       +     '<textarea id="cotizPaste" placeholder="Pegá aquí el texto de la boleta…" style="width:100%;min-height:90px;background:var(--bg2);border:1px solid var(--bd);border-radius:10px;color:var(--text);padding:10px;font-size:12px;font-family:inherit;box-sizing:border-box"></textarea>'
-      +     '<button onclick="Cotizacion._parsePasted()" style="width:100%;margin-top:6px;padding:10px;background:var(--blue);border:none;border-radius:10px;color:#fff;font-weight:700;font-size:13px;cursor:pointer;font-family:inherit">✨ Extraer</button>'
+      +     '<button onclick="Cotizacion._parsePasted()" style="width:100%;margin-top:6px;padding:10px;background:var(--blue-fill);border:none;border-radius:10px;color:#fff;font-weight:700;font-size:13px;cursor:pointer;font-family:inherit">✨ Extraer</button>'
       +   '</div>'
       +   '<div id="cotizStockBar" style="display:flex;align-items:center;justify-content:space-between;gap:8px;background:var(--bg2);border:1px solid var(--bd);border-radius:10px;padding:8px 10px;margin-bottom:10px">'
       +     '<span id="cotizStockInfo" style="font-size:11px;color:var(--text2)">🏬 Sin stock de tienda cargado</span>'
@@ -474,7 +474,7 @@
       +   '<select id="cotizEnvSup" style="width:100%;background:var(--bg2);border:1px solid var(--bd);border-radius:10px;color:var(--text);padding:11px;font-size:14px;font-family:inherit;margin-bottom:10px;box-sizing:border-box"></select>'
       +   '<div style="display:flex;gap:8px">'
       +     '<button onclick="Cotizacion._closeEnvio()" style="flex:1;padding:12px;background:var(--bg2);border:1.5px solid var(--bd);border-radius:12px;color:var(--text);font-weight:600;font-size:13px;cursor:pointer;font-family:inherit">Ahora no</button>'
-      +     '<button onclick="Cotizacion._confirmEnvio()" style="flex:2;padding:12px;background:var(--blue);border:none;border-radius:12px;color:#fff;font-weight:700;font-size:14px;cursor:pointer;font-family:inherit">📤 Enviar a proveedor</button>'
+      +     '<button onclick="Cotizacion._confirmEnvio()" style="flex:2;padding:12px;background:var(--blue-fill);border:none;border-radius:12px;color:#fff;font-weight:700;font-size:14px;cursor:pointer;font-family:inherit">📤 Enviar a proveedor</button>'
       +   '</div>'
       + '</div>';
     ov.addEventListener('click', function(e){ if(e.target===ov) Cotizacion._closeEnvio(); });

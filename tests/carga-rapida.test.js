@@ -14,6 +14,7 @@ module.exports = async ({bloque, ok}) => {
     ok(!/@import/.test(E.leerReal('panel.css')), 'panel.css no encadena las fuentes con @import');
     ok(/<link rel="stylesheet" href="https:\/\/fonts\.googleapis\.com[^>]+media="print" onload="this\.media='all'">/.test(html),
        'las fuentes cargan sin bloquear');
+    ok(/display=optional/.test(html), 'y sin saltos de diseño cuando llegan');
   }
 
   bloque('Panel: el login aparece primero');
@@ -60,5 +61,32 @@ module.exports = async ({bloque, ok}) => {
   {
     ok(/try\{ if\(document\.getElementById\('authOverlay'\)\) return; \}catch\(e\)\{\}/.test(E.leerReal('panel/datos/nube.js')),
        'con el login en pantalla no sale «Tu sesion vencio»');
+  }
+  bloque('Fase 2: accesibilidad y buenas practicas');
+  {
+    ok(/<meta name="viewport" content="width=device-width, initial-scale=1\.0">/.test(html), 'el zoom esta permitido');
+    const css = E.leerReal('panel.css');
+    ok(/@supports \(-webkit-touch-callout:none\)\{input,select,textarea\{font-size:16px\}\}/.test(css),
+       'en iPhone los campos no hacen zoom solos al tocarlos');
+    ok(/--blue-fill:#1f6feb/.test(css) && !/background:var\(--blue\)/.test(css), 'botones azules con texto blanco legible');
+    ok(!/background:var\(--blue\)/.test(E.modulosPanel().map(E.leerReal).join('\n')), 'tambien en los estilos en linea');
+    ok(/background:#1f6feb/.test(E.leerReal('auth.js')), 'y el boton del login');
+    ok(/\.powered\{[^}]*color:var\(--text2\)/.test(css), 'el pie se lee');
+    ['index.html', 'formulario.html', 'seguimiento.html'].forEach((f) =>
+      ok(/<link rel="icon" href="icono\.svg"/.test(E.leerCrudo(f)), f + ' tiene icono (sin 404)'));
+    ok(E.existe('icono.svg'), 'el icono existe');
+    ok(/body:has\(#authOverlay\)>:not\(#authOverlay\):not\(#arranque\)\{visibility:hidden\}|body:has\(#authOverlay\)>:not\(#authOverlay\):not\(#arranque\)\{/.test(html),
+       'el panel no se ve detras del login');
+  }
+
+  bloque('Fase 2: nada pesado de terceros en el login');
+  {
+    const ac = E.leerReal('appcheck.js');
+    ok(/if \(!_enLogin\(\)\) _cuandoLibre\(_init\);/.test(ac) && !/^\s*_init\(\);\s*$/m.test(ac),
+       'App Check (reCAPTCHA) no se descarga mientras se muestra el login');
+    const auth = E.leerReal('auth.js');
+    ok(/var poner = function\(\)\{ document\.head\.appendChild\(s\); \};[\s\S]{0,120}requestIdleCallback\(poner/.test(auth),
+       'el boton de Google carga cuando el navegador esta libre');
+    ok(/id="authGoogleBtn" style="min-height:44px"/.test(auth), 'con su espacio reservado (sin saltos)');
   }
 };

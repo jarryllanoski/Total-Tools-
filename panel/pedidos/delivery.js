@@ -77,7 +77,7 @@ function _css(){
        .btn-edit del panel principal. Aquí solo lo exclusivo de la ruta. */
     '.dlv-card{background:#0d1117;border:1px solid #30363d;border-radius:11px;margin-bottom:9px}'+
     '.dlv-card.dlv-moving{border-color:var(--blue);box-shadow:0 0 0 2px rgba(56,139,253,.25)}'+
-    '.dlv-num{width:24px;height:24px;border-radius:50%;background:var(--blue);color:#fff;font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;cursor:pointer;-webkit-tap-highlight-color:transparent}'+
+    '.dlv-num{width:24px;height:24px;border-radius:50%;background:var(--blue-fill);color:#fff;font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;cursor:pointer;-webkit-tap-highlight-color:transparent}'+
     '.dlv-num.on{background:#fff;color:var(--blue);box-shadow:0 0 0 2px var(--blue)}'+
     '.dlv-entr{padding:6px 11px;border-radius:8px;border:none;background:linear-gradient(135deg,var(--green),#1a7f37);color:#fff;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap}'+
     '.dlv-pin{flex-shrink:0;background:rgba(56,139,253,.12);border:1px solid rgba(56,139,253,.3);border-radius:7px;color:var(--blue);font-size:13px;line-height:1;padding:4px 7px;cursor:pointer;font-family:inherit}'+
