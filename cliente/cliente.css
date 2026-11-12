@@ -314,3 +314,6 @@ body.dlv-ajustando #tt-narr{display:none!important}
 .addr-pin-chip button{margin-left:auto;background:none;border:none;color:var(--text2);font-size:15px;cursor:pointer;font-family:inherit;line-height:1;padding:0 2px}
 
 .ic{display:inline-block;width:1.15em;height:1.15em;background-color:currentColor;-webkit-mask:no-repeat center/contain;mask:no-repeat center/contain;vertical-align:-.2em;flex-shrink:0;font-style:normal}
+
+.biz-marca{display:inline-flex;align-items:center;gap:10px;max-width:calc(100% - 184px)}.biz-logo{width:48px;height:35px;flex-shrink:0}.biz-marca .biz-name{margin-bottom:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+@media(max-width:400px){.biz-header{text-align:left}.biz-marca{max-width:calc(100% - 100px)}.biz-marca .biz-name{font-size:20px}}

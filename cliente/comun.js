@@ -78,10 +78,9 @@ function headerHtml(ayudaTipo){
   const bizCity = (CFG&&(CFG.city||CFG.config&&CFG.config.city)) || '';
   const ayudaFn = ayudaTipo==='track' ? 'abrirAyudaTrack()' : 'abrirAyudaForm()';
   const isTrack = ayudaTipo==='track';
-  const brand = isTrack
-    ? `<div class="biz-name">${esc(bizName)}</div>${bizCity?`<div class="biz-city">📍 ${esc(bizCity)}</div>`:''}`
-    : '';
-  return `<div class="biz-header" style="position:relative${isTrack?'':';min-height:34px'}">${brand}<div onclick="${ayudaFn}" style="position:absolute;top:2px;right:0;display:flex;align-items:center;gap:4px;background:rgba(167,139,250,.12);border:1px solid rgba(167,139,250,.3);color:#a78bfa;border-radius:8px;padding:5px 10px;cursor:pointer;font-size:12px;font-weight:700" title="Ayuda">📖 Ayuda</div></div>`;
+  const brand = `<div class="biz-marca"><img class="biz-logo" src="marca/logo.svg?v=1" alt="" width="48" height="35" decoding="async"><div class="biz-name">${esc(bizName)}</div></div>`
+    + (isTrack && bizCity ? `<div class="biz-city">📍 ${esc(bizCity)}</div>` : '');
+  return `<div class="biz-header" style="position:relative">${brand}<div onclick="${ayudaFn}" style="position:absolute;top:2px;right:0;display:flex;align-items:center;gap:4px;background:rgba(167,139,250,.12);border:1px solid rgba(167,139,250,.3);color:#a78bfa;border-radius:8px;padding:5px 10px;cursor:pointer;font-size:12px;font-weight:700" title="Ayuda">📖 Ayuda</div></div>`;
 }
 
 function _ayudaFormCss(){

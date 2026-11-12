@@ -72,9 +72,15 @@ module.exports = async ({bloque, ok}) => {
     ok(!/background:var\(--blue\)/.test(E.modulosPanel().map(E.leerReal).join('\n')), 'tambien en los estilos en linea');
     ok(/background:#1f6feb/.test(E.leerReal('auth.js')), 'y el boton del login');
     ok(/\.powered\{[^}]*color:var\(--text2\)/.test(css), 'el pie se lee');
-    ['index.html', 'formulario.html', 'seguimiento.html'].forEach((f) =>
-      ok(/<link rel="icon" href="icono\.svg"/.test(E.leerCrudo(f)), f + ' tiene icono (sin 404)'));
-    ok(E.existe('icono.svg'), 'el icono existe');
+    ['index.html', 'formulario.html', 'seguimiento.html'].forEach((f) => {
+      const h = E.leerCrudo(f);
+      ok(/<link rel="icon" href="marca\/icono\.svg\?v=\d+" type="image\/svg\+xml">/.test(h) &&
+         /<link rel="icon" href="marca\/icono-32\.png\?v=\d+" sizes="32x32" type="image\/png">/.test(h) &&
+         /<link rel="apple-touch-icon" href="marca\/apple-touch-icon\.png\?v=\d+">/.test(h), f + ': icono SVG, PNG de respaldo y de iPhone');
+      ok(/<title>Total Tools · /.test(h) && /<meta name="theme-color" content="#[0-9a-f]{6}">/.test(h), f + ': titulo con la marca y color de barra');
+    });
+    ['icono.svg', 'logo.svg', 'icono-32.png', 'apple-touch-icon.png', 'icono-192.png', 'icono-512.png',
+      'icono-maskable-512.png', 'compartir.png', 'app.webmanifest'].forEach((f) => ok(E.existe('marca/' + f), 'marca/' + f));
     ok(/body:has\(#authOverlay\)>:not\(#authOverlay\):not\(#arranque\)\{visibility:hidden\}|body:has\(#authOverlay\)>:not\(#authOverlay\):not\(#arranque\)\{/.test(html),
        'el panel no se ve detras del login');
   }
