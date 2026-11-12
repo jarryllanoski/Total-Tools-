@@ -2,12 +2,14 @@
 
 const FORM_API = 'https://us-central1-total-tools-24ce8.cloudfunctions.net/formApi';
 
+const CON_APPCHECK = {reniec: true};
+
 async function _api(action, params, opts){
   let url = FORM_API + '?action=' + encodeURIComponent(action);
   if(params){ for(const k in params){ url += '&' + k + '=' + encodeURIComponent(params[k]); } }
   const o = Object.assign({}, opts || {});
   try{
-    if(typeof window._appCheckToken === 'function'){
+    if(CON_APPCHECK[action] && typeof window._appCheckToken === 'function'){
       const t = await window._appCheckToken();
       if(t){ o.headers = Object.assign({}, o.headers, {'X-Firebase-AppCheck': t}); }
     }

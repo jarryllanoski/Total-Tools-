@@ -60,6 +60,7 @@ async function checkToken(tok){
     if(data.prefillPhone) _prefillPhone = data.prefillPhone;
     if(data.prefillLink)  _prefillLink  = data.prefillLink;
     if(data.cfgId) _tokCfgId = String(data.cfgId);
+    if(data.cfg || data.vivo) _cfgAdjunta = {cfg: data.cfg || null, vivo: data.vivo || null};
     loadCfg();
   }catch(e){
     if(e.message==='timeout'){
@@ -80,6 +81,7 @@ function showTokenScreen(icon, title, msg){
 }
 
 var _tokCfgId = '';
+var _cfgAdjunta = null;
 
 async function loadCfg(){
   CFG = null;
@@ -88,12 +90,16 @@ async function loadCfg(){
     const cfgId = _tokCfgId || new URLSearchParams(location.search).get('cfg');
     const withTO = (pr,ms)=>Promise.race([pr, new Promise(r=>setTimeout(()=>r(null),ms))]);
     let cfg = null;
-    if(cfgId){
+    const adj = _cfgAdjunta;
+    _cfgAdjunta = null;
+    if(adj && adj.cfg){
+      cfg = adj.cfg;
+    } else if(cfgId){
       const snap = await withTO(_api('formcfg', {id: cfgId}), 5000);
       if(snap && !snap.error) cfg = snap;
     }
     if(!cfg || !_cfgHasPhone(cfg)){
-      const live = await withTO(_api('config'), 5000);
+      const live = (adj && adj.vivo) || await withTO(_api('config'), 5000);
       if(live && !live.error){
         if(!cfg){ cfg = live; }
         else{

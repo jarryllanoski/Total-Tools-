@@ -1,5 +1,5 @@
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-:root{--bg:#080810;--card:#0f0f1a;--card2:#13131f;--bd:#1e1e30;--blue:#4f8ef7;--green:#22c55e;--red:#f87171;--purple:#a78bfa;--text:#f0f0f8;--text2:#6b7280}
+:root{--bg:#080810;--card:#0f0f1a;--card2:#13131f;--bd:#1e1e30;--blue:#4f8ef7;--green:#22c55e;--red:#f87171;--purple:#a78bfa;--text:#f0f0f8;--text2:#7d8493}
 body{background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,sans-serif;min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:0 0 40px}
 .container{width:100%;max-width:460px;padding:0 16px}
 
@@ -198,7 +198,7 @@ body.wz-sede #tt-lbl{display:none!important}
 .tt-wa-q{color:var(--text);font-size:15px;font-weight:800;margin-bottom:8px}
 .tt-wa-otra{display:flex;align-items:center;justify-content:center;text-decoration:none;border-radius:10px;min-height:44px;font-weight:800;font-size:13.5px}
 @media(prefers-reduced-motion:reduce){.tt-wa-vuelta.tt-asoma,.tt-dedo,.tt-sello,#tt-lbl .card.tt-tiembla,.btn-wa.tt-wa-btn,.btn-wa.tt-llama,.tt-reg-bar{animation:none}#tt-lbl .card.tt-imprimiendo::after{display:none}.tt-reg-bar{width:88%}}
-.btn-wa{width:100%;background:linear-gradient(135deg,#128c7e,#25d366);color:#fff;border:none;border-radius:14px;font-family:inherit;font-size:16px;font-weight:600;padding:15px;cursor:pointer;margin-top:10px;text-decoration:none;display:flex;align-items:center;justify-content:center;gap:8px}
+.btn-wa{width:100%;background:linear-gradient(135deg,#0d6e5f,#0f7f3c);color:#fff;border:none;border-radius:14px;font-family:inherit;font-size:16px;font-weight:600;padding:15px;cursor:pointer;margin-top:10px;text-decoration:none;display:flex;align-items:center;justify-content:center;gap:8px}
 .btn-purple{width:100%;background:linear-gradient(135deg,#3730a3,var(--purple));color:#fff;border:none;border-radius:14px;font-family:inherit;font-size:15px;font-weight:600;padding:13px;cursor:pointer;margin-top:10px}
 
 .success{text-align:center;padding:8px 0}
@@ -254,7 +254,7 @@ body.wz-sede #tt-lbl{display:none!important}
 .brand-foot .bf-ic{width:13px;height:13px;flex:none}
 .brand-foot .bf-web{color:#12a5b4;text-decoration:none;font-weight:600}
 .brand-foot .bf-dot{color:var(--text2);opacity:.4}
-.brand-foot .bf-soc .bf-item{font-size:11px;opacity:.85}
+.brand-foot .bf-soc .bf-item{font-size:12px}
 .used-note{text-align:center;font-size:12px;color:var(--text2);margin-top:14px;padding:10px 14px;background:rgba(107,114,128,.06);border:1px solid var(--bd);border-radius:10px;line-height:1.5}
 
 .section-ttl{font-size:11px;font-weight:700;color:var(--text2);letter-spacing:.7px;text-transform:uppercase;margin-bottom:10px}

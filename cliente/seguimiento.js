@@ -186,7 +186,7 @@ async function buscarPedido(token, silent){
     const _waHref=_bizPhone?`https://wa.me/51${_bizPhone}?text=${encodeURIComponent('Hola, tengo una consulta sobre mi pedido')}`:'';
     setTrackContent(
       `<div class="error-box" style="text-align:center">🔧 Link no disponible<br><small style="font-weight:400;opacity:.8">Para consultar el estado de tu pedido, escríbenos directamente.</small></div>`+
-      (_waHref?`<div style="text-align:center;margin-top:20px"><a href="${_waHref}" target="_blank" rel="noopener" style="display:inline-block;background:#25D366;color:#fff;padding:14px 24px;border-radius:12px;text-decoration:none;font-weight:700;font-size:15px">💬 Consultar por WhatsApp</a></div>`:'')
+      (_waHref?`<div style="text-align:center;margin-top:20px"><a href="${_waHref}" target="_blank" rel="noopener" style="display:inline-block;background:#0f7f3c;color:#fff;padding:14px 24px;border-radius:12px;text-decoration:none;font-weight:700;font-size:15px">💬 Consultar por WhatsApp</a></div>`:'')
     );
   }catch(e){
     if(window.TTLoader) TTLoader.done();
@@ -424,7 +424,7 @@ function renderTrackResult(ship, code){
       </div>
       ${(ship.links&&ship.links.length)?`<div class="tk-section"><div class="tk-lbl">📄 Documentos adjuntos</div>${ship.links.map(l=>`<a href="${l.u}" target="_blank" rel="noopener" style="display:flex;align-items:center;justify-content:space-between;padding:13px 16px;background:var(--bg2);border:1px solid var(--bd);border-radius:10px;text-decoration:none;margin-bottom:6px"><span style="color:var(--blue);font-weight:600;font-size:14px">📄 Presiona para ver tu documento</span><span style="color:var(--text2);font-size:18px">→</span></a>`).join('')}</div>`:''}
     </div>
-    ${waConsultUrl?`<div style="padding:4px 0 8px;text-align:center"><a href="${waConsultUrl}" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:8px;padding:13px 28px;background:#25D366;border-radius:14px;color:#fff;font-weight:700;font-size:15px;text-decoration:none">💬 Consultar por WhatsApp</a></div>`:''}
+    ${waConsultUrl?`<div style="padding:4px 0 8px;text-align:center"><a href="${waConsultUrl}" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:8px;padding:13px 28px;background:#0f7f3c;border-radius:14px;color:#fff;font-weight:700;font-size:15px;text-decoration:none">💬 Consultar por WhatsApp</a></div>`:''}
     <a href="https://www.totaltoolspe.com/" target="_blank" rel="noopener" style="display:flex;align-items:center;justify-content:space-between;margin-top:12px;padding:14px 18px;background:linear-gradient(135deg,rgba(56,139,253,.12),rgba(163,113,247,.12));border:1px solid rgba(56,139,253,.25);border-radius:14px;text-decoration:none;gap:12px">
       <div>
         <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:3px">🛍️ ¿Quieres ver más productos y ofertas?</div>

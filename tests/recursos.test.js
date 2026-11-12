@@ -177,8 +177,13 @@ module.exports = async ({bloque, ok}) => {
        público. Guardar ahí los recursos publicaría los precios mayoristas y
        los comunicados internos a quien pidiera esa URL. */
     const fidx = E.leer('functions/index.js');
-    const pub = fidx.slice(fidx.indexOf('async function handleConfig'),
+    const pub = fidx.slice(fidx.indexOf('async function configViva'),
         fidx.indexOf('async function handleFormCfg(req, res) {'));
+    const tok = fidx.slice(fidx.indexOf('async function handleToken'), fidx.indexOf('function telefonoDe'));
+    ok(/out\.cfg = soloCampos\(c\.data\(\), FORMCFG_PUBLICO\)/.test(tok) && /out\.vivo = await configViva\(\)/.test(tok) &&
+       !/c\.data\(\)[^,]/.test(tok.replace('c.data(), FORMCFG_PUBLICO', '')),
+       'el link adjunta su configuracion por la MISMA lista blanca que formcfg y config');
+    ok(/async function handleConfig\(req, res\) \{\s*res\.json\(await configViva\(\)\);/.test(fidx), 'config y el link comparten configViva');
     ok(/config: configPublica\(d\.config\)/.test(pub) &&
        /const CONFIG_PUBLICA = \["name", "phone", "city"\];/.test(fidx),
        'la función pública devuelve de `config` SOLO nombre, celular y ' +

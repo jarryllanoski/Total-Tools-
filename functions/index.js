@@ -451,26 +451,45 @@ async function handleToken(req, res) {
   }
   const cfgId = /^[A-Za-z0-9_-]{6,40}$/.test(String(d.cfgId || "")) ?
     String(d.cfgId) : "";
-  res.json({
+  const out = {
     status: "valid",
     prefillName: d.prefillName || "",
     prefillPhone: d.prefillPhone || "",
     prefillLink: d.prefillLink || "",
     cfgId: cfgId,
-  });
+  };
+  try {
+    if (cfgId) {
+      const c = await db.doc(`${FORMCFG_COL}/${cfgId}`).get();
+      if (c.exists) out.cfg = soloCampos(c.data(), FORMCFG_PUBLICO);
+    }
+    if (!out.cfg || !telefonoDe(out.cfg)) out.vivo = await configViva();
+  } catch (e) {
+    console.warn("token: sin config adjunta:", e && e.message);
+  }
+  res.json(out);
 }
 
-async function handleConfig(req, res) {
+function telefonoDe(c) {
+  return String((c && (c.phone || (c.config && c.config.phone))) || "")
+      .trim();
+}
+
+async function configViva() {
   const snap = await db.doc(CFG_DOC).get();
   const d = snap.exists ? snap.data() : {};
-  res.json({
+  return {
     config: configPublica(d.config),
     couriers: d.couriers || [],
     courierActive: d.courierActive || {},
     courierTypes: d.courierTypes || {},
     dispatch: d.dispatch || {},
     extraFields: d.extraFields || [],
-  });
+  };
+}
+
+async function handleConfig(req, res) {
+  res.json(await configViva());
 }
 
 async function handleFormCfg(req, res) {

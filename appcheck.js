@@ -53,6 +53,17 @@
     if (typeof global.requestIdleCallback === 'function') global.requestIdleCallback(fn, {timeout: 4000});
     else setTimeout(fn, 1500);
   }
-  if (!_enLogin()) _cuandoLibre(_init);
+  function _alInteractuar(fn) {
+    var hecho = false;
+    var una = function () {
+      if (hecho) return;
+      hecho = true;
+      ['pointerdown', 'keydown', 'focusin', 'touchstart'].forEach(function (e) { document.removeEventListener(e, una, true); });
+      fn();
+    };
+    ['pointerdown', 'keydown', 'focusin', 'touchstart'].forEach(function (e) { document.addEventListener(e, una, {capture: true, passive: true}); });
+  }
+  if (document.documentElement.getAttribute('data-appcheck') === 'interaccion') _alInteractuar(_init);
+  else if (!_enLogin()) _cuandoLibre(_init);
 
 })(window);
