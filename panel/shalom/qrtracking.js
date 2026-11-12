@@ -286,7 +286,7 @@ QRTracking.init = function(){
 
 global.QRTracking = QRTracking;
 
-if(document.readyState === 'loading'){
+if(document.readyState !== 'complete'){
   document.addEventListener('DOMContentLoaded', QRTracking.init);
 } else {
   QRTracking.init();

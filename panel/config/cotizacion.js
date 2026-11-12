@@ -652,7 +652,8 @@
     },
     _onStock: function(input){
       var file=input && input.files && input.files[0]; if(!file) return;
-      if(typeof XLSX==='undefined'){ _setStatus('⚠️ Librería de Excel no disponible.','var(--red)'); return; }
+      var self=this;
+      if(!conXLSX(function(){ self._onStock(input); }, function(){ _setStatus('No se pudo cargar Excel. Revisa tu conexión.','var(--red)'); })) return;
       _setStatus('⏳ Leyendo Excel…');
       var reader=new FileReader();
       reader.onload=function(e){

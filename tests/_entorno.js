@@ -47,6 +47,11 @@ const ruta = (rel) => MOVIDOS[rel] || rel;
 
 /** Lee un archivo del proyecto, tal cual está en disco. */
 function leerReal(rel) {
+  const t = fs.readFileSync(path.join(RAIZ, ruta(rel)), 'utf8');
+  return /\.html$/.test(rel) ? t.replace(/<script defer(?: fetchpriority="high")? src=/g, '<script src=') : t;
+}
+
+function leerCrudo(rel) {
   return fs.readFileSync(path.join(RAIZ, ruta(rel)), 'utf8');
 }
 
@@ -215,4 +220,4 @@ function scriptsEnLinea(rel) {
   return out;
 }
 
-module.exports = {cliente, trozoCliente, CLIENTE, leerReal, CONFIG_JS, modulosPanel, MOVIDOS, ruta, RAIZ, leer, existe, cargar, trozo, scriptsEnLinea, domFalso };
+module.exports = {cliente, trozoCliente, CLIENTE, leerReal, leerCrudo, CONFIG_JS, modulosPanel, MOVIDOS, ruta, RAIZ, leer, existe, cargar, trozo, scriptsEnLinea, domFalso };

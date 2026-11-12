@@ -653,7 +653,7 @@
   var ChipsNav = { verActivo: function(){}, actualizarFlechas: function(){} };
   window.ChipsNav = ChipsNav;
 
-  if(document.readyState === 'loading'){
+  if(document.readyState !== 'complete'){
     document.addEventListener('DOMContentLoaded', function(){
       setTimeout(init, 500);
     });

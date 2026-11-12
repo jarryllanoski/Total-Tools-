@@ -84,6 +84,7 @@
      espera, la otra se resuelve volviendo a entrar. */
   let _avisoSesionTs = 0;
   function _avisarSesion(motivo){
+    try{ if(document.getElementById('authOverlay')) return; }catch(e){}
     const ahora = Date.now();
     if(ahora - _avisoSesionTs < 30000) return;
     _avisoSesionTs = ahora;

@@ -191,12 +191,7 @@
         var expiry = Date.now() + (parseInt(d.expiresIn||3600)*1000);
         _saveSession(d.refreshToken||d.idToken, expiry, d.email||'');
         _saveIdToken(d.idToken);
-        _hideOverlay();
-        /* Ya hay sesión: traer la nube AHORA. La carga del arranque pudo
-           rendirse mientras se escribía la contraseña. */
-        if(typeof window._trasEntrar === 'function'){
-          try{ window._trasEntrar(); }catch(e){}
-        }
+        _alEntrar();
         return;
       }
       // Autenticó con Google pero Firebase lo rechazó. Se muestra el correo:
@@ -454,11 +449,7 @@
           var expiry = Date.now() + (parseInt(d.expiresIn||3600)*1000);
           _saveSession(d.refreshToken||d.idToken, expiry, email);
           _saveIdToken(d.idToken);
-          _hideOverlay();
-          // Igual que al entrar con Google: traer la nube ya.
-          if(typeof window._trasEntrar === 'function'){
-            try{ window._trasEntrar(); }catch(e){}
-          }
+          _alEntrar();
         } else {
           // Error de Firebase
           var msg = 'Correo o contraseña incorrectos';
@@ -585,12 +576,37 @@
      en eso ya salió caro dos veces en este proyecto: `save` declarado con
      const que no llegaba a window, y `Seleccion` usado sin prefijo desde el
      repintado. Escribirlo explícito cuesta siete letras. */
-  if(document.readyState === 'loading'){
-    document.addEventListener('DOMContentLoaded', function(){
-      window.AuthModule.init();
+  var _listo = new Promise(function(r){
+    if(document.readyState === 'complete') r();
+    else document.addEventListener('DOMContentLoaded', function(){ r(); });
+  });
+
+  function _alEntrar(){
+    _listo.then(function(){
+      _hideOverlay();
+      if(typeof window._trasEntrar === 'function'){
+        try{ window._trasEntrar(); }catch(e){}
+      }
     });
+  }
+
+  function _haySesionGuardada(){
+    try { return !!localStorage.getItem(TOKEN_KEY); } catch(e){ return false; }
+  }
+
+  function _quitarArranque(){
+    var a = document.getElementById('arranque');
+    if(a) a.remove();
+  }
+  function _arrancar(){
+    Promise.resolve().then(function(){ return window.AuthModule.init(); })
+      .catch(function(){}).then(_quitarArranque);
+    setTimeout(_quitarArranque, 20000);
+  }
+  if(!_haySesionGuardada() || document.readyState === 'complete'){
+    _arrancar();
   } else {
-    window.AuthModule.init();
+    document.addEventListener('DOMContentLoaded', _arrancar);
   }
 
 })();

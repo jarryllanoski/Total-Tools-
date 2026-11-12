@@ -424,7 +424,7 @@ DeliveryModule.init=function(){
 };
 
 global.DeliveryModule=DeliveryModule;
-if(document.readyState==='loading'){
+if(document.readyState !== 'complete'){
   document.addEventListener('DOMContentLoaded',DeliveryModule.init);
 }else{
   DeliveryModule.init();

@@ -9,7 +9,7 @@
 /* EXCEL EXPORT / IMPORT */
 function exportExcel(){
   if(!S.shipments.length){ toast('Sin envíos para exportar'); return; }
-  if(typeof XLSX==='undefined'){ toast('⚠️ Cargando librería...'); return; }
+  if(!conXLSX(exportExcel)) return;
   const rows=S.shipments.map(s=>({
     'N° Orden':          s.id||'',
     'Nombre':            s.name||'',
@@ -40,6 +40,7 @@ function exportExcel(){
 
 function importExcel(input){
   const file=input.files[0]; if(!file) return;
+  if(!conXLSX(function(){ importExcel(input); }, function(){ input.value=''; toast('No se pudo cargar Excel. Revisa tu conexión.'); })) return;
   const res=$('importResult');
   res.style.display='block'; res.innerHTML='⏳ Procesando...'; res.style.color='var(--text2)';
   const reader=new FileReader();

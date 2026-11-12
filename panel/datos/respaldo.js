@@ -307,7 +307,7 @@
   };
 
   // Refrescar la fecha al cargar (si el elemento ya existe)
-  if(document.readyState==='loading'){
+  if(document.readyState!=='complete'){
     document.addEventListener('DOMContentLoaded', _refrescarFecha);
   } else {
     _refrescarFecha();

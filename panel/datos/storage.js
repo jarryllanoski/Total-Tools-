@@ -362,7 +362,7 @@ var StorageModule = {
 global.StorageModule = StorageModule;
 
 // Auto-init
-if (document.readyState === 'loading') {
+if (document.readyState !== 'complete') {
   document.addEventListener('DOMContentLoaded', StorageModule.init);
 } else {
   StorageModule.init();

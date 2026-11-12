@@ -485,7 +485,7 @@
     }
   }
 
-  if (document.readyState === 'loading') {
+  if (document.readyState !== 'complete') {
     document.addEventListener('DOMContentLoaded', montarBoton);
   } else {
     montarBoton();

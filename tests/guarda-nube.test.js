@@ -180,8 +180,10 @@ module.exports = async ({bloque, ok}) => {
         .test(src),
        'y entrar con exito dispara la carga de inmediato');
     const auth = E.leer('auth.js');
-    const llamadas = (auth.match(/window\._trasEntrar\(\)/g) || []).length;
-    ok(llamadas >= 3,
+    const alEntrar = (auth.match(/_alEntrar\(\);/g) || []).length;
+    const llamadas = (auth.match(/window\._trasEntrar\(\)/g) || []).length +
+      (/function _alEntrar\(\)\{[\s\S]{0,200}window\._trasEntrar\(\)/.test(auth) ? alEntrar - 1 : 0);
+    ok(alEntrar >= 2 && llamadas >= 3,
        'auth.js la llama en los tres caminos de entrada —Google, correo y ' +
        'token renovado— salio en ' + llamadas);
   }

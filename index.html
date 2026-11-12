@@ -4,10 +4,11 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
 <title>Mi Panel de Envíos</title>
-<script src="firebase-config.js?v=4"></script>
+<script defer fetchpriority="high" src="panel/datos/errores.js?v=1"></script>
+<script defer fetchpriority="high" src="firebase-config.js?v=4"></script>
+<script defer fetchpriority="high" src="auth.js?v=12"></script>
 <!-- errores.js va PRONTO: engancha window.onerror, así que cuanto antes
      cargue, más fallos atrapa. No depende de nada. -->
-<script src="panel/datos/errores.js?v=1"></script>
 <!-- seleccion.js TAMBIÉN va pronto, y no por gusto: el script en línea de
      más abajo llama a Seleccion._pintarBoton() en cada repintado. Cargándolo
      al final del body había una ventana real —un repintado en el primer
@@ -15,36 +16,41 @@
      ReferenceError y ABORTABA EL RENDER ENTERO: cero tarjetas. Pasó en una
      recarga forzada, con todo bajando de red a la vez.
      No depende de nada al cargar: solo define window.Seleccion. -->
-<script src="panel/pantalla/seleccion.js?v=1"></script>
+<script defer src="panel/pantalla/seleccion.js?v=1"></script>
 <!-- guias.js: avisos del número de guía. Lógica pura + un pintor; no
      depende de nada al cargar. Lo usan config.js (formulario) y tracking.js
      (modal de seguimiento). -->
-<script src="panel/shalom/guias.js?v=2"></script>
+<script defer src="panel/shalom/guias.js?v=2"></script>
 <!-- ⚠️ SÍ, ESTE ARCHIVO ESTÁ EN functions/ Y NO ES UN ERROR.
      Es la fórmula de qué etiqueta le toca a un pedido, y la usan LOS DOS: este
      panel y el barrido programado del servidor. Una copia en cada lado
      divergiría, y divergir ahí significa que el barrido mueva de madrugada una
      etiqueta que el panel habría rechazado. Un archivo raro de ver en el árbol
      es mejor que dos reglas que deciden si tus pedidos retroceden. -->
-<script src="functions/shalomEstado.js?v=1"></script>
-<script src="functions/codigoSeguimiento.js?v=1"></script>
-<script src="functions/etiquetas.js?v=2"></script>
-<script src="functions/agencias.js?v=1"></script>
-<script src="functions/enlaceSeguimiento.js?v=1"></script>
-<script src="functions/registroShalom.js?v=7"></script>
-<script src="functions/dniPedido.js?v=1"></script>
-<script src="functions/sincro.js?v=1"></script>
-<script src="panel/datos/mezclaConfig.js?v=1"></script>
-<script src="functions/nroComprobante.js?v=2"></script>
-<script src="functions/montoPedido.js?v=1"></script>
-<script src="functions/fechaPedido.js?v=1"></script>
-<script src="appcheck.js?v=2"></script>
+<script defer src="functions/shalomEstado.js?v=1"></script>
+<script defer src="functions/codigoSeguimiento.js?v=1"></script>
+<script defer src="functions/etiquetas.js?v=2"></script>
+<script defer src="functions/agencias.js?v=1"></script>
+<script defer src="functions/enlaceSeguimiento.js?v=1"></script>
+<script defer src="functions/registroShalom.js?v=7"></script>
+<script defer src="functions/dniPedido.js?v=1"></script>
+<script defer src="functions/sincro.js?v=1"></script>
+<script defer src="panel/datos/mezclaConfig.js?v=1"></script>
+<script defer src="functions/nroComprobante.js?v=2"></script>
+<script defer src="functions/montoPedido.js?v=1"></script>
+<script defer src="functions/fechaPedido.js?v=1"></script>
+<script defer src="appcheck.js?v=2"></script>
 <!-- FIREBASE via REST API — sin SDK, funciona en Brave/Chrome/Firefox/Safari -->
-<script src="panel/datos/nube.js?v=4"></script>
-<script src="panel/datos/copia-local.js?v=1"></script>
-<link rel="stylesheet" href="panel.css?v=11">
+<script defer src="panel/datos/nube.js?v=5"></script>
+<script defer src="panel/datos/copia-local.js?v=1"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@400;500;600&display=swap" media="print" onload="this.media='all'">
+<link rel="stylesheet" href="panel.css?v=12">
+<style>#arranque{position:fixed;inset:0;z-index:99998;display:flex;align-items:center;justify-content:center;flex-direction:column;padding:24px;background:#0d1117;color:#e6edf3;font-family:'DM Sans',system-ui,sans-serif;text-align:center}#arranque .ic{font-size:48px;margin-bottom:8px}#arranque .nm{width:100%;max-width:340px;font-family:'Syne',system-ui,sans-serif;font-weight:800;font-size:26px;letter-spacing:1px}#arranque .sb{font-size:12px;color:#8b949e;margin-top:6px}</style>
 </head>
 <body>
+<div id="arranque" role="status" aria-live="polite"><div class="ic" aria-hidden="true">📦</div><div class="nm">TOTAL TOOLS</div><div class="sb">Cargando...</div></div>
 
 <!-- HEADER -->
 <div class="hdr">
@@ -1058,54 +1064,53 @@
 
 <div class="toast" id="toastEl"></div>
 
-<script src="auth.js?v=10"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
-<script src="panel/datos/estado.js?v=4"></script>
-<script src="panel/pantalla/whatsapp.js?v=1"></script>
-<script src="panel/pantalla/navegacion.js?v=1"></script>
-<script src="panel/pantalla/lista.js?v=2"></script>
-<script src="panel/shalom/shalom-ajustes.js?v=7"></script>
-<script src="panel/config/recursos-ui.js?v=1"></script>
-<script src="panel/pantalla/acciones.js?v=1"></script>
-<script src="panel/config/proveedores.js?v=1"></script>
-<script src="panel/pedidos/estados-papelera.js?v=1"></script>
-<script src="panel/pantalla/escaner.js?v=1"></script>
-<script src="panel/pantalla/inicio.js?v=4"></script>
+<script defer src="panel/datos/estado.js?v=4"></script>
+<script defer src="panel/pantalla/whatsapp.js?v=1"></script>
+<script defer src="panel/pantalla/navegacion.js?v=1"></script>
+<script defer src="panel/pantalla/lista.js?v=2"></script>
+<script defer src="panel/shalom/shalom-ajustes.js?v=7"></script>
+<script defer src="panel/config/recursos-ui.js?v=1"></script>
+<script defer src="panel/pantalla/acciones.js?v=1"></script>
+<script defer src="panel/config/proveedores.js?v=2"></script>
+<script defer src="panel/pedidos/estados-papelera.js?v=1"></script>
+<script defer src="panel/pantalla/escaner.js?v=1"></script>
+<script defer src="panel/pantalla/inicio.js?v=4"></script>
 <!-- ★ SHALOM tracking — cargado al final -->
-<script src="panel/datos/storage.js?v=6"></script>
-<script src="panel/datos/fotos.js?v=1"></script>
+<script defer src="panel/datos/storage.js?v=7"></script>
+<script defer src="panel/datos/fotos.js?v=1"></script>
 <!-- seleccion.js ya se cargó en la cabecera, ANTES del script en línea que
      lo usa. config.js, print.js y voz.js preguntan por los pedidos marcados,
      así que siguen yendo detrás. El orden de carga es un contrato
      (ver docs/ARQUITECTURA.md). -->
-<script src="panel/pedidos/pin-papelera.js?v=1"></script>
-<script src="panel/pedidos/pedido-docs.js?v=1"></script>
-<script src="panel/pedidos/pedido-form.js?v=2"></script>
-<script src="panel/shalom/shalom-registro.js?v=3"></script>
-<script src="panel/shalom/shalom-origen.js?v=2"></script>
-<script src="panel/shalom/shalom-cuenta.js?v=1"></script>
-<script src="panel/pedidos/pedido-reniec.js?v=2"></script>
-<script src="panel/pedidos/pedido-guardar.js?v=1"></script>
-<script src="panel/compartir/excel.js?v=1"></script>
-<script src="panel/compartir/links-tokens.js?v=1"></script>
-<script src="panel/config/configuracion.js?v=1"></script>
-<script src="panel/pedidos/print.js?v=21"></script>
-<script src="panel/pedidos/notify.js?v=7"></script>
-<script src="panel/shalom/shalom.js?v=39"></script>
-<script src="panel/shalom/tracking.js?v=28"></script>
-<script src="panel/pantalla/floatpanel.js?v=4"></script>
-<script src="panel/pedidos/delivery.js?v=9"></script>
-<script src="panel/shalom/qrtracking.js?v=3"></script>
-<script src="panel/shalom/ticket.js?v=9"></script>
-<script src="panel/shalom/agencias-extractor.js?v=11"></script>
-<script src="panel/datos/respaldo.js?v=2"></script>
-<script src="narrador/toby.js?v=1"></script>
-<script src="panel/pantalla/ayuda.js?v=13"></script>
-<script src="panel/config/recursos.js?v=2"></script>
-<script src="panel/pantalla/dashboard.js?v=2"></script>
-<script src="panel/pantalla/voz.js?v=3"></script>
-<script src="panel/config/cotizacion.js?v=3"></script>
-<script src="panel/pedidos/pedido-ui.js?v=2"></script>
+<script defer src="panel/pedidos/pin-papelera.js?v=1"></script>
+<script defer src="panel/pedidos/pedido-docs.js?v=1"></script>
+<script defer src="panel/pedidos/pedido-form.js?v=2"></script>
+<script defer src="panel/shalom/shalom-registro.js?v=3"></script>
+<script defer src="panel/shalom/shalom-origen.js?v=2"></script>
+<script defer src="panel/shalom/shalom-cuenta.js?v=1"></script>
+<script defer src="panel/pedidos/pedido-reniec.js?v=2"></script>
+<script defer src="panel/pedidos/pedido-guardar.js?v=1"></script>
+<script defer src="panel/compartir/xlsx.js?v=1"></script>
+<script defer src="panel/compartir/excel.js?v=2"></script>
+<script defer src="panel/compartir/links-tokens.js?v=1"></script>
+<script defer src="panel/config/configuracion.js?v=1"></script>
+<script defer src="panel/pedidos/print.js?v=22"></script>
+<script defer src="panel/pedidos/notify.js?v=8"></script>
+<script defer src="panel/shalom/shalom.js?v=39"></script>
+<script defer src="panel/shalom/tracking.js?v=28"></script>
+<script defer src="panel/pantalla/floatpanel.js?v=5"></script>
+<script defer src="panel/pedidos/delivery.js?v=10"></script>
+<script defer src="panel/shalom/qrtracking.js?v=4"></script>
+<script defer src="panel/shalom/ticket.js?v=10"></script>
+<script defer src="panel/shalom/agencias-extractor.js?v=12"></script>
+<script defer src="panel/datos/respaldo.js?v=3"></script>
+<script defer src="narrador/toby.js?v=1"></script>
+<script defer src="panel/pantalla/ayuda.js?v=13"></script>
+<script defer src="panel/config/recursos.js?v=2"></script>
+<script defer src="panel/pantalla/dashboard.js?v=3"></script>
+<script defer src="panel/pantalla/voz.js?v=4"></script>
+<script defer src="panel/config/cotizacion.js?v=4"></script>
+<script defer src="panel/pedidos/pedido-ui.js?v=2"></script>
 </body>
 </html>

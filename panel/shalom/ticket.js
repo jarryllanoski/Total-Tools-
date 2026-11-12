@@ -179,7 +179,7 @@
 
   global.TicketModule = TicketModule;
 
-  if (document.readyState === 'loading') {
+  if (document.readyState !== 'complete') {
     document.addEventListener('DOMContentLoaded', TicketModule.init);
   } else {
     TicketModule.init();

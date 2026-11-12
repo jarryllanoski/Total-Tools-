@@ -357,7 +357,7 @@
     }
   }
 
-  if(document.readyState === 'loading'){
+  if(document.readyState !== 'complete'){
     document.addEventListener('DOMContentLoaded', function(){ setTimeout(init, 400); });
   } else {
     setTimeout(init, 400);

@@ -183,7 +183,7 @@ function renderSuppStock(sup){
 function loadSuppStock(input){
   const file=input.files[0]; if(!file) return;
   const sup=S.suppliers.find(x=>x.id===_suppId); if(!sup){ input.value=''; return; }
-  if(typeof XLSX==='undefined'){ toast('⚠️ Librería de Excel no disponible'); input.value=''; return; }
+  if(!conXLSX(function(){ loadSuppStock(input); }, function(){ input.value=''; toast('No se pudo cargar Excel. Revisa tu conexión.'); })) return;
   const r=new FileReader();
   r.onload=e=>{
     try{

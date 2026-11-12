@@ -724,7 +724,7 @@ window.esc = esc;
   };
 
   // Inyectar al cargar
-  if(document.readyState === 'loading'){
+  if(document.readyState !== 'complete'){
     document.addEventListener('DOMContentLoaded', _injectPrintBell);
   } else {
     setTimeout(_injectPrintBell, 200);

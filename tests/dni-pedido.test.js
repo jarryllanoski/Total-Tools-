@@ -182,7 +182,7 @@ module.exports = async ({bloque, ok}) => {
   {
     const cfg = E.leer('config.js');
     const imp = cfg.slice(cfg.indexOf('function importExcel'),
-        cfg.indexOf('function importExcel') + 2000);
+        cfg.indexOf('function importExcel') + 2600);
     ok(/dni:\s*\(row\['DNI'\]/.test(imp),
        '⚠️ importar Excel escribe `dni`. Antes escribia SOLO ' +
        '`dniDestinatario` y el exportador lee `dni`: exportar e importar ' +

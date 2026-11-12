@@ -403,7 +403,7 @@
 
   global.AgenciasExtractor = AgenciasExtractor;
 
-  if (document.readyState === 'loading') {
+  if (document.readyState !== 'complete') {
     document.addEventListener('DOMContentLoaded', AgenciasExtractor.init);
   } else {
     AgenciasExtractor.init();

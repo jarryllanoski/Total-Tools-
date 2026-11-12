@@ -339,7 +339,7 @@ DashBoard.init = function(){
 
 global.DashBoard = DashBoard;
 
-if(document.readyState==='loading'){
+if(document.readyState!=='complete'){
   document.addEventListener('DOMContentLoaded', DashBoard.init);
 } else {
   DashBoard.init();
