@@ -74,3 +74,5 @@ node_modules/
 
 # Local scratchpad / throwaway test scripts (no van al repo)
 scratchpad/
+dist/
+herramientas/node_modules/

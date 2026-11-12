@@ -1,0 +1,11 @@
+{
+  "name": "total-tools-herramientas",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "construir": "node construir.mjs"
+  },
+  "devDependencies": {
+    "esbuild": "0.24.0"
+  }
+}
