@@ -60,8 +60,10 @@ async function construir() {
     if (PAGINAS.includes(f)) continue;
     const out = await procesar(f);
     hechos.set(f, out);
-    antes += leer(f).length;
-    despues += out.length;
+    if (/\.(js|css)$/.test(f)) {
+      antes += leer(f).length;
+      despues += out.length;
+    }
   }
   for (const p of PAGINAS) {
     const t = leer(p).toString('utf8').replace(/((?:src|href)=")([^"?#]+)\?v=[^"]*"/g, (m, a, f) =>
