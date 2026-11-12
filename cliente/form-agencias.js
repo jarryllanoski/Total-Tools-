@@ -3,7 +3,7 @@
 const AGENCY_SOURCES = {
   SHALOM: {
     label: 'Shalom',
-    version: '2026-11-11',
+    version: '2026-11-12',
     jsonPath: './data/agencias-shalom.json',
     apiUrl: '',
     cacheKey: 'shalom'

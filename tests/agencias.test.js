@@ -405,6 +405,11 @@ module.exports = async ({bloque, ok}) => {
     const prueba = j.agencias.filter((a) => /prueba|no usar|\btest\b/i.test(a.nombre + ' ' + a.direccion));
     ok(prueba.length === 0, 'ninguna agencia de prueba de Shalom en la lista' +
        (prueba.length ? ' (' + prueba.map((a) => a.ter_id).join(', ') + ')' : ''));
+    const relleno = j.agencias.filter((a) => /^\s*(direccion|cargando|\.+)?\s*$/i.test(String(a.direccion || '')));
+    ok(relleno.length === 0, 'ninguna agencia con direccion de relleno (puntos internos de Shalom)' +
+       (relleno.length ? ' (' + relleno.map((a) => a.ter_id).join(', ') + ')' : ''));
+    ok(!j.agencias.some((a) => ['236', '557', '364', '744'].indexOf(String(a.ter_id)) >= 0),
+       'las 4 retiradas a mano no vuelven');
     const f = E.leer('formulario.html');
     const c = E.leer('config.js');
     const vf = (/version: '(\d{4}-\d{2}-\d{2})',\n\s*jsonPath: '\.\/data\/agencias-shalom\.json'/.exec(f) || [])[1];

@@ -298,7 +298,7 @@ function parseWAOrder(){
 }
 
 let _shTimer=null;
-const SHALOM_CATALOGO_V='2026-11-11';
+const SHALOM_CATALOGO_V='2026-11-12';
 async function _panelShalomLoad(){
   if(window._shalomData && window._shalomData.length) return window._shalomData;
   try{
