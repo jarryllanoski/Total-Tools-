@@ -7,6 +7,9 @@ import {transform} from 'esbuild';
 
 const RAIZ = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const SALIDA = path.resolve(process.argv[2] || path.join(RAIZ, 'dist'));
+const SITIO_FUENTE = 'https://jarryllanoski.github.io/Total-Tools-/';
+const SITIO = process.argv[3] || SITIO_FUENTE;
+if (!/^https:\/\/[a-z0-9.-]+\/([A-Za-z0-9_-]+\/)?$/.test(SITIO)) throw new Error('Sitio invalido: ' + SITIO);
 const PAGINAS = ['index.html', 'formulario.html', 'seguimiento.html'];
 const FUERA_CARPETAS = ['tests/', 'docs/', 'herramientas/', '.github/', 'shalom-local/', 'functions/'];
 const FUERA_ARCHIVOS = new Set(['medir-registro.js', 'firebase.json', 'firestore.rules', 'storage.rules',
@@ -76,7 +79,7 @@ async function construir() {
   for (const p of PAGINAS) {
     const t = leer(p).toString('utf8').replace(/((?:src|href)=")([^"?#]+)\?v=[^"]*"/g, (m, a, f) =>
       hechos.has(f) ? a + f + '?v=' + huella(hechos.get(f)) + '"' : m);
-    hechos.set(p, Buffer.from(t));
+    hechos.set(p, Buffer.from(t.split(SITIO_FUENTE).join(SITIO)));
   }
   for (const [f, b] of hechos) {
     const destino = path.join(SALIDA, f);

@@ -10,7 +10,7 @@ module.exports = async ({bloque, ok}) => {
   bloque('Firebase Hosting publica solo el sitio construido');
   {
     ok(h.public === 'dist', 'publica dist/ (lo construido), no el repositorio');
-    ok(JSON.stringify(h.predeploy) === JSON.stringify(['npm --prefix herramientas ci', 'node herramientas/construir.mjs dist']),
+    ok(JSON.stringify(h.predeploy) === JSON.stringify(['npm --prefix herramientas ci', 'node herramientas/construir.mjs dist https://total-tools-24ce8.web.app/']),
        'antes de publicar instala y construye');
     ok(/dist\//.test(E.leerReal('.gitignore')), 'dist/ no se sube a git');
   }
@@ -39,5 +39,18 @@ module.exports = async ({bloque, ok}) => {
   bloque('El servidor ya acepta la direccion nueva');
   {
     ok(/"https:\/\/total-tools-24ce8\.web\.app"/.test(E.leerReal('functions/index.js')), 'web.app en la lista de origenes');
+  }
+
+  bloque('Vista previa: cada sitio con su propia imagen (tarjeta grande en WhatsApp)');
+  {
+    const c = E.leerReal('herramientas/construir.mjs');
+    ok(/const SITIO = process\.argv\[3\] \|\| SITIO_FUENTE;/.test(c) && /t\.split\(SITIO_FUENTE\)\.join\(SITIO\)/.test(c),
+       'construir cambia la direccion de la vista previa por la del sitio que se publica');
+    ['formulario.html', 'seguimiento.html'].forEach((f) => {
+      const t = E.leerCrudo(f);
+      ok(/<meta property="og:url" content="https:\/\/jarryllanoski\.github\.io\/Total-Tools-\//.test(t) &&
+         /og:image:secure_url/.test(t) && /<meta property="og:image:type" content="image\/png">/.test(t),
+         f + ': og:url, secure_url y tipo de imagen');
+    });
   }
 };

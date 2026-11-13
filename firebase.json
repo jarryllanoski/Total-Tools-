@@ -26,7 +26,7 @@
     "public": "dist",
     "predeploy": [
       "npm --prefix herramientas ci",
-      "node herramientas/construir.mjs dist"
+      "node herramientas/construir.mjs dist https://total-tools-24ce8.web.app/"
     ],
     "cleanUrls": false,
     "trailingSlash": false,
