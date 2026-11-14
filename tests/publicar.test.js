@@ -17,6 +17,24 @@ module.exports = async ({bloque, ok}) => {
        'esbuild con version fija y lockfile (npm ci)');
   }
 
+  bloque('Firebase desde GitHub: sin claves y solo si las pruebas pasan');
+  {
+    const fw = E.leerReal('.github/workflows/firebase.yml');
+    const i = (t) => fw.indexOf(t);
+    ok(/id-token: write/.test(fw) && /contents: read/.test(fw) && !/contents: write/.test(fw), 'permisos minimos: leer el codigo y pedir identidad');
+    ok(/google-github-actions\/auth@v2/.test(fw) && /workload_identity_provider: projects\/256086864182\/locations\/global\/workloadIdentityPools\/github\/providers\/total-tools/.test(fw),
+       'identidad por Workload Identity Federation');
+    ok(!/credentials_json|secrets\./.test(fw), '⚠️ ninguna clave guardada en GitHub: no hay nada que robar');
+    ok(i('node tests/correr.js') > 0 && i('node tests/correr.js') < i('google-github-actions/auth'),
+       'las pruebas corren antes de pedir permisos: si fallan, no se toca Google');
+    ok(i('--only hosting') < i('--only functions'), 'primero la web, despues el servidor');
+    ok(/firebase-tools@\d+\.\d+\.\d+/.test(fw), 'Firebase CLI con version fija');
+    ok(!/--force/.test(fw), '⚠️ sin --force: nunca borra funciones ni cambia nada sin preguntar');
+    ok((fw.match(/--project total-tools-24ce8 --non-interactive/g) || []).length === 2, 'proyecto explicito y sin preguntas');
+    ok(/if: inputs\.servidor/.test(fw), 'el servidor solo se publica si se pide');
+    ok(/group: firebase/.test(fw) && /cancel-in-progress: false/.test(fw), 'nunca dos publicaciones a la vez, y ninguna se corta a medias');
+  }
+
   bloque('Construir: que se publica y como');
   {
     ok(/minify: true/.test(cons) && /legalComments: 'none'/.test(cons), 'JS y CSS minificados');

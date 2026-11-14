@@ -1,0 +1,45 @@
+name: Publicar en Firebase
+
+on:
+  workflow_dispatch:
+    inputs:
+      servidor:
+        description: Publicar tambien el servidor (functions)
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: firebase
+  cancel-in-progress: false
+
+jobs:
+  publicar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Pruebas
+        run: node tests/correr.js
+      - name: Identidad sin claves (Workload Identity Federation)
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: projects/256086864182/locations/global/workloadIdentityPools/github/providers/total-tools
+          service_account: github-action-1237310279@total-tools-24ce8.iam.gserviceaccount.com
+      - name: Firebase CLI
+        run: npm install -g firebase-tools@15.36.0
+      - name: Publicar la web
+        run: firebase deploy --only hosting --project total-tools-24ce8 --non-interactive
+      - name: Dependencias del servidor
+        if: inputs.servidor
+        working-directory: functions
+        run: npm ci
+      - name: Publicar el servidor
+        if: inputs.servidor
+        run: firebase deploy --only functions --project total-tools-24ce8 --non-interactive
