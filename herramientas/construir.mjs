@@ -6,7 +6,7 @@ import {fileURLToPath} from 'node:url';
 import {transform} from 'esbuild';
 
 const RAIZ = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const SALIDA = path.resolve(process.argv[2] || path.join(RAIZ, 'dist'));
+const SALIDA = path.resolve(RAIZ, process.argv[2] || 'dist');
 const SITIO_FUENTE = 'https://jarryllanoski.github.io/Total-Tools-/';
 const SITIO = process.argv[3] || SITIO_FUENTE;
 if (!/^https:\/\/[a-z0-9.-]+\/([A-Za-z0-9_-]+\/)?$/.test(SITIO)) throw new Error('Sitio invalido: ' + SITIO);

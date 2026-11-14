@@ -3,7 +3,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "construir": "node construir.mjs"
+    "construir": "node construir.mjs",
+    "sitio-firebase": "node construir.mjs dist https://total-tools-24ce8.web.app/"
   },
   "devDependencies": {
     "esbuild": "0.24.0"

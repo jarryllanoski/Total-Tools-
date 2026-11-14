@@ -10,8 +10,27 @@ module.exports = async ({bloque, ok}) => {
   bloque('Firebase Hosting publica solo el sitio construido');
   {
     ok(h.public === 'dist', 'publica dist/ (lo construido), no el repositorio');
-    ok(JSON.stringify(h.predeploy) === JSON.stringify(['npm --prefix herramientas ci', 'node herramientas/construir.mjs dist https://total-tools-24ce8.web.app/']),
+    ok(JSON.stringify(h.predeploy) === JSON.stringify(['npm --prefix herramientas ci', 'npm --prefix herramientas run sitio-firebase']),
        'antes de publicar instala y construye');
+    const pk = JSON.parse(E.leerReal('herramientas/package.json'));
+    ok(pk.scripts['sitio-firebase'] === 'node construir.mjs dist https://total-tools-24ce8.web.app/',
+       'la direccion del sitio vive en el script de npm');
+    ok(/const SALIDA = path\.resolve\(RAIZ, process\.argv\[2\] \|\| 'dist'\);/.test(E.leerReal('herramientas/construir.mjs')),
+       'dist sale en la raiz del proyecto aunque npm lo corra desde herramientas/');
+  }
+
+  bloque('Publicar desde Windows: Firebase trata cada comando previo como una ruta');
+  {
+    const win = require('path').win32;
+    const previos = [].concat(h.predeploy || [], ...[].concat(fb.functions || []).map((f) => f.predeploy || []));
+    ok(previos.length >= 3, 'se revisan los comandos previos de hosting y de functions (' + previos.length + ')');
+    previos.forEach((c) => {
+      const conVariables = c.replace(/\$(\w+)|\$\{(\w+)\}/g, (m, a, b2) => '%' + (a || b2) + '%');
+      ok(win.normalize(conVariables) === conVariables,
+         '⚠️ «' + c + '» llega a Windows sin cambios (sin barras ni «:»; si no, sale «.\\node no se reconoce»)');
+    });
+    ok(win.normalize('node herramientas/construir.mjs dist https://total-tools-24ce8.web.app/').indexOf('.\\node') === 0,
+       'la prueba reconoce el comando que fallo el 14/11');
     ok(/dist\//.test(E.leerReal('.gitignore')), 'dist/ no se sube a git');
   }
 
