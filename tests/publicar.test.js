@@ -31,8 +31,59 @@ module.exports = async ({bloque, ok}) => {
     ok(/firebase-tools@\d+\.\d+\.\d+/.test(fw), 'Firebase CLI con version fija');
     ok(!/--force/.test(fw), '⚠️ sin --force: nunca borra funciones ni cambia nada sin preguntar');
     ok((fw.match(/--project total-tools-24ce8 --non-interactive/g) || []).length === 2, 'proyecto explicito y sin preguntas');
-    ok(/if: inputs\.servidor/.test(fw), 'el servidor solo se publica si se pide');
+    ok(/on:\n  push:\n    branches: \[main\]\n  workflow_dispatch:/.test(fw), 'publica sola con cada push a main (y a mano si hace falta)');
+    ok((fw.match(/if: steps\.cambios\.outputs\.servidor == 'true'/g) || []).length === 2, 'el servidor solo si toca');
+    ok(/fetch-depth: 0/.test(fw), 'trae la historia para comparar que cambio');
+    ok(!/run: \|[\s\S]*\$\{\{/.test(fw.slice(fw.indexOf('- name: Que cambio'), fw.indexOf('- uses: actions/setup-node'))),
+       'el script no mezcla expresiones de GitHub: los datos llegan por variables de entorno');
     ok(/group: firebase/.test(fw) && /cancel-in-progress: false/.test(fw), 'nunca dos publicaciones a la vez, y ninguna se corta a medias');
+  }
+
+  bloque('Firebase desde GitHub: el servidor se publica solo cuando cambia functions/');
+  {
+    const {execFileSync} = require('child_process');
+    const fs = require('fs');
+    const os = require('os');
+    const path = require('path');
+    const fw = E.leerReal('.github/workflows/firebase.yml');
+    const trozo = fw.slice(fw.indexOf('- name: Que cambio'), fw.indexOf('- uses: actions/setup-node'));
+    const guion = trozo.slice(trozo.indexOf('run: |') + 7).split('\n')
+        .map((l) => l.replace(/^ {10}/, '')).join('\n');
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cambios-'));
+    const git = (...a) => execFileSync('git', a, {cwd: dir, stdio: 'pipe'}).toString().trim();
+    git('init', '-q');
+    git('config', 'user.email', 'prueba@example.com');
+    git('config', 'user.name', 'prueba');
+    const confirmar = (archivo) => {
+      fs.mkdirSync(path.dirname(path.join(dir, archivo)), {recursive: true});
+      fs.writeFileSync(path.join(dir, archivo), String(Math.random()));
+      git('add', '-A');
+      git('commit', '-q', '-m', archivo);
+      return git('rev-parse', 'HEAD');
+    };
+    const correr = (env) => {
+      const salida = path.join(dir, '.salida');
+      fs.writeFileSync(salida, '');
+      execFileSync('bash', ['-c', guion], {cwd: dir, stdio: 'pipe',
+        env: Object.assign({PATH: process.env.PATH, GITHUB_OUTPUT: salida, EVENTO: 'push', MANUAL: '', ANTES: ''}, env)});
+      return (/servidor=(\w*)/.exec(fs.readFileSync(salida, 'utf8')) || [])[1];
+    };
+    const c0 = confirmar('index.html');
+    confirmar('cliente/form-base.js');
+    ok(correr({ANTES: c0}) === 'false', 'push que solo cambia la web: el servidor NO se publica');
+    const c1 = git('rev-parse', 'HEAD');
+    confirmar('functions/index.js');
+    ok(correr({ANTES: c1}) === 'true', 'push que cambia functions/: el servidor SI se publica');
+    const c2 = git('rev-parse', 'HEAD');
+    confirmar('docs/nota.md');
+    confirmar('functions/barrido.js');
+    confirmar('index.html');
+    ok(correr({ANTES: c2}) === 'true', 'varios commits en un push, uno toca functions/: se publica');
+    ok(correr({ANTES: '0000000000000000000000000000000000000000'}) === 'true', 'rama nueva o historia desconocida: se publica por si acaso');
+    ok(correr({ANTES: 'deadbeef'}) === 'true', 'un commit que no existe: se publica por si acaso');
+    ok(correr({EVENTO: 'workflow_dispatch', MANUAL: 'true'}) === 'true' &&
+       correr({EVENTO: 'workflow_dispatch', MANUAL: 'false'}) === 'false', 'a mano: lo que marques');
+    fs.rmSync(dir, {recursive: true, force: true});
   }
 
   bloque('Construir: que se publica y como');

@@ -33,11 +33,22 @@ Estado del plan de auditoría enterprise. Proyecto Firebase: `total-tools-24ce8`
 | L1 | Token del formulario con `crypto.getRandomValues` (22 caracteres, sin sesgo) | ✅ |
 | L1 | El servidor no crea pedidos sin token (`SIN_LINK`, antes del freno por IP) | ✅ |
 | L1 | `formulario.html` sin token muestra «Pide tu link» con botón a WhatsApp | ✅ |
+| CI | Publicar en Firebase desde GitHub con Workload Identity Federation, sin claves; el servidor solo cuando cambia `functions/` | ✅ |
 | L2 | Links generales con nombre, pausa, vencimiento, tope diario y contador | Pendiente |
 | L3 | Anti-bots al enviar: App Check, campo trampa, tiempo mínimo, tope por celular | Pendiente |
 | L4 | Seguimiento con id antiguo solo mientras el pedido siga abierto | Pendiente |
 | L5 | Autocompletado guardado en el celular del cliente («¿Eres tú?»); el servidor ya no da nombres por celular | Pendiente |
 | L6 | Revisión de escapado del texto del cliente y CSP de lista blanca | Pendiente |
+
+---
+
+### Publicar
+
+Cada push a `main` corre `.github/workflows/firebase.yml`: pruebas, identidad sin claves, web y, si cambió `functions/`, servidor.
+La cuenta `github-action-1237310279` solo se puede usar desde `jarryllanoski/Total-Tools-` en `refs/heads/main`.
+Roles: firebasehosting.admin, cloudfunctions.admin, run.admin, cloudscheduler.admin, secretmanager.viewer, artifactregistry.reader,
+serviceusage.serviceUsageConsumer, firebase.viewer, y Service Account User solo sobre las cuentas de Compute y de App Engine.
+Desde una PC sigue funcionando `firebase deploy --only hosting` y `firebase deploy --only functions`.
 
 ---
 

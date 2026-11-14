@@ -1,6 +1,8 @@
 name: Publicar en Firebase
 
 on:
+  push:
+    branches: [main]
   workflow_dispatch:
     inputs:
       servidor:
@@ -22,6 +24,26 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Que cambio
+        id: cambios
+        env:
+          EVENTO: ${{ github.event_name }}
+          MANUAL: ${{ inputs.servidor }}
+          ANTES: ${{ github.event.before }}
+        run: |
+          if [ "$EVENTO" = "workflow_dispatch" ]; then
+            servidor="$MANUAL"
+          elif ! git cat-file -e "$ANTES^{commit}" 2>/dev/null; then
+            servidor=true
+          elif git diff --quiet "$ANTES" HEAD -- functions; then
+            servidor=false
+          else
+            servidor=true
+          fi
+          echo "servidor=$servidor" >> "$GITHUB_OUTPUT"
+          echo "Servidor: $servidor"
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
@@ -37,9 +59,9 @@ jobs:
       - name: Publicar la web
         run: firebase deploy --only hosting --project total-tools-24ce8 --non-interactive
       - name: Dependencias del servidor
-        if: inputs.servidor
+        if: steps.cambios.outputs.servidor == 'true'
         working-directory: functions
         run: npm ci
       - name: Publicar el servidor
-        if: inputs.servidor
+        if: steps.cambios.outputs.servidor == 'true'
         run: firebase deploy --only functions --project total-tools-24ce8 --non-interactive
