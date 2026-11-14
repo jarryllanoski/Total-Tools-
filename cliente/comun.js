@@ -140,10 +140,14 @@ function _ayudaHoja(){
   return ov;
 }
 
-function _ayudaWa(texto){
-  let bizPhone = String((CFG&&(CFG.config&&CFG.config.phone||CFG.phone))||'').replace(/\D/g,'');
+function _waNegocio(c, texto){
+  let bizPhone = String((c&&(c.config&&c.config.phone||c.phone))||'').replace(/\D/g,'');
   if(bizPhone.startsWith('51') && bizPhone.length>9) bizPhone = bizPhone.slice(2);
   return bizPhone ? `https://wa.me/51${bizPhone}?text=${encodeURIComponent(texto)}` : '';
+}
+
+function _ayudaWa(texto){
+  return _waNegocio(CFG, texto);
 }
 
 function cerrarAyudaForm(){

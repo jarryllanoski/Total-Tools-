@@ -304,6 +304,20 @@ function pickOrderFields(src) {
 const ID_RE = /^[A-Za-z0-9_-]{2,64}$/;
 
 async function handleCreate(req, res) {
+  const body = req.body || {};
+  const order = body.order || {};
+  const tokenId = String(body.token || "").trim();
+
+  if (!tokenId) {
+    res.status(400).json({status: "error", motivo: "SIN_LINK",
+      error: "Para registrar tu pedido usa el link que te enviamos."});
+    return;
+  }
+  if (!ID_RE.test(tokenId)) {
+    res.status(400).json({status: "error", error: "Token inválido"});
+    return;
+  }
+
   if (!(await checkRateLimit("formApi_create", req))) {
     res.status(429).json({
       status: "error",
@@ -312,10 +326,6 @@ async function handleCreate(req, res) {
     return;
   }
 
-  const body = req.body || {};
-  const order = body.order || {};
-  const tokenId = (body.token || "").trim();
-
   if (!order.name || !order.phone) {
     res.status(400).json({
       status: "error", error: "Nombre y teléfono requeridos",
@@ -323,26 +333,19 @@ async function handleCreate(req, res) {
     return;
   }
 
-  let tokData = null;
-  if (tokenId) {
-    if (!ID_RE.test(tokenId)) {
-      res.status(400).json({status: "error", error: "Token inválido"});
-      return;
-    }
-    const tokSnap = await db.doc(`${TOK_COL}/${tokenId}`).get();
-    if (!tokSnap.exists) {
-      res.status(400).json({status: "error", error: "Token inválido"});
-      return;
-    }
-    tokData = tokSnap.data();
-    if (tokData.used) {
-      res.status(400).json({status: "error", error: "Token ya utilizado"});
-      return;
-    }
-    if (tokData.expiresAt && new Date(tokData.expiresAt) < new Date()) {
-      res.status(400).json({status: "error", error: "Token vencido"});
-      return;
-    }
+  const tokSnap = await db.doc(`${TOK_COL}/${tokenId}`).get();
+  if (!tokSnap.exists) {
+    res.status(400).json({status: "error", error: "Token inválido"});
+    return;
+  }
+  const tokData = tokSnap.data();
+  if (tokData.used) {
+    res.status(400).json({status: "error", error: "Token ya utilizado"});
+    return;
+  }
+  if (tokData.expiresAt && new Date(tokData.expiresAt) < new Date()) {
+    res.status(400).json({status: "error", error: "Token vencido"});
+    return;
   }
 
   const now = Date.now();
@@ -373,7 +376,7 @@ async function handleCreate(req, res) {
     console.warn("create: no se pudo adjuntar reniec:", e && e.message);
   }
 
-  if (tokData && (tokData.monto || tokData.adelanto)) {
+  if (tokData.monto || tokData.adelanto) {
     const monto = Number(tokData.monto) || 0;
     const adelanto = Number(tokData.adelanto) || 0;
     const deuda = Math.max(0, monto - adelanto);
@@ -382,10 +385,10 @@ async function handleCreate(req, res) {
     orderToSave.cost = deuda > 0 ? String(deuda) : "";
   }
 
-  const nroComprobante = tokData ? nroComp.de(tokData) : "";
+  const nroComprobante = nroComp.de(tokData);
   if (nroComprobante) orderToSave.nroComprobante = nroComprobante;
 
-  const tokRef = tokenId ? db.doc(`${TOK_COL}/${tokenId}`) : null;
+  const tokRef = db.doc(`${TOK_COL}/${tokenId}`);
   let orderId = "";
   let trackCode = "";
   for (let intento = 0; intento < 5 && !orderId; intento++) {
@@ -393,22 +396,17 @@ async function handleCreate(req, res) {
     const code = id.slice(-4).toUpperCase();
     const shipRef = db.doc(`${SHIP_COL}/${id}`);
     const r = await db.runTransaction(async (tx) => {
-      const [ts, ss] = await Promise.all([
-        tokRef ? tx.get(tokRef) : Promise.resolve(null),
-        tx.get(shipRef),
-      ]);
-      if (tokRef && (!ts.exists || ts.data().used)) return "usado";
+      const [ts, ss] = await Promise.all([tx.get(tokRef), tx.get(shipRef)]);
+      if (!ts.exists || ts.data().used) return "usado";
       if (ss.exists) return "ocupado";
       tx.create(shipRef, _conMts(Object.assign({}, orderToSave, {id: id})));
-      if (tokRef) {
-        tx.set(tokRef, {
-          used: true,
-          orderId: id,
-          trackCode: code,
-          clientName: order.name,
-          usedAt: new Date().toISOString(),
-        }, {merge: true});
-      }
+      tx.set(tokRef, {
+        used: true,
+        orderId: id,
+        trackCode: code,
+        clientName: order.name,
+        usedAt: new Date().toISOString(),
+      }, {merge: true});
       tx.set(db.doc(CFG_DOC), {ts: now, formTs: now, syncV: SYNC_V},
           {merge: true});
       return "ok";

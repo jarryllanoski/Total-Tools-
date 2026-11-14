@@ -76,7 +76,8 @@ module.exports = async ({bloque, ok}) => {
     const cr = srv.slice(srv.indexOf('async function handleCreate'), srv.indexOf('async function handleToken(req, res) {'));
     ok(/db\.runTransaction/.test(cr) && /tx\.create\(shipRef/.test(cr), 'transacción con create (falla si el id existe)');
     ok(!/batch\.set\(db\.doc\(`\$\{SHIP_COL\}/.test(cr), 'ya no hay set que pise un pedido');
-    ok(/ts\.data\(\)\.used\)\) return "usado"/.test(cr), 'el link se mira y se marca en la MISMA operación');
+    ok(/if \(!ts\.exists \|\| ts\.data\(\)\.used\) return "usado";/.test(cr) && /tx\.set\(tokRef, \{\s*used: true/.test(cr),
+       'el link se mira y se marca en la MISMA operación');
   }
 
   bloque('El freno del seguimiento: en memoria, gratis');

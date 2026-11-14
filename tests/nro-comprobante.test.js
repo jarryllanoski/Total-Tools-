@@ -175,9 +175,8 @@ module.exports = async ({bloque, ok}) => {
     r = resFalsa();
     await c.fn({body: {order: {name: 'ANA', phone: '911111111',
       nroComprobante: 'B999-TRAMPA'}}}, r);
-    const ped3 = c.escritos.find((w) => w.p.indexOf('panel/shipments/') === 0);
-    ok(!('nroComprobante' in ped3.data),
-       'sin token (link general) tampoco hay número');
+    ok(r.code === 400 && r.body.motivo === 'SIN_LINK' && c.escritos.length === 0,
+       'sin token ya no nace ningún pedido, con o sin número');
   }
 
   bloque('El seguimiento del cliente lo enseña como su código (desde el 26/10)');

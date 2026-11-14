@@ -21,6 +21,26 @@ Estado del plan de auditoría enterprise. Proyecto Firebase: `total-tools-24ce8`
 
 ---
 
+## Noviembre 2026 — Consola y links
+
+| Paso | Qué | Estado |
+|------|-----|--------|
+| Consola | Alerta de presupuesto S/ 59 al mes (50/90/100 % real y 100 % previsto) | ✅ |
+| Consola | Clave del navegador limitada a web.app, firebaseapp.com y github.io | ✅ |
+| Consola | Registro de cuentas cerrado, protección de enumeración activa | ✅ |
+| Consola | PITR 7 días y copia diaria con 98 días de retención | ✅ |
+| Consola | Verificación en 2 pasos (Google y GitHub) | ⏸️ pendiente |
+| L1 | Token del formulario con `crypto.getRandomValues` (22 caracteres, sin sesgo) | ✅ |
+| L1 | El servidor no crea pedidos sin token (`SIN_LINK`, antes del freno por IP) | ✅ |
+| L1 | `formulario.html` sin token muestra «Pide tu link» con botón a WhatsApp | ✅ |
+| L2 | Links generales con nombre, pausa, vencimiento, tope diario y contador | Pendiente |
+| L3 | Anti-bots al enviar: App Check, campo trampa, tiempo mínimo, tope por celular | Pendiente |
+| L4 | Seguimiento con id antiguo solo mientras el pedido siga abierto | Pendiente |
+| L5 | Autocompletado guardado en el celular del cliente («¿Eres tú?»); el servidor ya no da nombres por celular | Pendiente |
+| L6 | Revisión de escapado del texto del cliente y CSP de lista blanca | Pendiente |
+
+---
+
 ## Ola 3 — Infraestructura (requiere TU consola de Google Cloud)
 
 Estos pasos NO son código; se configuran una sola vez en la consola.

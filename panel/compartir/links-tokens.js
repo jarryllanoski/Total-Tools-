@@ -174,7 +174,6 @@ function genQuickToken(action, btn){
 function copyLink(btn){ return genQuickToken('copy', btn); }
 function openFormLink(btn){ return genQuickToken('open', btn); }
 function shareWA(btn){ return genQuickToken('wa', btn); }
-function shareTG(){ window.open(`https://t.me/share/url?url=${encodeURIComponent(getFormLink())}`); }
 
 let _tokCache = [];
 let _tokSel = {};
@@ -235,9 +234,17 @@ function _nroRepetido(nro, idPropio){
   return (S.shipments||[]).find(x=>x && x.id!==idPropio && _nroDe(x)===nro) || null;
 }
 
+const _TOK_LETRAS='ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+const _TOK_LARGO=22;
 function _genTokId(){
-  const c='ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-  let r=''; for(let i=0;i<20;i++) r+=c[Math.floor(Math.random()*c.length)];
+  const azar=new Uint8Array(32);
+  let r='';
+  while(r.length<_TOK_LARGO){
+    crypto.getRandomValues(azar);
+    for(let i=0;i<azar.length && r.length<_TOK_LARGO;i++){
+      if(azar[i]<248) r+=_TOK_LETRAS[azar[i]%62];
+    }
+  }
   return r;
 }
 

@@ -35,7 +35,7 @@ function init(){
     }catch(e){}
   }
 
-  loadCfg();
+  showTokenScreen('🔗','Pide tu link para hacer tu pedido','Cada pedido se registra con un link personal que te enviamos por WhatsApp.\nEscríbenos y te lo mandamos al instante.','Hola, quiero hacer un pedido. ¿Me envías mi link para registrarlo?');
 }
 
 async function checkToken(tok){
@@ -44,15 +44,15 @@ async function checkToken(tok){
     const timeoutP = new Promise((_,rej)=>setTimeout(()=>rej(new Error('timeout')),8000));
     const data = await Promise.race([_api('token', {t: tok}), timeoutP]);
     if(data.status === 'expired'){
-      showTokenScreen('⏰','Link vencido','Este link ya venció. Solicitá uno nuevo.');
+      showTokenScreen('⏰','Link vencido','Este link ya venció.\nEscríbenos y te enviamos uno nuevo.','Hola, mi link para registrar el pedido venció. ¿Me envías uno nuevo?');
       return;
     }
     if(data.status === 'used'){
-      showTokenScreen('🔒','Link ya utilizado','Este link ya fue utilizado.\nPara registrar un nuevo pedido, solicitá un nuevo link.');
+      showTokenScreen('🔒','Link ya utilizado','Este link ya se usó para un pedido.\nPara registrar otro, escríbenos y te enviamos un link nuevo.','Hola, quiero registrar otro pedido. ¿Me envías un link nuevo?');
       return;
     }
     if(data.status === 'invalid'){
-      showTokenScreen('❌','Link inválido','Este link no existe o fue eliminado.');
+      showTokenScreen('❌','Link inválido','Este link no existe o fue eliminado.\nEscríbenos y te enviamos uno correcto.','Hola, mi link para registrar el pedido no funciona. ¿Me ayudas?');
       return;
     }
     currentToken = tok;
@@ -66,18 +66,29 @@ async function checkToken(tok){
     if(e.message==='timeout'){
       showTokenScreen('⚠️','Sin conexión','No se pudo verificar el link.\nRevisa tu conexión e intenta de nuevo.');
     } else {
-      showTokenScreen('⚠️','Error de conexión','Reintentá más tarde.');
+      showTokenScreen('⚠️','Error de conexión','Intenta de nuevo en unos minutos.');
     }
   }
 }
 
-function showTokenScreen(icon, title, msg){
+function showTokenScreen(icon, title, msg, waTexto){
   setApp(`<div class="unconf">
     <div class="unconf-icon">${icon}</div>
     <div class="unconf-ttl">${esc(title)}</div>
     <div class="unconf-sub">${esc(msg).replace(/\n/g,'<br>')}</div>
+    <div id="unconfWa"></div>
   </div>`);
   if(window.TTFormLoader) TTFormLoader.ready();
+  if(waTexto) _botonPedirLink(waTexto);
+}
+
+async function _botonPedirLink(texto){
+  let cfg = null;
+  try{ cfg = await Promise.race([_api('config'), new Promise(r=>setTimeout(()=>r(null),5000))]); }catch(e){}
+  const href = _waNegocio(cfg, texto);
+  const caja = document.getElementById('unconfWa');
+  if(!href || !caja) return;
+  caja.innerHTML = `<a class="btn-wa" href="${esc(href)}" target="_blank" rel="noopener">💬 Pedir mi link por WhatsApp</a>`;
 }
 
 var _tokCfgId = '';

@@ -56,8 +56,9 @@ module.exports = async ({bloque, ok}) => {
     return r;
   };
 
+  await Promise.all([1, 2, 3, 4, 5].map((i) => db.doc('panel/tokens/items/LINKcliente0' + i).set({used: false})));
   const r5 = await Promise.all([1, 2, 3, 4, 5].map((i) =>
-    llamar({order: {name: 'CLIENTE ' + i, phone: '90000000' + i}})));
+    llamar({token: 'LINKcliente0' + i, order: {name: 'CLIENTE ' + i, phone: '90000000' + i}})));
   const ids = r5.map((r) => r.body && r.body.orderId);
   ok(r5.every((r) => r.code === 200 && r.body.status === 'ok'), '5 pedidos a la vez en el mismo milisegundo: los 5 responden ok');
   ok(new Set(ids).size === 5, '⚠️ con 5 ids DISTINTOS: ' + ids.join(', '));
@@ -79,6 +80,9 @@ module.exports = async ({bloque, ok}) => {
   ok(tok.used === true && tok.orderId === buenos[0].body.orderId, 'el link queda marcado con el pedido que sí nació');
   const total = (await db.collection('panel/shipments/items').get()).size;
   ok(total === 6, 'en la base: 5 + 1 = 6 pedidos');
+  const sin = await llamar({order: {name: 'BOT', phone: '900000009'}});
+  ok(sin.code === 400 && sin.body.motivo === 'SIN_LINK' &&
+     (await db.collection('panel/shipments/items').get()).size === 6, '⚠️ sin link: rechazado y la base sigue con 6');
   const r4 = await llamar({token: 'otro/../ruta', order: {name: 'X', phone: '9'}});
   ok(r4.code === 400 && /inválido/.test(r4.body.error), 'un id de link con «/» se rechaza sin leer nada');
 };
