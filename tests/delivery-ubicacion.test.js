@@ -167,6 +167,6 @@ module.exports = async ({bloque, ok}) => {
     ok((form.match(/_mapaCapa\(/g) || []).length >= 3, 'una sola definición de teselas, usada por los dos mapas');
     ok((form.match(/function _mapaDosDedos\(/g) || []).length === 1 && (form.match(/_mapaDosDedos\(/g) || []).length >= 3,
        'una sola función de «dos dedos», usada por sedes y delivery');
-    ok((form.match(/tile\.openstreetmap\.org/g) || []).length === 1, 'la URL de teselas existe UNA vez');
+    ok((form.replace(/<meta http-equiv="Content-Security-Policy"[^>]*>/g, '').match(/tile\.openstreetmap\.org/g) || []).length === 1, 'la URL de teselas existe UNA vez');
   }
 };

@@ -46,7 +46,8 @@ Estado del plan de auditoría enterprise. Proyecto Firebase: `total-tools-24ce8`
 | L6 | Ataque simulado (código en cada campo) sobre panel, seguimiento, etiqueta e impresión; cerrados: guía de Shalom en el botón QR, copiar teléfono, imprimir por courier, links `javascript:` y documentos | ✅ |
 | L6 | `escJs` seguro dentro de `onclick`, `escU` con lista de esquemas, y todos los limpiadores escapan comillas | ✅ |
 | L6 | El servidor limpia el pedido del formulario por tipo (`functions/pedidoForm.js`): estado, fecha, links, documentos y montos los pone él | ✅ |
-| L6 | CSP de lista blanca | Pendiente |
+| L6 | CSP de lista blanca en las tres páginas (`<meta>`, igual en Firebase y GitHub Pages) y `frame-ancestors 'none'` en Firebase; conexiones solo a servidores con nombre exacto | ✅ |
+| L6 | Prueba de inventario: un servicio externo nuevo en el código sin sumarlo a la CSP hace fallar las pruebas | ✅ |
 
 ---
 
