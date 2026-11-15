@@ -321,11 +321,11 @@ dos a petición:
 | Camino | Quién lo dispara |
 |---|---|
 | ⟳ Consultar / 🔄 masivo | el operador, desde el panel |
-| `shalom-local/subir.js` | el Programador de tareas de Windows, cada 6 h |
+| `barridoShalom` | Cloud Scheduler, dos veces al día |
+| `shalomWebhook` | Shalom, al instante, para las guías suscritas |
 
-`shalom-local` sigue vivo **a propósito** hasta que la integración con la API
-oficial esté probada: es lo que mantiene los estados al día mientras tanto. No
-mueve etiquetas (§ 2), solo registra.
+`shalom-local` (el lector que corría en una PC con el Programador de tareas de
+Windows) se retiró el 15/11/2026: la API oficial y los avisos lo reemplazan.
 
 ### Lo visible y la etiqueta son cosas separadas
 

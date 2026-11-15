@@ -70,6 +70,13 @@ module.exports = async ({bloque, ok}) => {
     ok(fc.indexOf('ID_RE.test(id)') > 0 && fc.indexOf('ID_RE.test(id)') < fc.indexOf('db.doc'), 'la foto también');
   }
 
+  bloque('Parámetros de la URL: siempre texto');
+  {
+    ok(!/\(req\.query\.\w+ \|\| ""\)\.trim\(\)|String\(req\.query\./.test(srv),
+       'ningún handler hace .trim() sobre req.query directo (una lista t[]=… daba error 500)');
+    ok(/function _texto\(v\) \{\s*return typeof v === "string" \? v\.trim\(\) : "";\s*\}/.test(srv), 'lo que no es texto se toma como vacío');
+  }
+
   bloque('El alta: transacción, create y link de un solo uso');
 
   {

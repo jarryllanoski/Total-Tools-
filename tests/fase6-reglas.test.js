@@ -66,7 +66,7 @@ module.exports = async ({bloque, ok}) => {
     const archivos = [];
     const recorrer = (d) => fs.readdirSync(path.join(E.RAIZ, d), {withFileTypes: true}).forEach((x) => {
       const r = path.join(d, x.name);
-      if (x.isDirectory()) { if (!/^(node_modules|tests|\.git|data|docs|shalom-local)$/.test(x.name)) recorrer(r); }
+      if (x.isDirectory()) { if (!/^(node_modules|tests|\.git|data|docs)$/.test(x.name)) recorrer(r); }
       else if (/\.(js|html)$/.test(x.name)) archivos.push(r);
     });
     recorrer('.');

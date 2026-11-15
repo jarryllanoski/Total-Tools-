@@ -23,7 +23,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0
       - name: Que cambio
@@ -44,7 +44,7 @@ jobs:
           fi
           echo "servidor=$servidor" >> "$GITHUB_OUTPUT"
           echo "Servidor: $servidor"
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: '24'
       - name: Pruebas

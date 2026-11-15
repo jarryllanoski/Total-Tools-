@@ -11,7 +11,7 @@ const SITIO_FUENTE = 'https://jarryllanoski.github.io/Total-Tools-/';
 const SITIO = process.argv[3] || SITIO_FUENTE;
 if (!/^https:\/\/[a-z0-9.-]+\/([A-Za-z0-9_-]+\/)?$/.test(SITIO)) throw new Error('Sitio invalido: ' + SITIO);
 const PAGINAS = ['index.html', 'formulario.html', 'seguimiento.html'];
-const FUERA_CARPETAS = ['tests/', 'docs/', 'herramientas/', '.github/', 'shalom-local/', 'functions/'];
+const FUERA_CARPETAS = ['tests/', 'docs/', 'herramientas/', '.github/', 'functions/'];
 const FUERA_ARCHIVOS = new Set(['medir-registro.js', 'firebase.json', 'firestore.rules', 'storage.rules',
   'firestore.indexes.json', '.firebaserc', '.gitignore', '.gitattributes']);
 

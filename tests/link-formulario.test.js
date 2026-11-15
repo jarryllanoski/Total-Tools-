@@ -65,7 +65,8 @@ function servidor(tokens, opciones) {
 
 function verificador(tokens) {
   const src = E.leer('functions/index.js');
-  const tok = src.slice(src.indexOf('async function handleToken'), src.indexOf('function telefonoDe'));
+  const tok = src.slice(src.indexOf('function _texto(v) {'), src.indexOf('function setCORS(req, res) {')) +
+    src.slice(src.indexOf('async function handleToken'), src.indexOf('function telefonoDe'));
   const db = {doc: (p) => ({get: async () => {
     const id = p.split('/').pop();
     const t = p.indexOf('panel/tokens/items/') === 0 ? tokens[id] : null;
@@ -192,6 +193,8 @@ module.exports = async ({bloque, ok}) => {
     }
     const ver = verificador({});
     ok((await ver('noExiste12345')).status === 'invalid' && (await ver('')).status === 'invalid', 'uno inexistente o vacío: inválido');
+    ok((await ver(['aB3dE5gH7jK9mN1pQ3sT', 'x'])).status === 'invalid' && (await ver({a: 1})).status === 'invalid',
+       'un parámetro que llega como lista u objeto (t[]=…) se rechaza limpio, sin error 500');
   }
 
   bloque('Fase 1: el formulario sin link pide el link por WhatsApp');

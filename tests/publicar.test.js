@@ -13,7 +13,7 @@ module.exports = async ({bloque, ok}) => {
     ok(i('node --check') > i('construir.mjs') && i('node --check') < i('upload-pages-artifact'), 'la sintaxis se revisa antes de subir');
     ok(/needs: construir/.test(wf) && /actions\/deploy-pages@v4/.test(wf), 'publicar solo si construir salio bien');
     ok(/branches: \[main\]/.test(wf) && /pages: write/.test(wf) && /id-token: write/.test(wf), 'en cada push a main, con los permisos de Pages');
-    ok(/"esbuild": "0\.24\.0"/.test(E.leerReal('herramientas/package.json')) && E.existe('herramientas/package-lock.json'),
+    ok(/"esbuild": "\d+\.\d+\.\d+"/.test(E.leerReal('herramientas/package.json')) && E.existe('herramientas/package-lock.json'),
        'esbuild con version fija y lockfile (npm ci)');
   }
 
@@ -86,6 +86,16 @@ module.exports = async ({bloque, ok}) => {
     fs.rmSync(dir, {recursive: true, force: true});
   }
 
+  bloque('Versiones al dia en GitHub Actions');
+  {
+    const fs = require('fs');
+    const dir = require('path').join(E.RAIZ, '.github/workflows');
+    const todos = fs.readdirSync(dir).filter((f) => f.endsWith('.yml')).map((f) => fs.readFileSync(require('path').join(dir, f), 'utf8')).join('\n');
+    ok(!/actions\/(checkout|setup-node)@v[1-4]\b/.test(todos), 'checkout y setup-node en v5 (Node 24): GitHub retira Node 20');
+    ok(!/node-version: '(1\d|20|21)'/.test(todos), 'los flujos usan Node 24: firebase-admin 14 pide 22 o mas');
+    ok(/"node": "24"/.test(E.leerReal('functions/package.json')), 'y el servidor corre en Node 24');
+  }
+
   bloque('Construir: que se publica y como');
   {
     ok(/minify: true/.test(cons) && /legalComments: 'none'/.test(cons), 'JS y CSS minificados');
@@ -93,7 +103,7 @@ module.exports = async ({bloque, ok}) => {
     ok(/'\?v=' \+ huella\(hechos\.get\(f\)\)/.test(cons), 'la version de cada archivo es la huella de su contenido');
     ok(/if \(f\.startsWith\('functions\/'\)\) return usadas\.has\(f\);/.test(cons),
        'de functions/ solo se publica lo que cargan las paginas (el codigo del servidor no)');
-    ok(/'tests\/', 'docs\/', 'herramientas\/', '\.github\/', 'shalom-local\/'/.test(cons), 'pruebas, docs y herramientas no se publican');
+    ok(/'tests\/', 'docs\/', 'herramientas\/', '\.github\/', 'functions\/'/.test(cons), 'pruebas, docs y herramientas no se publican');
     ok(/firestore\.rules/.test(cons) && /storage\.rules/.test(cons) && /firebase\.json/.test(cons), 'ni la configuracion de Firebase');
     ok(/Las paginas usan archivos que no se publican/.test(cons), 'si una pagina pide algo que no se publica, la construccion falla');
     ok(/git ls-files/.test(cons), 'solo lo que esta en git (nada suelto de una PC)');

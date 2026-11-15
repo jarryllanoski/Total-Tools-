@@ -223,6 +223,10 @@ const ALLOWED_ORIGINS = [
 ];
 const LOCALHOST_ORIGIN_RE = /^http:\/\/localhost(:\d+)?$/;
 
+function _texto(v) {
+  return typeof v === "string" ? v.trim() : "";
+}
+
 function setCORS(req, res) {
   const origin = req.get("Origin") || "";
   if (ALLOWED_ORIGINS.includes(origin) || LOCALHOST_ORIGIN_RE.test(origin)) {
@@ -242,7 +246,7 @@ exports.formApi = onRequest(
         res.status(204).send(""); return;
       }
 
-      const action = (req.query.action || "").trim();
+      const action = _texto(req.query.action);
       try {
         if (action === "create") await handleCreate(req, res);
         else if (action === "token") await handleToken(req, res);
@@ -428,7 +432,7 @@ async function handleCreate(req, res) {
 }
 
 async function handleToken(req, res) {
-  const tokenId = (req.query.t || "").trim();
+  const tokenId = _texto(req.query.t);
   if (!ID_RE.test(tokenId)) {
     res.json({status: "invalid"}); return;
   }
@@ -491,7 +495,7 @@ async function handleConfig(req, res) {
 }
 
 async function handleFormCfg(req, res) {
-  const id = (req.query.id || "").trim();
+  const id = _texto(req.query.id);
   if (!ID_RE.test(id)) return res.status(400).json({error: "missing id"});
   const snap = await db.doc(`${FORMCFG_COL}/${id}`).get();
   if (!snap.exists) return res.status(404).json({error: "not found"});
@@ -537,7 +541,7 @@ async function handleClient(req, res) {
 
   if (!(await checkRateLimit("formApi_client", req))) return vacio();
 
-  const phone = String(req.query.phone || "").replace(/\D/g, "").slice(-9);
+  const phone = _texto(req.query.phone).replace(/\D/g, "").slice(-9);
   if (phone.length !== 9) return vacio();
 
   try {
@@ -669,7 +673,7 @@ function _reniecFuera(p) {
 }
 
 async function handleTrack(req, res) {
-  const trackToken = (req.query.token || "").trim();
+  const trackToken = _texto(req.query.token);
   if (!trackToken) {
     res.json({status: "error", error: "Token requerido"});
     return;
@@ -837,7 +841,7 @@ exports.agenciasOlva = onRequest(
         return;
       }
       try {
-        const q = (req.query.q || "").trim().slice(0, 100).toLowerCase();
+        const q = _texto(req.query.q).slice(0, 100).toLowerCase();
         let lista = await olvaFetchAll();
         if (q) {
           lista = lista.filter((a) => [
@@ -866,8 +870,8 @@ exports.extraerComprobante = onRequest(
         return;
       }
       try {
-        const pedidoId = (req.query.pedidoId || "").trim();
-        const urlDirecta = (req.query.url || "").trim();
+        const pedidoId = _texto(req.query.pedidoId);
+        const urlDirecta = _texto(req.query.url);
 
         const authz = req.get("Authorization") || "";
         const bearer = authz.match(/^Bearer\s+(.+)$/i);
