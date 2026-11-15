@@ -18,7 +18,7 @@
   var esc = function(t){ return String(t==null?'':t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); };
 
   var HEAVY = {
-    img: BASE+'heavy.webp', name:'Heavy · Jefe de Producción',
+    img: BASE+'heavy.webp?v=1', name:'Heavy · Jefe de Producción',
     welcome:'¡Bienvenido a la Fábrica Total! 🔥 Soy Heavy, jefe de producción. Tú haces el pedido, nosotros fabricamos la experiencia. Comencemos.',
     name_new:'Perfecto. Ya sabemos quién recibirá esta herramienta.',
     name_known:function(n){ return '¡Te reconozco, '+n+'! Un gusto tenerte de vuelta. 👊'; },
@@ -40,7 +40,7 @@
   };
 
   var DELFI = {
-    img: BASE+'delfi.webp', name:'Delfi · Jefe de Logística',
+    img: BASE+'delfi.webp?v=1', name:'Delfi · Jefe de Logística',
     welcome:'¡Hola! 👋 Soy Delfi, jefe de logística. Desde ahora te acompaño hasta que recibas tu pedido.',
     s0:'Tu pedido llegó bien y ya está registrado. 📋 Comenzamos a trabajarlo.',
     s1:'Los especialistas están alistando y protegiendo tu herramienta para que llegue en excelentes condiciones. 📦',

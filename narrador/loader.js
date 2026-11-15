@@ -24,11 +24,11 @@
    +'@media(prefers-reduced-motion:reduce){#ttf-logo,#ttf-bar{animation:none}}';
   (document.head||document.documentElement).appendChild(st);
 
-  var LOGOS=['load-heavy.webp','load-super.webp','load-nauti.webp','load-toby.webp'];
+  var LOGOS=['load-heavy.webp?v=3','load-super.webp?v=3','load-nauti.webp?v=3','load-toby.webp?v=3'];
   var pick=LOGOS[Math.floor(Math.random()*LOGOS.length)];
 
   ov=document.createElement('div'); ov.id='ttf-ov';
-  ov.innerHTML='<img id="ttf-logo" alt="Total" fetchpriority="high" decoding="async" src="'+BASE+pick+'?v=3">'
+  ov.innerHTML='<img id="ttf-logo" alt="Total" fetchpriority="high" decoding="async" src="'+BASE+pick+'">'
     +'<div id="ttf-bar-w"><div id="ttf-bar"></div></div>'
     +'<div id="ttf-msg">Iniciando fábrica…</div>';
   (document.body||document.documentElement).appendChild(ov);

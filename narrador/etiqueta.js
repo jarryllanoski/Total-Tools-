@@ -85,7 +85,7 @@
       +      '<div class="rem-sub rem-city" style="display:none"></div>'
       +    '</div>'
       +    '<div class="qr">'
-      +      '<img src="narrador/qr-negocio.svg" alt="QR" width="74" height="74" loading="lazy" onerror="this.style.display=\'none\'">'
+      +      '<img src="narrador/qr-negocio.svg?v=1" alt="QR" width="74" height="74" loading="lazy" onerror="this.style.display=\'none\'">'
       +      '<div class="qrnum"></div>'
       +    '</div>'
       +  '</div>'

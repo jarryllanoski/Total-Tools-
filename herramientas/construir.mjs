@@ -38,10 +38,30 @@ function publicables(usadas) {
   });
 }
 
-async function procesar(f) {
+const RECURSO = /(["'])([A-Za-z0-9_][A-Za-z0-9_./-]*\.(?:webp|png|jpe?g|svg|gif))(\?v=[A-Za-z0-9]+)?(?=["'?])/g;
+
+function recursoPublicado(f, nombre, publicados) {
+  const candidatos = [path.posix.join(path.posix.dirname(f), nombre), path.posix.normalize(nombre.replace(/^\.\//, ''))];
+  return candidatos.find((c) => publicados.has(c)) || '';
+}
+
+function versionarRecursos(f, texto, publicados, sinVersion) {
+  return texto.replace(RECURSO, (m, comilla, nombre, version) => {
+    const real = recursoPublicado(f, nombre, publicados);
+    if (!real) return m;
+    if (!version) {
+      sinVersion.push(f + ': ' + nombre);
+      return m;
+    }
+    return comilla + nombre + '?v=' + huella(leer(real));
+  });
+}
+
+async function procesar(f, publicados, sinVersion) {
   const b = leer(f);
   if (f.endsWith('.js')) {
-    const r = await transform(b.toString('utf8'), {loader: 'js', minify: true, legalComments: 'none', charset: 'utf8'});
+    const fuente = versionarRecursos(f, b.toString('utf8'), publicados, sinVersion);
+    const r = await transform(fuente, {loader: 'js', minify: true, legalComments: 'none', charset: 'utf8'});
     return Buffer.from(r.code);
   }
   if (f.endsWith('.css')) {
@@ -66,16 +86,19 @@ async function construir() {
   const faltan = [...usadas].filter((u) => !lista.includes(u));
   if (faltan.length) throw new Error('Las paginas usan archivos que no se publican: ' + faltan.join(', '));
   const hechos = new Map();
+  const publicados = new Set(lista);
+  const recursosSinVersion = [];
   let antes = 0, despues = 0;
   for (const f of lista) {
     if (PAGINAS.includes(f)) continue;
-    const out = await procesar(f);
+    const out = await procesar(f, publicados, recursosSinVersion);
     hechos.set(f, out);
     if (/\.(js|css)$/.test(f)) {
       antes += leer(f).length;
       despues += out.length;
     }
   }
+  if (recursosSinVersion.length) throw new Error('Imagenes sin ?v= en los scripts (quedarian 7 dias en cache): ' + recursosSinVersion.join(', '));
   for (const p of PAGINAS) {
     const t = leer(p).toString('utf8').replace(/((?:src|href)=")([^"?#]+)\?v=[^"]*"/g, (m, a, f) =>
       hechos.has(f) ? a + f + '?v=' + huella(hechos.get(f)) + '"' : m);

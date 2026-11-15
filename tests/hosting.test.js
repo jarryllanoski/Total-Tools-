@@ -43,6 +43,41 @@ module.exports = async ({bloque, ok}) => {
     ok(/Scripts o estilos sin \?v=/.test(E.leerReal('herramientas/construir.mjs')), 'construir falla si un script o estilo no lleva version');
   }
 
+  bloque('Nada se queda viejo en cache: imagenes y catalogos con version');
+  {
+    const {execSync} = require('child_process');
+    const fs = require('fs');
+    const pathm = require('path');
+    const publicados = new Set(execSync('git ls-files', {cwd: E.RAIZ}).toString().split('\n').filter(Boolean));
+    const scripts = [...publicados].filter((f) => f.endsWith('.js') && !/^(tests|functions|herramientas|docs)\//.test(f));
+    const re = /(["'])([A-Za-z0-9_][A-Za-z0-9_./-]*\.(?:webp|png|jpe?g|svg|gif))(\?v=[A-Za-z0-9]+)?(?=["'?])/g;
+    const sinVersion = [];
+    let conVersion = 0;
+    scripts.forEach((f) => {
+      for (const m of E.leerReal(f).matchAll(re)) {
+        const real = [pathm.posix.join(pathm.posix.dirname(f), m[2]), pathm.posix.normalize(m[2].replace(/^\.\//, ''))].find((c) => publicados.has(c));
+        if (!real) continue;
+        if (m[3]) conVersion++; else sinVersion.push(f + ': ' + m[2]);
+      }
+    });
+    ok(sinVersion.length === 0 && conVersion >= 9,
+       'cada imagen que carga un script lleva ?v= (' + conVersion + ')' + (sinVersion.length ? ': faltan ' + sinVersion.join(', ') : ''));
+    const c = E.leerReal('herramientas/construir.mjs');
+    ok(/return comilla \+ nombre \+ '\?v=' \+ huella\(leer\(real\)\);/.test(c), 'al publicar, la version de cada imagen es la huella de su contenido');
+    ok(/Imagenes sin \?v= en los scripts/.test(c), 'y la construccion falla si alguna no la lleva');
+    ok(/var LOGOS=\['load-heavy\.webp\?v=\d+'/.test(E.leerReal('narrador/loader.js')) && !/pick\+'\?v=/.test(E.leerReal('narrador/loader.js')),
+       'cada personaje del cargador con su propia version');
+
+    const fa = E.leerReal('cliente/form-agencias.js');
+    [['SHALOM', 'data/agencias-shalom.json'], ['OLVA', 'data/agencias-olva.json']].forEach(([k, archivo]) => {
+      const v = (new RegExp(k + ": \\{[\\s\\S]*?version: '([0-9-]+)'").exec(fa) || [])[1];
+      const generado = String((JSON.parse(fs.readFileSync(pathm.join(E.RAIZ, archivo), 'utf8')).meta || {}).generado || '').slice(0, 10);
+      ok(v && v === generado, k + ': la version del catalogo (' + v + ') es la fecha del archivo (' + generado + '); si actualizas el catalogo sin cambiarla, esta prueba falla');
+    });
+    const vs = (/version: '([0-9-]+)',\s*jsonPath: '\.\/data\/agencias-shalom\.json'/.exec(fa) || [])[1];
+    ok(new RegExp("const SHALOM_CATALOGO_V='" + vs + "';").test(E.leerReal('panel/pedidos/pedido-form.js')), 'el panel usa la misma version de Shalom que el formulario');
+  }
+
   bloque('Cabeceras de seguridad en todo');
   {
     ok(/max-age=31536000/.test(val('**', 'Strict-Transport-Security')), 'HSTS: siempre HTTPS');
