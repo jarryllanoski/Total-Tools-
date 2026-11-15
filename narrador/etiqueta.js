@@ -3,7 +3,7 @@
   if(new URLSearchParams(location.search).has('seg')) return;
   var app=document.getElementById('app'); if(!app) return;
 
-  var esc=function(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); };
+  var esc=function(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); };
   var txt=function(sel){ var e=app.querySelector(sel); return e?(e.textContent||'').trim():''; };
   var val=function(id){ var e=document.getElementById(id); return e?(e.value||'').trim():''; };
   var visible=function(id){ var e=document.getElementById(id); return !!(e&&e.offsetParent!==null); };

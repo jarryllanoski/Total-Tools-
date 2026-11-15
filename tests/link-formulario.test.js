@@ -15,7 +15,7 @@ function generador(conCrypto) {
 function servidor(tokens, opciones) {
   const o = opciones || {};
   const src = E.leer('functions/index.js');
-  const campos = src.slice(src.indexOf('const ORDER_FIELDS'), src.indexOf('async function handleCreate(req, res) {'));
+  const campos = src.slice(src.indexOf('function pickOrderFields(src) {'), src.indexOf('async function handleCreate(req, res) {'));
   const create = src.slice(src.indexOf('async function handleCreate'), src.indexOf('async function handleToken(req, res) {'));
   const lecturas = [];
   const escritos = [];
@@ -47,12 +47,12 @@ function servidor(tokens, opciones) {
   };
   // eslint-disable-next-line no-new-func
   const handleCreate = new Function('db', 'agencias', 'enlace', 'reniecPublico', 'nroComp',
-      'checkRateLimit', 'appCheckOk', 'TOK_COL', 'SHIP_COL', 'CFG_DOC', '_conMts', 'SYNC_V',
+      'checkRateLimit', 'appCheckOk', 'pedidoForm', 'TOK_COL', 'SHIP_COL', 'CFG_DOC', '_conMts', 'SYNC_V',
       campos + create + ';return handleCreate;',
   )(db, require('../functions/agencias.js'), require('../functions/enlaceSeguimiento.js'),
       {normalizar: () => ''}, require('../functions/nroComprobante.js'),
       async (n) => { frenos.push(n); return o.freno !== false; },
-      async () => o.appCheck !== false,
+      async () => o.appCheck !== false, require('../functions/pedidoForm.js'),
       'panel/tokens/items', 'panel/shipments/items', 'panel/config', (x) => x, 1);
   const llamar = async (body) => {
     const r = {code: 200, body: null};
@@ -349,5 +349,26 @@ module.exports = async ({bloque, ok}) => {
     const lista = E.leerReal('panel/pantalla/lista.js');
     ok(/Array\.isArray\(s\.alertas\)&&s\.alertas\.length\)\?`<span class="meta" title="\$\{escH\('Revisar: '\+s\.alertas\.join\(' · '\)\)\}"/.test(lista) && /⚠️ revisar/.test(lista),
        'el panel muestra «⚠️ revisar» con el motivo al pasar el dedo o el mouse');
+  }
+
+  bloque('Alta: el servidor decide lo que no le toca al cliente');
+  {
+    const s = servidor({Duro0000001: {used: false, prefillLink: 'https://drive.google.com/file/d/guia'}});
+    const r = await s.llamar({token: 'Duro0000001', ms: 30000, order: {name: '<b>Ana</b> Lopez', phone: '+51 987 654 321', status: 'FINALIZADO',
+      createdAt: '2020-01-01T00:00:00Z', links: [{u: 'javascript:alert(1)', n: 'x'}], docGuia: {t: 'image/png', d: 'x" onerror="alert(1)'}, cost: '0'}});
+    const ped = (s.escritos.find((w) => w.p.indexOf('panel/shipments/items/') === 0) || {}).data || {};
+    ok(r.code === 200 && ped.status === 'NUEVO PEDIDO', 'el estado siempre nace como NUEVO PEDIDO, mande lo que mande');
+    ok(ped.createdAt > '2025' && ped.phone === '987654321' && ped.name === 'bAna/b Lopez', 'fecha del servidor, celular en 9 digitos y nombre sin < >');
+    ok(ped.links.length === 1 && ped.links[0].u === 'https://drive.google.com/file/d/guia', '⚠️ los links salen del link que creaste tu, no de lo que mande el cliente');
+    ok(!('docGuia' in ped) && !ped.cost, 'ni documentos ni costo del cliente');
+    ok(s.tokens.Duro0000001.clientName === 'bAna/b Lopez', 'el link guarda el nombre ya limpio');
+    const s2 = servidor({Duro0000002: {used: false}});
+    const r2 = await s2.llamar({token: 'Duro0000002', ms: 30000, order: {name: 'Ana', phone: '98765'}});
+    ok(r2.code === 400 && /9 dígitos/.test(r2.body.error) && s2.tokens.Duro0000002.used === false && s2.escritos.length === 0,
+       'celular incompleto: rechazado, se le dice por que, y el link no se gasta');
+    const s3 = servidor({Duro0000003: {used: false, prefillLink: 'javascript:alert(1)'}});
+    await s3.llamar({token: 'Duro0000003', ms: 30000, order: {name: 'Ana', phone: '987654321'}});
+    const p3 = (s3.escritos.find((w) => w.p.indexOf('panel/shipments/items/') === 0) || {}).data || {};
+    ok(!('links' in p3), 'un link guardado que no es https no pasa al pedido');
   }
 };

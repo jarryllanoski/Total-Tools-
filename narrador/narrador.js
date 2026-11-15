@@ -15,7 +15,7 @@
     return 'narrador/';
   })();
 
-  var esc = function(t){ return String(t==null?'':t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); };
+  var esc = function(t){ return String(t==null?'':t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); };
 
   var HEAVY = {
     img: BASE+'heavy.webp?v=1', name:'Heavy · Jefe de Producción',

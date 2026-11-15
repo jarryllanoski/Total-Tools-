@@ -33,7 +33,7 @@ function waDT(doc,chk,slot,color){
   const meta={guia:{lbl:'GUÍA',icon:'🚚'},embalado:{lbl:'EMBALADO',icon:'📦'},ticket:{lbl:'BOLETA',icon:'🧾'}};
   const m=meta[slot]||{lbl:slot.toUpperCase(),icon:'📄'};
   return`<div onclick="event.stopPropagation();togWADoc('${slot}')" style="position:relative;cursor:pointer;border-radius:9px;overflow:hidden;border:2px solid ${chk?color:'var(--bd)'};${chk?'box-shadow:0 0 0 2px rgba(46,160,67,.25)':''}">
-    ${doc.t&&doc.t.startsWith('image/')?`<img src="${doc.d}" style="width:80px;height:100px;object-fit:cover;display:block">`:`<div class="wa-doc-pdf"><span style="font-size:28px">${m.icon}</span></div>`}
+    ${doc.t&&doc.t.startsWith('image/')?`<img src="${escU(doc.d)}" style="width:80px;height:100px;object-fit:cover;display:block">`:`<div class="wa-doc-pdf"><span style="font-size:28px">${m.icon}</span></div>`}
     <div class="wa-doc-lbl">${m.lbl}</div>
     <div id="waChk_${slot}" class="wa-doc-chk" style="background:${chk?color:'rgba(0,0,0,.3)'};">${chk?'✓':''}</div>
   </div>`;
@@ -53,7 +53,7 @@ function selWAMsg(idx){
 async function doWASend(){
   const s=S.shipments.find(x=>x.id===_waId);if(!s)return;
   const gChk=s.chkGuia||false,tChk=s.chkTicket||false,eChk=s.chkEmbalado||false;
-  const phone='51'+s.phone;
+  const phone='51'+String(s.phone||'').replace(/\D/g,'');
   let msg='';
   if(_waMsgIdx>=0){const msgs=S.msgTemplates[s.status]||['',''];const t=msgs[_waMsgIdx];if(t&&t.trim())msg=fillVars(t,s)}
   if(!gChk&&!tChk&&!eChk){window.open(msg?`https://wa.me/${phone}?text=${encodeURIComponent(msg)}`:`https://wa.me/${phone}`,'_blank');closeOverlay('waOverlay');return}
@@ -83,9 +83,9 @@ async function doWASend(){
   ${docs.map(({doc,label})=>`<div style="background:#1c2333;border:1px solid #30363d;border-radius:10px;overflow:hidden;margin-bottom:10px">
     <div style="padding:10px 12px;border-bottom:1px solid #30363d;display:flex;justify-content:space-between;align-items:center">
       <span style="font-size:12px;font-weight:700">${label}</span>
-      <a href="${doc.d}" download="${label}.${doc.t.includes('pdf')?'pdf':'jpg'}" style="background:#388bfd;color:#fff;border-radius:7px;padding:5px 12px;font-size:11px;font-weight:700;text-decoration:none">⬇ Descargar</a>
+      <a href="${escU(doc.d)}" download="${label}.${String(doc.t||'').includes('pdf')?'pdf':'jpg'}" style="background:#388bfd;color:#fff;border-radius:7px;padding:5px 12px;font-size:11px;font-weight:700;text-decoration:none">⬇ Descargar</a>
     </div>
-    ${doc.t&&doc.t.startsWith('image/')?`<img src="${doc.d}" style="width:100%;max-height:200px;object-fit:contain;background:#0d1117;display:block">`:`<div style="padding:20px;text-align:center;font-size:32px">📄</div>`}
+    ${doc.t&&doc.t.startsWith('image/')?`<img src="${escU(doc.d)}" style="width:100%;max-height:200px;object-fit:contain;background:#0d1117;display:block">`:`<div style="padding:20px;text-align:center;font-size:32px">📄</div>`}
   </div>`).join('')}
   <a href="https://wa.me/${phone}${msg?'?text='+encodeURIComponent(msg):''}" target="_blank" style="display:block;width:100%;padding:13px;background:#25d366;border-radius:10px;color:#fff;font-weight:700;font-size:14px;text-align:center;text-decoration:none;margin-top:4px">💬 Abrir WhatsApp</a>
   <div style="height:30px"></div>`;
@@ -178,7 +178,7 @@ function refreshSlot(slot){
   lbl.className='doc-tap '+m.cls;if(btn)btn.style.display='none';act.style.display='flex';
   const _marca = doc.pendiente ? '<div class="doc-ok" style="background:#d29922">⏳ por subir</div>' : '<div class="doc-ok">✓</div>';
   if(doc.t&&doc.t.startsWith('image/')){
-    prev.innerHTML=`<div class="doc-full"><img src="${escH(doc.m||doc.d)}" decoding="async" style="width:100%;height:100%;object-fit:cover;display:block">${_marca}</div>`;
+    prev.innerHTML=`<div class="doc-full"><img src="${escU(doc.m||doc.d)}" decoding="async" style="width:100%;height:100%;object-fit:cover;display:block">${_marca}</div>`;
   } else {
     const _n=doc.n||'';const sn=_n.length>16?_n.substring(0,16)+'…':_n;
     prev.innerHTML=`<div class="doc-full"><div class="doc-full-pdf"><span style="font-size:32px">📄</span><span style="font-size:10px;color:var(--text2);text-align:center;padding:0 6px;word-break:break-all">${sn}</span></div><div class="doc-ok">✓ PDF</div></div>`;
@@ -192,16 +192,17 @@ function viewSlot(slot){
 }
 
 let _curDoc=null;
-function openViewer(doc,title){_curDoc=doc;if(doc.t&&doc.t.startsWith('image/')){$('viewerImg').src=doc.d;$('viewerTtl').textContent=title;$('viewer').classList.add('open')}else{const a=document.createElement('a');a.href=doc.d;a.target='_blank';a.click()}}
+function _docUrl(d){ d=String(d==null?'':d).trim(); return (/^(https?|blob:https?):\/\//i.test(d)||/^data:(image\/(png|jpe?g|gif|webp)|application\/pdf)[;,]/i.test(d))?d:''; }
+function openViewer(doc,title){_curDoc=doc;if(!_docUrl(doc&&doc.d)){toast('⚠️ Documento no válido');return}if(doc.t&&doc.t.startsWith('image/')){$('viewerImg').src=_docUrl(doc.d);$('viewerTtl').textContent=title;$('viewer').classList.add('open')}else{const a=document.createElement('a');a.href=_docUrl(doc.d);a.target='_blank';a.rel='noopener';a.click()}}
 function closeViewer(){$('viewer').classList.remove('open');$('viewerImg').src=''}
-function dlDoc(){if(!_curDoc)return;const a=document.createElement('a');a.href=_curDoc.d;a.download=_curDoc.n||'doc';a.click()}
+function dlDoc(){if(!_curDoc||!_docUrl(_curDoc.d))return;const a=document.createElement('a');a.href=_docUrl(_curDoc.d);a.download=_curDoc.n||'doc';a.click()}
 function qView(shipId,slot){const s=S.shipments.find(x=>x.id===shipId);if(!s)return;const d=slot==='guia'?s.docGuia:slot==='embalado'?s.docEmbalado:s.docTicket;if(!d)return;openViewer(d,slot==='guia'?'🚚 Guía / Ticket':slot==='embalado'?'📦 Embalado':'🧾 Boleta / Factura')}
 $('viewer').addEventListener('click',e=>{if(e.target===$('viewer'))closeViewer()});
 
 let _links=[];
 function addLink(){const v=$('fLink').value.trim();if(!v){toast('Ingresa un link');return}if(!v.startsWith('http')){toast('⚠️ Link inválido');return}const n=v.length>36?v.substring(0,36)+'…':v;_links.push({u:v,n});renderLinks();$('fLink').value='';toast('🔗 Agregado')}
 function removeLink(i){_links.splice(i,1);renderLinks()}
-function renderLinks(){$('linkListForm').innerHTML=_links.map((l,i)=>`<div class="link-item"><span>🔗</span><div class="link-name">${esc(l.n)}</div><a href="${esc(l.u)}" target="_blank" style="color:var(--blue);font-size:12px;text-decoration:none">↗</a><button class="link-del" type="button" onclick="removeLink(${i})">✕</button></div>`).join('')}
+function renderLinks(){$('linkListForm').innerHTML=_links.map((l,i)=>`<div class="link-item"><span>🔗</span><div class="link-name">${esc(l.n)}</div><a href="${escU(l.u)}" target="_blank" style="color:var(--blue);font-size:12px;text-decoration:none">↗</a><button class="link-del" type="button" onclick="removeLink(${i})">✕</button></div>`).join('')}
 
 function recalcDeuda(){
   const m=parseFloat(($('fMonto')||{value:''}).value)||0;

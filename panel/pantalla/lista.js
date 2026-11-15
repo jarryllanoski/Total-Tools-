@@ -396,7 +396,7 @@ function _renderAhora(){
 }
 
 function escH(s){ return s==null?'':String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
-function escJs(s){ return String(s==null?'':s).replace(/\\/g,'\\\\').replace(/'/g,"\\'"); }
+function escJs(s){ return String(s==null?'':s).replace(/[\\'"<>&\n\r\u2028\u2029]/g, function(c){ return '\\u'+('000'+c.charCodeAt(0).toString(16)).slice(-4); }); }
 
 function _courierIcon(name){
   var u=(name||'').toUpperCase();
@@ -437,7 +437,7 @@ function scrollCard(dir){
   const y=window.scrollY + cards[t].getBoundingClientRect().top - (_altoFijoArriba(cards[t])+6);
   window.scrollTo({top:Math.max(0,y), behavior:'smooth'});
 }
-function escU(u){ u=String(u==null?'':u).trim(); return (/^https?:\/\//i.test(u)||/^data:image\//i.test(u))?escH(u):'#'; }
+function escU(u){ u=String(u==null?'':u).trim(); return (/^(https?|blob:https?):\/\//i.test(u)||/^data:(image\/(png|jpe?g|gif|webp)|application\/pdf)[;,]/i.test(u))?escH(u):'#'; }
 function _montoCard(s){
   if(typeof MontoPedido!=='undefined' && MontoPedido.esNuevo(s)){
     const e=MontoPedido.de(s);
@@ -470,7 +470,7 @@ function cardHTML(s){
     </div>
     ${pvtNote?`<div class="pvt-note" id="pvt_${s.id}" style="display:none" ondblclick="openPrivateNote('${s.id}')">🔒 ${escH(pvtNote)}</div>`:''}
     <div class="card-meta">
-      <span class="meta">${esUsuarioWA(s.phone)?'':`<a href="tel:+51${escH(s.phone)}" class="ph-call" onclick="event.stopPropagation()" title="Llamar">📞</a>`}${escH(s.phone)}<button class="ph-copy" onclick="event.stopPropagation();copyPhone('${escH(s.phone)}')" title="Copiar número"><svg viewBox="0 0 448 512" width="11" height="11" fill="currentColor" aria-hidden="true"><path d="M320 448v40c0 13.255-10.745 24-24 24H24c-13.255 0-24-10.745-24-24V120c0-13.255 10.745-24 24-24h72v296c0 30.879 25.121 56 56 56h168zm0-344V0H152c-13.255 0-24 10.745-24 24v368c0 13.255 10.745 24 24 24h272c13.255 0 24-10.745 24-24V128H344c-13.2 0-24-10.8-24-24zm120.971-31.029L375.029 7.029A24 24 0 0 0 358.059 0H352v96h96v-6.059a24 24 0 0 0-7.029-16.97z"/></svg></button></span>
+      <span class="meta">${esUsuarioWA(s.phone)?'':`<a href="tel:+51${escH(s.phone)}" class="ph-call" onclick="event.stopPropagation()" title="Llamar">📞</a>`}${escH(s.phone)}<button class="ph-copy" onclick="event.stopPropagation();copyPhone('${escJs(s.phone)}')" title="Copiar número"><svg viewBox="0 0 448 512" width="11" height="11" fill="currentColor" aria-hidden="true"><path d="M320 448v40c0 13.255-10.745 24-24 24H24c-13.255 0-24-10.745-24-24V120c0-13.255 10.745-24 24-24h72v296c0 30.879 25.121 56 56 56h168zm0-344V0H152c-13.255 0-24 10.745-24 24v368c0 13.255 10.745 24 24 24h272c13.255 0 24-10.745 24-24V128H344c-13.2 0-24-10.8-24-24zm120.971-31.029L375.029 7.029A24 24 0 0 0 358.059 0H352v96h96v-6.059a24 24 0 0 0-7.029-16.97z"/></svg></button></span>
       <span class="meta">📅 ${escH(s.date||'—')} <button onclick="copyCardLink('${s.id}')" title="Copiar link" style="background:none;border:none;color:#388bfd;font-size:11px;cursor:pointer;padding:0 0 0 2px;vertical-align:middle">🔗</button></span>
       ${_montoCard(s)}
       ${(window.NroComprobante&&NroComprobante.de(s))?`<span class="meta" title="Factura / Boleta" style="opacity:.75">🧾 ${escH(NroComprobante.de(s))}</span>`:''}

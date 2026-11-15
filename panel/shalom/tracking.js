@@ -11,7 +11,7 @@ var TRK = {
 var ESTADOS_SHALOM = ['', 'En origen', 'En tránsito', 'Demora de envíos',
   'En destino', 'Entregado', 'Retorno a origen'];
 
-function _esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function _esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
 
 function detectarEstadoAuto(estadoTexto) {
   if (!estadoTexto) return null;

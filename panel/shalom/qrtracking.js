@@ -228,7 +228,7 @@ QRTracking.patchTrackingBlock = function(){
     if(!html) return html;
     var guia = s.trackingOrderNumber || s.shalomGuia || '';
     if(!guia) return html;
-    var qrBtn = '<button class="trk-btn-qr-hdr" onclick="QRTracking.abrir(\''+guia+'\')" title="Ver QR de seguimiento">📷 QR</button>';
+    var qrBtn = '<button class="trk-btn-qr-hdr" onclick="QRTracking.abrir(\''+escJs(guia)+'\')" title="Ver QR de seguimiento">📷 QR</button>';
     html = html.replace(
       '<button onclick="Tracking.abrirManual()" style="background:none;border:none;color:#8b949e;font-size:10px;cursor:pointer;padding:0" title="Instrucciones">📖 Ayuda</button>',
       '<button onclick="Tracking.abrirManual()" style="background:none;border:none;color:#8b949e;font-size:10px;cursor:pointer;padding:0" title="Instrucciones">📖 Ayuda</button>' + qrBtn

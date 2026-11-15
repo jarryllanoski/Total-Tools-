@@ -43,7 +43,10 @@ Estado del plan de auditoría enterprise. Proyecto Firebase: `total-tools-24ce8`
 | L4 | El botón 🔗 del panel da un token seguro a los pedidos antiguos (`trackLegado: true`): el link viejo del cliente sigue hasta que se cierre | ✅ |
 | CI | Se retira la comprobación manual de `?v=`: la construcción pone la huella de cada archivo | ✅ |
 | L5 | «¿Eres tú?»: los datos del último pedido viven solo en el celular del cliente (`tt_mis_datos`, 180 días, DNI y celular tapados en pantalla, «No soy yo» los borra) | ✅ |
-| L6 | Revisión de escapado del texto del cliente y CSP de lista blanca | Pendiente |
+| L6 | Ataque simulado (código en cada campo) sobre panel, seguimiento, etiqueta e impresión; cerrados: guía de Shalom en el botón QR, copiar teléfono, imprimir por courier, links `javascript:` y documentos | ✅ |
+| L6 | `escJs` seguro dentro de `onclick`, `escU` con lista de esquemas, y todos los limpiadores escapan comillas | ✅ |
+| L6 | El servidor limpia el pedido del formulario por tipo (`functions/pedidoForm.js`): estado, fecha, links, documentos y montos los pone él | ✅ |
+| L6 | CSP de lista blanca | Pendiente |
 
 ---
 

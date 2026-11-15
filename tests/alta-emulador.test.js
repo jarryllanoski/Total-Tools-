@@ -33,7 +33,7 @@ module.exports = async ({bloque, ok}) => {
   await fetch('http://' + EMU + '/emulator/v1/projects/demo-alta/databases/(default)/documents', {method: 'DELETE'});
 
   const src = E.leer('functions/index.js');
-  const campos = src.slice(src.indexOf('const ORDER_FIELDS'), src.indexOf('async function handleCreate(req, res) {'));
+  const campos = src.slice(src.indexOf('function pickOrderFields(src) {'), src.indexOf('async function handleCreate(req, res) {'));
   const create = src.slice(src.indexOf('async function handleCreate'), src.indexOf('async function handleToken(req, res) {'));
   // El reloj CONGELADO: todos los pedidos nacen en el mismo milisegundo.
   let T = 1793350000000;
@@ -43,10 +43,10 @@ module.exports = async ({bloque, ok}) => {
   }
   // eslint-disable-next-line no-new-func
   const handleCreate = new Function('db', 'agencias', 'enlace', 'reniecPublico', 'nroComp',
-      'checkRateLimit', 'appCheckOk', 'TOK_COL', 'SHIP_COL', 'CFG_DOC', '_conMts', 'SYNC_V', 'Date',
+      'checkRateLimit', 'appCheckOk', 'pedidoForm', 'TOK_COL', 'SHIP_COL', 'CFG_DOC', '_conMts', 'SYNC_V', 'Date',
       campos + create + ';return handleCreate;',
   )(db, require('../functions/agencias.js'), {generar: () => 't1_' + Math.random().toString(36).slice(2)},
-      {normalizar: () => ''}, require('../functions/nroComprobante.js'), async () => true, async () => true,
+      {normalizar: () => ''}, require('../functions/nroComprobante.js'), async () => true, async () => true, require('../functions/pedidoForm.js'),
       'panel/tokens/items', 'panel/shipments/items', 'panel/config', (o) => o, 1, Reloj);
   const llamar = async (body) => {
     const r = {code: 200, body: null};

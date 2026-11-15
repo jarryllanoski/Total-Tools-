@@ -139,7 +139,7 @@
         : '<button class="notify-btn notify-btn-print" onclick="NotifyModule.imprimir('+i+')">🖨️ Imprimir</button>';
 
       var linkHtml = n.link
-        ? '<a href="' + n.link.replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;') + '" target="_blank" rel="noopener" class="link-chip" onclick="event.stopPropagation()">🔗 Link</a>'
+        ? '<a href="' + escU(n.link) + '" target="_blank" rel="noopener" class="link-chip" onclick="event.stopPropagation()">🔗 Link</a>'
         : '';
 
       return '<div class="notify-item">' +
@@ -172,7 +172,7 @@
   }
 
   function _esc(s){
-    return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
   }
 
   function _closePanel(){

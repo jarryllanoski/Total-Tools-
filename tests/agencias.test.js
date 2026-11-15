@@ -239,10 +239,14 @@ module.exports = async ({bloque, ok}) => {
        'los campos viajan en el pedido');
 
     /* EL SERVIDOR — el filtro que los habría tirado en silencio. */
-    ok(/"agenciaId", "agenciaNombre", "agenciaGeo", "agenciaCourier",/.test(fidx),
+    const PF = require('../functions/pedidoForm.js');
+    const lim = PF.limpiar({agenciaId: '123', agenciaNombre: 'LIMA / LIMA / COMAS', agenciaGeo: 'LIMA|LIMA|COMAS', agenciaCourier: 'SHALOM'});
+    ok(lim.agenciaId === '123' && lim.agenciaNombre === 'LIMA / LIMA / COMAS' && lim.agenciaGeo === 'LIMA|LIMA|COMAS' && lim.agenciaCourier === 'SHALOM',
        'la lista blanca del servidor los deja pasar. Sin esto se descartarían ' +
        'sin dar error: los mandas, no falla nada, y no llegan');
-    ok(/agenciaId: 10, agenciaNombre: 120/.test(fidx), 'con su tope de tamaño');
+    ok(PF.TEXTOS.agenciaNombre === 120 && PF.TEXTOS.agenciaGeo === 200 && PF.limpiar({agenciaNombre: 'x'.repeat(500)}).agenciaNombre.length === 120,
+       'con su tope de tamaño');
+    ok(/if \(!agencias\.idValido\(out\.agenciaId\) \|\|/.test(fidx), 'y una agencia con id invalido se descarta entera');
     ok(/if \(!agencias\.idValido\(out\.agenciaId\) \|\|/.test(fidx),
        'y se VALIDAN, no solo se recortan: `agenciaId: "../x"` recortado ' +
        'sigue siendo basura');

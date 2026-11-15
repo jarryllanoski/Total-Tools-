@@ -207,7 +207,7 @@ function renderSuppCotiz(sup){
         <div style="font-size:12.5px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap"><b style="font-family:monospace">${escH(it.codigo)}</b> · ${escH(it.desc||'')} · <b>${escH(it.cant)}</b>u</div>
         <div style="font-size:10px;color:var(--text2)">🧾 ${escH(it.cliente||'—')}</div>
       </div>
-      <button onclick="quitarAsignacion('${escH(it.pedidoId)}','${escH(it.codigo)}')" title="Quitar" style="background:none;border:none;color:var(--red);font-size:16px;cursor:pointer;flex-shrink:0;padding:0 4px">✕</button>
+      <button onclick="quitarAsignacion('${escJs(it.pedidoId)}','${escJs(it.codigo)}')" title="Quitar" style="background:none;border:none;color:var(--red);font-size:16px;cursor:pointer;flex-shrink:0;padding:0 4px">✕</button>
     </div>`).join('')}`;
 }
 

@@ -32,6 +32,7 @@ const cuentaShalom = require("./cuentaShalom");
 const reniecPublico = require("./reniecPublico");
 const credenciales = require("./credenciales");
 const ipCliente = require("./ipCliente");
+const pedidoForm = require("./pedidoForm");
 
 setGlobalOptions({maxInstances: 10});
 initializeApp();
@@ -269,36 +270,8 @@ exports.formApi = onRequest(
       }
     });
 
-const ORDER_FIELDS = [
-  "id", "name", "phone", "address", "gpsCoords", "referencia",
-  "dniRecoger", "ciudadDestino", "dniDestinatario", "encAgencia",
-  "courier", "date", "status", "cost", "notes", "extra",
-  "docGuia", "docEmbalado", "docComprobante", "links",
-  "sel", "chkGuia", "chkEmbalado", "chkComprobante",
-  "createdAt", "fromForm", "dni",
-  "agenciaId", "agenciaNombre", "agenciaGeo", "agenciaCourier",
-];
-
-const FIELD_MAX = {
-  name: 120, phone: 20, dni: 12, dniRecoger: 12, dniDestinatario: 12,
-  cost: 20, courier: 60, date: 30, status: 60, encAgencia: 200,
-  ciudadDestino: 120, address: 600, referencia: 300, notes: 600,
-  gpsCoords: 60, id: 60, createdAt: 40,
-  agenciaId: 10, agenciaNombre: 120, agenciaGeo: 200, agenciaCourier: 20,
-};
-const DEFAULT_MAX = 600;
-
 function pickOrderFields(src) {
-  const out = {};
-  ORDER_FIELDS.forEach((k) => {
-    if (!Object.prototype.hasOwnProperty.call(src, k)) return;
-    let v = src[k];
-    if (typeof v === "string") {
-      const max = FIELD_MAX[k] || DEFAULT_MAX;
-      if (v.length > max) v = v.slice(0, max);
-    }
-    out[k] = v;
-  });
+  const out = pedidoForm.limpiar(src);
   if (!agencias.idValido(out.agenciaId) ||
       !agencias.courierDe(out.agenciaCourier)) {
     agencias.CAMPOS.forEach((k) => delete out[k]);
@@ -336,10 +309,10 @@ async function handleCreate(req, res) {
     return;
   }
 
-  if (!order.name || !order.phone) {
-    res.status(400).json({
-      status: "error", error: "Nombre y teléfono requeridos",
-    });
+  const limpio = pickOrderFields(order);
+  if (!limpio.name || limpio.phone.length !== 9) {
+    res.status(400).json({status: "error",
+      error: "Revisa tu nombre y tu número de WhatsApp (9 dígitos)."});
     return;
   }
 
@@ -361,12 +334,14 @@ async function handleCreate(req, res) {
   const now = Date.now();
   const trackToken = enlace.generar();
 
-  const orderToSave = Object.assign({}, pickOrderFields(order), {
-    status: order.status || "NUEVO PEDIDO",
-    createdAt: order.createdAt || new Date().toISOString(),
+  const orderToSave = Object.assign({}, limpio, {
+    status: "NUEVO PEDIDO",
+    createdAt: new Date(now).toISOString(),
     fromForm: true,
     trackToken,
   });
+  const linkDelLink = pedidoForm.linkSeguro(tokData.prefillLink);
+  if (linkDelLink) orderToSave.links = [linkDelLink];
   const alertas = alertasDelAlta(await appCheckOk(req), body.ms);
   if (alertas.length) orderToSave.alertas = alertas;
 
@@ -416,7 +391,7 @@ async function handleCreate(req, res) {
         used: true,
         orderId: id,
         trackCode: code,
-        clientName: order.name,
+        clientName: limpio.name,
         usedAt: new Date().toISOString(),
       }, {merge: true});
       tx.set(db.doc(CFG_DOC), {ts: now, formTs: now, syncV: SYNC_V},

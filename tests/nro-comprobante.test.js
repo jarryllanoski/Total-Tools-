@@ -36,7 +36,7 @@ function cargarEtiqueta() {
 /* El alta de pedidos del servidor, ejecutada contra una base de mentira. */
 function cargarCreate(tokens) {
   const src = E.leer('functions/index.js');
-  const campos = src.slice(src.indexOf('const ORDER_FIELDS'),
+  const campos = src.slice(src.indexOf('function pickOrderFields(src) {'),
       src.indexOf('async function handleCreate(req, res) {'));
   const create = src.slice(src.indexOf('async function handleCreate'),
       src.indexOf('async function handleToken(req, res) {'));
@@ -60,10 +60,10 @@ function cargarCreate(tokens) {
   };
   // eslint-disable-next-line no-new-func
   const fn = new Function('db', 'agencias', 'enlace', 'reniecPublico',
-      'nroComp', 'checkRateLimit', 'appCheckOk', 'TOK_COL', 'SHIP_COL', 'CFG_DOC', '_conMts', 'SYNC_V',
+      'nroComp', 'checkRateLimit', 'appCheckOk', 'pedidoForm', 'TOK_COL', 'SHIP_COL', 'CFG_DOC', '_conMts', 'SYNC_V',
       campos + create + ';return handleCreate;',
   )(db, require('../functions/agencias.js'), {generar: () => 'tok128'},
-      {normalizar: () => ''}, N, async () => true, async () => true,
+      {normalizar: () => ''}, N, async () => true, async () => true, require('../functions/pedidoForm.js'),
       'panel/tokens/items', 'panel/shipments/items', 'panel/config',
       (o) => Object.assign({}, o, {_mts: 'HORA_DEL_SERVIDOR'}), 1);
   return {fn, escritos};
@@ -144,8 +144,8 @@ module.exports = async ({bloque, ok}) => {
 
   {
     const src = E.leer('functions/index.js');
-    const lista = src.slice(src.indexOf('const ORDER_FIELDS'),
-        src.indexOf('];', src.indexOf('const ORDER_FIELDS')));
+    const lista = src.slice(src.indexOf('function pickOrderFields(src) {'),
+        src.indexOf('];', src.indexOf('function pickOrderFields(src) {')));
     ok(lista.indexOf('nroComprobante') < 0,
        '⚠️ no está en ORDER_FIELDS: lo que mande el formulario con ese ' +
        'nombre se tira — nadie se pone el número de otra venta');

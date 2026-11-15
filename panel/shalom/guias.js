@@ -61,7 +61,7 @@
 
   function _escapar(t) {
     return String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+        .replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
   }
 
   function vigilar(idInput, idActual) {
