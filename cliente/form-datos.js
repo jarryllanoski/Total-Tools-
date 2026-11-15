@@ -21,12 +21,16 @@ function _notesCount(){
   document.addEventListener('paste', function(e){ var el=e.target; if(el&&el.classList&&el.classList.contains('phone-norm')) setTimeout(function(){ _norm(el); },0); }, true);
 })();
 
+function _soltarConocido(phone){
+  if(!(_knownClient && _knownClient.local && _knownClient.telefono===phone)) _knownClient=null;
+  const b=$('knownBadge'); if(b) b.style.display='none';
+}
+
 function onPhoneInput(val){
   clearTimeout(_phoneTimer);
   const phone=val.replace(/\D/g,'');
   if(phone.length!==9){
-    _knownClient=null;
-    const b=$('knownBadge'); if(b) b.style.display='none';
+    _soltarConocido(phone);
     return;
   }
   if(!currentToken) return;
@@ -37,12 +41,10 @@ function onPhoneInput(val){
         _knownClient = c;
         _showKnownBadge();
       } else {
-        _knownClient=null;
-        const b=$('knownBadge'); if(b) b.style.display='none';
+        _soltarConocido(phone);
       }
     }catch(e){
-      _knownClient=null;
-      const b=$('knownBadge'); if(b) b.style.display='none';
+      _soltarConocido(phone);
     }
   },500);
 }

@@ -184,6 +184,7 @@ async function submitOrder(){
     localStorage.setItem('dpanel_order_'+wsId, JSON.stringify({
       trackToken: resp.trackToken, orderId: resp.orderId, name: order.name
     }));
+    if(typeof _misDatosGuardar==='function') _misDatosGuardar(order, ($('f_dni')||{value:''}).value.replace(/\D/g,''));
     const espera=Math.max(0, 900-(Date.now()-t0));
     setTimeout(function(){ showInlineConfirmed(order, codigoSeg(order.id, order.createdAt || new Date().toISOString()), resp.trackToken); }, espera);
   }catch(e){

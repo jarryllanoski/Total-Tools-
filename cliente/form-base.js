@@ -340,6 +340,7 @@ function renderForm(){
            pantalla es el que Shalom va a exigir en el mostrador, así que
            llamarlo «tus datos» invita a poner el del que paga. -->
       <div class="section-ttl" style="margin-top:4px">Datos de la persona que recibe</div>
+      <div id="misDatosCard"></div>
       <!-- ★ EL DNI VA PRIMERO, Y ES UN CAMBIO DE ORDEN, NO DE LÓGICA.
            Lo pidió el dueño y tiene su razón: el DNI es el único dato que
            puede RELLENAR a los otros. Pedirlo al final es pedir que el
@@ -460,6 +461,7 @@ function renderForm(){
 
   if(_prefillName){ const el=$('f_name'); if(el) el.value=_prefillName; }
   if(_prefillPhone){ const el=$('f_phone'); if(el){ el.value=_prefillPhone; onPhoneInput(_prefillPhone); } }
+  if(typeof _misDatosOfrecer==='function') _misDatosOfrecer();
 
   wzInit();
 }

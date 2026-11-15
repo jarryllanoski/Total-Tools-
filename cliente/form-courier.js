@@ -83,6 +83,8 @@ function usarDireccionDeSiempre(){
   if(!_knownClient||!_knownClient.address) return;
   const ta=$('addrManualInput');
   if(ta){ ta.value=_knownClient.address; try{ ta.focus(); }catch(e){} }
+  const ref=$('f_ref');
+  if(ref && !ref.value.trim() && _knownClient.referencia) ref.value=_knownClient.referencia;
   onDireccionInput();
 }
 

@@ -42,7 +42,7 @@ Estado del plan de auditoría enterprise. Proyecto Firebase: `total-tools-24ce8`
 | L4 | Seguimiento con id antiguo solo mientras el pedido siga abierto (`enlace.aceptaLegado`); freno propio de 20 por minuto | ✅ |
 | L4 | El botón 🔗 del panel da un token seguro a los pedidos antiguos (`trackLegado: true`): el link viejo del cliente sigue hasta que se cierre | ✅ |
 | CI | Se retira la comprobación manual de `?v=`: la construcción pone la huella de cada archivo | ✅ |
-| L5 | Autocompletado guardado en el celular del cliente («¿Eres tú?»); el servidor ya no da nombres por celular | Pendiente |
+| L5 | «¿Eres tú?»: los datos del último pedido viven solo en el celular del cliente (`tt_mis_datos`, 180 días, DNI y celular tapados en pantalla, «No soy yo» los borra) | ✅ |
 | L6 | Revisión de escapado del texto del cliente y CSP de lista blanca | Pendiente |
 
 ---

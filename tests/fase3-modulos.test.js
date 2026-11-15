@@ -40,7 +40,7 @@ module.exports = async ({bloque, ok}) => {
     ok(enLinea.length === 1 && /location\.replace\('seguimiento\.html'/.test(enLinea[0]),
        'su único script en línea es la redirección de los links viejos (tiene que ir primero en el <head>)');
     // Fase 5: el formulario en módulos cliente/form-*.js, en este orden.
-    const ORDEN = ['comun', 'form-base', 'form-datos', 'form-courier', 'form-delivery', 'form-fecha', 'form-enviar',
+    const ORDEN = ['comun', 'form-base', 'form-datos', 'form-mis-datos', 'form-courier', 'form-delivery', 'form-fecha', 'form-enviar',
       'form-agencias', 'form-ubicacion', 'form-sedes-mapa', 'form-asistente', 'form-arranque'];
     const p = ORDEN.map((n) => fo.indexOf('<script src="cliente/' + n + '.js?v='));
     ok(p.every((x, k) => x > 0 && (k === 0 || x > p[k - 1])), 'los módulos del formulario se cargan todos y en orden (comun.js primero)');
