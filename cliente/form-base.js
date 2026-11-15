@@ -51,6 +51,10 @@ async function checkToken(tok){
       showTokenScreen('🔒','Link ya utilizado','Este link ya se usó para un pedido.\nPara registrar otro, escríbenos y te enviamos un link nuevo.','Hola, quiero registrar otro pedido. ¿Me envías un link nuevo?');
       return;
     }
+    if(data.status === 'rate_limited'){
+      showTokenScreen('⏳','Un momento, por favor','Recibimos muchas consultas seguidas.\nEspera un minuto y vuelve a abrir tu link.');
+      return;
+    }
     if(data.status === 'invalid'){
       showTokenScreen('❌','Link inválido','Este link no existe o fue eliminado.\nEscríbenos y te enviamos uno correcto.','Hola, mi link para registrar el pedido no funciona. ¿Me ayudas?');
       return;
@@ -107,11 +111,11 @@ async function loadCfg(){
       cfg = adj.cfg;
     } else if(cfgId){
       const snap = await withTO(_api('formcfg', {id: cfgId}), 5000);
-      if(snap && !snap.error) cfg = snap;
+      if(snap && !snap.error && snap.status !== 'rate_limited') cfg = snap;
     }
     if(!cfg || !_cfgHasPhone(cfg)){
       const live = (adj && adj.vivo) || await withTO(_api('config'), 5000);
-      if(live && !live.error){
+      if(live && !live.error && live.status !== 'rate_limited'){
         if(!cfg){ cfg = live; }
         else{
           const lp = live.phone || (live.config && live.config.phone) || '';
@@ -435,6 +439,7 @@ function renderForm(){
         <div id="f_notes_count" style="text-align:right;font-size:11px;color:var(--muted,#8b949e);margin-top:3px">0 / 600</div>
       </div>
 
+      <div class="tt-h7" aria-hidden="true"><input type="text" id="f_h7" name="h7" tabindex="-1" autocomplete="off" value=""></div>
       <div id="submitErrBox" class="error-box" style="display:none;margin-top:4px"></div>
       <div class="wz-nav">
         <button class="wz-back" onclick="wzBack()">← Atrás</button>

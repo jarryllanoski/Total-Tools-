@@ -2,7 +2,8 @@
 
 const FORM_API = 'https://us-central1-total-tools-24ce8.cloudfunctions.net/formApi';
 
-const CON_APPCHECK = {reniec: true};
+const CON_APPCHECK = {reniec: true, create: true};
+const APPCHECK_ESPERA_MS = 2500;
 
 async function _api(action, params, opts){
   let url = FORM_API + '?action=' + encodeURIComponent(action);
@@ -10,7 +11,7 @@ async function _api(action, params, opts){
   const o = Object.assign({}, opts || {});
   try{
     if(CON_APPCHECK[action] && typeof window._appCheckToken === 'function'){
-      const t = await window._appCheckToken();
+      const t = await Promise.race([window._appCheckToken(), new Promise((r)=>setTimeout(()=>r(''), APPCHECK_ESPERA_MS))]);
       if(t){ o.headers = Object.assign({}, o.headers, {'X-Firebase-AppCheck': t}); }
     }
   }catch(e){}

@@ -34,8 +34,11 @@ Estado del plan de auditoría enterprise. Proyecto Firebase: `total-tools-24ce8`
 | L1 | El servidor no crea pedidos sin token (`SIN_LINK`, antes del freno por IP) | ✅ |
 | L1 | `formulario.html` sin token muestra «Pide tu link» con botón a WhatsApp | ✅ |
 | CI | Publicar en Firebase desde GitHub con Workload Identity Federation, sin claves; el servidor solo cuando cambia `functions/` | ✅ |
-| L2 | Links generales con nombre, pausa, vencimiento, tope diario y contador | Pendiente |
-| L3 | Anti-bots al enviar: App Check, campo trampa, tiempo mínimo, tope por celular | Pendiente |
+| L2 | Links generales con nombre, pausa, vencimiento, tope diario y contador | Descartado por ahora |
+| L3 | IP real del cliente desde la derecha de X-Forwarded-For (`functions/ipCliente.js`); antes se tomaba la que escribe el cliente | ✅ |
+| L3 | Frenos en memoria para alta, link, configuración, autocompletado y agencias; el DNI conserva el freno exacto en Firestore | ✅ |
+| L3 | Alta: campo trampa (rechaza sin gastar el link) y marcas `alertas` por falta de App Check o llenado en menos de 4 s; el panel muestra «⚠️ revisar» | ✅ |
+| L3 | Autocompletado solo con el link personal de ese mismo celular; si no, no responde ni consulta la base | ✅ |
 | L4 | Seguimiento con id antiguo solo mientras el pedido siga abierto | Pendiente |
 | L5 | Autocompletado guardado en el celular del cliente («¿Eres tú?»); el servidor ya no da nombres por celular | Pendiente |
 | L6 | Revisión de escapado del texto del cliente y CSP de lista blanca | Pendiente |

@@ -183,7 +183,7 @@ module.exports = async ({bloque, ok}) => {
     ok(/out\.cfg = soloCampos\(c\.data\(\), FORMCFG_PUBLICO\)/.test(tok) && /out\.vivo = await configViva\(\)/.test(tok) &&
        !/c\.data\(\)[^,]/.test(tok.replace('c.data(), FORMCFG_PUBLICO', '')),
        'el link adjunta su configuracion por la MISMA lista blanca que formcfg y config');
-    ok(/async function handleConfig\(req, res\) \{\s*res\.json\(await configViva\(\)\);/.test(fidx), 'config y el link comparten configViva');
+    ok(/async function handleConfig\(req, res\) \{\s*if \(await _frenado\("formApi_config", req, res\)\) return;\s*res\.json\(await configViva\(\)\);/.test(fidx), 'config y el link comparten configViva');
     ok(/config: configPublica\(d\.config\)/.test(pub) &&
        /const CONFIG_PUBLICA = \["name", "phone", "city"\];/.test(fidx),
        'la función pública devuelve de `config` SOLO nombre, celular y ' +

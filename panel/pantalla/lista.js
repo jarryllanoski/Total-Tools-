@@ -474,6 +474,7 @@ function cardHTML(s){
       <span class="meta">📅 ${escH(s.date||'—')} <button onclick="copyCardLink('${s.id}')" title="Copiar link" style="background:none;border:none;color:#388bfd;font-size:11px;cursor:pointer;padding:0 0 0 2px;vertical-align:middle">🔗</button></span>
       ${_montoCard(s)}
       ${(window.NroComprobante&&NroComprobante.de(s))?`<span class="meta" title="Factura / Boleta" style="opacity:.75">🧾 ${escH(NroComprobante.de(s))}</span>`:''}
+      ${(Array.isArray(s.alertas)&&s.alertas.length)?`<span class="meta" title="${escH('Revisar: '+s.alertas.join(' · '))}" style="color:var(--amber,#d29922);font-weight:700">⚠️ revisar</span>`:''}
     </div>
     ${(s.courier||'').toUpperCase().includes('ENCOMIENDA')?((s.ciudadDestino||s.address)?`<div class="card-addr">📦 ${escH(s.ciudadDestino||s.address)}${s.encAgencia?' · 🏪 '+escH(s.encAgencia):''}</div>`:''): (s.address?`<div class="card-addr">🏠 ${escH(s.address)}</div>`:'' )}
     ${s.notes?`<div class="card-note">📝 ${escH(s.notes)}</div>`:''}

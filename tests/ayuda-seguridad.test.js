@@ -47,9 +47,10 @@ module.exports = async ({bloque, ok}) => {
 
   {
     const cl = srv.slice(srv.indexOf('async function handleClient'), srv.indexOf('async function appCheckOk'));
-    ok(/if \(await _tokenDeEseCelular\(req\.query\.t, phone\)\) return res\.json\(cli\);/.test(cl),
+    ok(/if \(!\(await _tokenDeEseCelular\(req\.query\.t, phone\)\)\) return vacio\(\);/.test(cl) && /return res\.json\(cli\);/.test(cl),
        'nombre completo y dirección SOLO si el link personalizado es de ese mismo celular');
-    ok(/split\(\/\\s\+\/\)\[0\][\s\S]{0,40}parcial: true/.test(cl), 'si no, solo el primer nombre');
+    ok(!/parcial/.test(cl) && cl.indexOf('_tokenDeEseCelular') < cl.indexOf('db.collection(SHIP_COL)'),
+       '⚠️ si no, nada: ni el primer nombre, y ni siquiera se consulta la base (nadie averigua nombres probando celulares)');
     const tk = srv.slice(srv.indexOf('async function _tokenDeEseCelular'), srv.indexOf('async function handleClient(req, res) {'));
     ok(/if \(d\.used\) return false;/.test(tk) && /tp === phone/.test(tk), 'un link ya usado o de otro número no abre nada');
     ok(/\{phone: phone, t: currentToken\}/.test(form), 'el formulario manda el link junto al celular');

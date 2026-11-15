@@ -315,5 +315,5 @@ body.dlv-ajustando #tt-narr{display:none!important}
 
 .ic{display:inline-block;width:1.15em;height:1.15em;background-color:currentColor;-webkit-mask:no-repeat center/contain;mask:no-repeat center/contain;vertical-align:-.2em;flex-shrink:0;font-style:normal}
 
-.biz-marca{display:inline-flex;align-items:center;gap:10px;max-width:calc(100% - 184px)}.biz-logo{width:48px;height:34px;flex-shrink:0}.biz-marca .biz-name{margin-bottom:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tt-h7{position:absolute;left:-9999px;top:auto;width:1px;height:1px;overflow:hidden}.biz-marca{display:inline-flex;align-items:center;gap:10px;max-width:calc(100% - 184px)}.biz-logo{width:48px;height:34px;flex-shrink:0}.biz-marca .biz-name{margin-bottom:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 @media(max-width:400px){.biz-header{text-align:left}.biz-marca{max-width:calc(100% - 100px)}.biz-marca .biz-name{font-size:20px}}

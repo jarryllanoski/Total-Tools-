@@ -174,7 +174,7 @@ async function submitOrder(){
     const resp = await _api('create', null, {
       method: 'POST',
       headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({ order: order, token: currentToken || '' })
+      body: JSON.stringify({ order: order, token: currentToken || '', ms: Math.round(performance.now()), trampa: ($('f_h7')||{}).value || '' })
     });
     if(!resp || resp.status !== 'ok' || !resp.trackToken){
       throw new Error((resp && resp.error) || 'No se pudo registrar');

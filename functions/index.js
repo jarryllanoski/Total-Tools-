@@ -31,6 +31,7 @@ const ticketShalom = require("./ticketShalom");
 const cuentaShalom = require("./cuentaShalom");
 const reniecPublico = require("./reniecPublico");
 const credenciales = require("./credenciales");
+const ipCliente = require("./ipCliente");
 
 setGlobalOptions({maxInstances: 10});
 initializeApp();
@@ -251,8 +252,8 @@ exports.formApi = onRequest(
         if (action === "create") await handleCreate(req, res);
         else if (action === "token") await handleToken(req, res);
         else if (action === "config") await handleConfig(req, res);
-        else if (action === "track") await handleTrack(req, res);
         else if (action === "formcfg") await handleFormCfg(req, res);
+        else if (action === "track") await handleTrack(req, res);
         else if (action === "client") await handleClient(req, res);
         else if (action === "reniec") await handleReniec(req, res);
         else {
@@ -321,6 +322,11 @@ async function handleCreate(req, res) {
     res.status(400).json({status: "error", error: "Token inválido"});
     return;
   }
+  if (body.trampa !== undefined && body.trampa !== "") {
+    res.status(400).json({status: "error",
+      error: "No se pudo registrar tu pedido."});
+    return;
+  }
 
   if (!(await checkRateLimit("formApi_create", req))) {
     res.status(429).json({
@@ -361,6 +367,8 @@ async function handleCreate(req, res) {
     fromForm: true,
     trackToken,
   });
+  const alertas = alertasDelAlta(await appCheckOk(req), body.ms);
+  if (alertas.length) orderToSave.alertas = alertas;
 
   try {
     const _d = reniecPublico.normalizar(orderToSave.dni);
@@ -431,11 +439,26 @@ async function handleCreate(req, res) {
   res.json(resp);
 }
 
+const LLENADO_MIN_MS = 4000;
+
+function alertasDelAlta(verificado, ms) {
+  const out = [];
+  if (!verificado) out.push("sin verificación anti-bots");
+  const n = Number(ms);
+  if (typeof ms !== "number" || !isFinite(n) || n <= 0) {
+    out.push("sin tiempo de llenado");
+  } else if (n < LLENADO_MIN_MS) {
+    out.push("llenado en " + Math.max(1, Math.round(n / 1000)) + " s");
+  }
+  return out;
+}
+
 async function handleToken(req, res) {
   const tokenId = _texto(req.query.t);
   if (!ID_RE.test(tokenId)) {
     res.json({status: "invalid"}); return;
   }
+  if (await _frenado("formApi_token", req, res)) return;
 
   const snap = await db.doc(`${TOK_COL}/${tokenId}`).get();
   if (!snap.exists) {
@@ -490,13 +513,22 @@ async function configViva() {
   };
 }
 
+async function _frenado(nombre, req, res) {
+  if (await checkRateLimit(nombre, req)) return false;
+  res.status(429).json({status: "rate_limited",
+    error: "Demasiadas consultas. Espera un momento."});
+  return true;
+}
+
 async function handleConfig(req, res) {
+  if (await _frenado("formApi_config", req, res)) return;
   res.json(await configViva());
 }
 
 async function handleFormCfg(req, res) {
   const id = _texto(req.query.id);
   if (!ID_RE.test(id)) return res.status(400).json({error: "missing id"});
+  if (await _frenado("formApi_config", req, res)) return;
   const snap = await db.doc(`${FORMCFG_COL}/${id}`).get();
   if (!snap.exists) return res.status(404).json({error: "not found"});
   res.json(soloCampos(snap.data(), FORMCFG_PUBLICO));
@@ -543,6 +575,7 @@ async function handleClient(req, res) {
 
   const phone = _texto(req.query.phone).replace(/\D/g, "").slice(-9);
   if (phone.length !== 9) return vacio();
+  if (!(await _tokenDeEseCelular(req.query.t, phone))) return vacio();
 
   try {
     const snap = await db.collection(SHIP_COL)
@@ -554,9 +587,7 @@ async function handleClient(req, res) {
 
     const cli = clienteLookup.elegirCliente(pedidos, Date.now());
     if (!cli) return vacio();
-    if (await _tokenDeEseCelular(req.query.t, phone)) return res.json(cli);
-    return res.json({name: String(cli.name || "").split(/\s+/)[0] || "",
-      parcial: true});
+    return res.json(cli);
   } catch (e) {
     console.error("handleClient error:", e);
     return vacio();
@@ -732,10 +763,12 @@ async function handleTrack(req, res) {
 }
 
 const RATE_LIMITS = {
-  agenciasOlva: {windowMs: 60000, max: 100},
-  formApi_create: {windowMs: 60000, max: 10},
-  formApi_client: {windowMs: 60000, max: 20},
+  agenciasOlva: {windowMs: 60000, max: 100, memoria: true},
+  formApi_create: {windowMs: 60000, max: 10, memoria: true},
+  formApi_client: {windowMs: 60000, max: 20, memoria: true},
   formApi_track: {windowMs: 60000, max: 120, memoria: true},
+  formApi_token: {windowMs: 60000, max: 30, memoria: true},
+  formApi_config: {windowMs: 60000, max: 60, memoria: true},
   formApi_reniec: {windowMs: 60000, max: 10},
 };
 
@@ -754,8 +787,7 @@ function _frenoMemoria(clave, ventana, max) {
 
 async function checkRateLimit(name, req) {
   const cfg = RATE_LIMITS[name];
-  const forwarded = req.get("x-forwarded-for") || req.ip || "unknown";
-  const ip = forwarded.split(",")[0].trim();
+  const ip = ipCliente.de(req);
   const windowStart = Math.floor(Date.now() / cfg.windowMs) * cfg.windowMs;
   if (cfg.memoria) return _frenoMemoria(name + "|" + ip, windowStart, cfg.max);
   const docId = (name + "_" + ip + "_" + windowStart)

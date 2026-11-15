@@ -8,10 +8,12 @@ module.exports = async ({bloque, ok}) => {
   bloque('El formulario no espera a reCAPTCHA');
   {
     const comun = E.leerReal('cliente/comun.js');
-    ok(/const CON_APPCHECK = \{reniec: true\};/.test(comun) && /if\(CON_APPCHECK\[action\] && typeof window\._appCheckToken === 'function'\)/.test(comun),
-       'App Check solo en la consulta de DNI (es la unica que el servidor verifica)');
+    ok(/const CON_APPCHECK = \{reniec: true, create: true\};/.test(comun) && /if\(CON_APPCHECK\[action\] && typeof window\._appCheckToken === 'function'\)/.test(comun),
+       'App Check solo en la consulta de DNI y al enviar el pedido (las dos que el servidor verifica)');
+    ok(/Promise\.race\(\[window\._appCheckToken\(\), new Promise\(\(r\)=>setTimeout\(\(\)=>r\(''\), APPCHECK_ESPERA_MS\)\)\]\)/.test(comun) && /const APPCHECK_ESPERA_MS = 2500;/.test(comun),
+       'si reCAPTCHA tarda o esta bloqueado, se sigue sin el a los 2,5 s: nunca traba el envio');
     const fidx = E.leerReal('functions/index.js');
-    ok((fidx.match(/await appCheckOk\(req\)/g) || []).length === 1, 'y el servidor lo verifica en un solo lugar');
+    ok((fidx.match(/await appCheckOk\(req\)/g) || []).length === 2, 'y el servidor lo verifica en esos dos lugares');
     const ac = E.leerReal('appcheck.js');
     ok(/getAttribute\('data-appcheck'\) === 'interaccion'\) _alInteractuar\(_init\)/.test(ac), 'reCAPTCHA llega con la primera interaccion');
     ok(/<html lang="es" data-appcheck="interaccion">/.test(fo), 'el formulario lo pide asi');

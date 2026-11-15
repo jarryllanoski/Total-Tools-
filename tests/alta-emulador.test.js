@@ -43,10 +43,10 @@ module.exports = async ({bloque, ok}) => {
   }
   // eslint-disable-next-line no-new-func
   const handleCreate = new Function('db', 'agencias', 'enlace', 'reniecPublico', 'nroComp',
-      'checkRateLimit', 'TOK_COL', 'SHIP_COL', 'CFG_DOC', '_conMts', 'SYNC_V', 'Date',
+      'checkRateLimit', 'appCheckOk', 'TOK_COL', 'SHIP_COL', 'CFG_DOC', '_conMts', 'SYNC_V', 'Date',
       campos + create + ';return handleCreate;',
   )(db, require('../functions/agencias.js'), {generar: () => 't1_' + Math.random().toString(36).slice(2)},
-      {normalizar: () => ''}, require('../functions/nroComprobante.js'), async () => true,
+      {normalizar: () => ''}, require('../functions/nroComprobante.js'), async () => true, async () => true,
       'panel/tokens/items', 'panel/shipments/items', 'panel/config', (o) => o, 1, Reloj);
   const llamar = async (body) => {
     const r = {code: 200, body: null};

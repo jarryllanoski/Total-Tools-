@@ -29,9 +29,10 @@ function onPhoneInput(val){
     const b=$('knownBadge'); if(b) b.style.display='none';
     return;
   }
+  if(!currentToken) return;
   _phoneTimer=setTimeout(async ()=>{
     try{
-      const c = await _api('client', currentToken ? {phone: phone, t: currentToken} : {phone: phone});
+      const c = await _api('client', {phone: phone, t: currentToken});
       if(c && c.name){
         _knownClient = c;
         _showKnownBadge();

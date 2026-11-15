@@ -47,11 +47,12 @@ function servidor(tokens, opciones) {
   };
   // eslint-disable-next-line no-new-func
   const handleCreate = new Function('db', 'agencias', 'enlace', 'reniecPublico', 'nroComp',
-      'checkRateLimit', 'TOK_COL', 'SHIP_COL', 'CFG_DOC', '_conMts', 'SYNC_V',
+      'checkRateLimit', 'appCheckOk', 'TOK_COL', 'SHIP_COL', 'CFG_DOC', '_conMts', 'SYNC_V',
       campos + create + ';return handleCreate;',
   )(db, require('../functions/agencias.js'), require('../functions/enlaceSeguimiento.js'),
       {normalizar: () => ''}, require('../functions/nroComprobante.js'),
       async (n) => { frenos.push(n); return o.freno !== false; },
+      async () => o.appCheck !== false,
       'panel/tokens/items', 'panel/shipments/items', 'panel/config', (x) => x, 1);
   const llamar = async (body) => {
     const r = {code: 200, body: null};
@@ -63,7 +64,8 @@ function servidor(tokens, opciones) {
   return {llamar, lecturas, escritos, frenos, tokens, transacciones};
 }
 
-function verificador(tokens) {
+function verificador(tokens, frenar) {
+  const llamadasFreno = [];
   const src = E.leer('functions/index.js');
   const tok = src.slice(src.indexOf('function _texto(v) {'), src.indexOf('function setCORS(req, res) {')) +
     src.slice(src.indexOf('async function handleToken'), src.indexOf('function telefonoDe'));
@@ -74,13 +76,20 @@ function verificador(tokens) {
   }})};
   // eslint-disable-next-line no-new-func
   const handleToken = new Function('db', 'ID_RE', 'TOK_COL', 'FORMCFG_COL', 'soloCampos', 'FORMCFG_PUBLICO',
-      'telefonoDe', 'configViva', tok + ';return handleToken;',
-  )(db, ID_RE, 'panel/tokens/items', 'panel/formcfg/items', (x) => x, [], () => '911', async () => ({}));
-  return async (t) => {
+      'telefonoDe', 'configViva', '_frenado', tok + ';return handleToken;',
+  )(db, ID_RE, 'panel/tokens/items', 'panel/formcfg/items', (x) => x, [], () => '911', async () => ({}), async (n, rq, rs) => {
+    llamadasFreno.push(n);
+    if (!frenar) return false;
+    rs.status(429).json({status: 'rate_limited'});
+    return true;
+  });
+  const fn = async (t) => {
     const r = {body: null, json: (b) => { r.body = b; return r; }, status: () => r};
     await handleToken({query: {t}}, r);
     return r.body;
   };
+  fn.frenos = llamadasFreno;
+  return fn;
 }
 
 function formulario(opciones) {
@@ -193,6 +202,10 @@ module.exports = async ({bloque, ok}) => {
     }
     const ver = verificador({});
     ok((await ver('noExiste12345')).status === 'invalid' && (await ver('')).status === 'invalid', 'uno inexistente o vacío: inválido');
+    const frenado = verificador({LinkReal00001: {used: false}}, true);
+    ok((await frenado('LinkReal00001')).status === 'rate_limited' && frenado.frenos.join() === 'formApi_token',
+       'quien prueba links seguidos queda frenado (antes, cada intento era una lectura gratis para el bot)');
+    ok((await frenado('no/vale')).status === 'invalid' && frenado.frenos.length === 1, 'un link con forma invalida se descarta antes, sin gastar el freno');
     ok((await ver(['aB3dE5gH7jK9mN1pQ3sT', 'x'])).status === 'invalid' && (await ver({a: 1})).status === 'invalid',
        'un parámetro que llega como lista u objeto (t[]=…) se rechaza limpio, sin error 500');
   }
@@ -254,9 +267,87 @@ module.exports = async ({bloque, ok}) => {
 
   bloque('Fase 1: el envío sigue mandando el token');
   {
-    ok(/body: JSON\.stringify\(\{ order: order, token: currentToken \|\| '' \}\)/.test(E.leerReal('cliente/form-enviar.js')),
-       'el formulario manda el token con el pedido');
+    ok(/body: JSON\.stringify\(\{ order: order, token: currentToken \|\| '', ms: Math\.round\(performance\.now\(\)\), trampa: \(\$\('f_h7'\)\|\|\{\}\)\.value \|\| '' \}\)/.test(E.leerReal('cliente/form-enviar.js')),
+       'el formulario manda el token con el pedido, el tiempo desde que abrió la página y el campo trampa');
     ok(/function _ayudaWa\(texto\)\{\s*return _waNegocio\(CFG, texto\);/.test(E.leerReal('cliente/comun.js')),
        'la ayuda de Toby usa el mismo armado del enlace de WhatsApp');
+  }
+
+  bloque('Anti-bots: la IP real del cliente, aunque invente la cabecera');
+  {
+    const IP = require('../functions/ipCliente.js');
+    const req = (xff, ip) => ({get: (k) => (k.toLowerCase() === 'x-forwarded-for' ? xff : undefined), ip});
+    ok(IP.de(req('190.42.10.5')) === '190.42.10.5', 'una sola IP: esa');
+    ok(IP.de(req('1.1.1.1, 190.42.10.5')) === '190.42.10.5', '⚠️ con una IP inventada a la izquierda: se usa la que agregó Google (la de la derecha)');
+    ok(IP.de(req('1.1.1.1, 2.2.2.2, 190.42.10.5, 35.191.4.7')) === '190.42.10.5', 'salta el balanceador de Google');
+    ok(IP.de(req('190.42.10.5, 10.8.0.3, 169.254.8.1')) === '190.42.10.5', 'salta las IPs internas');
+    ok(IP.de(req('2001:db8::7')) === '2001:db8::7', 'IPv6 tambien');
+    ok(IP.de(req('<script>')) === 'invalida' && IP.de(req('1.1.1.1, nada')) === 'invalida', 'basura en la cabecera: un solo cajon comun, no una clave nueva por intento');
+    ok(IP.de(req('', '190.42.10.9')) === '190.42.10.9' && IP.de(req('')) === 'desconocida', 'sin cabecera: la IP de la conexion');
+    const src = E.leer('functions/index.js');
+    const freno = src.slice(src.indexOf('const RATE_LIMITS = {'), src.indexOf('const OLVA_STORES_URL'));
+    // eslint-disable-next-line no-new-func
+    const check = new Function('ipCliente', 'db', freno + ';return checkRateLimit;')(IP, null);
+    let pasan = 0;
+    for (let i = 0; i < 25; i++) {
+      if (await check('formApi_create', req((i + 1) + '.' + i + '.0.1, 190.42.10.5'))) pasan++;
+    }
+    ok(pasan === 10, '⚠️ 25 envios cambiando la IP inventada en cada uno: igual solo pasan 10 por minuto (' + pasan + ')');
+    ok(await check('formApi_create', req('190.42.10.6')), 'otra persona de verdad no queda frenada');
+    ok(/formApi_token: \{windowMs: 60000, max: 30, memoria: true\}/.test(src) && /formApi_config: \{windowMs: 60000, max: 60, memoria: true\}/.test(src),
+       'verificar link y leer configuracion tambien tienen freno (antes, ilimitado)');
+    ok(/formApi_create: \{[^}]*memoria: true\}/.test(src) && /formApi_client: \{[^}]*memoria: true\}/.test(src) && /agenciasOlva: \{[^}]*memoria: true\}/.test(src),
+       'los frenos van en memoria: ya no cuesta una escritura en la base por cada intento');
+    ok(/formApi_reniec: \{windowMs: 60000, max: 10\}/.test(src), 'el DNI (consulta pagada) mantiene el freno exacto en la base');
+  }
+
+  bloque('Anti-bots: al enviar el pedido');
+  {
+    const src = E.leer('functions/index.js');
+    // eslint-disable-next-line no-new-func
+    const alertas = new Function(src.slice(src.indexOf('const LLENADO_MIN_MS'), src.indexOf('async function handleToken')) + ';return alertasDelAlta;')();
+    ok(alertas(true, 45000).length === 0, 'persona real verificada que tardo 45 s: sin marcas');
+    ok(alertas(false, 45000).join() === 'sin verificación anti-bots', 'sin App Check (bloqueador, celular viejo): entra, marcado');
+    ok(alertas(true, 1800).join() === 'llenado en 2 s', 'llenado en menos de 4 s: entra, marcado');
+    ok(alertas(false, undefined).join() === 'sin verificación anti-bots,sin tiempo de llenado', 'un envio directo al servidor: entra marcado con las dos');
+    ok(alertas(true, '9000').join() === 'sin tiempo de llenado' && alertas(true, -5).join() === 'sin tiempo de llenado', 'un tiempo que no es numero valido no cuenta');
+
+    const pedido = {name: 'CLIENTE PRUEBA', phone: '900000001'};
+    let s = servidor({Trampa001: {used: false}});
+    let r = await s.llamar({token: 'Trampa001', trampa: 'http://spam.example', ms: 30000, order: pedido});
+    ok(r.code === 400 && s.escritos.length === 0 && s.tokens.Trampa001.used === false && s.lecturas.length === 0,
+       '⚠️ campo trampa lleno (bot): rechazado, sin leer ni escribir y el link sigue sin usar');
+    s = servidor({Normal001: {used: false}});
+    r = await s.llamar({token: 'Normal001', trampa: '', ms: 52000, order: pedido});
+    let ped = s.escritos.find((w) => w.p.indexOf('panel/shipments/items/') === 0);
+    ok(r.code === 200 && ped && !('alertas' in ped.data), 'persona real: pedido sin marcas');
+    s = servidor({Rapido001: {used: false}}, {appCheck: false});
+    r = await s.llamar({token: 'Rapido001', ms: 1200, order: pedido});
+    ped = s.escritos.find((w) => w.p.indexOf('panel/shipments/items/') === 0);
+    ok(r.code === 200 && ped && ped.data.alertas.join() === 'sin verificación anti-bots,llenado en 1 s', 'sospechoso: el pedido entra con sus marcas (nunca se pierde una venta)');
+    s = servidor({Falsa001: {used: false}});
+    r = await s.llamar({token: 'Falsa001', ms: 52000, order: Object.assign({alertas: []}, pedido)});
+    ped = s.escritos.find((w) => w.p.indexOf('panel/shipments/items/') === 0);
+    ok(!('alertas' in ped.data), 'el cliente no puede mandar sus propias marcas (las pone solo el servidor)');
+    s = servidor({Viejo0001: {used: false}});
+    r = await s.llamar({token: 'Viejo0001', order: pedido});
+    ok(r.code === 200, 'un formulario viejo en cache (sin trampa ni tiempo) igual registra');
+  }
+
+  bloque('Anti-bots: en el formulario y en el panel');
+  {
+    const fb = E.leerReal('cliente/form-base.js');
+    ok(/<div class="tt-h7" aria-hidden="true"><input type="text" id="f_h7" name="h7" tabindex="-1" autocomplete="off" value=""><\/div>/.test(fb),
+       'campo trampa: invisible, fuera del tabulador y sin autocompletar (ni el navegador ni el lector de pantalla lo llenan)');
+    ok(/\.tt-h7\{position:absolute;left:-9999px/.test(E.leerReal('cliente/cliente.css')), 'escondido fuera de la pantalla, no con display:none (que algunos bots detectan)');
+    let f = formulario({search: '?t=LinkX0001', token: {status: 'rate_limited'}});
+    f.ctx.init();
+    await esperar();
+    ok(/Un momento, por favor/.test(f.estado.pantalla) && !f.estado.formulario, 'si el servidor frena: aviso claro, no un formulario roto');
+    ok(/snap\.status !== 'rate_limited'/.test(fb) && /live\.status !== 'rate_limited'/.test(fb), 'la configuracion frenada no se confunde con una configuracion');
+    ok(/if\(!currentToken\) return;/.test(E.leerReal('cliente/form-datos.js')), 'el autocompletado solo pregunta con un link');
+    const lista = E.leerReal('panel/pantalla/lista.js');
+    ok(/Array\.isArray\(s\.alertas\)&&s\.alertas\.length\)\?`<span class="meta" title="\$\{escH\('Revisar: '\+s\.alertas\.join\(' · '\)\)\}"/.test(lista) && /⚠️ revisar/.test(lista),
+       'el panel muestra «⚠️ revisar» con el motivo al pasar el dedo o el mouse');
   }
 };
