@@ -21,7 +21,9 @@ module.exports = async ({bloque, ok}) => {
     const m = JSON.parse(E.leerReal('marca/app.webmanifest'));
     ok(m.short_name === 'Total Tools' && m.display === 'standalone' && m.start_url === '../index.html', 'nombre, pantalla completa y entrada al panel');
     ok(m.icons.some((i) => i.sizes === '512x512' && i.purpose === 'maskable') && m.icons.some((i) => i.sizes === '192x192'), 'iconos 192, 512 y adaptable');
-    m.icons.forEach((i) => ok(fs.existsSync(path.join(E.RAIZ, 'marca', i.src)), 'existe ' + i.src));
+    m.icons.forEach((i) => ok(fs.existsSync(path.join(E.RAIZ, 'marca', i.src.split('?')[0])), 'existe ' + i.src));
+    ok(m.icons.every((i) => /\?v=\d+$/.test(i.src)),
+       'cada icono de la app lleva version: si cambia el logo, Chrome baja el nuevo aunque la imagen vieja este en cache 7 dias');
     ok(/<link rel="manifest" href="marca\/app\.webmanifest\?v=\d+">/.test(E.leerCrudo('index.html')), 'el panel lo enlaza');
   }
 
