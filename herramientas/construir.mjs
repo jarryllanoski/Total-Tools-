@@ -64,6 +64,12 @@ async function procesar(f, publicados, sinVersion) {
     const r = await transform(fuente, {loader: 'js', minify: true, legalComments: 'none', charset: 'utf8'});
     return Buffer.from(r.code);
   }
+  if (f.endsWith('.webmanifest')) {
+    return Buffer.from(b.toString('utf8').replace(/("src": ")([^"?]+)\?v=[^"]*"/g, (m, a, nombre) => {
+      const real = recursoPublicado(f, nombre, publicados);
+      return real ? a + nombre + '?v=' + huella(leer(real)) + '"' : m;
+    }));
+  }
   if (f.endsWith('.css')) {
     const r = await transform(b.toString('utf8'), {loader: 'css', minify: true, legalComments: 'none', charset: 'utf8'});
     return Buffer.from(r.code);

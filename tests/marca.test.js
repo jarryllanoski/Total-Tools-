@@ -24,6 +24,8 @@ module.exports = async ({bloque, ok}) => {
     m.icons.forEach((i) => ok(fs.existsSync(path.join(E.RAIZ, 'marca', i.src.split('?')[0])), 'existe ' + i.src));
     ok(m.icons.every((i) => /\?v=\d+$/.test(i.src)),
        'cada icono de la app lleva version: si cambia el logo, Chrome baja el nuevo aunque la imagen vieja este en cache 7 dias');
+    ok(/if \(f\.endsWith\('\.webmanifest'\)\)[\s\S]{0,400}huella\(leer\(real\)\)/.test(E.leerReal('herramientas/construir.mjs')),
+       'al publicar, esa version es la huella de cada icono (no hay que cambiarla a mano)');
     ok(/<link rel="manifest" href="marca\/app\.webmanifest\?v=\d+">/.test(E.leerCrudo('index.html')), 'el panel lo enlaza');
   }
 
