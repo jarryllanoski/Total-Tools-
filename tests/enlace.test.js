@@ -221,6 +221,16 @@ module.exports = async ({bloque, ok}) => {
        'pero uno nuevo, con token, NO se abre por su id: ahi estaba la puerta trasera');
     ok(L.aceptaLegado({name: 'Ana', trackToken: ''}) === true,
        'un token vacio no cuenta como token: el pedido sigue siendo de los viejos');
+    ok(L.aceptaLegado({status: 'ENVIADO'}) === true && L.aceptaLegado({status: 'LLEGÓ A DESTINO'}) === true,
+       'un pedido antiguo ABIERTO se sigue abriendo por su id');
+    ok(['FINALIZADO', 'ENTREGADO', 'CANCELADO', ' finalizado ', 'Entregado'].every((st) => L.aceptaLegado({status: st}) === false),
+       '⚠️ al cerrarse (finalizado, entregado o cancelado) el link antiguo se detiene');
+    ok(L.aceptaLegado({status: 'ENVIADO', trackToken: 't1_aaaaaaaaaaaaaaaaaaaaaa', trackLegado: true}) === true,
+       'si al pedido antiguo se le dio un link nuevo, el que ya tenia el cliente sigue sirviendo mientras este abierto');
+    ok(L.aceptaLegado({status: 'FINALIZADO', trackToken: 't1_aaaaaaaaaaaaaaaaaaaaaa', trackLegado: true}) === false,
+       'y se detiene igual al cerrarse');
+    ok(L.aceptaLegado({status: 'ENVIADO', trackToken: 't1_aaaaaaaaaaaaaaaaaaaaaa', trackLegado: 'true'}) === false,
+       'la marca tiene que ser true de verdad, no un texto');
     ok(L.aceptaLegado({}) === true && L.aceptaLegado(null) === true,
        'y ante la duda se ABRE: dejar a un cliente sin ver su pedido es peor ' +
        'que aceptar un id que de todas formas ya era publico ayer');
@@ -291,12 +301,9 @@ module.exports = async ({bloque, ok}) => {
        Son dos botones distintos —la tarjeta del panel y la vista de
        seguimiento— y si uno se queda con el id, la mitad de los links que
        mandes seguiran siendo adivinables sin que nada lo indique. */
-    ['index.html', 'tracking.js'].forEach((f) => {
-      const src = E.leer(f);
-      const trozo = src.slice(src.indexOf('?seg=') - 500, src.indexOf('?seg=') + 200);
-      ok(/tokenDe/.test(trozo),
-         f + ' arma el link con EnlaceSeguimiento.tokenDe, no con el id pelado');
-    });
+    const usos = E.modulosPanel().filter((f) => /\?seg='/.test(E.leerReal(f)));
+    ok(usos.length === 1 && usos[0] === 'panel/compartir/links-tokens.js',
+       'el panel arma el link de seguimiento en UN solo lugar (' + usos.join(', ') + ')');
   }
 
   {
@@ -510,5 +517,83 @@ module.exports = async ({bloque, ok}) => {
     ok(!/\.set\(|\.update\(|\.create\(/.test(track),
        'handleTrack no escribe NADA: mirar un pedido no lo modifica, ni para ' +
        'ponerle un token que no tenia');
+  }
+
+  bloque('Seguimiento antiguo: abierto funciona, cerrado se detiene (servidor real)');
+  {
+    const src = E.leer('functions/index.js');
+    const T = src.slice(src.indexOf('function _texto(v) {'), src.indexOf('function setCORS(req, res) {')) +
+      src.slice(src.indexOf('async function handleTrack'), src.indexOf('const RATE_LIMITS = {'));
+    const pedidos = {
+      id_1754000000001: {id: 'id_1754000000001', name: 'ANTIGUO ABIERTO', status: 'ENVIADO'},
+      id_1754000000002: {id: 'id_1754000000002', name: 'ANTIGUO CERRADO', status: 'FINALIZADO'},
+      id_1754000000003: {id: 'id_1754000000003', name: 'NUEVO', status: 'ENVIADO', trackToken: 't1_nuevoNUEVOnuevoNUEVOnu'},
+      id_1754000000004: {id: 'id_1754000000004', name: 'ANTIGUO CON LINK NUEVO', status: 'ENVIADO', trackToken: 't1_legadoLEGADOlegadoLEGA', trackLegado: true},
+      id_1754000000005: {id: 'id_1754000000005', name: 'ANTIGUO CON LINK NUEVO CERRADO', status: 'ENTREGADO', trackToken: 't1_cerradoCERRADOcerradoC', trackLegado: true},
+    };
+    const db = {
+      doc: (p) => ({get: async () => {
+        const id = p.split('/').pop();
+        return pedidos[id] ? {exists: true, data: () => pedidos[id]} : {exists: false, data: () => null};
+      }}),
+      collection: () => ({where: (k, op, v) => ({limit: () => ({get: async () => {
+        const d = Object.values(pedidos).filter((x) => x[k] === v);
+        return {empty: !d.length, docs: d.map((x) => ({data: () => x}))};
+      }})})}),
+    };
+    const frenos = {};
+    let limiteLegado = 1000;
+    // eslint-disable-next-line no-new-func
+    const handleTrack = new Function('db', 'enlace', 'checkRateLimit', 'pedidoPublico', 'SHIP_COL', 'CFG_DOC', T + ';return handleTrack;')(
+        db, L, async (n) => { frenos[n] = (frenos[n] || 0) + 1; return n !== 'formApi_track_legado' || frenos[n] <= limiteLegado; },
+        require('../functions/pedidoPublico.js'), 'panel/shipments/items', 'panel/config');
+    const ver = async (t) => {
+      const r = {code: 200, body: null};
+      r.status = (c) => { r.code = c; return r; };
+      r.json = (b) => { r.body = b; return r; };
+      await handleTrack({query: {token: t}}, r);
+      return r;
+    };
+    ok((await ver('id_1754000000001')).body.status === 'ok', 'link antiguo de un pedido abierto: funciona como siempre');
+    ok((await ver('id_1754000000002')).body.status === 'not_found', '⚠️ link antiguo de un pedido FINALIZADO: se detiene');
+    ok((await ver('id_1754000000003')).body.status === 'not_found', 'pedido nuevo por su id (adivinable): no se abre');
+    ok((await ver('t1_nuevoNUEVOnuevoNUEVOnu')).body.status === 'ok', 'pedido nuevo por su token: si');
+    ok((await ver('id_1754000000004')).body.status === 'ok' && (await ver('t1_legadoLEGADOlegadoLEGA')).body.status === 'ok',
+       'antiguo al que le diste link nuevo: abre por los dos mientras siga abierto');
+    const c5 = await ver('t1_cerradoCERRADOcerradoC');
+    ok((await ver('id_1754000000005')).body.status === 'not_found' && c5.body.status === 'ok' && c5.body.order.frozen === true,
+       'al cerrarse: el link viejo se detiene y el nuevo sigue mostrando el pedido (congelado)');
+    ok((await ver('id_1754000000002')).body.order === undefined, 'el link detenido no devuelve ningun dato del pedido');
+    limiteLegado = Object.keys(frenos).length ? frenos.formApi_track_legado : 0;
+    const r429 = await ver('id_1754000000001');
+    const rNuevo = await ver('t1_nuevoNUEVOnuevoNUEVOnu');
+    ok(r429.code === 429 && r429.body.status === 'rate_limited' && rNuevo.body.status === 'ok',
+       'probar muchos ids antiguos tiene su propio freno (20 por minuto) y no afecta a los links nuevos');
+    ok(/formApi_track_legado: \{windowMs: 60000, max: 20, memoria: true\}/.test(src), 'freno de 20 por minuto para links antiguos');
+  }
+
+  bloque('Panel: el boton 🔗 siempre copia un link seguro');
+  {
+    const vm = require('vm');
+    const fuente = E.trozo('panel/compartir/links-tokens.js', 'function getSeguimientoLink(){', 'function updateShareLink(){');
+    const guardados = [];
+    const S = {shipments: [
+      {id: 'id_1754000000001', status: 'ENVIADO'},
+      {id: 'id_1790000000000', status: 'ENVIADO', trackToken: 't1_yaTENIAyaTENIAyaTENIAy'},
+    ]};
+    const ctx = vm.createContext({window: {S, EnlaceSeguimiento: L}, S, save: (id) => guardados.push(id), Date,
+      getFormLink: () => 'https://total-tools-24ce8.web.app/formulario.html'});
+    ctx.window.EnlaceSeguimiento = L;
+    vm.runInContext(fuente + ';this.linkSeguimientoDe=linkSeguimientoDe;', ctx);
+    const u1 = ctx.linkSeguimientoDe('id_1790000000000');
+    ok(u1 === 'https://total-tools-24ce8.web.app/seguimiento.html?seg=t1_yaTENIAyaTENIAyaTENIAy' && guardados.length === 0,
+       'pedido con token: copia ese token y no toca nada');
+    const u2 = ctx.linkSeguimientoDe('id_1754000000001');
+    const p = S.shipments[0];
+    ok(/\?seg=t1_[A-Za-z0-9_-]{22}$/.test(u2) && p.trackToken === u2.split('seg=')[1] && p.trackLegado === true && guardados.join() === 'id_1754000000001',
+       '⚠️ pedido antiguo: recibe un token seguro nuevo, queda marcado y se guarda (el link viejo del cliente sigue hasta que se cierre)');
+    ok(ctx.linkSeguimientoDe('id_1754000000001') === u2 && guardados.length === 1, 'la segunda vez copia el mismo link, sin volver a guardar');
+    ok(ctx.linkSeguimientoDe('no-existe') === '', 'sin pedido, no inventa un link');
+    ok(/if\(!url\)\{ toast\(/.test(E.leerReal('panel/pantalla/escaner.js')), 'y el boton avisa si no pudo armarlo');
   }
 };

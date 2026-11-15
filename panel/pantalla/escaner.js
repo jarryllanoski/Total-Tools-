@@ -197,9 +197,9 @@ function shalomTicketFoto(file){
 }
 
 function copyCardLink(id){
-  const base=typeof getSeguimientoLink==='function'?getSeguimientoLink():window.location.origin+window.location.pathname.replace(/\/[^\/]*$/,'/seguimiento.html');
-  const _ped=(window.S&&S.shipments||[]).find(x=>x&&x.id===id);
-  const url=base+'?seg='+(window.EnlaceSeguimiento?EnlaceSeguimiento.tokenDe(_ped||{id}):id);
+  let url='';
+  try{ url=linkSeguimientoDe(id); }catch(e){ url=''; }
+  if(!url){ toast('⚠️ No se pudo armar el link. Recarga con Ctrl+Shift+R y vuelve a intentar.'); return; }
   const done=()=>toast('🔗 Link de seguimiento copiado');
   try{navigator.clipboard.writeText(url).then(done).catch(()=>{const t=document.createElement('textarea');t.value=url;document.body.appendChild(t);t.select();document.execCommand('copy');document.body.removeChild(t);done()});}
   catch(e){const t=document.createElement('textarea');t.value=url;document.body.appendChild(t);t.select();document.execCommand('copy');document.body.removeChild(t);done();}

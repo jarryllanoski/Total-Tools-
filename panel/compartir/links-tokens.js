@@ -5,6 +5,17 @@ function getFormLink(){
 function getSeguimientoLink(){
   return getFormLink().replace(/formulario\.html$/, 'seguimiento.html');
 }
+function linkSeguimientoDe(id){
+  const ped=(window.S&&S.shipments||[]).find(function(x){ return x && x.id===id; });
+  if(!ped) return '';
+  if(!(typeof ped.trackToken==='string' && ped.trackToken)){
+    ped.trackToken=window.EnlaceSeguimiento.generar();
+    ped.trackLegado=true;
+    ped._localTs=Date.now();
+    save(ped.id);
+  }
+  return getSeguimientoLink()+'?seg='+ped.trackToken;
+}
 function updateShareLink(){
   const link = getFormLink();
   const el = document.getElementById('shareUrl');

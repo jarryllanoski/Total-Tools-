@@ -85,8 +85,8 @@ module.exports = async ({bloque, ok}) => {
     const c = E.leer('config.js');
     ok(/function getSeguimientoLink\(\)\{\s*return getFormLink\(\)\.replace\(\/formulario\\\.html\$\/, 'seguimiento\.html'\);/.test(c),
        'el panel tiene UNA regla para el link de seguimiento');
-    ok(/getSeguimientoLink\(\):window\.location\.origin/.test(E.leer('index.html')), 'copiar link desde la tarjeta');
-    ok(/typeof getSeguimientoLink === 'function' \? getSeguimientoLink\(\)/.test(E.leer('tracking.js')), 'y desde el seguimiento del panel');
+    ok(/try\{ url=linkSeguimientoDe\(id\); \}/.test(E.leer('index.html')), 'copiar link desde la tarjeta usa esa regla');
+    ok(!/Tracking\.copiarLink/.test(E.leer('tracking.js')), 'y no queda una segunda copia de la regla en el seguimiento del panel');
     ok(/location\.pathname\.replace\(\/\[\^\/\]\*\$\/, 'seguimiento\.html'\)\}\?seg=\$\{trackToken\}/.test(fo),
        'el link que el cliente recibe por WhatsApp');
     // La regla, ejecutada.

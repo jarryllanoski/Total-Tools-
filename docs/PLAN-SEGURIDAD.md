@@ -39,7 +39,9 @@ Estado del plan de auditoría enterprise. Proyecto Firebase: `total-tools-24ce8`
 | L3 | Frenos en memoria para alta, link, configuración, autocompletado y agencias; el DNI conserva el freno exacto en Firestore | ✅ |
 | L3 | Alta: campo trampa (rechaza sin gastar el link) y marcas `alertas` por falta de App Check o llenado en menos de 4 s; el panel muestra «⚠️ revisar» | ✅ |
 | L3 | Autocompletado solo con el link personal de ese mismo celular; si no, no responde ni consulta la base | ✅ |
-| L4 | Seguimiento con id antiguo solo mientras el pedido siga abierto | Pendiente |
+| L4 | Seguimiento con id antiguo solo mientras el pedido siga abierto (`enlace.aceptaLegado`); freno propio de 20 por minuto | ✅ |
+| L4 | El botón 🔗 del panel da un token seguro a los pedidos antiguos (`trackLegado: true`): el link viejo del cliente sigue hasta que se cierre | ✅ |
+| CI | Se retira la comprobación manual de `?v=`: la construcción pone la huella de cada archivo | ✅ |
 | L5 | Autocompletado guardado en el celular del cliente («¿Eres tú?»); el servidor ya no da nombres por celular | Pendiente |
 | L6 | Revisión de escapado del texto del cliente y CSP de lista blanca | Pendiente |
 

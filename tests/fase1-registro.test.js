@@ -265,7 +265,8 @@ module.exports = async ({bloque, ok}) => {
 
   {
     const srv = E.leer('functions/index.js');
-    ok(/\["ENTREGADO", "CANCELADO", "FINALIZADO"\]\s*\.includes\(String\(order\.status \|\| ""\)\.trim\(\)\.toUpperCase\(\)\)/.test(srv),
+    const L = require('../functions/enlaceSeguimiento.js');
+    ok(/const frozen = enlace\.cerrado\(order\);/.test(srv) && L.CERRADOS.join() === 'FINALIZADO,ENTREGADO,CANCELADO',
        'FINALIZADO congela el link: no se consulta cada 30 s');
     ok(/pedidoPublico\.minimizarViejo\(\s*pedidoPublico\.proyectar\(order, \{code, frozen\}\), order, Date\.now\(\)\)/.test(srv),
        'el link pasa por la reja del tiempo');

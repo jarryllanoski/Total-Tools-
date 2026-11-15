@@ -47,9 +47,19 @@
     return "invalido";
   }
 
+  const CERRADOS = ["FINALIZADO", "ENTREGADO", "CANCELADO"];
+
+  function cerrado(pedido) {
+    const st = pedido && typeof pedido.status === "string" ?
+      pedido.status.trim().toUpperCase() : "";
+    return CERRADOS.indexOf(st) >= 0;
+  }
+
   function aceptaLegado(pedido) {
     if (!pedido || typeof pedido !== "object") return true;
-    return !(typeof pedido.trackToken === "string" && pedido.trackToken);
+    if (cerrado(pedido)) return false;
+    const conToken = typeof pedido.trackToken === "string" && pedido.trackToken;
+    return !conToken || pedido.trackLegado === true;
   }
 
   function tokenDe(pedido) {
@@ -60,6 +70,6 @@
     return String(pedido.id || "");
   }
 
-  return {LEGADO, NUEVO, PREFIJO, generar, tipoDe, aceptaLegado, tokenDe,
-    _crypto};
+  return {LEGADO, NUEVO, PREFIJO, CERRADOS, generar, tipoDe, cerrado,
+    aceptaLegado, tokenDe, _crypto};
 });

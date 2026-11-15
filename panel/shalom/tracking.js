@@ -772,24 +772,6 @@ Tracking.abrirManual = function() {
   if (ov) ov.classList.add('open');
 };
 
-Tracking.copiarLink = function(id) {
-  var base = typeof getSeguimientoLink === 'function' ? getSeguimientoLink()
-    : window.location.origin + window.location.pathname.replace(/\/[^\/]*$/, '/seguimiento.html');
-  var _ped = (window.S && S.shipments || []).filter(function(x){ return x && x.id === id; })[0];
-  var url = base + '?seg=' + (window.EnlaceSeguimiento
-    ? EnlaceSeguimiento.tokenDe(_ped || {id: id}) : id);
-  var done = function() { if (typeof toast === 'function') toast('🔗 Link de seguimiento copiado'); };
-  try {
-    navigator.clipboard.writeText(url).then(done).catch(function() {
-      var t = document.createElement('textarea'); t.value = url;
-      document.body.appendChild(t); t.select(); document.execCommand('copy'); document.body.removeChild(t); done();
-    });
-  } catch(e) {
-    var t = document.createElement('textarea'); t.value = url;
-    document.body.appendChild(t); t.select(); document.execCommand('copy'); document.body.removeChild(t); done();
-  }
-};
-
 var AUTO_CHECK_ACTIVO = false;
 var _autoRunning = false;
 async function autoTrackingCheck() {

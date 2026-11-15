@@ -12,9 +12,7 @@ name: CI
 #      2 398 de index.html y las 2 276 de formulario.html) que ninguna
 #      comprobación miraba.
 #   4. Que todo <script src> apunte a un archivo que existe.
-#   5. Que el ?v= se haya subido cuando cambia un .js. Sin esto, un despliegue
-#      "sale bien" pero los clientes siguen con la versión vieja en caché.
-#   6. Las pruebas del panel (tests/), que cuidan los invariantes de negocio:
+#   5. Las pruebas del panel (tests/), que cuidan los invariantes de negocio:
 #      que la selección no viaje entre dispositivos, que un envío no desande el
 #      camino, que buscar encuentre también los finalizados, y que nadie llame
 #      a Shalom saltándose la puerta única.
@@ -178,53 +176,3 @@ jobs:
               sys.exit(1)
           print('ok: ningun window.X apunta a un const/let sin exportar')
           PY
-
-      - name: El ?v= se subió al cambiar un .js
-        env:
-          BASE_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
-        run: |
-          set -e
-          vacio=0000000000000000000000000000000000000000
-          if [ -z "$BASE_SHA" ] || [ "$BASE_SHA" = "$vacio" ] \
-             || ! git cat-file -e "$BASE_SHA^{commit}" 2>/dev/null; then
-            echo "Sin commit base con el que comparar — se omite."
-            exit 0
-          fi
-
-          # Todos los .js menos los de functions/ (no se sirven al navegador y
-          # no llevan ?v=). Se incluyen las SUBCARPETAS: narrador/etiqueta.js
-          # también se referencia con ?v= y antes quedaba fuera de esta red.
-          # tests/ tampoco lleva ?v=: no lo carga el navegador.
-          cambiados=$(git diff --name-only "$BASE_SHA" HEAD -- '*.js' \
-                      | grep -v '^functions/' | grep -v '^tests/' || true)
-          if [ -z "$cambiados" ]; then
-            echo "Ningún .js de la raíz cambió — nada que comprobar."
-            exit 0
-          fi
-
-          fallos=0
-          for f in $cambiados; do
-            [ -f "$f" ] || continue          # borrado: no aplica
-            esc=$(printf '%s' "$f" | sed 's/\./\\./g')
-            referenciado=0
-            for html in index.html formulario.html seguimiento.html; do
-              [ -f "$html" ] || continue
-              # El ancla src=" evita que tracking.js case dentro de
-              # qrtracking.js — ese error ya se cometió a mano una vez.
-              nueva=$(grep -o "src=\"$esc?v=[0-9]*\"" "$html" || true)
-              [ -z "$nueva" ] && continue
-              referenciado=1
-              vieja=$(git show "$BASE_SHA:$html" 2>/dev/null \
-                      | grep -o "src=\"$esc?v=[0-9]*\"" || true)
-              if [ "$nueva" = "$vieja" ]; then
-                echo "::error file=$html::$f cambió pero su ?v= sigue igual ($nueva). Súbelo o los clientes se quedan con la versión vieja en caché."
-                fallos=1
-              else
-                echo "  ok: $f  $vieja -> $nueva"
-              fi
-            done
-            if [ "$referenciado" = "0" ]; then
-              echo "  (aviso) $f cambió y no lo referencia ningún .html"
-            fi
-          done
-          exit $fallos

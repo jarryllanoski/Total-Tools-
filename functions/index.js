@@ -724,6 +724,16 @@ async function handleTrack(req, res) {
     return;
   }
 
+  const frenoLegado = tipo === "legado" &&
+      !(await checkRateLimit("formApi_track_legado", req));
+  if (frenoLegado) {
+    res.status(429).json({
+      status: "rate_limited",
+      error: "Demasiadas consultas. Espera un momento y vuelve a intentar.",
+    });
+    return;
+  }
+
   let snap = null;
   if (tipo === "legado") {
     snap = await db.doc(`${SHIP_COL}/${trackToken}`).get();
@@ -745,8 +755,7 @@ async function handleTrack(req, res) {
     return;
   }
   const code = (order.id || "").slice(-4).toUpperCase();
-  const frozen = ["ENTREGADO", "CANCELADO", "FINALIZADO"]
-      .includes(String(order.status || "").trim().toUpperCase());
+  const frozen = enlace.cerrado(order);
 
   const safe = pedidoPublico.minimizarViejo(
       pedidoPublico.proyectar(order, {code, frozen}), order, Date.now());
@@ -767,6 +776,7 @@ const RATE_LIMITS = {
   formApi_create: {windowMs: 60000, max: 10, memoria: true},
   formApi_client: {windowMs: 60000, max: 20, memoria: true},
   formApi_track: {windowMs: 60000, max: 120, memoria: true},
+  formApi_track_legado: {windowMs: 60000, max: 20, memoria: true},
   formApi_token: {windowMs: 60000, max: 30, memoria: true},
   formApi_config: {windowMs: 60000, max: 60, memoria: true},
   formApi_reniec: {windowMs: 60000, max: 10},
