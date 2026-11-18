@@ -49,6 +49,15 @@ module.exports = async ({bloque, ok}) => {
     const trozo = fw.slice(fw.indexOf('- name: Que cambio'), fw.indexOf('- uses: actions/setup-node'));
     const guion = trozo.slice(trozo.indexOf('run: |') + 7).split('\n')
         .map((l) => l.replace(/^ {10}/, '')).join('\n');
+    const candidatos = process.platform === 'win32' ?
+      ['C:\\Program Files\\Git\\bin\\bash.exe', 'C:\\Program Files\\Git\\usr\\bin\\bash.exe', 'C:\\Program Files (x86)\\Git\\bin\\bash.exe'] :
+      ['bash'];
+    const bash = candidatos.find((b) => {
+      try { execFileSync(b, ['-c', 'git --version'], {stdio: 'pipe'}); return true; } catch (e) { return false; }
+    });
+    if (!bash) {
+      ok(true, 'OMITIDA: no hay bash con git en esta PC (en Windows lo trae Git for Windows). La corre GitHub en cada push.');
+    } else {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cambios-'));
     const git = (...a) => execFileSync('git', a, {cwd: dir, stdio: 'pipe'}).toString().trim();
     git('init', '-q');
@@ -64,8 +73,8 @@ module.exports = async ({bloque, ok}) => {
     const correr = (env) => {
       const salida = path.join(dir, '.salida');
       fs.writeFileSync(salida, '');
-      execFileSync('bash', ['-c', guion], {cwd: dir, stdio: 'pipe',
-        env: Object.assign({PATH: process.env.PATH, GITHUB_OUTPUT: salida, EVENTO: 'push', MANUAL: '', ANTES: ''}, env)});
+      execFileSync(bash, ['-c', guion], {cwd: dir, stdio: 'pipe',
+        env: Object.assign({}, process.env, {GITHUB_OUTPUT: salida.split('\\').join('/'), EVENTO: 'push', MANUAL: '', ANTES: ''}, env)});
       return (/servidor=(\w*)/.exec(fs.readFileSync(salida, 'utf8')) || [])[1];
     };
     const c0 = confirmar('index.html');
@@ -84,6 +93,7 @@ module.exports = async ({bloque, ok}) => {
     ok(correr({EVENTO: 'workflow_dispatch', MANUAL: 'true'}) === 'true' &&
        correr({EVENTO: 'workflow_dispatch', MANUAL: 'false'}) === 'false', 'a mano: lo que marques');
     fs.rmSync(dir, {recursive: true, force: true});
+    }
   }
 
   bloque('Versiones al dia en GitHub Actions');
