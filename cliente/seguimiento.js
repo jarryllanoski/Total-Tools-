@@ -126,6 +126,7 @@ function abrirAyudaTrack(){
 
 function renderTracking(token){
   clearTrackRefresh();
+  document.body.classList.add('seg');
   setApp(`
     ${headerHtml('track')}
     <div id="trackContent">
@@ -361,11 +362,91 @@ function _datosNarrador(ship){
   return {tipo, esShalom, enShalom, shalomSt, shalomFase, tiendaDir};
 }
 
+var _SEG_PASOS = {
+  envio: ['Recibido', 'Preparando', 'En camino', 'Entregado'],
+  retiro: ['Recibido', 'Preparando', 'Listo', 'Recogido']
+};
+
+function _vistaPedido(ship, tipo, shalomIdx){
+  var st = String((ship && ship.status) || '').trim().toUpperCase();
+  var retiro = tipo === 'retiro';
+  var pasos = retiro ? _SEG_PASOS.retiro : _SEG_PASOS.envio;
+  var v = function(paso, titulo, sub, ultimo, tono){
+    return {paso: paso, pasos: pasos, pill: paso >= 0 ? pasos[paso] : 'Cancelado',
+      titulo: titulo, sub: sub, ultimo: ultimo, tono: tono || 'marca'};
+  };
+  if(st === 'CANCELADO'){
+    return v(-1, 'Pedido cancelado', 'Si tienes alguna duda, escríbenos y te ayudamos.', '', 'gris');
+  }
+  if(st === 'FINALIZADO' || st === 'ENTREGADO' || shalomIdx === 3){
+    return v(3, retiro ? '¡Recogiste tu pedido!' : '¡Tu pedido fue entregado!',
+      'Gracias por tu compra. Esperamos que lo disfrutes.', retiro ? 'recogiste tu pedido' : 'tu pedido fue entregado', 'ok');
+  }
+  if(retiro && (st === 'ALISTADO' || st === 'ENVIADO' || st === 'LLEGÓ A DESTINO' || st === 'PENDIENTE DE PAGO')){
+    return v(2, '¡Tu pedido está listo!', st === 'PENDIENTE DE PAGO'
+      ? 'Completa el pago y pasa a recogerlo a nuestra tienda con tu DNI.'
+      : 'Ya puedes pasar a recogerlo a nuestra tienda. Trae tu DNI.', 'tu pedido quedó listo para recoger');
+  }
+  if(shalomIdx >= 0 || st === 'ENVIADO' || st === 'LLEGÓ A DESTINO' || st === 'PENDIENTE DE PAGO'){
+    if(st === 'PENDIENTE DE PAGO'){
+      return v(2, 'Falta completar el pago', 'Tu pedido está en camino. Completa el pago para poder recibirlo.', 'el pedido fue enviado', 'aviso');
+    }
+    if(st === 'LLEGÓ A DESTINO' && shalomIdx < 0){
+      return v(2, '¡Ya llegó a destino!', tipo === 'delivery'
+        ? 'El motorizado está llegando. Ten tu DNI a la mano.'
+        : 'Ya está en la agencia de destino: recógelo con el DNI del destinatario.', 'llegó a destino');
+    }
+    return v(2, '¡Tu pedido va en camino!', tipo === 'delivery'
+      ? 'Salió con nuestro motorizado hacia tu dirección.'
+      : 'Ya preparamos tu paquete. Ahora está rumbo a su destino.', 'el pedido fue enviado');
+  }
+  if(st === 'POR ALISTAR' || st === 'ALISTADO'){
+    var enShalom = !!(ship && (ship.shalomGuia || ship.trackingOrderNumber));
+    return v(1, 'Estamos preparando tu pedido', enShalom
+      ? 'Ya registramos tu envío en Shalom. Pronto lo dejamos en la agencia.'
+      : 'Lo estamos empacando con cuidado para enviártelo.', 'empezamos a preparar tu pedido');
+  }
+  return v(0, '¡Recibimos tu pedido!', 'Lo estamos revisando. Te avisaremos en cada avance.', 'recibimos tu pedido');
+}
+
+function _pasosHtml(vista){
+  if(vista.paso < 0) return '';
+  return '<ol class="seg-pasos">' + vista.pasos.map(function(p, i){
+    var fin = vista.paso === vista.pasos.length - 1;
+    var cls = (i < vista.paso || fin) ? 'hecho' : (i === vista.paso ? 'ahora' : '');
+    return '<li class="' + cls + '"' + (i === vista.paso ? ' aria-current="step"' : '') + '>'
+      + '<span class="seg-punto">' + ((i < vista.paso || fin) ? '✓' : (i + 1)) + '</span>'
+      + '<span class="seg-paso-t">' + esc(p) + '</span></li>';
+  }).join('') + '</ol>';
+}
+
+function _segMostrar(cual){
+  document.querySelectorAll('.seg-vista').forEach(function(el){ el.hidden = el.getAttribute('data-vista') !== cual; });
+  document.querySelectorAll('.seg-nav button[data-ir]').forEach(function(b){
+    var on = b.getAttribute('data-ir') === cual;
+    b.classList.toggle('on', on);
+    if(on) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current');
+  });
+  window._segVista = cual;
+}
+
+function _segVer(cual){
+  _segMostrar(cual);
+  try{ window.scrollTo({top: 0, behavior: 'smooth'}); }catch(_){ window.scrollTo(0, 0); }
+}
+
+function _segNavHtml(){
+  return '<nav class="seg-nav" aria-label="Secciones">'
+    + '<button type="button" data-ir="inicio" onclick="_segVer(\'inicio\')">🏠<span>Inicio</span></button>'
+    + '<button type="button" data-ir="docs" onclick="_segVer(\'docs\')">📄<span>Documentos</span></button>'
+    + '<button type="button" onclick="abrirAyudaTrack()">❓<span>Ayuda</span></button>'
+    + '</nav>';
+}
+
 function renderTrackResult(ship, code){
   const _dniTk    = window.DniPedido ? DniPedido.de(ship)
     : String(ship.dni||ship.dniRecoger||ship.dniDestinatario||'').trim();
   const _dniTkLbl = window.DniPedido ? DniPedido.etiqueta(ship) : 'DNI';
-  const meta   = STATUS_META[ship.status]||{color:'#6b7280',emoji:'🏷️',step:0};
   const _nroTk = String(ship.nroComprobante||'').replace(/[^A-Z0-9-]/g,'').slice(0,20);
   const tc     = _nroTk || codigoSeg(ship.id, ship.createdAt);
 
@@ -377,6 +458,9 @@ function renderTrackResult(ship, code){
   window._trackNombre = ship.name||'';
   const _enShalom = narr.esShalom && !!(ship.shalomGuia || ship.trackingOrderNumber);
   window._trackShalom = _enShalom ? {estado: String(ship.trackingStatus||'').trim()} : null;
+
+  const vista = _vistaPedido(ship, narr.tipo, narr.shalomFase === null ? -1 : narr.shalomFase);
+  const hola = _holaNombre(ship.name).trim();
 
   const dateLabel = ship.date
     ? new Date(ship.date+'T12:00:00').toLocaleDateString('es-PE',{weekday:'short',year:'numeric',month:'short',day:'numeric'})
@@ -391,23 +475,30 @@ function renderTrackResult(ship, code){
   const waConsultUrl = bizPhone
     ? `https://wa.me/51${bizPhone}?text=${encodeURIComponent('Hola, tengo una consulta sobre mi pedido #'+tc)}`
     : '';
+  const links = (ship.links||[]).filter(l=>l&&/^https:\/\//i.test(String(l.u||'').trim()));
+  const docsHtml = links.length
+    ? links.map(l=>`<a class="seg-doc" href="${esc(String(l.u).trim())}" target="_blank" rel="noopener"><span class="seg-doc-ic">🧾</span><span class="seg-doc-t">Boleta / factura<small>Toca para ver tu documento</small></span><span class="seg-doc-ir">→</span></a>`).join('')
+    : '<div class="seg-vacio">📄 Aquí aparecerán tus documentos cuando los subamos.</div>';
 
   setTrackContent(`
-    <div id="refreshRow" class="refresh-row">
-      <span class="refresh-lbl">🔄 Se actualiza automáticamente</span>
+    <div class="seg-hola">
+      <h1>${hola || '¡Hola!'} <span aria-hidden="true">👋</span></h1>
+      <p>Todo sobre tu compra, en un solo lugar.</p>
     </div>
+    <section class="seg-vista" data-vista="inicio">
     <div class="track-card" data-tipo="${esc(narr.tipo)}"${narr.enShalom?' data-en-shalom="1"':''}${narr.shalomFase!==null?` data-shalom-fase="${narr.shalomFase}"`:''}${narr.shalomSt!==null?` data-shalom-st="${narr.shalomSt}"`:''}${narr.tiendaDir?` data-tienda-dir="${esc(narr.tiendaDir)}"`:''}>
-      <div class="tk-section">
-        <div class="tk-lbl">${_nroTk ? 'Factura / Boleta' : 'Código de seguimiento'}</div>
-        <div style="font-size:22px;font-weight:700;color:var(--purple);letter-spacing:${_nroTk ? '1px' : '3px'};word-break:break-all">${_nroTk ? '' : '#'}${esc(tc)}</div>
+      <div class="seg-cab">
+        <span class="tk-lbl">Seguimiento de pedido</span>
+        <button type="button" class="seg-codigo" onclick="_copyTrack(this.getAttribute('data-c'), this)" data-c="${esc(tc)}" title="${_nroTk ? 'Factura / Boleta' : 'Código de seguimiento'}">${_nroTk ? '' : '#'}${esc(tc)}</button>
       </div>
-      ${_enShalom ? '' : `<div class="tk-section">
-        <div class="tk-lbl">Estado actual</div>
-        <div class="status-badge" style="background:${meta.color}22;border:1px solid ${meta.color}55;color:${meta.color}">
-          ${meta.emoji} ${esc(ship.status||'Desconocido')}
-        </div>
-      </div>`}
-      ${shalomBlock}
+      <span class="seg-pill seg-${vista.tono}">${esc(vista.pill)}</span>
+      <h2 class="seg-titulo">${esc(vista.titulo)}</h2>
+      <p class="seg-sub">${esc(vista.sub)}</p>
+      ${_pasosHtml(vista)}
+      ${vista.ultimo?`<div class="seg-ultimo">🕐 Último avance: ${esc(vista.ultimo)}.</div>`:''}
+    </div>
+    ${shalomBlock?`<div class="seg-shalom">${shalomBlock}</div>`:''}
+    <div class="seg-tarjeta">
       <div class="tk-section">
         <div class="tk-lbl">Detalle</div>
         <div class="tk-row"><span class="tk-row-lbl">Cliente</span><span class="tk-row-val">${esc(ship.name||'—')}</span></div>
@@ -422,17 +513,24 @@ function renderTrackResult(ship, code){
         ${extraRows}
         ${ship.minimo?`<div class="tk-row"><span class="tk-row-val" style="color:var(--text2);font-size:12px">🔒 Por tu privacidad, los datos de un pedido entregado hace tiempo ya no se muestran aquí. Si necesitas algo, escríbenos.</span></div>`:''}
       </div>
-      ${(ship.links&&ship.links.length)?`<div class="tk-section"><div class="tk-lbl">📄 Documentos adjuntos</div>${ship.links.filter(l=>l&&/^https:\/\//i.test(String(l.u||'').trim())).map(l=>`<a href="${esc(String(l.u).trim())}" target="_blank" rel="noopener" style="display:flex;align-items:center;justify-content:space-between;padding:13px 16px;background:var(--bg2);border:1px solid var(--bd);border-radius:10px;text-decoration:none;margin-bottom:6px"><span style="color:var(--blue);font-weight:600;font-size:14px">📄 Presiona para ver tu documento</span><span style="color:var(--text2);font-size:18px">→</span></a>`).join('')}</div>`:''}
     </div>
-    ${waConsultUrl?`<div style="padding:4px 0 8px;text-align:center"><a href="${waConsultUrl}" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:8px;padding:13px 28px;background:#0f7f3c;border-radius:14px;color:#fff;font-weight:700;font-size:15px;text-decoration:none">💬 Consultar por WhatsApp</a></div>`:''}
-    <a href="https://www.totaltoolspe.com/" target="_blank" rel="noopener" style="display:flex;align-items:center;justify-content:space-between;margin-top:12px;padding:14px 18px;background:linear-gradient(135deg,rgba(56,139,253,.12),rgba(163,113,247,.12));border:1px solid rgba(56,139,253,.25);border-radius:14px;text-decoration:none;gap:12px">
-      <div>
-        <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:3px">🛍️ ¿Quieres ver más productos y ofertas?</div>
-        <div style="font-size:11px;color:var(--text2)">Visita nuestra tienda online</div>
-      </div>
-      <div style="font-size:13px;font-weight:700;color:var(--blue);white-space:nowrap">Ver tienda →</div>
+    ${waConsultUrl?`<a class="btn-wa seg-wa" href="${waConsultUrl}" target="_blank" rel="noopener">💬 Consultar por WhatsApp</a>`:''}
+    <a class="seg-tienda" href="https://www.totaltoolspe.com/" target="_blank" rel="noopener">
+      <span><b>🛍️ ¿Quieres ver más productos y ofertas?</b><small>Visita nuestra tienda online</small></span>
+      <span class="seg-tienda-ir">Ver tienda →</span>
     </a>
+    </section>
+    <section class="seg-vista" data-vista="docs" hidden>
+      <div class="seg-tarjeta">
+        <h2 class="seg-h2">Tus documentos</h2>
+        <p class="seg-sub">Siempre a la mano cuando los necesites.</p>
+        ${docsHtml}
+      </div>
+    </section>
+    <div class="refresh-row" id="refreshRow"><span class="refresh-lbl">🔄 Se actualiza automáticamente</span></div>
+    ${_segNavHtml()}
   `);
+  _segMostrar(window._segVista === 'docs' ? 'docs' : 'inicio');
 }
 
 function init(){
@@ -444,6 +542,8 @@ function init(){
 window.buscarPedido    = buscarPedido;
 window.abrirAyudaTrack = abrirAyudaTrack;
 window._copyGuia       = _copyGuia;
+window._copyTrack      = _copyTrack;
+window._segVer         = _segVer;
 window.cerrarAyudaForm = cerrarAyudaForm;
 
 init();

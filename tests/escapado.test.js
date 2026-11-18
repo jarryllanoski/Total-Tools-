@@ -41,7 +41,7 @@ module.exports = async ({bloque, ok}) => {
        'abrir o descargar un documento valida el link antes');
     ok(/<a href="\$\{escU\(l\.u\)\}" target="_blank"/.test(docs), 'links del formulario de edicion');
     ok(/'<a href="' \+ escU\(n\.link\) \+ '"/.test(E.leerReal('panel/pedidos/notify.js')), 'links en notificaciones');
-    ok(/ship\.links\.filter\(l=>l&&\/\^https:\\\/\\\/\/i\.test/.test(E.leerReal('cliente/seguimiento.js')), 'seguimiento del cliente: solo links https');
+    ok(/const links = \(ship\.links\|\|\[\]\)\.filter\(l=>l&&\/\^https:\\\/\\\/\/i\.test/.test(E.leerReal('cliente/seguimiento.js')), 'seguimiento del cliente: solo links https');
   }
 
   bloque('Todos los limpiadores escapan comillas y apostrofos');

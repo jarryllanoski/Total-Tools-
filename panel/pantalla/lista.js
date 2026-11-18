@@ -525,20 +525,20 @@ function cardDocs(s,gChk,tChk,eChk){
   const has=s.docGuia||s.docEmbalado||s.docTicket||(s.links&&s.links.length);
   if(!has)return'';
   return`<div class="card-docs">
-    ${s.docGuia?`<div class="doc-thumb" style="border:2px solid ${gChk?'var(--green)':'var(--bd)'}">
-      <div onclick="qView('${s.id}','guia')">${_docMini(s.docGuia,'📄')}</div>
-      <div class="doc-lbl">GUÍA</div>
-      <div class="doc-chk ${gChk?'on-g':''}" onclick="event.stopPropagation();togDoc('${s.id}','guia')">${gChk?'✓':''}</div>
+    ${s.docTicket?`<div class="doc-thumb" style="border:2px solid ${tChk?'var(--purple)':'var(--bd)'}">
+      <div onclick="qView('${s.id}','ticket')">${_docMini(s.docTicket,'🧾')}</div>
+      <div class="doc-lbl">BOLETA</div>
+      <div class="doc-chk ${tChk?'on-t':''}" onclick="event.stopPropagation();togDoc('${s.id}','ticket')">${tChk?'✓':''}</div>
     </div>`:''}
     ${s.docEmbalado?`<div class="doc-thumb" style="border:2px solid ${eChk?'var(--blue)':'var(--bd)'}">
       <div onclick="qView('${s.id}','embalado')">${_docMini(s.docEmbalado,'📦')}</div>
       <div class="doc-lbl">EMBALADO</div>
       <div class="doc-chk ${eChk?'on-e':''}" onclick="event.stopPropagation();togDoc('${s.id}','embalado')">${eChk?'✓':''}</div>
     </div>`:''}
-    ${s.docTicket?`<div class="doc-thumb" style="border:2px solid ${tChk?'var(--purple)':'var(--bd)'}">
-      <div onclick="qView('${s.id}','ticket')">${_docMini(s.docTicket,'🧾')}</div>
-      <div class="doc-lbl">TICKET</div>
-      <div class="doc-chk ${tChk?'on-t':''}" onclick="event.stopPropagation();togDoc('${s.id}','ticket')">${tChk?'✓':''}</div>
+    ${s.docGuia?`<div class="doc-thumb" style="border:2px solid ${gChk?'var(--green)':'var(--bd)'}">
+      <div onclick="qView('${s.id}','guia')">${_docMini(s.docGuia,'📄')}</div>
+      <div class="doc-lbl">GUÍA</div>
+      <div class="doc-chk ${gChk?'on-g':''}" onclick="event.stopPropagation();togDoc('${s.id}','guia')">${gChk?'✓':''}</div>
     </div>`:''}
     ${(s.links||[]).map(l=>`<a href="${escU(l.u)}" target="_blank" rel="noopener" class="link-chip" style="text-decoration:none;cursor:pointer">🔗 ${escH(l.n)}</a>`).join('')}
   </div>`;

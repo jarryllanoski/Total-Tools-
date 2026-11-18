@@ -172,7 +172,7 @@ module.exports = async ({bloque, ok}) => {
     const raro = msg(Object.assign({nroComprobante: 'b<x>'}, base), '1', 't');
     ok(raro.indexOf('<x>') < 0, 'un número raro se filtra antes de escribirlo');
 
-    const trk = E.trozoCliente('const _nroTk', 'Estado actual');
+    const trk = E.trozoCliente('const _nroTk', 'class="seg-pill');
     ok(/const tc\s*=\s*_nroTk \|\| codigoSeg/.test(trk),
        'la página de seguimiento usa el mismo número');
     ok(/_nroTk \? 'Factura \/ Boleta' : 'Código de seguimiento'/.test(trk),
