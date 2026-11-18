@@ -362,51 +362,13 @@ function _datosNarrador(ship){
   return {tipo, esShalom, enShalom, shalomSt, shalomFase, tiendaDir};
 }
 
-var _SEG_PASOS = {
-  envio: ['Recibido', 'Preparando', 'En camino', 'Entregado'],
-  retiro: ['Recibido', 'Preparando', 'Listo', 'Recogido']
-};
-
-function _vistaPedido(ship, tipo, shalomIdx){
-  var st = String((ship && ship.status) || '').trim().toUpperCase();
-  var retiro = tipo === 'retiro';
-  var pasos = retiro ? _SEG_PASOS.retiro : _SEG_PASOS.envio;
-  var v = function(paso, titulo, sub, ultimo, tono){
-    return {paso: paso, pasos: pasos, pill: paso >= 0 ? pasos[paso] : 'Cancelado',
-      titulo: titulo, sub: sub, ultimo: ultimo, tono: tono || 'marca'};
-  };
-  if(st === 'CANCELADO'){
-    return v(-1, 'Pedido cancelado', 'Si tienes alguna duda, escríbenos y te ayudamos.', '', 'gris');
-  }
-  if(st === 'FINALIZADO' || st === 'ENTREGADO' || shalomIdx === 3){
-    return v(3, retiro ? '¡Recogiste tu pedido!' : '¡Tu pedido fue entregado!',
-      'Gracias por tu compra. Esperamos que lo disfrutes.', retiro ? 'recogiste tu pedido' : 'tu pedido fue entregado', 'ok');
-  }
-  if(retiro && (st === 'ALISTADO' || st === 'ENVIADO' || st === 'LLEGÓ A DESTINO' || st === 'PENDIENTE DE PAGO')){
-    return v(2, '¡Tu pedido está listo!', st === 'PENDIENTE DE PAGO'
-      ? 'Completa el pago y pasa a recogerlo a nuestra tienda con tu DNI.'
-      : 'Ya puedes pasar a recogerlo a nuestra tienda. Trae tu DNI.', 'tu pedido quedó listo para recoger');
-  }
-  if(shalomIdx >= 0 || st === 'ENVIADO' || st === 'LLEGÓ A DESTINO' || st === 'PENDIENTE DE PAGO'){
-    if(st === 'PENDIENTE DE PAGO'){
-      return v(2, 'Falta completar el pago', 'Tu pedido está en camino. Completa el pago para poder recibirlo.', 'el pedido fue enviado', 'aviso');
-    }
-    if(st === 'LLEGÓ A DESTINO' && shalomIdx < 0){
-      return v(2, '¡Ya llegó a destino!', tipo === 'delivery'
-        ? 'El motorizado está llegando. Ten tu DNI a la mano.'
-        : 'Ya está en la agencia de destino: recógelo con el DNI del destinatario.', 'llegó a destino');
-    }
-    return v(2, '¡Tu pedido va en camino!', tipo === 'delivery'
-      ? 'Salió con nuestro motorizado hacia tu dirección.'
-      : 'Ya preparamos tu paquete. Ahora está rumbo a su destino.', 'el pedido fue enviado');
-  }
-  if(st === 'POR ALISTAR' || st === 'ALISTADO'){
-    var enShalom = !!(ship && (ship.shalomGuia || ship.trackingOrderNumber));
-    return v(1, 'Estamos preparando tu pedido', enShalom
-      ? 'Ya registramos tu envío en Shalom. Pronto lo dejamos en la agencia.'
-      : 'Lo estamos empacando con cuidado para enviártelo.', 'empezamos a preparar tu pedido');
-  }
-  return v(0, '¡Recibimos tu pedido!', 'Lo estamos revisando. Te avisaremos en cada avance.', 'recibimos tu pedido');
+function _confianzaShalom(){
+  return '<div class="seg-confianza">'
+    + '<span class="seg-conf-ic" aria-hidden="true">✓</span>'
+    + '<span class="seg-conf-txt"><b>Envío oficial con Shalom Pro</b>'
+    + '<span>Desde nuestra cuenta empresa. Compruébalo con tu guía y código.</span></span>'
+    + '<a href="https://shalom.com.pe/" target="_blank" rel="noopener" aria-label="Verificar en shalom.com.pe">Verificar ↗</a>'
+    + '</div>';
 }
 
 function _pasosHtml(vista){
@@ -459,7 +421,9 @@ function renderTrackResult(ship, code){
   const _enShalom = narr.esShalom && !!(ship.shalomGuia || ship.trackingOrderNumber);
   window._trackShalom = _enShalom ? {estado: String(ship.trackingStatus||'').trim()} : null;
 
-  const vista = _vistaPedido(ship, narr.tipo, narr.shalomFase === null ? -1 : narr.shalomFase);
+  const vista = PasosEnvio.vista(ship, narr.tipo, {esShalom: narr.esShalom,
+    idx: narr.shalomFase === null ? -1 : narr.shalomFase, registrado: _enShalom});
+  const primera = !document.body.classList.contains('seg-quieto');
   const hola = _holaNombre(ship.name).trim();
 
   const dateLabel = ship.date
@@ -486,18 +450,19 @@ function renderTrackResult(ship, code){
       <p>Todo sobre tu compra, en un solo lugar.</p>
     </div>
     <section class="seg-vista" data-vista="inicio">
-    <div class="track-card" data-tipo="${esc(narr.tipo)}"${narr.enShalom?' data-en-shalom="1"':''}${narr.shalomFase!==null?` data-shalom-fase="${narr.shalomFase}"`:''}${narr.shalomSt!==null?` data-shalom-st="${narr.shalomSt}"`:''}${narr.tiendaDir?` data-tienda-dir="${esc(narr.tiendaDir)}"`:''}>
+    <div class="track-card${vista.modo === 'shalom' ? ' seg-solo-shalom' : ''}" data-tipo="${esc(narr.tipo)}"${narr.enShalom?' data-en-shalom="1"':''}${narr.shalomFase!==null?` data-shalom-fase="${narr.shalomFase}"`:''}${narr.shalomSt!==null?` data-shalom-st="${narr.shalomSt}"`:''}${narr.tiendaDir?` data-tienda-dir="${esc(narr.tiendaDir)}"`:''}>
       <div class="seg-cab">
-        <span class="tk-lbl">Seguimiento de pedido</span>
+        <span class="tk-lbl">${vista.modo === 'shalom' ? 'Seguimiento de envío' : 'Seguimiento de pedido'}</span>
         <button type="button" class="seg-codigo" onclick="_copyTrack(this.getAttribute('data-c'), this)" data-c="${esc(tc)}" title="${_nroTk ? 'Factura / Boleta' : 'Código de seguimiento'}">${_nroTk ? '' : '#'}${esc(tc)}</button>
       </div>
+      ${vista.modo === 'shalom' ? '' : `
       <span class="seg-pill seg-${vista.tono}">${esc(vista.pill)}</span>
       <h2 class="seg-titulo">${esc(vista.titulo)}</h2>
-      <p class="seg-sub">${esc(vista.sub)}</p>
-      ${_pasosHtml(vista)}
-      ${vista.ultimo?`<div class="seg-ultimo">🕐 Último avance: ${esc(vista.ultimo)}.</div>`:''}
+      <p class="seg-sub">${esc(vista.sub)}</p>`}
+      ${vista.aviso?`<div class="seg-aviso" role="status">💰 ${esc(vista.aviso)}</div>`:''}
+      ${vista.modo === 'shalom' ? `<div class="seg-shalom">${shalomBlock}</div>${_confianzaShalom()}` : _pasosHtml(vista)}
+      ${vista.modo !== 'shalom' && vista.ultimo?`<div class="seg-ultimo">🕐 Último avance: ${esc(vista.ultimo)}.</div>`:''}
     </div>
-    ${shalomBlock?`<div class="seg-shalom">${shalomBlock}</div>`:''}
     <div class="seg-tarjeta">
       <div class="tk-section">
         <div class="tk-lbl">Detalle</div>
@@ -511,6 +476,7 @@ function renderTrackResult(ship, code){
         ${_dniTk?`<div class="tk-row"><span class="tk-row-lbl">${_dniTkLbl}</span><span class="tk-row-val">${esc(_dniTk)}</span></div>`:''}
         ${ship.notes?`<div class="tk-row"><span class="tk-row-lbl">Notas</span><span class="tk-row-val">${esc(ship.notes)}</span></div>`:''}
         ${extraRows}
+        <div class="seg-privado">🔒 Enlace privado: solo tú lo tienes. Por tu seguridad, tu DNI se muestra oculto.</div>
         ${ship.minimo?`<div class="tk-row"><span class="tk-row-val" style="color:var(--text2);font-size:12px">🔒 Por tu privacidad, los datos de un pedido entregado hace tiempo ya no se muestran aquí. Si necesitas algo, escríbenos.</span></div>`:''}
       </div>
     </div>
@@ -531,6 +497,7 @@ function renderTrackResult(ship, code){
     ${_segNavHtml()}
   `);
   _segMostrar(window._segVista === 'docs' ? 'docs' : 'inicio');
+  if(primera) setTimeout(function(){ document.body.classList.add('seg-quieto'); }, 1600);
 }
 
 function init(){

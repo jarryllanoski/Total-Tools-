@@ -1,60 +1,104 @@
 'use strict';
 const vm = require('vm');
 const E = require('./_entorno.js');
+const PE = require('../cliente/pasos-envio.js');
 
 module.exports = async ({bloque, ok}) => {
-  const src = E.trozoCliente('var _SEG_PASOS = {', 'function _segMostrar(cual){');
+  const V = (status, tipo, sh, extra) => PE.vista(Object.assign({status}, extra || {}), tipo, sh);
+  const fila = (tipo, status) => { const v = V(status, tipo); return v.paso >= 0 ? v.pasos[v.paso] : v.pill; };
+
+  bloque('Pasos según el tipo de envío');
+  {
+    ok(PE.PASOS.agencia.join() === 'Recibido,Preparando,En camino,En destino,Recogido', 'agencia (Olva, Marvisur, Dinsides…): con En destino');
+    ok(PE.PASOS.encomienda.join() === PE.PASOS.agencia.join(), 'otras agencias / encomienda: igual que agencia');
+    ok(PE.PASOS.delivery.join() === 'Recibido,Preparando,En reparto,Entregado', 'delivery: En reparto y Entregado');
+    ok(PE.PASOS.retiro.join() === 'Recibido,Preparando,Listo para recoger,Recogido', 'retiro: Listo para recoger y Recogido');
+    ok(PE.pasosDe('raro').join() === PE.PASOS.agencia.join() && V('ENVIADO', 'raro').tipo === 'agencia', 'un tipo desconocido se trata como agencia');
+  }
+
+  bloque('Cada etiqueta del panel en cada tipo');
+  {
+    const tabla = {
+      'NUEVO PEDIDO': ['Recibido', 'Recibido', 'Recibido'],
+      'EN PROCESO': ['Recibido', 'Recibido', 'Recibido'],
+      'POR ALISTAR': ['Preparando', 'Preparando', 'Preparando'],
+      'ALISTADO': ['Preparando', 'Preparando', 'Listo para recoger'],
+      'ENVIADO': ['En camino', 'En reparto', 'Listo para recoger'],
+      'LLEGÓ A DESTINO': ['En destino', 'En reparto', 'Listo para recoger'],
+      'PENDIENTE DE PAGO': ['En destino', 'En reparto', 'Listo para recoger'],
+      'FINALIZADO': ['Recogido', 'Entregado', 'Recogido'],
+      'ENTREGADO': ['Recogido', 'Entregado', 'Recogido'],
+    };
+    Object.keys(tabla).forEach((st) => {
+      const [a, d, r] = tabla[st];
+      ok(fila('agencia', st) === a && fila('delivery', st) === d && fila('retiro', st) === r,
+         st + ' → agencia «' + a + '», delivery «' + d + '», retiro «' + r + '»');
+    });
+    ok(V('', 'agencia').paso === 0 && V('raro', 'delivery').paso === 0, 'sin etiqueta o una desconocida: Recibido');
+    ok(V('CANCELADO', 'agencia').paso === -1 && V('CANCELADO', 'agencia').tono === 'gris', 'cancelado: sin pasos');
+    ok(/motorizado está llegando/.test(V('LLEGÓ A DESTINO', 'delivery').titulo), 'delivery que llegó: «el motorizado está llegando»');
+    ok(/DNI del destinatario/.test(V('LLEGÓ A DESTINO', 'agencia').sub), 'agencia en destino: recoger con el DNI');
+    ok(!/recog/i.test(Object.keys(tabla).map((s) => V(s, 'delivery').titulo + V(s, 'delivery').sub).join(' ')), '⚠️ delivery nunca dice «recoger»');
+  }
+
+  bloque('Subestado: falta pagar');
+  {
+    const a = V('PENDIENTE DE PAGO', 'agencia'), d = V('PENDIENTE DE PAGO', 'delivery'), r = V('PENDIENTE DE PAGO', 'retiro');
+    ok(a.tono === 'aviso' && /recogerlo\./.test(a.aviso), 'agencia: aviso para poder recogerlo');
+    ok(d.tono === 'aviso' && /al recibir/.test(d.aviso), 'delivery: se paga al recibir');
+    ok(/en tienda/.test(r.aviso), 'retiro: en tienda');
+    ok(V('ENVIADO', 'agencia').aviso === '', 'sin deuda, sin aviso');
+  }
+
+  bloque('Shalom: solo el cuadro de Shalom desde que entra a la agencia (A)');
+  {
+    ok(V('ALISTADO', 'agencia', {esShalom: true, idx: -1, registrado: true}).modo === 'pasos', 'registrado pero sin dejar: todavía los pasos');
+    ok(/Shalom Pro/.test(V('ALISTADO', 'agencia', {esShalom: true, idx: -1, registrado: true}).sub), 'y dice que ya está registrado en Shalom Pro');
+    [0, 1, 2, 3].forEach((i) => ok(V('ENVIADO', 'agencia', {esShalom: true, idx: i}).modo === 'shalom', 'Shalom fase ' + i + ': solo Shalom'));
+    ok(V('PENDIENTE DE PAGO', 'agencia', {esShalom: true, idx: 2}).aviso !== '', 'en Shalom y debe: el aviso de pago va encima del cuadro');
+    ok(V('FINALIZADO', 'agencia', {esShalom: true, idx: 2}).modo === 'pasos' && V('FINALIZADO', 'agencia', {esShalom: true, idx: 2}).pill === 'Recogido',
+       'si la tienda ya lo finalizó, manda la tienda (Shalom puede tardar en actualizar)');
+    ok(V('CANCELADO', 'agencia', {esShalom: true, idx: 1}).modo === 'pasos', 'cancelado manda sobre todo');
+    ok(V('ENVIADO', 'agencia', {esShalom: false, idx: 1}).modo === 'pasos', 'otro courier con un dato raro no se vuelve Shalom');
+  }
+
+  const src = E.trozoCliente('function _confianzaShalom(){', 'function _segMostrar(cual){');
   const ctx = vm.createContext({esc: (x) => String(x == null ? '' : x).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')});
-  vm.runInContext(src + ';this.V=_vistaPedido;this.P=_pasosHtml;', ctx);
-  const V = (status, tipo, sh, extra) => ctx.V(Object.assign({status}, extra || {}), tipo || 'agencia', sh === undefined ? -1 : sh);
+  vm.runInContext(src + ';this.P=_pasosHtml;this.C=_confianzaShalom;', ctx);
 
-  bloque('Seguimiento: los 4 pasos salen del estado del panel');
+  bloque('Confianza: que no parezca estafa');
   {
-    ok(V('NUEVO PEDIDO').paso === 0 && V('EN PROCESO').paso === 0 && V('').paso === 0, 'nuevo o en proceso: Recibido');
-    ok(V('POR ALISTAR').paso === 1 && V('ALISTADO').paso === 1, 'por alistar o alistado: Preparando');
-    ok(/Shalom/.test(V('ALISTADO', 'agencia', -1, {shalomGuia: '104201894'}).sub), 'alistado con guía de Shalom: lo dice, sin adelantar el paso');
-    ok(V('ENVIADO').paso === 2 && V('ENVIADO').titulo === '¡Tu pedido va en camino!', 'enviado: En camino');
-    ok(V('LLEGÓ A DESTINO').paso === 2 && /destino/.test(V('LLEGÓ A DESTINO').titulo), 'llegó a destino: sigue en camino, con su mensaje');
-    ok(V('PENDIENTE DE PAGO').paso === 2 && V('PENDIENTE DE PAGO').tono === 'aviso', 'pendiente de pago: en camino y aviso de pago');
-    ok(V('FINALIZADO').paso === 3 && V('ENTREGADO').paso === 3 && V('FINALIZADO').tono === 'ok', 'finalizado o entregado: Entregado');
-    ok(V('CANCELADO').paso === -1 && ctx.P(V('CANCELADO')) === '', 'cancelado: sin barra de pasos');
-    ok(/motorizado/.test(V('ENVIADO', 'delivery').sub), 'delivery: habla del motorizado');
+    const c = ctx.C();
+    ok(/Envío oficial con Shalom Pro/.test(c) && /nuestra cuenta empresa/.test(c), 'dice que es Shalom Pro y que es de la cuenta empresa');
+    ok(/href="https:\/\/shalom\.com\.pe\/" target="_blank" rel="noopener" aria-label="Verificar en shalom\.com\.pe"/.test(c) && /Compruébalo con tu guía y código/.test(c), 'invita a verificarlo en la web oficial de Shalom');
+    const r0 = E.trozoCliente('function renderTrackResult(ship, code){', 'function init(){');
+    ok(/<div class="seg-shalom">\$\{shalomBlock\}<\/div>\$\{_confianzaShalom\(\)\}/.test(r0), 'primero el estado de Shalom, y debajo la verificación (junto a la guía y el código)');
+    ok(/Enlace privado: solo tú lo tienes\. Por tu seguridad, tu DNI se muestra oculto\./.test(E.leerReal('cliente/seguimiento.js')), 'y explica por qué el DNI sale oculto');
   }
 
-  bloque('Seguimiento: ya en Shalom, manda el estado de Shalom');
+  bloque('La barra de pasos');
   {
-    ok(V('ALISTADO', 'agencia', 0).paso === 2 && V('ALISTADO', 'agencia', 1).paso === 2, 'Shalom ya lo recibió o lo lleva: En camino aunque el panel diga ALISTADO');
-    ok(V('ENVIADO', 'agencia', 3).paso === 3, 'Shalom dice entregado: Entregado');
-    ok(V('ENVIADO', 'agencia', 2).titulo === '¡Tu pedido va en camino!', 'en destino de Shalom: el detalle lo da el cuadro de Shalom');
+    const h = ctx.P(V('ENVIADO', 'agencia'));
+    ok((h.match(/class="hecho"/g) || []).length === 2 && /class="ahora" aria-current="step"/.test(h) && (h.match(/<li/g) || []).length === 5, 'agencia: 5 pasos, dos hechos y el actual');
+    const f = ctx.P(V('FINALIZADO', 'delivery'));
+    ok((f.match(/class="hecho"/g) || []).length === 4 && !/ahora/.test(f), 'entregado: todos con ✓');
+    ok(ctx.P(V('CANCELADO', 'agencia')) === '', 'cancelado: sin barra');
   }
 
-  bloque('Seguimiento: retiro en tienda');
-  {
-    ok(V('ALISTADO', 'retiro').paso === 2 && V('ALISTADO', 'retiro').pill === 'Listo', 'alistado: Listo para recoger');
-    ok(V('FINALIZADO', 'retiro').pill === 'Recogido', 'finalizado: Recogido');
-    ok(V('ALISTADO', 'retiro').pasos.join() === 'Recibido,Preparando,Listo,Recogido', 'con sus propios pasos');
-  }
-
-  bloque('Seguimiento: la barra de pasos');
-  {
-    const h = ctx.P(V('ENVIADO'));
-    ok((h.match(/class="hecho"/g) || []).length === 2 && /class="ahora" aria-current="step"/.test(h), 'dos hechos y el actual marcado (también para lectores de pantalla)');
-    const f = ctx.P(V('FINALIZADO'));
-    ok((f.match(/class="hecho"/g) || []).length === 4 && !/ahora/.test(f), 'entregado: los cuatro con ✓');
-  }
-
-  bloque('Seguimiento: estructura de la pantalla');
+  bloque('Pantalla y efectos livianos');
   {
     const r = E.trozoCliente('function renderTrackResult(ship, code){', 'function init(){');
+    ok(/PasosEnvio\.vista\(ship, narr\.tipo, \{esShalom: narr\.esShalom,/.test(r), 'la tarjeta usa la configuración por courier');
     ok(/data-vista="inicio"/.test(r) && /data-vista="docs" hidden/.test(r) && /_segNavHtml\(\)/.test(r), 'Inicio y Documentos, con menú abajo');
-    ok(/abrirAyudaTrack\(\)/.test(E.trozoCliente('function _segNavHtml(){', 'function renderTrackResult(')), 'Ayuda abre la misma ayuda de siempre (Toby y estados)');
     ok(/_segMostrar\(window\._segVista === 'docs'/.test(r), 'la actualización automática no cambia de sección ni salta arriba');
-    ok(/class="seg-codigo" onclick="_copyTrack\(this\.getAttribute\('data-c'\), this\)" data-c="\$\{esc\(tc\)\}"/.test(r), 'el número de boleta o código se copia con un toque');
+    ok(/if\(primera\) setTimeout\(function\(\)\{ document\.body\.classList\.add\('seg-quieto'\); \}, 1600\);/.test(r), 'las animaciones solo al entrar, no cada 30 s');
     const css = E.leerReal('cliente/cliente.css');
-    ok(/\.seg-shalom\{--bg:#080810;--card:#0f0f1a;[^}]*--purple:#a78bfa/.test(css), 'el cuadro de Shalom conserva sus colores de siempre');
+    ok(/body\.seg:not\(\.seg-quieto\) \.track-card/.test(css) && /@keyframes segLatido/.test(css), 'entrada suave y el paso actual late');
+    ok(/@media\(prefers-reduced-motion:reduce\)\{body\.seg \*,body\.seg \*:after\{animation:none!important\}\}/.test(css), 'sin animaciones si el celular pide menos movimiento');
+    ok(/\.seg-shalom\{--bg:#080810;--card:#0f0f1a;[^}]*--purple:#a78bfa/.test(css), 'el cuadro de Shalom conserva sus colores');
     ok(/body\.seg #tt-narr\{bottom:calc\(74px/.test(css), 'Delfi y Heavy no tapan el menú');
-    ok(/body\.seg\{[^}]*--marca:#02787c/.test(css) && /<meta name="theme-color" content="#f3f6f7">/.test(E.leerCrudo('seguimiento.html')), 'colores de la marca, solo en el seguimiento');
-    ok(/document\.body\.classList\.add\('seg'\)/.test(E.leerReal('cliente/seguimiento.js')), 'el tema claro se aplica solo en esta página');
+    const se = E.leerCrudo('seguimiento.html');
+    ok(se.indexOf('cliente/pasos-envio.js') > 0 && se.indexOf('cliente/pasos-envio.js') < se.indexOf('cliente/seguimiento.js'), 'el módulo carga antes del seguimiento');
   }
 
   bloque('Panel: documentos en el orden del formulario');

@@ -98,7 +98,7 @@ module.exports = async ({bloque, ok}) => {
     ok(F._datosNarrador({courier: 'DELIVERY'}).tiendaDir === '', 'y solo para retiro');
 
     const r = E.trozoCliente('function renderTrackResult(ship, code){', 'function init(){');
-    ok(/<div class="track-card" data-tipo="\$\{esc\(narr\.tipo\)\}"/.test(r) &&
+    ok(/<div class="track-card\$\{vista\.modo === 'shalom' \? ' seg-solo-shalom' : ''\}" data-tipo="\$\{esc\(narr\.tipo\)\}"/.test(r) &&
        /data-shalom-st="\$\{narr\.shalomSt\}"/.test(r) && /data-tienda-dir="\$\{esc\(narr\.tiendaDir\)\}"/.test(r),
        'la tarjeta publica tipo, etapa de Shalom y dirección (escapados)');
   }

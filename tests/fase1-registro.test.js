@@ -288,8 +288,8 @@ module.exports = async ({bloque, ok}) => {
     const form = E.cliente();
     ok(/const _enShalom = narr\.esShalom && !!\(ship\.shalomGuia \|\| ship\.trackingOrderNumber\);/.test(form),
        'con guía de Shalom se reconoce «ya en Shalom»');
-    ok(/\$\{shalomBlock\?`<div class="seg-shalom">\$\{shalomBlock\}<\/div>`:''\}/.test(form) && !/Estado actual/.test(form),
-       'ya en Shalom: el cuadro de Shalom tal cual, debajo de los 4 pasos (sin la etiqueta suelta del panel)');
+    ok(/\$\{vista\.modo === 'shalom' \? `<div class="seg-shalom">\$\{shalomBlock\}<\/div>\$\{_confianzaShalom\(\)\}` : _pasosHtml\(vista\)\}/.test(form) && !/Estado actual/.test(form),
+       'ya en Shalom: SOLO el cuadro de Shalom, tal cual (sin los pasos del panel ni la etiqueta suelta)');
     ok(/var titulo = estado \|\| 'Registrado en Shalom';/.test(form), 'sin estado de Shalom aún: «Registrado en Shalom»');
     // Toby habla de Shalom.
     const i = form.indexOf('function _ayudaTrackContenido(');

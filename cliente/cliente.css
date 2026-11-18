@@ -353,3 +353,21 @@ body.seg .refresh-row{justify-content:center;margin:14px 0 0}body.seg .refresh-l
 body.seg #tt-narr{bottom:calc(74px + env(safe-area-inset-bottom))}
 body.seg .brand-foot{border-top-color:var(--bd)}
 body.seg .brand-foot svg[fill="#e9edf3"]{fill:#0e1a1f}
+.seg-confianza{display:flex;gap:10px;align-items:center;padding:9px 10px;border-radius:12px;background:#ecf8f0;border:1px solid #c9ebd5;margin-top:10px}
+.seg-conf-ic{flex-shrink:0;width:26px;height:26px;border-radius:50%;background:var(--green);color:#fff;font-weight:900;display:flex;align-items:center;justify-content:center;font-size:13px}
+.seg-conf-txt{flex:1;min-width:0}.seg-conf-txt b{display:block;font-size:13.5px;color:#0f5a2c}.seg-conf-txt span{display:block;font-size:11.5px;color:var(--text2);line-height:1.35}
+.seg-confianza a{flex-shrink:0;font-size:12.5px;font-weight:800;color:#fff;background:var(--marca);text-decoration:none;padding:8px 10px;border-radius:10px}
+.seg-aviso{margin:10px 0 0;padding:9px 12px;border-radius:12px;background:#fff4e0;border:1px solid #f5d9a8;color:#7a4700;font-size:13px;font-weight:700}
+.seg-solo-shalom .seg-shalom{margin:12px 0 0}
+.seg-privado{margin-top:10px;padding-top:10px;border-top:1px dashed var(--bd);font-size:12px;color:var(--text2)}
+body.seg:not(.seg-quieto) .track-card,body.seg:not(.seg-quieto) .seg-hola{animation:segEntra .45s cubic-bezier(.2,.8,.2,1) both}
+body.seg:not(.seg-quieto) .seg-tarjeta{animation:segEntra .45s .08s cubic-bezier(.2,.8,.2,1) both}
+body.seg:not(.seg-quieto) .seg-pasos li.hecho .seg-punto,body.seg:not(.seg-quieto) .seg-pasos li.ahora .seg-punto{animation:segPop .4s cubic-bezier(.2,1.4,.4,1) both}
+body.seg:not(.seg-quieto) .seg-pasos li:nth-child(2) .seg-punto{animation-delay:.15s}body.seg:not(.seg-quieto) .seg-pasos li:nth-child(3) .seg-punto{animation-delay:.3s}body.seg:not(.seg-quieto) .seg-pasos li:nth-child(4) .seg-punto{animation-delay:.45s}body.seg:not(.seg-quieto) .seg-pasos li:nth-child(5) .seg-punto{animation-delay:.6s}
+body.seg:not(.seg-quieto) .seg-conf-ic{animation:segPop .5s .2s cubic-bezier(.2,1.4,.4,1) both}
+.seg-pasos li.ahora .seg-punto:after{content:"";position:absolute;inset:-6px;border-radius:50%;border:2px solid var(--purple);opacity:0;animation:segLatido 2.4s 1s ease-out infinite}
+.seg-pill.seg-ok:before{content:"🎉 "}
+@keyframes segEntra{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+@keyframes segPop{from{transform:scale(.4);opacity:0}to{transform:none;opacity:1}}
+@keyframes segLatido{0%{opacity:.6;transform:scale(.85)}70%,100%{opacity:0;transform:scale(1.35)}}
+@media(prefers-reduced-motion:reduce){body.seg *,body.seg *:after{animation:none!important}}
