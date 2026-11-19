@@ -35,6 +35,7 @@ const ipCliente = require("./ipCliente");
 const pedidoForm = require("./pedidoForm");
 const docsPublicos = require("./docsPublicos");
 const vitrina = require("./vitrina");
+const resenas = require("./resenas");
 
 setGlobalOptions({maxInstances: 10});
 initializeApp();
@@ -258,6 +259,7 @@ exports.formApi = onRequest(
         else if (action === "formcfg") await handleFormCfg(req, res);
         else if (action === "track") await handleTrack(req, res);
         else if (action === "doc") await handleDoc(req, res);
+        else if (action === "review") await handleReview(req, res);
         else if (action === "client") await handleClient(req, res);
         else if (action === "reniec") await handleReniec(req, res);
         else {
@@ -734,9 +736,13 @@ async function handleTrack(req, res) {
   if (!safe.minimo) {
     safe.docs = docsPublicos.disponibles(order, getStorage().bucket().name);
   }
+  const rs = resenas.publica(order.resena);
+  if (rs) safe.resena = rs;
+  else if (resenas.abierta(order, Date.now())) safe.resenaAbierta = true;
   const out = {status: "ok", order: safe};
   const vit = await _vitrinaPublica();
   if (vit) out.vitrina = vit;
+  if (rs) out.google = _linkResenas();
   res.json(out);
 }
 
@@ -757,7 +763,16 @@ async function _vitrinaPublica() {
   return vitrina.publica(_vitrina.doc, ahora, getStorage().bucket().name);
 }
 
+function _linkResenas() {
+  return resenas.linkGoogle(_vitrina.doc && _vitrina.doc.resenas);
+}
+
 async function _pedidoDelEnlace(token, tipo) {
+  const snap = await _snapDelEnlace(token, tipo);
+  return snap ? snap.data() : null;
+}
+
+async function _snapDelEnlace(token, tipo) {
   let snap = null;
   if (tipo === "legado") {
     snap = await db.doc(`${SHIP_COL}/${token}`).get();
@@ -768,9 +783,8 @@ async function _pedidoDelEnlace(token, tipo) {
     snap = q.empty ? null : q.docs[0];
   }
   if (!snap) return null;
-  const order = snap.data();
-  if (tipo === "legado" && !enlace.aceptaLegado(order)) return null;
-  return order;
+  if (tipo === "legado" && !enlace.aceptaLegado(snap.data())) return null;
+  return snap;
 }
 
 async function handleDoc(req, res) {
@@ -836,6 +850,7 @@ const RATE_LIMITS = {
   formApi_track: {windowMs: 60000, max: 120, memoria: true},
   formApi_track_legado: {windowMs: 60000, max: 20, memoria: true},
   formApi_doc: {windowMs: 60000, max: 20, memoria: true},
+  formApi_review: {windowMs: 60000, max: 5, memoria: true},
   formApi_token: {windowMs: 60000, max: 30, memoria: true},
   formApi_config: {windowMs: 60000, max: 60, memoria: true},
   formApi_reniec: {windowMs: 60000, max: 10},
@@ -875,6 +890,54 @@ async function checkRateLimit(name, req) {
     console.error("checkRateLimit error:", name, e);
     return true;
   }
+}
+
+async function handleReview(req, res) {
+  res.set("Cache-Control", "private, no-store");
+  if (req.method !== "POST") {
+    res.status(405).json({status: "error"});
+    return;
+  }
+  const body = req.body || {};
+  const token = _texto(body.token);
+  const tipo = enlace.tipoDe(token);
+  const r = resenas.limpiar(body);
+  if (tipo === "invalido" || !r) {
+    res.status(400).json({status: "error", error: "Datos no válidos"});
+    return;
+  }
+  const freno = !(await checkRateLimit("formApi_review", req)) ||
+    (tipo === "legado" && !(await checkRateLimit("formApi_track_legado", req)));
+  if (freno) {
+    res.status(429).json({status: "rate_limited"});
+    return;
+  }
+  const snap = await _snapDelEnlace(token, tipo);
+  if (!snap) {
+    res.status(404).json({status: "not_found"});
+    return;
+  }
+  const ahora = Date.now();
+  const estado = await db.runTransaction(async (tx) => {
+    const d = await tx.get(snap.ref);
+    const o = d.exists ? d.data() : null;
+    if (!o) return "not_found";
+    if (resenas.publica(o.resena)) return "ya";
+    if (!resenas.abierta(o, ahora)) return "cerrada";
+    tx.update(snap.ref, _conMts({resena: {estrellas: r.estrellas,
+      texto: r.texto, fecha: new Date(ahora).toISOString()}}));
+    return "ok";
+  });
+  if (estado === "not_found") {
+    res.status(404).json({status: "not_found"});
+    return;
+  }
+  if (estado === "cerrada") {
+    res.status(409).json({status: "cerrada"});
+    return;
+  }
+  await _vitrinaPublica();
+  res.json({status: estado, google: _linkResenas()});
 }
 
 const OLVA_STORES_URL =

@@ -2,11 +2,12 @@
   'use strict';
 
   var MAX = 6;
+  var HOSTS_GOOGLE = ['g.page', 'search.google.com', 'www.google.com', 'google.com', 'maps.google.com', 'maps.app.goo.gl', 'goo.gl'];
   var _v = null;
   var _cargando = false;
 
   function _vacia(){
-    return {activa: true, promos: [], sorteo: {activo: false, titulo: '', texto: '', link: '', hasta: ''}};
+    return {activa: true, promos: [], sorteo: {activo: false, titulo: '', texto: '', link: '', hasta: ''}, resenas: {link: ''}};
   }
 
   function _box(){ return document.getElementById('vitrinaBox'); }
@@ -44,6 +45,9 @@
       + '<div class="fg"><input class="fi" maxlength="140" placeholder="Texto corto (ej. Participa gratis, sorteamos el 30/11)" value="' + escH(s.texto || '') + '" oninput="Vitrina.sorteo(\'texto\',this.value)"></div>'
       + '<div class="fg"><input class="fi" maxlength="500" placeholder="https://… link para participar" value="' + escH(s.link || '') + '" oninput="Vitrina.sorteo(\'link\',this.value)"></div>'
       + '<label class="vit-hasta">Hasta <input class="fi" type="date" value="' + escH(s.hasta || '') + '" onchange="Vitrina.sorteo(\'hasta\',this.value)"></label>'
+      + '<div class="cfg-ttl" style="margin-top:14px">⭐ Reseñas de Google</div>'
+      + '<div class="tgl-s" style="margin:-4px 0 8px">Cuando un pedido se finaliza, el cliente califica su compra en el seguimiento y Toby lo invita a publicarla en Google. Pega aquí el link «Pedir reseñas» de tu Perfil de Empresa de Google (si lo dejas vacío, se abre tu ficha en Google Maps).</div>'
+      + '<div class="fg"><input class="fi" maxlength="500" placeholder="https://g.page/r/…/review" value="' + escH((_v.resenas && _v.resenas.link) || '') + '" oninput="Vitrina.resenas(this.value)"></div>'
       + '<button type="button" class="cfg-save" style="width:100%;margin-top:12px" onclick="Vitrina.guardar(this)">💾 Guardar promos y sorteo</button>';
   }
 
@@ -55,6 +59,7 @@
       var d = global._fbLeerVitrina ? await global._fbLeerVitrina() : null;
       _v = Object.assign(_vacia(), d || {});
       _v.sorteo = Object.assign(_vacia().sorteo, (d && d.sorteo) || {});
+      _v.resenas = Object.assign(_vacia().resenas, (d && d.resenas) || {});
       _v.promos = Array.isArray(_v.promos) ? _v.promos.slice(0, MAX) : [];
     }catch(e){
       _v = _vacia();
@@ -67,6 +72,15 @@
 
   function cambiar(i, k, val){ if(_v && _v.promos[i]) _v.promos[i][k] = String(val || '').trim(); }
   function sorteo(k, val){ if(_v) _v.sorteo[k] = String(val || '').trim(); }
+  function resenas(val){ if(_v) _v.resenas = {link: String(val || '').trim()}; }
+
+  function _linkGoogleOk(u){
+    if(!u) return true;
+    try{
+      var x = new URL(u);
+      return x.protocol === 'https:' && HOSTS_GOOGLE.indexOf(x.hostname) >= 0;
+    }catch(e){ return false; }
+  }
   function alternar(){ if(!_v) return; _v.activa = _v.activa === false; _pintar(); }
   function alternarSorteo(){ if(!_v) return; _v.sorteo.activo = !_v.sorteo.activo; _pintar(); }
   function quitar(i){ if(!_v) return; _v.promos.splice(i, 1); _pintar(); }
@@ -114,9 +128,11 @@
     var s = _v.sorteo;
     if(s.activo && !/^https:\/\/\S{4,}$/i.test(s.link || '')){ toast('⚠️ El sorteo necesita un link que empiece con https://'); return; }
     if(s.activo && !s.titulo){ toast('⚠️ Escribe el título del sorteo'); return; }
+    var rl = (_v.resenas && _v.resenas.link) || '';
+    if(!_linkGoogleOk(rl)){ toast('⚠️ El link de reseñas debe ser de Google (g.page, maps.app.goo.gl o google.com)'); return; }
     if(btn) btn.disabled = true;
     try{
-      await global._fbGuardarVitrina({activa: _v.activa !== false, promos: _v.promos, sorteo: s, actualizado: new Date().toISOString()});
+      await global._fbGuardarVitrina({activa: _v.activa !== false, promos: _v.promos, sorteo: s, resenas: {link: rl}, actualizado: new Date().toISOString()});
       toast('✅ Guardado. Tus clientes lo verán en 1 minuto');
     }catch(e){
       toast('⚠️ No se guardó: ' + e.message);
@@ -126,5 +142,5 @@
   }
 
   global.Vitrina = {abrir: abrir, cambiar: cambiar, sorteo: sorteo, alternar: alternar, alternarSorteo: alternarSorteo,
-    quitar: quitar, subir: subir, guardar: guardar, MAX: MAX};
+    resenas: resenas, quitar: quitar, subir: subir, guardar: guardar, MAX: MAX};
 })(window);

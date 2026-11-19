@@ -64,6 +64,8 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);max
 .meta{font-size:11px;color:var(--blue)}
 .card-addr{font-size:11px;color:var(--text2);line-height:1.4}
 .card-note{font-size:11px;color:var(--purple);margin-top:3px}
+.card-resena{font-size:11px;color:#d4a72c;margin-top:3px}
+.card-resena-mala{color:var(--red,#f85149);font-weight:700}
 .supp-panel{margin-bottom:12px}
 .supp-panel-hdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
 .supp-panel-ttl{font-family:'Syne',sans-serif;font-weight:700;font-size:14px;color:var(--text)}

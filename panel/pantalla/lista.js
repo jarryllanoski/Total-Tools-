@@ -395,6 +395,13 @@ function _renderAhora(){
   }
 }
 
+function _resenaCard(s){
+  const r=s&&s.resena;
+  const n=r?Number(r.estrellas):0;
+  if(!(Number.isInteger(n)&&n>=1&&n<=5)) return '';
+  const t=String(r.texto||'').slice(0,160);
+  return `<div class="card-resena${n<=3?' card-resena-mala':''}" title="Opinión del cliente">${'★'.repeat(n)}<span style="opacity:.3">${'★'.repeat(5-n)}</span>${t?' '+escH(t):''}</div>`;
+}
 function escH(s){ return s==null?'':String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
 function escJs(s){ return String(s==null?'':s).replace(/[\\'"<>&\n\r\u2028\u2029]/g, function(c){ return '\\u'+('000'+c.charCodeAt(0).toString(16)).slice(-4); }); }
 
@@ -478,6 +485,7 @@ function cardHTML(s){
     </div>
     ${(s.courier||'').toUpperCase().includes('ENCOMIENDA')?((s.ciudadDestino||s.address)?`<div class="card-addr">📦 ${escH(s.ciudadDestino||s.address)}${s.encAgencia?' · 🏪 '+escH(s.encAgencia):''}</div>`:''): (s.address?`<div class="card-addr">🏠 ${escH(s.address)}</div>`:'' )}
     ${s.notes?`<div class="card-note">📝 ${escH(s.notes)}</div>`:''}
+    ${_resenaCard(s)}
     ${cardDocs(s,gChk,tChk,eChk)}
     ${(s.trackingOrderNumber||s.shalomGuia)&&typeof Tracking!=='undefined'?Tracking.renderCardBlock(s):''}
     ${dlvDriverBlock(s)}

@@ -165,6 +165,7 @@ async function buscarPedido(token, silent){
       if(window.TTLoader) TTLoader.done();
       window._segTok = t;
       window._segVitrina = resp.vitrina || null;
+      window._segGoogle = /^https:\/\//.test(String(resp.google || '')) ? resp.google : '';
       renderTrackResult(resp.order, resp.order.code);
       if(resp.order.frozen){
         clearTrackRefresh();
@@ -548,6 +549,121 @@ async function instalarSeg(){
   document.body.classList.add('tt-ayuda-on');
 }
 
+var _segRes = {n: 0, chips: [], texto: ''};
+var _SEG_CHIPS = {
+  bien: ['Llegó rápido', 'Bien empacado', 'Buena atención', 'Buen precio', 'Producto original'],
+  mal: ['Demoró', 'Llegó dañado', 'Faltó algo', 'No era lo que pedí', 'Mala atención']
+};
+var _SEG_CARITA = ['Toca una estrella', 'Muy mal', 'Mal', 'Regular', 'Bien', '¡Excelente!'];
+
+function _tobyMini(texto){
+  return '<div class="seg-nauti-cab"><img class="seg-nauti-av" src="narrador/toby.webp?v=1" alt="" width="56" height="56" decoding="async">'
+    + '<div class="seg-nauti-bub"><span class="seg-nauti-quien">Toby · Tu asistente</span>' + texto + '</div></div>';
+}
+
+function _resenaTexto(){
+  var t = _segRes.chips.join(' · ');
+  if(_segRes.texto) t = t ? t + ' — ' + _segRes.texto : _segRes.texto;
+  return t.slice(0, 500);
+}
+
+function _resenaCuerpo(){
+  var n = _segRes.n;
+  var est = [1, 2, 3, 4, 5].map(function(i){
+    return '<button type="button" role="radio" aria-checked="' + (i === n) + '" aria-label="' + i + (i === 1 ? ' estrella' : ' estrellas') + '"'
+      + ' class="seg-estrella' + (i <= n ? ' on' : '') + '" onclick="resenaEstrella(' + i + ')">★</button>';
+  }).join('');
+  var lista = n >= 4 ? _SEG_CHIPS.bien : _SEG_CHIPS.mal;
+  var resto = n ? '<div class="seg-chips">' + lista.map(function(c, i){
+      return '<button type="button" class="seg-chip" aria-pressed="' + (_segRes.chips.indexOf(c) >= 0) + '" onclick="resenaChip(' + i + ')">' + esc(c) + '</button>';
+    }).join('') + '</div>'
+    + '<textarea class="seg-resena-txt" maxlength="400" rows="3" oninput="resenaTexto(this.value)" placeholder="'
+    + (n >= 4 ? '¿Qué fue lo que más te gustó? (opcional)' : 'Cuéntanos qué pasó y lo solucionamos (opcional)') + '">' + esc(_segRes.texto) + '</textarea>'
+    + '<button type="button" class="seg-resena-env" onclick="enviarResena(this)">Enviar mi opinión</button>'
+    + '<div class="seg-resena-msg" id="segResMsg" role="status"></div>' : '';
+  return _tobyMini('¿Qué tal tu compra? Tu opinión nos ayuda a mejorar y a que otros compren con confianza.')
+    + '<div class="seg-estrellas" role="radiogroup" aria-label="Califica tu compra">' + est + '</div>'
+    + '<div class="seg-carita">' + esc(_SEG_CARITA[n]) + '</div>' + resto;
+}
+
+function _resenaGracias(r){
+  var n = r.estrellas;
+  var g = window._segGoogle;
+  var tel = window._segTel;
+  var est = '<div class="seg-estrellas seg-hecha" aria-label="Calificaste con ' + n + ' de 5">'
+    + [1, 2, 3, 4, 5].map(function(i){ return '<span class="seg-estrella' + (i <= n ? ' on' : '') + '">★</span>'; }).join('') + '</div>';
+  var gBtn = g ? '<a class="seg-resena-g' + (n >= 4 ? '' : ' seg-sec') + '" href="' + esc(g) + '" target="_blank" rel="noopener noreferrer" onclick="resenaCopiar()">'
+    + (n >= 4 ? '⭐ Publicarla en Google' : 'También puedes opinar en Google') + '</a>' : '';
+  if(n >= 4){
+    return _tobyMini('¡Gracias por tu opinión! ¿Nos regalas 10 segundos más? En Google ayuda a otros clientes a comprar seguro.')
+      + est + gBtn + (g && r.texto ? '<div class="seg-resena-nota">Copiamos tu opinión: solo pégala en Google.</div>' : '');
+  }
+  var msg = 'Hola, califiqué mi pedido #' + (window._segCodigo || '') + ' con ' + n + (n === 1 ? ' estrella' : ' estrellas') + (r.texto ? ': ' + r.texto : '') + '. ¿Me ayudan?';
+  var wa = tel ? '<a class="btn-wa seg-wa" href="https://wa.me/51' + esc(tel) + '?text=' + esc(encodeURIComponent(msg)) + '" target="_blank" rel="noopener">💬 Quiero que lo solucionen</a>' : '';
+  return _tobyMini('Gracias por contarnos. Sentimos que no fue lo que esperabas: escríbenos y lo solucionamos.')
+    + est + wa + gBtn;
+}
+
+function _resenaHtml(ship){
+  if(ship.resena){
+    _segRes.enviado = String(ship.resena.texto || '');
+    return '<section class="seg-resena" id="segResena" aria-label="Tu opinión">' + _resenaGracias(ship.resena) + '</section>';
+  }
+  if(!ship.resenaAbierta) return '';
+  return '<section class="seg-resena" id="segResena" aria-label="Califica tu compra">' + _resenaCuerpo() + '</section>';
+}
+
+function _resenaPintar(){ var b = $('segResena'); if(b) b.innerHTML = _resenaCuerpo(); }
+
+function resenaEstrella(n){
+  var antes = _segRes.n;
+  _segRes.n = n;
+  if((antes >= 4) !== (n >= 4)) _segRes.chips = [];
+  _resenaPintar();
+}
+
+function resenaChip(i){
+  var c = (_segRes.n >= 4 ? _SEG_CHIPS.bien : _SEG_CHIPS.mal)[i];
+  if(!c) return;
+  var k = _segRes.chips.indexOf(c);
+  if(k >= 0) _segRes.chips.splice(k, 1); else _segRes.chips.push(c);
+  _resenaPintar();
+}
+
+function resenaTexto(v){ _segRes.texto = String(v || '').slice(0, 400); }
+
+function resenaCopiar(){
+  var t = _segRes.enviado || '';
+  if(t && navigator.clipboard) navigator.clipboard.writeText(t).catch(function(){});
+}
+
+async function enviarResena(btn){
+  var n = _segRes.n;
+  if(!(n >= 1 && n <= 5) || !window._segTok) return;
+  var msg = $('segResMsg');
+  btn.disabled = true;
+  btn.textContent = 'Enviando…';
+  var texto = _resenaTexto();
+  try{
+    var r = await fetch(FORM_API + '?action=review', {method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({token: window._segTok, estrellas: n, texto: texto})});
+    var d = await r.json().catch(function(){ return {}; });
+    if(d.status === 'ok' || d.status === 'ya'){
+      if(/^https:\/\//.test(String(d.google || ''))) window._segGoogle = d.google;
+      _segRes.enviado = texto;
+      var b = $('segResena');
+      if(b) b.innerHTML = _resenaGracias(d.status === 'ok' ? {estrellas: n, texto: texto} : {estrellas: n, texto: ''});
+      return;
+    }
+    if(msg) msg.textContent = d.status === 'rate_limited' ? 'Espera un momento y vuelve a intentar.'
+      : d.status === 'cerrada' ? 'Este pedido ya no se puede calificar.' : 'No se pudo enviar. Intenta de nuevo.';
+  }catch(e){
+    if(msg) msg.textContent = 'Sin conexión. Intenta de nuevo.';
+  }
+  btn.disabled = false;
+  btn.textContent = 'Enviar mi opinión';
+}
+
 function _segNavHtml(){
   return '<nav class="seg-nav" aria-label="Secciones">'
     + '<button type="button" data-ir="inicio" onclick="_segVer(\'inicio\')">🏠<span>Inicio</span></button>'
@@ -591,6 +707,8 @@ function renderTrackResult(ship, code){
     ? `https://wa.me/51${bizPhone}?text=${encodeURIComponent('Hola, tengo una consulta sobre mi pedido #'+tc)}`
     : '';
   _segDocsDe = ship.docs || {};
+  window._segTel = bizPhone;
+  window._segCodigo = tc;
   const listos = _docsListos(ship.docs);
   const docsHtml = _docsHtml(ship.docs, !!ship.minimo);
 
@@ -613,6 +731,7 @@ function renderTrackResult(ship, code){
       ${vista.modo === 'shalom' ? `<div class="seg-shalom">${shalomBlock}</div>${_confianzaShalom()}` : _pasosHtml(vista)}
       ${vista.modo !== 'shalom' && vista.ultimo?`<div class="seg-ultimo">🕐 Último avance: ${esc(vista.ultimo)}.</div>`:''}
     </div>
+    ${_resenaHtml(ship)}
     <div class="seg-tarjeta">
       <div class="tk-section">
         <div class="tk-lbl">Detalle</div>
@@ -676,6 +795,11 @@ window._copyTrack      = _copyTrack;
 window._segVer         = _segVer;
 window.abrirDocSeg     = abrirDocSeg;
 window.instalarSeg     = instalarSeg;
+window.resenaEstrella  = resenaEstrella;
+window.resenaChip      = resenaChip;
+window.resenaTexto     = resenaTexto;
+window.resenaCopiar    = resenaCopiar;
+window.enviarResena    = enviarResena;
 window.cerrarDocSeg    = cerrarDocSeg;
 window.cerrarAyudaForm = cerrarAyudaForm;
 
