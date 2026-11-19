@@ -36,10 +36,10 @@ function servidor(pedidos, opciones) {
     }),
   };
   // eslint-disable-next-line no-new-func
-  const fn = new Function('db', 'enlace', 'checkRateLimit', 'SHIP_COL', 'getStorage', 'vitrina', 'resenas', '_conMts',
+  const fn = new Function('db', 'enlace', 'checkRateLimit', 'SHIP_COL', 'getStorage', 'vitrina', 'resenas', 'garantia', '_conMts',
       T + ';return handleReview;')(
       db, L, async () => o.freno !== true, 'panel/shipments/items', () => ({bucket: () => ({name: 'b'})}),
-      require('../functions/vitrina.js'), R, (c) => Object.assign({}, c, {_mts: 'HORA_SERVIDOR'}));
+      require('../functions/vitrina.js'), R, require('../functions/garantia.js'), (c) => Object.assign({}, c, {_mts: 'HORA_SERVIDOR'}));
   const enviar = async (body, metodo) => {
     const r = {code: 200, body: null, cab: {}};
     r.status = (c) => { r.code = c; return r; };
@@ -139,9 +139,9 @@ module.exports = async ({bloque, ok}) => {
         return {empty: !d.length, docs: d.map((x) => ({data: () => x}))};
       }})})})};
     // eslint-disable-next-line no-new-func
-    const ht = new Function('db', 'enlace', 'checkRateLimit', 'pedidoPublico', 'SHIP_COL', 'CFG_DOC', 'docsPublicos', 'getStorage', 'vitrina', 'resenas',
+    const ht = new Function('db', 'enlace', 'checkRateLimit', 'pedidoPublico', 'SHIP_COL', 'CFG_DOC', 'docsPublicos', 'getStorage', 'vitrina', 'resenas', 'garantia',
         T + ';return handleTrack;')(db, L, async () => true, require('../functions/pedidoPublico.js'), 'panel/shipments/items', 'panel/config',
-        require('../functions/docsPublicos.js'), () => ({bucket: () => ({name: 'b'})}), require('../functions/vitrina.js'), R);
+        require('../functions/docsPublicos.js'), () => ({bucket: () => ({name: 'b'})}), require('../functions/vitrina.js'), R, require('../functions/garantia.js'));
     const ver = async (t) => { const r = {json: (b) => { r.body = b; return r; }, status: () => r}; await ht({query: {token: t}}, r); return r.body; };
     const a = await ver(TOK('A'));
     ok(a.order.resenaAbierta === true && a.order.resena === undefined && a.google === undefined, 'finalizado sin reseña: invita a calificar');

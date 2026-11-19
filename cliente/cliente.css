@@ -417,5 +417,23 @@ button.seg-estrella:active{transform:scale(1.25)}
 .seg-resena-msg{text-align:center;font-size:12.5px;color:#b42318;margin-top:6px;min-height:1px}
 .seg-resena-nota{text-align:center;font-size:12px;color:var(--text2);margin-top:6px}
 .seg-resena .seg-wa{margin-top:10px}
+.seg-politica details{border-top:1px solid var(--bd);padding:10px 0}
+.seg-politica details:first-child{border-top:none}
+.seg-politica summary{font-weight:800;font-size:14px;cursor:pointer;list-style-position:outside}
+.seg-politica ul{margin:8px 0 0;padding-left:18px;font-size:13.5px;line-height:1.5;color:var(--text2)}
+.seg-politica li{margin-bottom:4px}
+.seg-politica-wa{font-size:12.5px;color:var(--text2);margin:10px 0 0}
+.seg-gar-ok{display:flex;gap:10px;align-items:center;background:#e8f6ee;border-radius:14px;padding:12px;margin:10px 0}
+.seg-gar-ok b{display:block;font-size:14px;color:var(--green)}.seg-gar-ok small{display:block;font-size:12.5px;color:var(--text2)}
+.seg-gar-lbl{display:block;font-size:12.5px;font-weight:800;color:var(--text2);margin:10px 0 6px;text-transform:uppercase;letter-spacing:.3px}
+.seg-chips-izq{justify-content:flex-start}
+.seg-gar-fotos{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:6px}
+.seg-gar-foto{position:relative;width:84px;height:84px}
+.seg-gar-foto img{width:100%;height:100%;object-fit:cover;border-radius:12px;border:1px solid var(--bd)}
+.seg-gar-foto button{position:absolute;top:-6px;right:-6px;width:26px;height:26px;border-radius:50%;border:none;background:#111;color:#fff;font-size:12px;cursor:pointer}
+.seg-gar-mas{width:84px;height:84px;border:2px dashed var(--bd);border-radius:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-size:22px;cursor:pointer;color:var(--marca)}
+.seg-gar-mas span{font-size:11px;font-weight:700}
+.seg-reclamo-resp{background:#f3f6f7;border-radius:12px;padding:10px 12px;margin-top:10px;font-size:13.5px}
+.seg-reclamo-resp b{display:block;font-size:12px;color:var(--marca);margin-bottom:2px}
 @keyframes segJala{0%{transform:translateX(-30px) rotate(-12deg);opacity:0}55%{transform:translateX(4px) rotate(6deg);opacity:1}75%{transform:rotate(-4deg)}100%{transform:none}}
 @keyframes segTira{from{transform:translateX(60px);opacity:0}to{transform:none;opacity:1}}

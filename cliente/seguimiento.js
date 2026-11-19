@@ -664,10 +664,179 @@ async function enviarResena(btn){
   btn.textContent = 'Enviar mi opinión';
 }
 
+var _segGar = {tipo: '', producto: '', texto: '', fotos: [], abierto: false};
+
+function _politicaHtml(){
+  if(!window.Garantia) return '';
+  return '<div class="seg-politica">' + Garantia.POLITICA.map(function(sec, i){
+    return '<details' + (i === 0 ? ' open' : '') + '><summary>' + esc(sec.t) + '</summary><ul>'
+      + sec.d.map(function(x){ return '<li>' + esc(x) + '</li>'; }).join('') + '</ul></details>';
+  }).join('') + '<p class="seg-politica-wa">¿Dudas? Escríbenos por WhatsApp y te ayudamos.</p></div>';
+}
+
+function _reclamoHtml(rc){
+  var G = window.Garantia;
+  var e = G.ESTADOS[rc.estado] || ['Recibimos tu solicitud', ''];
+  var pasos = ['Recibido', 'En revisión', 'Respuesta'];
+  var idx = rc.estado === 'RECIBIDO' ? 0 : rc.estado === 'EN REVISIÓN' ? 1 : 2;
+  var tono = rc.estado === 'RECHAZADO' ? 'gris' : idx === 2 ? 'ok' : 'marca';
+  return '<div class="seg-tarjeta seg-reclamo">'
+    + '<span class="seg-pill seg-' + tono + '">' + esc(G.TIPOS[rc.tipo] || 'Solicitud') + '</span>'
+    + '<h2 class="seg-titulo">' + esc(e[0]) + '</h2><p class="seg-sub">' + esc(e[1]) + '</p>'
+    + '<ol class="seg-pasos">' + pasos.map(function(t, i){
+        var hecho = i < idx || idx === 2;
+        return '<li class="' + (hecho ? 'hecho' : i === idx ? 'ahora' : '') + '"' + (i === idx ? ' aria-current="step"' : '') + '>'
+          + '<span class="seg-punto">' + (hecho ? '✓' : (i + 1)) + '</span><span class="seg-paso-t">' + esc(t) + '</span></li>';
+      }).join('') + '</ol>'
+    + (rc.respuesta ? '<div class="seg-reclamo-resp"><b>Respuesta de Total Tools</b>' + esc(rc.respuesta) + '</div>' : '')
+    + (rc.fecha ? '<div class="seg-ultimo">🕐 Solicitud enviada el ' + esc(new Date(rc.fecha).toLocaleDateString('es-PE', {day: 'numeric', month: 'long'})) + '.</div>' : '')
+    + '</div>';
+}
+
+function _garFormHtml(permitidos){
+  var G = window.Garantia;
+  var tipos = permitidos.map(function(t){
+    return '<button type="button" class="seg-chip" aria-pressed="' + (_segGar.tipo === t) + '" onclick="garTipo(\'' + t + '\')">' + esc(G.TIPOS[t]) + '</button>';
+  }).join('');
+  var fotos = _segGar.fotos.map(function(f, i){
+    return '<span class="seg-gar-foto"><img src="' + esc(f.url) + '" alt="Foto ' + (i + 1) + '"><button type="button" aria-label="Quitar foto" onclick="garQuitarFoto(' + i + ')">✕</button></span>';
+  }).join('');
+  return '<div class="seg-tarjeta seg-gar-form" id="segGarForm">'
+    + _tobyMini('Tranquilo, estamos para ayudarte. Una foto clara del producto y del problema nos ayuda a resolverlo más rápido.')
+    + '<div class="seg-gar-lbl">¿Qué necesitas?</div><div class="seg-chips seg-chips-izq">' + tipos + '</div>'
+    + '<label class="seg-gar-lbl" for="garProd">¿Qué producto?</label>'
+    + '<input id="garProd" class="seg-resena-txt" maxlength="80" placeholder="Ej. Taladro inalámbrico 20V" value="' + esc(_segGar.producto) + '" oninput="garCampo(\'producto\',this.value)">'
+    + '<label class="seg-gar-lbl" for="garTxt">Cuéntanos qué pasó</label>'
+    + '<textarea id="garTxt" class="seg-resena-txt" rows="3" maxlength="600" placeholder="Ej. No enciende desde el segundo día de uso" oninput="garCampo(\'texto\',this.value)">' + esc(_segGar.texto) + '</textarea>'
+    + '<div class="seg-gar-lbl">Fotos (1 a ' + G.MAX_FOTOS + ')</div>'
+    + '<div class="seg-gar-fotos">' + fotos
+    + (_segGar.fotos.length < G.MAX_FOTOS ? '<label class="seg-gar-mas">📷<span>Agregar foto</span><input type="file" accept="image/*" hidden onchange="garFoto(this)"></label>' : '') + '</div>'
+    + '<button type="button" class="seg-resena-env" onclick="enviarGarantia(this)">Enviar solicitud</button>'
+    + '<div class="seg-resena-msg" id="segGarMsg" role="status"></div>'
+    + '<div class="seg-resena-nota">🔒 Solo Total Tools ve tus fotos. Te respondemos por WhatsApp.</div>'
+    + '</div>';
+}
+
+function _garantiaHtml(ship){
+  var G = window.Garantia;
+  if(!G) return '';
+  var cab = '<div class="seg-tarjeta"><h2 class="seg-h2">Garantía y cambios</h2>';
+  if(ship.reclamo) return _reclamoHtml(ship.reclamo) + cab + _politicaHtml() + '</div>';
+  var permitidos = (Array.isArray(ship.garantia) ? ship.garantia : []).filter(function(t){ return G.TIPOS[t]; });
+  var intro;
+  if(permitidos.length){
+    var d = G.dias(ship, Date.now());
+    var quedan = G.DIAS_CAMBIO - d;
+    intro = '<div class="seg-gar-ok">🛡️ <span><b>Tu compra está protegida</b><small>'
+      + (permitidos.indexOf('cambio') >= 0 ? 'Te ' + (quedan === 1 ? 'queda 1 día' : 'quedan ' + quedan + ' días') + ' para cambio o devolución.' : 'Tu producto tiene garantía por falla de fabricación.')
+      + '</small></span></div>'
+      + (_segGar.abierto ? '' : '<button type="button" class="seg-resena-env" onclick="garAbrir()">Solicitar cambio o garantía</button>');
+  }else{
+    intro = '<p class="seg-sub">' + (G.FINALES.indexOf(String(ship.status || '').trim().toUpperCase()) >= 0
+      ? 'El plazo para solicitudes en línea de este pedido terminó. Escríbenos por WhatsApp y lo vemos.'
+      : 'Cuando recibas tu pedido, aquí podrás pedir un cambio o la garantía en un minuto.') + '</p>';
+  }
+  return cab + intro + '</div>' + (permitidos.length && _segGar.abierto ? _garFormHtml(permitidos) : '')
+    + '<div class="seg-tarjeta"><h2 class="seg-h2">Nuestras políticas</h2>' + _politicaHtml() + '</div>';
+}
+
+function _garPintar(){
+  var b = $('segGarantia');
+  if(b && window._segUltimoPedido) b.innerHTML = _garantiaHtml(window._segUltimoPedido);
+}
+
+function garAbrir(){ _segGar.abierto = true; _garPintar(); var f = $('segGarForm'); if(f && f.scrollIntoView) f.scrollIntoView({behavior: 'smooth', block: 'start'}); }
+function garTipo(t){ if(window.Garantia && Garantia.TIPOS[t]){ _segGar.tipo = t; _garPintar(); } }
+function garCampo(k, v){ if(k === 'producto' || k === 'texto') _segGar[k] = String(v || ''); }
+function garQuitarFoto(i){
+  var f = _segGar.fotos.splice(i, 1)[0];
+  if(f && f.url) try{ URL.revokeObjectURL(f.url); }catch(e){}
+  _garPintar();
+}
+
+function _garComprimir(file){
+  return new Promise(function(ok, mal){
+    var url = URL.createObjectURL(file);
+    var im = new Image();
+    im.onload = function(){
+      var k = Math.min(1, 1280 / Math.max(im.naturalWidth, im.naturalHeight));
+      var c = document.createElement('canvas');
+      c.width = Math.round(im.naturalWidth * k); c.height = Math.round(im.naturalHeight * k);
+      c.getContext('2d').drawImage(im, 0, 0, c.width, c.height);
+      URL.revokeObjectURL(url);
+      c.toBlob(function(b){ b ? ok(b) : mal(new Error('foto')); }, 'image/jpeg', 0.8);
+    };
+    im.onerror = function(){ URL.revokeObjectURL(url); mal(new Error('foto')); };
+    im.src = url;
+  });
+}
+
+function _aBase64(blob){
+  return new Promise(function(ok, mal){
+    var r = new FileReader();
+    r.onload = function(){ ok(String(r.result).split(',')[1] || ''); };
+    r.onerror = mal;
+    r.readAsDataURL(blob);
+  });
+}
+
+async function garFoto(input){
+  var f = input && input.files && input.files[0];
+  if(input) input.value = '';
+  var msg = $('segGarMsg');
+  if(!f || !window.Garantia || _segGar.fotos.length >= Garantia.MAX_FOTOS) return;
+  if(!/^image\//.test(f.type)){ if(msg) msg.textContent = 'Elige una foto.'; return; }
+  try{
+    var b = await _garComprimir(f);
+    if(b.size > Garantia.MAX_FOTO_BYTES){ if(msg) msg.textContent = 'La foto es muy pesada. Prueba con otra.'; return; }
+    _segGar.fotos.push({blob: b, url: URL.createObjectURL(b)});
+    _garPintar();
+  }catch(e){
+    if(msg) msg.textContent = 'No pudimos leer esa foto. Prueba con otra.';
+  }
+}
+
+async function enviarGarantia(btn){
+  var msg = $('segGarMsg');
+  var falta = !_segGar.tipo ? 'Elige qué necesitas.'
+    : _segGar.producto.trim().length < 2 ? 'Escribe qué producto es.'
+    : _segGar.texto.trim().length < 10 ? 'Cuéntanos un poco más qué pasó.'
+    : !_segGar.fotos.length ? 'Agrega al menos una foto.' : '';
+  if(falta){ if(msg) msg.textContent = falta; return; }
+  btn.disabled = true;
+  btn.textContent = 'Enviando…';
+  try{
+    var fotos = await Promise.all(_segGar.fotos.map(function(f){ return _aBase64(f.blob); }));
+    var r = await fetch(FORM_API + '?action=claim', {method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({token: window._segTok, tipo: _segGar.tipo, producto: _segGar.producto, texto: _segGar.texto, fotos: fotos})});
+    var d = await r.json().catch(function(){ return {}; });
+    if(d.status === 'ok' || d.status === 'ya'){
+      _segGar.fotos.forEach(function(f){ try{ URL.revokeObjectURL(f.url); }catch(e){} });
+      var tipo = _segGar.tipo;
+      _segGar = {tipo: '', producto: '', texto: '', fotos: [], abierto: false};
+      if(window._segUltimoPedido && d.status === 'ok'){
+        window._segUltimoPedido.reclamo = {estado: 'RECIBIDO', tipo: tipo, fecha: new Date().toISOString()};
+      }
+      if(d.status === 'ya' && window._segTok){ buscarPedido(window._segTok, true); return; }
+      _garPintar();
+      try{ window.scrollTo({top: 0, behavior: 'smooth'}); }catch(e){}
+      return;
+    }
+    if(msg) msg.textContent = d.status === 'rate_limited' ? 'Espera un momento y vuelve a intentar.'
+      : d.status === 'cerrada' ? 'El plazo para esta solicitud terminó. Escríbenos por WhatsApp.'
+      : (d.error || 'No se pudo enviar. Intenta de nuevo.');
+  }catch(e){
+    if(msg) msg.textContent = 'Sin conexión. Intenta de nuevo.';
+  }
+  btn.disabled = false;
+  btn.textContent = 'Enviar solicitud';
+}
+
 function _segNavHtml(){
   return '<nav class="seg-nav" aria-label="Secciones">'
     + '<button type="button" data-ir="inicio" onclick="_segVer(\'inicio\')">🏠<span>Inicio</span></button>'
     + '<button type="button" data-ir="docs" onclick="_segVer(\'docs\')">📄<span>Documentos</span></button>'
+    + '<button type="button" data-ir="garantia" onclick="_segVer(\'garantia\')">🛡️<span>Garantía</span></button>'
     + '<button type="button" onclick="abrirAyudaTrack()">❓<span>Ayuda</span></button>'
     + '</nav>';
 }
@@ -707,6 +876,7 @@ function renderTrackResult(ship, code){
     ? `https://wa.me/51${bizPhone}?text=${encodeURIComponent('Hola, tengo una consulta sobre mi pedido #'+tc)}`
     : '';
   _segDocsDe = ship.docs || {};
+  window._segUltimoPedido = ship;
   window._segTel = bizPhone;
   window._segCodigo = tc;
   const listos = _docsListos(ship.docs);
@@ -764,11 +934,12 @@ function renderTrackResult(ship, code){
         ${docsHtml}
       </div>
     </section>
+    <section class="seg-vista" data-vista="garantia" id="segGarantia" hidden>${_garantiaHtml(ship)}</section>
     ${_instalarHtml()}
     <div class="refresh-row" id="refreshRow"><span class="refresh-lbl">🔄 Se actualiza automáticamente</span></div>
     ${_segNavHtml()}
   `);
-  _segMostrar(window._segVista === 'docs' ? 'docs' : 'inicio');
+  _segMostrar(window._segVista === 'docs' || window._segVista === 'garantia' ? window._segVista : 'inicio');
   if(primera) setTimeout(function(){ document.body.classList.add('seg-quieto'); }, 1600);
 }
 
@@ -800,6 +971,12 @@ window.resenaChip      = resenaChip;
 window.resenaTexto     = resenaTexto;
 window.resenaCopiar    = resenaCopiar;
 window.enviarResena    = enviarResena;
+window.garAbrir        = garAbrir;
+window.garTipo         = garTipo;
+window.garCampo        = garCampo;
+window.garFoto         = garFoto;
+window.garQuitarFoto   = garQuitarFoto;
+window.enviarGarantia  = enviarGarantia;
 window.cerrarDocSeg    = cerrarDocSeg;
 window.cerrarAyudaForm = cerrarAyudaForm;
 

@@ -36,6 +36,7 @@ const pedidoForm = require("./pedidoForm");
 const docsPublicos = require("./docsPublicos");
 const vitrina = require("./vitrina");
 const resenas = require("./resenas");
+const garantia = require("./garantia");
 
 setGlobalOptions({maxInstances: 10});
 initializeApp();
@@ -260,6 +261,7 @@ exports.formApi = onRequest(
         else if (action === "track") await handleTrack(req, res);
         else if (action === "doc") await handleDoc(req, res);
         else if (action === "review") await handleReview(req, res);
+        else if (action === "claim") await handleClaim(req, res);
         else if (action === "client") await handleClient(req, res);
         else if (action === "reniec") await handleReniec(req, res);
         else {
@@ -743,6 +745,9 @@ async function handleTrack(req, res) {
   const vit = await _vitrinaPublica();
   if (vit) out.vitrina = vit;
   if (rs) out.google = _linkResenas();
+  const rc = garantia.publico(order.reclamo);
+  if (rc) safe.reclamo = rc;
+  else safe.garantia = garantia.tipos(order, Date.now());
   res.json(out);
 }
 
@@ -851,6 +856,7 @@ const RATE_LIMITS = {
   formApi_track_legado: {windowMs: 60000, max: 20, memoria: true},
   formApi_doc: {windowMs: 60000, max: 20, memoria: true},
   formApi_review: {windowMs: 60000, max: 5, memoria: true},
+  formApi_claim: {windowMs: 60000, max: 3, memoria: true},
   formApi_token: {windowMs: 60000, max: 30, memoria: true},
   formApi_config: {windowMs: 60000, max: 60, memoria: true},
   formApi_reniec: {windowMs: 60000, max: 10},
@@ -938,6 +944,91 @@ async function handleReview(req, res) {
   }
   await _vitrinaPublica();
   res.json({status: estado, google: _linkResenas()});
+}
+
+const RECLAMOS_COL = "panel/reclamos/items";
+
+async function handleClaim(req, res) {
+  res.set("Cache-Control", "private, no-store");
+  if (req.method !== "POST") {
+    res.status(405).json({status: "error"});
+    return;
+  }
+  const body = req.body || {};
+  const token = _texto(body.token);
+  const tipo = enlace.tipoDe(token);
+  if (tipo !== "nuevo") {
+    res.status(400).json({status: "error", error: "Link no válido"});
+    return;
+  }
+  if (!(await checkRateLimit("formApi_claim", req))) {
+    res.status(429).json({status: "rate_limited"});
+    return;
+  }
+  const snap = await _snapDelEnlace(token, tipo);
+  if (!snap) {
+    res.status(404).json({status: "not_found"});
+    return;
+  }
+  const ahora = Date.now();
+  const pedido = snap.data();
+  if (garantia.publico(pedido.reclamo)) {
+    res.json({status: "ya"});
+    return;
+  }
+  const r = garantia.limpiar(body, garantia.tipos(pedido, ahora));
+  if (!r) {
+    res.status(400).json({status: "error",
+      error: "Revisa los datos y las fotos de tu solicitud"});
+    return;
+  }
+  const pid = String(pedido.id || snap.ref.id);
+  const bucket = getStorage().bucket();
+  const subidas = [];
+  for (let i = 0; i < r.fotos.length; i++) {
+    const ruta = "reclamos/" + pid + "/" + ahora + "-" + (i + 1) + ".jpg";
+    const llave = crypto.randomUUID();
+    await bucket.file(ruta).save(r.fotos[i], {resumable: false,
+      contentType: "image/jpeg",
+      metadata: {metadata: {firebaseStorageDownloadTokens: llave}}});
+    subidas.push({ruta, url: "https://firebasestorage.googleapis.com/v0/b/" +
+      bucket.name + "/o/" + encodeURIComponent(ruta) + "?alt=media&token=" +
+      llave});
+  }
+  const fecha = new Date(ahora).toISOString();
+  const refRec = db.doc(RECLAMOS_COL + "/" + pid);
+  const estado = await db.runTransaction(async (tx) => {
+    const d = await tx.get(snap.ref);
+    const o = d.exists ? d.data() : null;
+    if (!o) return "not_found";
+    if (garantia.publico(o.reclamo)) return "ya";
+    if (garantia.tipos(o, ahora).indexOf(r.tipo) < 0) return "cerrada";
+    tx.create(refRec, {pedidoId: pid, tipo: r.tipo, producto: r.producto,
+      texto: r.texto, fotos: subidas.map((x) => x.url),
+      rutas: subidas.map((x) => x.ruta), estado: "RECIBIDO", creado: fecha,
+      cliente: _texto(o.name).slice(0, 80),
+      telefono: _texto(o.phone).replace(/\D/g, "").slice(0, 15),
+      codigo: _texto(o.nroComprobante) || pid.slice(-4).toUpperCase()});
+    tx.update(snap.ref, _conMts({reclamo: {estado: "RECIBIDO", tipo: r.tipo,
+      fecha}}));
+    return "ok";
+  }).catch((e) => {
+    console.error("handleClaim tx:", e && e.message);
+    return "error";
+  });
+  if (estado !== "ok") {
+    await Promise.all(subidas.map((x) =>
+      bucket.file(x.ruta).delete().catch(() => {})));
+  }
+  if (estado === "ok" || estado === "ya") {
+    res.json({status: estado});
+  } else if (estado === "not_found") {
+    res.status(404).json({status: "not_found"});
+  } else if (estado === "cerrada") {
+    res.status(409).json({status: "cerrada"});
+  } else {
+    res.status(409).json({status: "ya"});
+  }
 }
 
 const OLVA_STORES_URL =

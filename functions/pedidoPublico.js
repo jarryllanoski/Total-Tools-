@@ -20,7 +20,8 @@
     "trackingStatus", "trackingMessage", "trackingLastUpdate",
   ];
 
-  const CALCULADOS = ["docs", "resena", "resenaAbierta"];
+  const CALCULADOS = ["docs", "resena", "resenaAbierta", "reclamo",
+    "garantia"];
 
   const SECRETOS = [
     "shalomClave",

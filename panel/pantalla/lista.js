@@ -395,6 +395,12 @@ function _renderAhora(){
   }
 }
 
+function _reclamoCard(s){
+  const r=s&&s.reclamo;
+  if(!r||!r.estado) return '';
+  const abierto=r.estado==='RECIBIDO'||r.estado==='EN REVISIÓN';
+  return `<button type="button" class="card-reclamo${abierto?' card-reclamo-abierto':''}" onclick="event.stopPropagation();Reclamos.abrir('${escJs(s.id)}')">🛡️ Garantía · ${escH(r.estado)}</button>`;
+}
 function _resenaCard(s){
   const r=s&&s.resena;
   const n=r?Number(r.estrellas):0;
@@ -486,6 +492,7 @@ function cardHTML(s){
     ${(s.courier||'').toUpperCase().includes('ENCOMIENDA')?((s.ciudadDestino||s.address)?`<div class="card-addr">📦 ${escH(s.ciudadDestino||s.address)}${s.encAgencia?' · 🏪 '+escH(s.encAgencia):''}</div>`:''): (s.address?`<div class="card-addr">🏠 ${escH(s.address)}</div>`:'' )}
     ${s.notes?`<div class="card-note">📝 ${escH(s.notes)}</div>`:''}
     ${_resenaCard(s)}
+    ${_reclamoCard(s)}
     ${cardDocs(s,gChk,tChk,eChk)}
     ${(s.trackingOrderNumber||s.shalomGuia)&&typeof Tracking!=='undefined'?Tracking.renderCardBlock(s):''}
     ${dlvDriverBlock(s)}

@@ -533,6 +533,8 @@
   window._fbLeerAvisos = () => fsGet(`${RAIZ}/webhook`).catch(() => null);
   window._fbLeerVitrina = () => fsGet(`${RAIZ}/vitrina`);
   window._fbGuardarVitrina = (doc) => fsPatch(`${RAIZ}/vitrina`, doc);
+  window._fbLeerReclamo = (id) => fsGet(`${RAIZ}/reclamos/items/${encodeURIComponent(id)}`);
+  window._fbGuardarReclamo = (id, campos) => fsPatch(`${RAIZ}/reclamos/items/${encodeURIComponent(id)}`, campos);
 
   window._fbEncenderPuerta = (on) =>
     fsPatch(shalomPath(), {encendida: !!on, ultimoCambio: Date.now()});

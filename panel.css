@@ -66,6 +66,18 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);max
 .card-note{font-size:11px;color:var(--purple);margin-top:3px}
 .card-resena{font-size:11px;color:#d4a72c;margin-top:3px}
 .card-resena-mala{color:var(--red,#f85149);font-weight:700}
+.card-reclamo{display:inline-block;margin-top:5px;font:inherit;font-size:11px;font-weight:700;padding:4px 9px;border-radius:999px;border:1px solid var(--border,#30363d);background:transparent;color:var(--text2,#8b949e);cursor:pointer}
+.card-reclamo-abierto{border-color:var(--amber,#d29922);color:var(--amber,#d29922)}
+.rec-ov{position:fixed;inset:0;z-index:9500;background:rgba(0,0,0,.6);display:none;align-items:center;justify-content:center;padding:16px}
+.rec-box{background:var(--bg2,#161b22);color:var(--text,#e6edf3);border:1px solid var(--border,#30363d);border-radius:14px;padding:16px;width:100%;max-width:460px;max-height:90vh;overflow:auto}
+.rec-cab{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;font-size:15px}
+.rec-x{background:none;border:none;color:inherit;font-size:18px;cursor:pointer}
+.rec-dato{font-size:13px;margin-bottom:6px}.rec-dato span{display:block;font-size:11px;opacity:.6;text-transform:uppercase}
+.rec-fotos{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0}
+.rec-fotos img{width:96px;height:96px;object-fit:cover;border-radius:10px;border:1px solid var(--border,#30363d)}
+.rec-lbl{display:block;font-size:11px;opacity:.7;margin:10px 0 4px;text-transform:uppercase}
+.rec-btns{display:flex;gap:8px;margin-top:12px}.rec-btns .cfg-save{flex:1}
+.rec-wa{background:#1f883d}
 .supp-panel{margin-bottom:12px}
 .supp-panel-hdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
 .supp-panel-ttl{font-family:'Syne',sans-serif;font-weight:700;font-size:14px;color:var(--text)}
