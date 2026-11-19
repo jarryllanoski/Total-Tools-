@@ -135,7 +135,7 @@ module.exports = async ({bloque, ok}) => {
     const CAPAS = {datos: ['nube.js', 'estado.js', 'storage.js', 'fotos.js', 'respaldo.js', 'mezclaConfig.js', 'errores.js', 'copia-local.js'],
       pantalla: ['navegacion.js', 'iconos.js', 'lista.js', 'acciones.js', 'escaner.js', 'inicio.js', 'whatsapp.js',
         'floatpanel.js', 'seleccion.js', 'voz.js', 'dashboard.js', 'ayuda.js'],
-      pedidos: ['pedido-form.js', 'pedido-docs.js', 'reclamos.js', 'pedido-reniec.js', 'pedido-guardar.js', 'pedido-ui.js',
+      pedidos: ['pedido-form.js', 'pedido-docs.js', 'reclamos.js', 'actividad-campana.js', 'pedido-reniec.js', 'pedido-guardar.js', 'pedido-ui.js',
         'estados-papelera.js', 'pin-papelera.js', 'print.js', 'notify.js', 'delivery.js'],
       shalom: ['shalom-registro.js', 'shalom-origen.js', 'shalom-ajustes.js', 'shalom-cuenta.js', 'shalom.js', 'tracking.js',
         'qrtracking.js', 'ticket.js', 'guias.js', 'agencias-extractor.js'],

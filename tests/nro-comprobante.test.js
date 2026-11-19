@@ -441,7 +441,8 @@ module.exports = async ({bloque, ok}) => {
 
   {
     const nt = E.leer('notify.js');
-    ok(/var nro = ship && window\.NroComprobante \? NroComprobante\.de\(ship\) : ''/.test(nt),
+    ok(/_nroDe\(n\.shipId\)/.test(nt) &&
+       /var nro = ship && window\.NroComprobante \? NroComprobante\.de\(ship\) : ''/.test(E.leerReal('panel/pedidos/actividad-campana.js')),
        'la campana lo lee del PEDIDO al pintar, no de una copia vieja');
     const card = E.trozo('index.html', 'function cardHTML(s){',
         'function dlvDriverBlock');

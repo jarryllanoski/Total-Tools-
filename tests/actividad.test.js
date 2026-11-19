@@ -159,7 +159,12 @@ module.exports = async ({bloque, ok}) => {
 
   bloque('Campana del panel');
   {
-    const nt = E.leerReal('panel/pedidos/notify.js');
+    const nt = E.leerReal('panel/pedidos/actividad-campana.js');
+    const vieja = E.leerReal('panel/pedidos/notify.js');
+    ok(/🔔 Nuevos pedidos/.test(vieja) && /window\.NotifyModule = \{/.test(vieja) && !/Actividad|_fbLeerActividad/.test(vieja),
+       '⚠️ la campana de nuevos pedidos sigue como estaba, sin la actividad');
+    ok(/id="actividadBellSlot"/.test(E.leerReal('index.html')) && /'actividadBellSlot'/.test(nt) && /window\.ActividadCampana = \{/.test(nt) &&
+       !/NotifyModule|notifyPanel|notifyBtn/.test(nt), 'la actividad va en su propia campana (👥), con sus propios ids');
     ok(/var CADA_MS = 120000;/.test(nt) && /window\._syncUltimo && typeof window\._fbLeerActividad === 'function'/.test(nt) &&
        /if\(document\.hidden && !forzar\) return false;/.test(nt), 'lee cada 2 minutos, solo con sesión y con el panel a la vista');
     ok(/localStorage\.getItem\(CLAVE_VISTO\)/.test(nt) && /e\.ts > desde/.test(nt), 'el número cuenta solo lo nuevo desde que la abriste');
