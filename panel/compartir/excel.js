@@ -87,7 +87,12 @@ function importExcel(input){
   reader.readAsBinaryString(file);
 }
 
-function doCSV(){if(!S.shipments.length){toast('Sin envíos');return}const h=['Nombre','Teléfono','Dirección','Courier','Fecha','Estado','Costo','Notas','Factura/Boleta'];const rows=S.shipments.map(s=>[s.name,s.phone,`"${s.address}"`,s.courier,s.date,s.status,s.cost,`"${s.notes}"`,_nroDe(s)]);const csv=[h,...rows].map(r=>r.join(',')).join('\n');const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));a.download=`envios_${new Date().toLocaleDateString('es')}.csv`;a.click();toast('📊 CSV exportado')}
+function celdaCSV(v){
+  let t=v==null?'':String(v);
+  if(/^[=+\-@\t\r]/.test(t)) t="'"+t;
+  return '"'+t.replace(/"/g,'""')+'"';
+}
+function doCSV(){if(!S.shipments.length){toast('Sin envíos');return}const h=['Nombre','Teléfono','Dirección','Courier','Fecha','Estado','Costo','Notas','Factura/Boleta'];const rows=S.shipments.map(s=>[s.name,s.phone,s.address||s.ciudadDestino,s.courier,s.date,s.status,s.cost,s.notes,_nroDe(s)]);const csv=[h,...rows].map(r=>r.map(celdaCSV).join(',')).join('\n');const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));a.download=`envios_${new Date().toLocaleDateString('es')}.csv`;a.click();toast('📊 CSV exportado')}
 
 function doPrint(){
   if(window.PrintModule){ PrintModule.open(); }

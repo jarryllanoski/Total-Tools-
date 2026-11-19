@@ -13,6 +13,8 @@ const TEXTOS = {
 
 const DOCUMENTOS = ["dni", "dniRecoger", "dniDestinatario"];
 
+const SIEMPRE = ["name", "address", "referencia", "notes"];
+
 const FECHA = /^\d{4}-\d{2}-\d{2}$/;
 const GPS = /^-?\d{1,3}(\.\d{1,10})?,\s?-?\d{1,3}(\.\d{1,10})?$/;
 const COURIER_NO = /[^\p{L}\p{N} .,&()/+-]/gu;
@@ -62,7 +64,7 @@ function limpiar(order) {
   const out = {};
   Object.keys(TEXTOS).forEach((k) => {
     const v = texto(o[k], TEXTOS[k]);
-    if (v) out[k] = v;
+    if (v || SIEMPRE.indexOf(k) >= 0) out[k] = v;
   });
   DOCUMENTOS.forEach((k) => {
     const v = digitos(o[k], 12);
@@ -71,7 +73,7 @@ function limpiar(order) {
   out.phone = celular(o.phone);
   const courier = typeof o.courier === "string" ?
     o.courier.replace(COURIER_NO, "").trim().slice(0, 60) : "";
-  if (courier) out.courier = courier;
+  out.courier = courier;
   if (typeof o.date === "string" && FECHA.test(o.date)) out.date = o.date;
   if (typeof o.gpsCoords === "string" && GPS.test(o.gpsCoords.trim())) {
     out.gpsCoords = o.gpsCoords.trim();
@@ -85,5 +87,5 @@ function limpiar(order) {
   return out;
 }
 
-module.exports = {TEXTOS, DOCUMENTOS, texto, digitos, celular, extra,
+module.exports = {TEXTOS, DOCUMENTOS, SIEMPRE, texto, digitos, celular, extra,
   linkSeguro, limpiar};

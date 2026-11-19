@@ -65,4 +65,17 @@ function allStatuses(){ return S.labels; }
 function stIcon(st){ return FIXED_LABEL_ICONS[st]||(st==='PENDIENTE'?'🕐':st==='ENVIADO'?'🚚':st==='ENTREGADO'?'✅':'🏷️') }
 function stClass(st){ return st==='NUEVO PEDIDO'?'st-pend':st==='EN PROCESO'?'st-env':st==='POR ALISTAR'?'st-env':st==='FINALIZADO'?'st-ent':st==='ENVIADO'?'st-env':st==='ENTREGADO'?'st-ent':'st-cust' }
 function stSoptClass(st){ return st==='NUEVO PEDIDO'?'sopt-pend':st==='EN PROCESO'?'sopt-env':st==='POR ALISTAR'?'sopt-env':st==='FINALIZADO'?'sopt-ent':st==='ENVIADO'?'sopt-env':st==='ENTREGADO'?'sopt-ent':'sopt-cust' }
-function fillVars(tpl,s){return tpl.replace(/\{nombre\}/gi,s.name).replace(/\{telefono\}/gi,s.phone).replace(/\{direccion\}/gi,s.address).replace(/\{courier\}/gi,s.courier).replace(/\{fecha\}/gi,s.date||'—').replace(/\{costo\}/gi,s.cost?'S/ '+s.cost:'—').replace(/\{estado\}/gi,s.status)}
+function fillVars(tpl,s){
+  const p=s||{};
+  const txt=(v,def)=>{const t=v==null?'':String(v).trim();return t||def;};
+  const vars={
+    nombre:txt(p.name,''),
+    telefono:txt(p.phone,''),
+    direccion:txt(p.address,'')||txt(p.ciudadDestino,'—'),
+    courier:txt(p.courier,''),
+    fecha:txt(p.date,'—'),
+    costo:p.cost?'S/ '+p.cost:'—',
+    estado:txt(p.status,'')
+  };
+  return String(tpl==null?'':tpl).replace(/\{(nombre|telefono|direccion|courier|fecha|costo|estado)\}/gi,(m,k)=>vars[k.toLowerCase()]);
+}

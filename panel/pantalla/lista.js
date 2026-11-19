@@ -287,13 +287,23 @@ function _soloActivos(){
   return !_filt && !$('fSearch').value.trim() && !_advActive;
 }
 
+const _txtOrden=v=>v==null?'':String(v);
+const CAMPOS_BUSQUEDA=['name','phone','address','courier','ciudadDestino','referencia','encAgencia','shalomGuia','trackingOrderNumber'];
+function coincideBusqueda(x,q){
+  if(!x||!q) return !q;
+  if(CAMPOS_BUSQUEDA.some(k=>x[k]!=null&&String(x[k]).toLowerCase().includes(q))) return true;
+  const dni=_dniDe(x);
+  if(dni&&String(dni).includes(q)) return true;
+  return typeof NroComprobante!=='undefined'&&!!NroComprobante.coincide(x,q);
+}
+
 function visibleShipments(){
-  const srch=$('fSearch').value.toLowerCase();
+  const srch=$('fSearch').value.trim().toLowerCase();
   let data=S.shipments;
   if(_filt===SIN_ETIQUETA){ const l=new Set(S.labels); data=data.filter(x=>!l.has(x.status)); }
   else if(_filt) data=data.filter(x=>x.status===_filt);
   else if(_soloActivos()) data=data.filter(x=>x.status!=='FINALIZADO');
-  if(srch) data=data.filter(x=>x.name.toLowerCase().includes(srch)||x.phone.includes(srch)||(_dniDe(x)&&_dniDe(x).includes(srch))||x.address.toLowerCase().includes(srch)||x.courier.toLowerCase().includes(srch)||(typeof NroComprobante!=='undefined'&&NroComprobante.coincide(x,srch)));
+  if(srch) data=data.filter(x=>coincideBusqueda(x,srch));
   if(_advActive){
     if(typeof FechaPedido!=='undefined'){
       if(_adv.dateFrom||_adv.dateTo) data=data.filter(x=>FechaPedido.enRango(x,_adv.campo,_adv.dateFrom,_adv.dateTo));
@@ -341,13 +351,13 @@ function _renderAhora(){
       data=[...data].sort((a,b)=>_adv.sort==='oldest' ? _tsReg(a)-_tsReg(b) : _tsReg(b)-_tsReg(a));
     else if(_adv.sort==='oldest') data=[...data].sort((a,b)=>(a.date||'').localeCompare(b.date||''));
     else if(_adv.sort==='newest') data=[...data].sort((a,b)=>(b.date||'').localeCompare(a.date||''));
-    else if(_adv.sort==='name') data=[...data].sort((a,b)=>a.name.localeCompare(b.name));
+    else if(_adv.sort==='name') data=[...data].sort((a,b)=>_txtOrden(a.name).localeCompare(_txtOrden(b.name)));
     else if(_adv.sort==='cost') data=[...data].sort((a,b)=>parseFloat(b.cost||0)-parseFloat(a.cost||0));
   } else {
     const sort=_filt?(_chipSort[_filt]||'courier_date'):'courier_date';
-    if(sort==='courier_date')      data=[...data].sort((a,b)=>a.courier.localeCompare(b.courier)||b.date.localeCompare(a.date));
+    if(sort==='courier_date')      data=[...data].sort((a,b)=>_txtOrden(a.courier).localeCompare(_txtOrden(b.courier))||_txtOrden(b.date).localeCompare(_txtOrden(a.date)));
     else if(sort==='date')         data=[...data].sort((a,b)=>(b.date||'').localeCompare(a.date||''));
-    else if(sort==='name')         data=[...data].sort((a,b)=>a.name.localeCompare(b.name));
+    else if(sort==='name')         data=[...data].sort((a,b)=>_txtOrden(a.name).localeCompare(_txtOrden(b.name)));
     else if(sort==='cost')         data=[...data].sort((a,b)=>parseFloat(a.cost||0)-parseFloat(b.cost||0));
     else if(sort==='cost_desc')    data=[...data].sort((a,b)=>parseFloat(b.cost||0)-parseFloat(a.cost||0));
   }
@@ -355,7 +365,7 @@ function _renderAhora(){
     data = data.filter(x=>x.id===_qrMove.shown);
   }
   const groups={};
-  data.forEach(x=>{if(!groups[x.courier])groups[x.courier]=[];groups[x.courier].push(x)});
+  data.forEach(x=>{const k=_txtOrden(x.courier);if(!groups[k])groups[k]=[];groups[k].push(x)});
   const area=$('cardsArea');
   if(!data.length){
     const fin = _soloActivos()
@@ -380,7 +390,7 @@ function _renderAhora(){
     : '';
   area.innerHTML=Object.entries(groups).map(([courier,items])=>`
     <div class="cgroup">
-      <div class="cgroup-hdr"><div class="cgroup-bar"></div><span>${_courierIcon(courier)}</span><div class="cgroup-name">${escH(courier)}</div><div class="cgroup-spacer"></div><button class="cgroup-btn" title="Imprimir ${escH(courier)}" onclick="printGroup('${escJs(courier)}')">🖨️</button><div class="cgroup-spacer"></div><div class="cgroup-actions"><button class="cgroup-btn" title="Tarjeta anterior" onclick="scrollCard(-1)">▲</button><button class="cgroup-btn" title="Tarjeta siguiente" onclick="scrollCard(1)">▼</button></div><div class="cgroup-cnt">${items.length}</div></div>
+      <div class="cgroup-hdr"><div class="cgroup-bar"></div><span>${_courierIcon(courier)}</span><div class="cgroup-name">${escH(courier||'Sin courier')}</div><div class="cgroup-spacer"></div><button class="cgroup-btn" title="Imprimir ${escH(courier)}" onclick="printGroup('${escJs(courier)}')">🖨️</button><div class="cgroup-spacer"></div><div class="cgroup-actions"><button class="cgroup-btn" title="Tarjeta anterior" onclick="scrollCard(-1)">▲</button><button class="cgroup-btn" title="Tarjeta siguiente" onclick="scrollCard(1)">▼</button></div><div class="cgroup-cnt">${items.length}</div></div>
       ${items.map(s=>cardHTML(s)).join('')}
     </div>`).join('') + _pieOcultos;
 

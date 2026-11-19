@@ -112,7 +112,7 @@ module.exports = async ({bloque, ok}) => {
     ok(!N.coincide(p, '   '), 'buscar espacios no lo encuentra todo');
 
     // El buscador REAL del panel, ejecutado.
-    const src = E.trozo('index.html', 'function visibleShipments(){',
+    const src = E.trozo('index.html', 'const CAMPOS_BUSQUEDA=',
         'let _renderPedido = false;');
     const S = {shipments: [
       {id: 'a', name: 'ANA', phone: '911111111', address: 'X', courier: 'SHALOM',

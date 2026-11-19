@@ -28,17 +28,17 @@ function openForm(id){
   if(id){
     const s=S.shipments.find(x=>x.id===id);
     if(!s){toast('⚠️ Recarga la página e intenta de nuevo');return;}
-    $('fName').value=s.name;$('fPhone').value=s.phone;if($('fDni'))$('fDni').value=s.dni||'';
+    $('fName').value=s.name||'';$('fPhone').value=s.phone||'';if($('fDni'))$('fDni').value=s.dni||'';
     if(s.dni && typeof _dniReniec==='function') _dniReniec(s.dni);
     const _isEncEdit=(s.courier||'').toUpperCase().includes('ENCOMIENDA');
-    $('fAddr').value=_isEncEdit?(s.ciudadDestino||s.address||''):s.address;
+    $('fAddr').value=_isEncEdit?(s.ciudadDestino||s.address||''):(s.address||'');
     if($('fEncAgencia'))$('fEncAgencia').value=s.encAgencia||'';
-    $('fCourier').value=s.courier;$('fDate').value=s.date;
+    $('fCourier').value=s.courier||'';$('fDate').value=s.date||'';
     if(s.status && !S.labels.includes(s.status)){
       const o=document.createElement('option'); o.value=s.status; o.textContent=s.status+' (sin etiqueta)';
       $('fStatus').appendChild(o);
     }
-    $('fStatus').value=s.status;
+    $('fStatus').value=s.status||'';
     $('fNotes').value=s.notes||'';_loadMontoFields(s);
     if($('fComprobante'))$('fComprobante').value=_nroDe(s);
     document.querySelectorAll('.xf').forEach(el=>{el.value=(s.extra&&s.extra[el.dataset.f])||''});
