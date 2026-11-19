@@ -160,8 +160,11 @@ module.exports = async ({bloque, ok}) => {
     const todo = E.leer('index.html');
     const usos = (todo.match(/confirmar\(\{/g) || []).length;
     // 10/11/2026: +2, «guardar y registrar» y «registrar de nuevo» (cuestan).
-    ok(usos === 10,
-       'las diez pantallas irreversibles pasan por la misma puerta ' +
+    // 19/11/2026: -1, «vaciar papelera» ya no existe.
+    ok(usos === 9,
+       'las nueve pantallas irreversibles pasan por la misma puerta ' +
        '(vistas: ' + usos + ')');
+    ok(!/emptyTrash|Vaciar todo/.test(todo),
+       '⚠️ la papelera ya no se puede vaciar: cada envío se borra solo a los 30 días');
   }
 };

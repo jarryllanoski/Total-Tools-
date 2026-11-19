@@ -58,7 +58,7 @@ module.exports = async ({bloque, ok}) => {
        'y `_printed`, para los que la campana ya marcó');
     ok(PM.impreso({}) === false && PM.impreso(null) === false, 'sin marca, no');
     const nt = E.leer('notify.js');
-    ok(/_impreso\(s\) && !existing\.printed/.test(nt) && /printed: _impreso\(s\)/.test(nt),
+    ok(/_impreso\(ship\)\s*\n?\s*\? '<button class="notify-btn notify-btn-printed" disabled>/.test(nt),
        '⚠️ la campana pregunta lo mismo: deja de ofrecer «Imprimir» de algo impreso');
     ok(!/s\._printed && !existing/.test(nt), 'y ya no mira solo `_printed`');
   }

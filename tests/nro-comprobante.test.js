@@ -60,12 +60,12 @@ function cargarCreate(tokens) {
   };
   // eslint-disable-next-line no-new-func
   const fn = new Function('db', 'agencias', 'enlace', 'reniecPublico',
-      'nroComp', 'checkRateLimit', 'appCheckOk', 'pedidoForm', 'TOK_COL', 'SHIP_COL', 'CFG_DOC', '_conMts', 'SYNC_V',
+      'nroComp', 'checkRateLimit', 'appCheckOk', 'pedidoForm', 'TOK_COL', 'SHIP_COL', 'CFG_DOC', '_conMts', 'SYNC_V', '_anotar',
       campos + create + ';return handleCreate;',
   )(db, require('../functions/agencias.js'), {generar: () => 'tok128'},
       {normalizar: () => ''}, N, async () => true, async () => true, require('../functions/pedidoForm.js'),
       'panel/tokens/items', 'panel/shipments/items', 'panel/config',
-      (o) => Object.assign({}, o, {_mts: 'HORA_DEL_SERVIDOR'}), 1);
+      (o) => Object.assign({}, o, {_mts: 'HORA_DEL_SERVIDOR'}), 1, async () => false);
   return {fn, escritos};
 }
 function resFalsa() {
@@ -441,7 +441,7 @@ module.exports = async ({bloque, ok}) => {
 
   {
     const nt = E.leer('notify.js');
-    ok(/_nroDe\(n\.shipId\)/.test(nt),
+    ok(/var nro = ship && window\.NroComprobante \? NroComprobante\.de\(ship\) : ''/.test(nt),
        'la campana lo lee del PEDIDO al pintar, no de una copia vieja');
     const card = E.trozo('index.html', 'function cardHTML(s){',
         'function dlvDriverBlock');

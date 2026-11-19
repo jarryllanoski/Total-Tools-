@@ -160,7 +160,7 @@ async function buscarPedido(token, silent){
   }
 
   try{
-    const resp = await _api('track', {token: t});
+    const resp = await _api('track', silent ? {token: t, r: 1} : {token: t});
     if(resp && resp.status === 'ok' && resp.order){
       if(window.TTLoader) TTLoader.done();
       window._segTok = t;
@@ -495,18 +495,19 @@ function _nautiHtml(vit, bizPhone){
     ? (vit.sorteo ? 'Con mis tentáculos jalé las promos de hoy y un sorteo para ti.' : 'Con mis tentáculos jalé las promos de hoy para ti.')
     : 'Con mis tentáculos jalé un sorteo para ti.';
   var tarjetas = promos.map(function(p, i){
+    var idx = vit.promos.indexOf(p);
     var msg = 'Hola, vi la promo «' + p.titulo + '»' + (p.precio ? ' a ' + _soles(p.precio) : '') + ' en mi seguimiento. ¿Está disponible?';
     var wa = bizPhone ? 'https://wa.me/51' + bizPhone + '?text=' + encodeURIComponent(msg) : '';
     return '<article class="seg-promo" style="--i:' + i + '">'
       + '<img src="' + esc(p.img) + '" alt="' + esc(p.titulo) + '" width="160" height="160" loading="lazy" decoding="async">'
       + '<div class="seg-promo-t">' + esc(p.titulo) + '</div>'
       + (p.precio ? '<div class="seg-promo-p">' + (p.antes ? '<s>' + esc(_soles(p.antes)) + '</s> ' : '') + '<b>' + esc(_soles(p.precio)) + '</b></div>' : '')
-      + (wa ? '<a class="seg-promo-wa" href="' + esc(wa) + '" target="_blank" rel="noopener">Lo quiero</a>' : '')
+      + (wa ? '<a class="seg-promo-wa" href="' + esc(wa) + '" target="_blank" rel="noopener" onclick="segEvento(\'promo\',' + idx + ')">Lo quiero</a>' : '')
       + '</article>';
   }).join('');
   var s = vit.sorteo;
   var sorteo = (s && /^https:\/\//i.test(String(s.link || '')) && s.titulo)
-    ? '<a class="seg-sorteo" href="' + esc(s.link) + '" target="_blank" rel="noopener noreferrer">'
+    ? '<a class="seg-sorteo" href="' + esc(s.link) + '" target="_blank" rel="noopener noreferrer" onclick="segEvento(\'sorteo\')">'
       + '<span class="seg-sorteo-ic" aria-hidden="true">🎉</span>'
       + '<span class="seg-sorteo-t"><b>' + esc(s.titulo) + '</b>' + (s.texto ? '<small>' + esc(s.texto) + '</small>' : '')
       + (_fechaCorta(s.hasta) ? '<small class="seg-sorteo-h">Hasta el ' + esc(_fechaCorta(s.hasta)) + '</small>' : '') + '</span>'
@@ -518,6 +519,15 @@ function _nautiHtml(vit, bizPhone){
     + (tarjetas ? '<div class="seg-promos">' + tarjetas + '</div>' : '')
     + sorteo
     + '</section>';
+}
+
+function segEvento(tipo, i){
+  try{
+    if(!window._segTok || !navigator.sendBeacon) return;
+    var cuerpo = {token: window._segTok, tipo: tipo === 'sorteo' ? 'sorteo' : 'promo'};
+    if(cuerpo.tipo === 'promo') cuerpo.i = Number(i);
+    navigator.sendBeacon(FORM_API + '?action=evento', new Blob([JSON.stringify(cuerpo)], {type: 'text/plain'}));
+  }catch(e){}
 }
 
 function _esApp(){
@@ -977,6 +987,7 @@ window.garCampo        = garCampo;
 window.garFoto         = garFoto;
 window.garQuitarFoto   = garQuitarFoto;
 window.enviarGarantia  = enviarGarantia;
+window.segEvento       = segEvento;
 window.cerrarDocSeg    = cerrarDocSeg;
 window.cerrarAyudaForm = cerrarAyudaForm;
 

@@ -37,6 +37,7 @@ const docsPublicos = require("./docsPublicos");
 const vitrina = require("./vitrina");
 const resenas = require("./resenas");
 const garantia = require("./garantia");
+const actividad = require("./actividad");
 
 setGlobalOptions({maxInstances: 10});
 initializeApp();
@@ -262,6 +263,7 @@ exports.formApi = onRequest(
         else if (action === "doc") await handleDoc(req, res);
         else if (action === "review") await handleReview(req, res);
         else if (action === "claim") await handleClaim(req, res);
+        else if (action === "evento") await handleEvento(req, res);
         else if (action === "client") await handleClient(req, res);
         else if (action === "reniec") await handleReniec(req, res);
         else {
@@ -418,6 +420,8 @@ async function handleCreate(req, res) {
 
   const resp = {status: "ok", orderId, trackCode, trackToken};
   if (nroComprobante) resp.nroComprobante = nroComprobante;
+  await _anotar("pedido", Object.assign({}, orderToSave, {id: orderId}),
+      {x: orderToSave.courier});
   res.json(resp);
 }
 
@@ -748,6 +752,7 @@ async function handleTrack(req, res) {
   const rc = garantia.publico(order.reclamo);
   if (rc) safe.reclamo = rc;
   else safe.garantia = garantia.tipos(order, Date.now());
+  if (_texto(req.query.r) !== "1") await _anotar("visto", order);
   res.json(out);
 }
 
@@ -840,6 +845,7 @@ async function handleDoc(req, res) {
   const ext = mime === "application/pdf" ? "pdf" :
     mime.split("/")[1].replace("jpeg", "jpg");
   const codigo = (order.id || "").slice(-4).toUpperCase();
+  await _anotar("doc", order, {x: cual});
   res.set("Content-Type", mime);
   res.set("X-Content-Type-Options", "nosniff");
   res.set("Access-Control-Expose-Headers", "Content-Disposition");
@@ -857,6 +863,7 @@ const RATE_LIMITS = {
   formApi_doc: {windowMs: 60000, max: 20, memoria: true},
   formApi_review: {windowMs: 60000, max: 5, memoria: true},
   formApi_claim: {windowMs: 60000, max: 3, memoria: true},
+  formApi_evento: {windowMs: 60000, max: 20, memoria: true},
   formApi_token: {windowMs: 60000, max: 30, memoria: true},
   formApi_config: {windowMs: 60000, max: 60, memoria: true},
   formApi_reniec: {windowMs: 60000, max: 10},
@@ -943,7 +950,95 @@ async function handleReview(req, res) {
     return;
   }
   await _vitrinaPublica();
+  if (estado === "ok") {
+    await _anotar("resena", snap.data(), {x: String(r.estrellas), s: r.texto});
+  }
   res.json({status: estado, google: _linkResenas()});
+}
+
+const ACTIVIDAD_DOC = "panel/actividad";
+const _actividadReciente = new Map();
+const ACTIVIDAD_MEMORIA_MAX = 5000;
+
+async function _anotar(tipo, pedido, extra) {
+  try {
+    const ahora = Date.now();
+    const ev = actividad.evento(tipo, pedido, extra, ahora);
+    if (!ev) return false;
+    if (actividad.TIPOS[tipo].unaVez) {
+      const k = actividad.clave(ev);
+      const ult = _actividadReciente.get(k);
+      if (ult && ahora - ult < actividad.VENTANA_MS) return false;
+      if (_actividadReciente.size >= ACTIVIDAD_MEMORIA_MAX) {
+        _actividadReciente.clear();
+      }
+      _actividadReciente.set(k, ahora);
+    }
+    const ref = db.doc(ACTIVIDAD_DOC);
+    return await db.runTransaction(async (tx) => {
+      const snap = await tx.get(ref);
+      const items = snap.exists ? snap.data().items : [];
+      if (actividad.repetido(items, ev)) return false;
+      tx.set(ref, {items: actividad.agregar(items, ev), ts: ahora});
+      return true;
+    });
+  } catch (e) {
+    console.error("actividad:", tipo, e && e.message);
+    return false;
+  }
+}
+
+function _cuerpoJson(req) {
+  const b = req.body;
+  if (b && typeof b === "object" && !Buffer.isBuffer(b)) return b;
+  const t = Buffer.isBuffer(b) ? b.toString("utf8") : String(b || "");
+  if (t.length > 2000) return {};
+  try {
+    const o = JSON.parse(t);
+    return o && typeof o === "object" ? o : {};
+  } catch (e) {
+    return {};
+  }
+}
+
+async function handleEvento(req, res) {
+  res.set("Cache-Control", "no-store");
+  if (req.method !== "POST") {
+    res.status(405).json({status: "error"});
+    return;
+  }
+  const body = _cuerpoJson(req);
+  const token = _texto(body.token);
+  const tipoEnlace = enlace.tipoDe(token);
+  const tipo = body.tipo === "promo" || body.tipo === "sorteo" ?
+    body.tipo : "";
+  if (tipoEnlace === "invalido" || !tipo) {
+    res.status(400).json({status: "error"});
+    return;
+  }
+  if (!(await checkRateLimit("formApi_evento", req))) {
+    res.status(429).json({status: "rate_limited"});
+    return;
+  }
+  const vit = await _vitrinaPublica();
+  let titulo = "";
+  if (tipo === "sorteo") {
+    titulo = vit && vit.sorteo ? vit.sorteo.titulo : "";
+  } else {
+    const p = vit ? vit.promos[Number(body.i)] : null;
+    titulo = p ? p.titulo : "";
+  }
+  if (!titulo) {
+    res.status(404).json({status: "not_found"});
+    return;
+  }
+  const order = await _pedidoDelEnlace(token, tipoEnlace);
+  if (!order) {
+    res.status(404).json({status: "not_found"});
+    return;
+  }
+  await _anotar(tipo, order, {x: titulo});
+  res.status(204).send("");
 }
 
 const RECLAMOS_COL = "panel/reclamos/items";
@@ -1019,6 +1114,9 @@ async function handleClaim(req, res) {
   if (estado !== "ok") {
     await Promise.all(subidas.map((x) =>
       bucket.file(x.ruta).delete().catch(() => {})));
+  }
+  if (estado === "ok") {
+    await _anotar("reclamo", pedido, {x: r.tipo, s: r.producto});
   }
   if (estado === "ok" || estado === "ya") {
     res.json({status: estado});
@@ -1545,6 +1643,8 @@ exports.limpiezaLapidas = onSchedule({
   const r = await limpieza.limpiarLapidas(db, Date.now(),
       (ms) => Timestamp.fromMillis(ms));
   console.log("limpiezaLapidas:", JSON.stringify(r));
+  const p = await limpieza.limpiarPapelera(db, Date.now());
+  console.log("limpiezaPapelera:", JSON.stringify(p));
 });
 
 exports.barridoShalom = onSchedule({

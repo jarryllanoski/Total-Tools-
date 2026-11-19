@@ -43,9 +43,9 @@ function servidor(pedidos, opciones) {
     delete: async () => borrados.push(ruta),
   })};
   // eslint-disable-next-line no-new-func
-  const fn = new Function('db', 'enlace', 'checkRateLimit', 'SHIP_COL', 'getStorage', 'garantia', '_conMts', 'crypto',
+  const fn = new Function('db', '_anotar', 'enlace', 'checkRateLimit', 'SHIP_COL', 'getStorage', 'garantia', '_conMts', 'crypto',
       T + ';return handleClaim;')(
-      db, L, async () => o.freno !== true, 'panel/shipments/items', () => ({bucket: () => bucket}), G,
+      db, (globalThis.__anotar || (async () => false)), L, async () => o.freno !== true, 'panel/shipments/items', () => ({bucket: () => bucket}), G,
       (c) => Object.assign({}, c, {_mts: 'HORA_SERVIDOR'}), {randomUUID: () => 'llave-' + guardados.length});
   const enviar = async (body, metodo) => {
     const r = {code: 200, body: null, cab: {}};
@@ -147,8 +147,8 @@ module.exports = async ({bloque, ok}) => {
         return {empty: !d.length, docs: d.map((x) => ({data: () => x}))};
       }})})})};
     // eslint-disable-next-line no-new-func
-    const ht = new Function('db', 'enlace', 'checkRateLimit', 'pedidoPublico', 'SHIP_COL', 'CFG_DOC', 'docsPublicos', 'getStorage', 'vitrina', 'resenas', 'garantia',
-        T + ';return handleTrack;')(db, L, async () => true, require('../functions/pedidoPublico.js'), 'panel/shipments/items', 'panel/config',
+    const ht = new Function('db', '_anotar', 'enlace', 'checkRateLimit', 'pedidoPublico', 'SHIP_COL', 'CFG_DOC', 'docsPublicos', 'getStorage', 'vitrina', 'resenas', 'garantia',
+        T + ';return handleTrack;')(db, (globalThis.__anotar || (async () => false)), L, async () => true, require('../functions/pedidoPublico.js'), 'panel/shipments/items', 'panel/config',
         require('../functions/docsPublicos.js'), () => ({bucket: () => ({name: 'b'})}), require('../functions/vitrina.js'), require('../functions/resenas.js'), G);
     const ver = async (t) => { const r = {json: (b) => { r.body = b; return r; }, status: () => r}; await ht({query: {token: t}}, r); return r.body; };
     ok((await ver(TOK('A'))).order.garantia.join() === 'cambio,devolucion,falla', 'recién entregado: puede pedir cambio, devolución o garantía');

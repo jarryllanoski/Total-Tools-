@@ -41,10 +41,15 @@ function onTrashBtnTap(){
   openTrash();
 }
 
+const PAPELERA_DIAS=30;
+function papeleraVigentes(lista, ahora){
+  const limite=PAPELERA_DIAS*24*60*60*1000;
+  return (Array.isArray(lista)?lista:[]).filter(x=>x&&x.shipment&&typeof x.deletedAt==='number'&&ahora-x.deletedAt<limite);
+}
+
 function openTrash(){
-  const now=Date.now();
-  const before=S.trash.length;
-  S.trash=S.trash.filter(x=>(now-x.deletedAt)<30*24*60*60*1000);
+  const before=Array.isArray(S.trash)?S.trash.length:0;
+  S.trash=papeleraVigentes(S.trash,Date.now());
   if(S.trash.length!==before) save('config');
 
   if(!S.trash.length){
@@ -52,7 +57,7 @@ function openTrash(){
   } else {
     $('trashList').innerHTML=S.trash.map((item,i)=>{
       const days=Math.floor((Date.now()-item.deletedAt)/(24*60*60*1000));
-      const remaining=30-days;
+      const remaining=PAPELERA_DIAS-days;
       const warn=remaining<=5;
       return`<div class="trash-item">
         <div class="trash-item-info">
@@ -76,20 +81,3 @@ function restoreTrash(i){
   save(item.shipment.id);render();openTrash();toast(`✅ ${item.shipment.name} recuperado`);
 }
 
-function emptyTrash(){
-  if(!S.trash.length){toast('La papelera ya está vacía');return}
-  confirmar({
-    texto:`¿Eliminar definitivamente ${S.trash.length} envío(s)? Esto no se puede deshacer.`,
-    textoSi:'Eliminar definitivamente',
-    trabajando:'Eliminando...',
-    alConfirmar: async () => {
-      try{
-        if(window._fsList&&window._fbDeleteTrashItem){
-          const items=await window._fsList('panel/trash/items');
-          await Promise.all(items.map(x=>window._fbDeleteTrashItem(x._id)));
-        }
-      }catch(e){console.warn('emptyTrash subcol:',e.message);}
-      S.trash=[];save('config');openTrash();toast('🗑️ Papelera vaciada');
-    }
-  });
-}

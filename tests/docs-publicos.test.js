@@ -24,8 +24,8 @@ function servidor(pedidos, archivos, opciones) {
     download: async () => { descargas.push(ruta); return [archivos[ruta].bytes]; },
   })};
   // eslint-disable-next-line no-new-func
-  const fn = new Function('db', 'enlace', 'checkRateLimit', 'pedidoPublico', 'SHIP_COL', 'docsPublicos', 'getStorage', 'vitrina', 'resenas', 'garantia', T + ';return handleDoc;')(
-      db, L, async () => o.freno !== false, require('../functions/pedidoPublico.js'), 'panel/shipments/items', DP, () => ({bucket: () => bucket}), require('../functions/vitrina.js'), require('../functions/resenas.js'), require('../functions/garantia.js'));
+  const fn = new Function('db', '_anotar', 'enlace', 'checkRateLimit', 'pedidoPublico', 'SHIP_COL', 'docsPublicos', 'getStorage', 'vitrina', 'resenas', 'garantia', T + ';return handleDoc;')(
+      db, (globalThis.__anotar || (async () => false)), L, async () => o.freno !== false, require('../functions/pedidoPublico.js'), 'panel/shipments/items', DP, () => ({bucket: () => bucket}), require('../functions/vitrina.js'), require('../functions/resenas.js'), require('../functions/garantia.js'));
   const pedir = async (token, tipo) => {
     const r = {code: 200, body: null, cab: {}};
     r.status = (c) => { r.code = c; return r; };
@@ -129,8 +129,8 @@ module.exports = async ({bloque, ok}) => {
         return {empty: !d.length, docs: d.map((x) => ({data: () => x}))};
       }})})})};
     // eslint-disable-next-line no-new-func
-    const ht = new Function('db', 'enlace', 'checkRateLimit', 'pedidoPublico', 'SHIP_COL', 'CFG_DOC', 'docsPublicos', 'getStorage', 'vitrina', 'resenas', 'garantia', T + ';return handleTrack;')(
-        db, L, async () => true, require('../functions/pedidoPublico.js'), 'panel/shipments/items', 'panel/config', DP, () => ({bucket: () => ({name: BUCKET})}), require('../functions/vitrina.js'), require('../functions/resenas.js'), require('../functions/garantia.js'));
+    const ht = new Function('db', '_anotar', 'enlace', 'checkRateLimit', 'pedidoPublico', 'SHIP_COL', 'CFG_DOC', 'docsPublicos', 'getStorage', 'vitrina', 'resenas', 'garantia', T + ';return handleTrack;')(
+        db, (globalThis.__anotar || (async () => false)), L, async () => true, require('../functions/pedidoPublico.js'), 'panel/shipments/items', 'panel/config', DP, () => ({bucket: () => ({name: BUCKET})}), require('../functions/vitrina.js'), require('../functions/resenas.js'), require('../functions/garantia.js'));
     const ver = async (t) => { const r = {json: (b) => { r.body = b; return r; }, status: () => r}; await ht({query: {token: t}}, r); return r.body; };
     const r1 = await ver(TOK);
     ok(r1.order.docs && r1.order.docs.boleta === 'archivo' && !JSON.stringify(r1).includes('firebasestorage'), 'pedido actual: dice «hay boleta», sin el enlace');

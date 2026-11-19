@@ -36,9 +36,9 @@ function servidor(pedidos, opciones) {
     }),
   };
   // eslint-disable-next-line no-new-func
-  const fn = new Function('db', 'enlace', 'checkRateLimit', 'SHIP_COL', 'getStorage', 'vitrina', 'resenas', 'garantia', '_conMts',
+  const fn = new Function('db', '_anotar', 'enlace', 'checkRateLimit', 'SHIP_COL', 'getStorage', 'vitrina', 'resenas', 'garantia', '_conMts',
       T + ';return handleReview;')(
-      db, L, async () => o.freno !== true, 'panel/shipments/items', () => ({bucket: () => ({name: 'b'})}),
+      db, (globalThis.__anotar || (async () => false)), L, async () => o.freno !== true, 'panel/shipments/items', () => ({bucket: () => ({name: 'b'})}),
       require('../functions/vitrina.js'), R, require('../functions/garantia.js'), (c) => Object.assign({}, c, {_mts: 'HORA_SERVIDOR'}));
   const enviar = async (body, metodo) => {
     const r = {code: 200, body: null, cab: {}};
@@ -139,8 +139,8 @@ module.exports = async ({bloque, ok}) => {
         return {empty: !d.length, docs: d.map((x) => ({data: () => x}))};
       }})})})};
     // eslint-disable-next-line no-new-func
-    const ht = new Function('db', 'enlace', 'checkRateLimit', 'pedidoPublico', 'SHIP_COL', 'CFG_DOC', 'docsPublicos', 'getStorage', 'vitrina', 'resenas', 'garantia',
-        T + ';return handleTrack;')(db, L, async () => true, require('../functions/pedidoPublico.js'), 'panel/shipments/items', 'panel/config',
+    const ht = new Function('db', '_anotar', 'enlace', 'checkRateLimit', 'pedidoPublico', 'SHIP_COL', 'CFG_DOC', 'docsPublicos', 'getStorage', 'vitrina', 'resenas', 'garantia',
+        T + ';return handleTrack;')(db, (globalThis.__anotar || (async () => false)), L, async () => true, require('../functions/pedidoPublico.js'), 'panel/shipments/items', 'panel/config',
         require('../functions/docsPublicos.js'), () => ({bucket: () => ({name: 'b'})}), require('../functions/vitrina.js'), R, require('../functions/garantia.js'));
     const ver = async (t) => { const r = {json: (b) => { r.body = b; return r; }, status: () => r}; await ht({query: {token: t}}, r); return r.body; };
     const a = await ver(TOK('A'));

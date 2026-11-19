@@ -63,6 +63,12 @@
     .notify-time { font-size:10px;color:#8b949e;flex-shrink:0;margin-top:2px; }
     .notify-empty { text-align:center;padding:24px;color:#8b949e;font-size:12px; }
     .notify-dot { width:6px;height:6px;border-radius:50%;background:#a371f7;flex-shrink:0;margin-top:6px; }
+    .notify-filtros { display:flex;gap:6px;overflow-x:auto;padding:8px 12px;border-bottom:1px solid #30363d;flex-shrink:0; }
+    .notify-chip { background:none;border:1px solid #30363d;color:#8b949e;border-radius:999px;padding:4px 10px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap; }
+    .notify-chip.on { background:rgba(56,139,253,.15);border-color:rgba(56,139,253,.4);color:#388bfd; }
+    .notify-item.urgente { background:rgba(248,81,73,.06);box-shadow:inset 3px 0 0 #f85149; }
+    .notify-item.nuevo .notify-title { color:#fff; }
+    .notify-pie { padding:8px 12px;font-size:10.5px;color:#8b949e;border-top:1px solid #30363d;text-align:center;flex-shrink:0; }
 
     /* Resaltado de card al navegar desde notificación */
     @keyframes notifyHighlight {
@@ -77,12 +83,55 @@
   `;
   document.head.appendChild(style);
 
+  var FILTROS = [['todo', 'Todo'], ['pedidos', 'Pedidos'], ['vistas', 'Vistas'], ['resenas', 'Reseñas'], ['reclamos', 'Reclamos'], ['promos', 'Promos']];
+  var CADA_MS = 120000;
+  var CLAVE_VISTO = 'tt_campana_visto';
+  var _servidor = [];
+  var _locales = [];
+  var _filtro = 'todo';
+  var _leyendo = false;
+  var _timer = null;
+
+  function _A(){ return window.Actividad; }
+
+  function _vistoHasta(){
+    try{ return Number(localStorage.getItem(CLAVE_VISTO)) || 0; }catch(e){ return 0; }
+  }
+
+  function _guardarVisto(ts){
+    try{ localStorage.setItem(CLAVE_VISTO, String(ts)); }catch(e){}
+  }
+
+  function todos(){
+    var A = _A();
+    if(!A) return [];
+    var ya = {};
+    return A.lista(_locales.concat(_servidor))
+      .sort(function(a, b){ return b.ts - a.ts; })
+      .filter(function(e){
+        var k = e.t + '|' + e.id + '|' + e.ts;
+        if(ya[k]) return false;
+        ya[k] = 1;
+        return true;
+      })
+      .filter(function(e){
+        if(e.t !== 'pedido' || !e.local) return true;
+        return !_servidor.some(function(s){ return s.t === 'pedido' && s.id === e.id; });
+      })
+      .slice(0, A.MAX);
+  }
+
+  function nuevas(){
+    var desde = _vistoHasta();
+    return todos().filter(function(e){ return e.ts > desde; }).length;
+  }
+
   function _inject(){
     var slot = document.getElementById('notifyBellSlot');
     if(!slot || slot.querySelector('#notifyBtn')) return;
 
     slot.innerHTML =
-      '<button id="notifyBtn" onclick="NotifyModule.toggle()" title="Nuevos pedidos">'+
+      '<button id="notifyBtn" onclick="NotifyModule.toggle()" title="Actividad de tus clientes">'+
         '🔔'+
         '<span id="notifyBadge">0</span>'+
       '</button>';
@@ -91,12 +140,14 @@
     panel.id = 'notifyPanel';
     panel.innerHTML =
       '<div class="notify-hdr">'+
-        '<span class="notify-hdr-title">🔔 Nuevos pedidos</span>'+
-        '<button class="notify-clear" onclick="NotifyModule.clearAll()">Limpiar todo</button>'+
+        '<span class="notify-hdr-title">🔔 Actividad de tus clientes</span>'+
+        '<button class="notify-clear" onclick="NotifyModule.leer(true)">Actualizar</button>'+
       '</div>'+
+      '<div class="notify-filtros" id="notifyFiltros"></div>'+
       '<div class="notify-list" id="notifyList">'+
-        '<div class="notify-empty">Sin notificaciones</div>'+
-      '</div>';
+        '<div class="notify-empty">Sin actividad todavía</div>'+
+      '</div>'+
+      '<div class="notify-pie">Se guardan las últimas 50 acciones. Las más antiguas se borran solas.</div>';
     document.body.appendChild(panel);
 
     document.addEventListener('click', function(e){
@@ -111,52 +162,64 @@
     return !!(s && (s.printed || s._printed));
   }
 
-  function _nroDe(shipId){
-    if(!window.NroComprobante || !shipId || !window.S || !S.shipments) return '';
-    var s = S.shipments.find(function(x){ return x && x.id === shipId; });
-    return s ? NroComprobante.de(s) : '';
+  function _pedido(id){
+    return (window.S && S.shipments || []).find(function(x){ return x && x.id === id; }) || null;
+  }
+
+  function _filtrados(){
+    var A = _A();
+    return todos().filter(function(e){ return _filtro === 'todo' || (A.TIPOS[e.t] && A.TIPOS[e.t].grupo === _filtro); });
   }
 
   function _render(){
     var list  = document.getElementById('notifyList');
     var badge = document.getElementById('notifyBadge');
-    if(!list) return;
+    var fil   = document.getElementById('notifyFiltros');
+    var A = _A();
+    if(!list || !A) return;
 
-    var sinImprimir = _notifs.filter(function(n){ return !n.printed; }).length;
+    var n = nuevas();
     if(badge){
-      badge.textContent = sinImprimir;
-      badge.style.display = sinImprimir > 0 ? 'flex' : 'none';
+      badge.textContent = n > 49 ? '50' : String(n);
+      badge.style.display = n > 0 ? 'flex' : 'none';
+    }
+    if(fil){
+      fil.innerHTML = FILTROS.map(function(f){
+        return '<button type="button" class="notify-chip' + (_filtro === f[0] ? ' on' : '') + '" onclick="NotifyModule.filtrar(\'' + f[0] + '\')">' + _esc(f[1]) + '</button>';
+      }).join('');
     }
 
-    if(!_notifs.length){
-      list.innerHTML = '<div class="notify-empty">Sin notificaciones</div>';
+    var items = _filtrados();
+    if(!items.length){
+      list.innerHTML = '<div class="notify-empty">' + (_filtro === 'todo' ? 'Sin actividad todavía' : 'Nada en este filtro') + '</div>';
       return;
     }
-
-    list.innerHTML = _notifs.map(function(n, i){
-      var printedHtml = n.printed
-        ? '<button class="notify-btn notify-btn-printed" disabled>✅ Impreso</button>'
-        : '<button class="notify-btn notify-btn-print" onclick="NotifyModule.imprimir('+i+')">🖨️ Imprimir</button>';
-
-      var linkHtml = n.link
-        ? '<a href="' + escU(n.link) + '" target="_blank" rel="noopener" class="link-chip" onclick="event.stopPropagation()">🔗 Link</a>'
-        : '';
-
-      return '<div class="notify-item">' +
-        '<div class="notify-icon">' + n.icon + '</div>' +
+    var desde = _vistoHasta();
+    list.innerHTML = items.map(function(e){
+      var d = A.TIPOS[e.t];
+      var ship = _pedido(e.id);
+      var nro = ship && window.NroComprobante ? NroComprobante.de(ship) : '';
+      var vista = nro ? Object.assign({}, e, {c: nro}) : e;
+      var imprimir = '';
+      if(e.t === 'pedido' && ship){
+        imprimir = _impreso(ship)
+          ? '<button class="notify-btn notify-btn-printed" disabled>✅ Impreso</button>'
+          : '<button class="notify-btn notify-btn-print" onclick="NotifyModule.imprimir(\'' + _esc(e.id) + '\')">🖨️ Imprimir</button>';
+      }
+      var clases = 'notify-item' + (A.urgente(e) ? ' urgente' : '') + (e.ts > desde ? ' nuevo' : '');
+      return '<div class="' + clases + '">' +
+        '<div class="notify-icon">' + d.ico + '</div>' +
         '<div class="notify-content">' +
-          '<div class="notify-title">' + _esc(n.title) + '</div>' +
-          '<div class="notify-sub">'   + _esc(n.sub)   + '</div>' +
-          (_nroDe(n.shipId) ? '<div class="notify-sub" style="opacity:.75;margin-top:-4px">🧾 ' + _esc(_nroDe(n.shipId)) + '</div>' : '') +
+          '<div class="notify-title">' + _esc(A.texto(vista)) + '</div>' +
+          (e.s ? '<div class="notify-sub">' + _esc(e.s) + '</div>' : '') +
           '<div class="notify-actions">' +
-            '<button class="notify-btn notify-btn-ver" onclick="NotifyModule.ver('+i+')">👁 Ver</button>' +
-            printedHtml +
-            linkHtml +
+            (ship ? '<button class="notify-btn notify-btn-ver" onclick="NotifyModule.ver(\'' + _esc(e.id) + '\')">👁 Ver pedido</button>' : '') +
+            imprimir +
           '</div>' +
         '</div>' +
         '<div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">' +
-          '<div class="notify-time">' + n.time + '</div>' +
-          (!n.read ? '<div class="notify-dot"></div>' : '') +
+          '<div class="notify-time">' + _timeAgo(e.ts) + '</div>' +
+          (e.ts > desde ? '<div class="notify-dot"></div>' : '') +
         '</div>' +
       '</div>';
     }).join('');
@@ -172,7 +235,7 @@
   }
 
   function _esc(s){
-    return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+    return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
   }
 
   function _closePanel(){
@@ -182,26 +245,19 @@
 
   function _verShipment(id){
     _closePanel();
-
     if(typeof window.irAlPedido === 'function') window.irAlPedido(id);
     else if(typeof window.render === 'function') window.render();
   }
 
-  function _imprimirShipment(id, notifIdx){
+  function _imprimirShipment(id){
     _closePanel();
-
-    var ship = window.S && window.S.shipments && window.S.shipments.find(function(s){ return s.id===id; });
+    var ship = _pedido(id);
     if(!ship) return;
-
-    if(window.PrintModule && window.PrintModule.openOne){
-      window.PrintModule.openOne(id);
-    }
-
+    if(window.PrintModule && window.PrintModule.openOne) window.PrintModule.openOne(id);
     var _onAfterPrint = function(){
       window.removeEventListener('afterprint', _onAfterPrint);
       ship._printed = true;
       if(typeof window.save === 'function') window.save(ship.id);
-      if(_notifs[notifIdx]) _notifs[notifIdx].printed = true;
       _render();
       if(typeof window.toast === 'function') window.toast('✅ Impreso — ' + ship.name);
     };
@@ -209,103 +265,77 @@
     setTimeout(function(){ window.removeEventListener('afterprint', _onAfterPrint); }, 30000);
   }
 
-  var _seenIds = {};
+  function _listo(){
+    return !!(window._syncUltimo && typeof window._fbLeerActividad === 'function');
+  }
 
-  function _checkNewShipments(){
-    var S = window.S;
-    if(!S || !S.shipments) return;
-
-    S.shipments.forEach(function(s){
-      if(_seenIds[s.id]) {
-        var existing = _notifs.find(function(n){ return n.shipId === s.id; });
-        if(existing && _impreso(s) && !existing.printed){
-          existing.printed = true;
-          _render();
-        }
-        return;
-      }
-      _seenIds[s.id] = true;
-
-      var ts = s.createdAt ? new Date(s.createdAt).getTime() : 0;
-      if(!ts || Date.now() - ts > 2*60*60*1000) return;
-      if(s.fromForm || s.status==='NUEVO PEDIDO'){
-        window.NotifyModule.add({
-          icon:    '📦',
-          title:   'Nuevo pedido — ' + s.name,
-          sub:     s.courier + ' · ' + (s.address||s.ciudadDestino||'—').substring(0,45),
-          shipId:  s.id,
-          printed: _impreso(s),
-          ts:      ts,
-          link:    (s.links && s.links[0] && s.links[0].u) || ''
-        });
-      }
-    });
+  async function leer(forzar){
+    if(_leyendo || !_listo()) return false;
+    if(document.hidden && !forzar) return false;
+    _leyendo = true;
+    try{
+      var d = await window._fbLeerActividad();
+      _servidor = _A() ? _A().lista(d && d.items) : [];
+      return true;
+    }catch(e){
+      return false;
+    }finally{
+      _leyendo = false;
+      _render();
+    }
   }
 
   window.NotifyModule = {
 
     add: function(opts){
-      if(_notifs.find(function(n){ return n.shipId === opts.shipId; })) return;
-      _notifs.unshift({
-        icon:    opts.icon    || '🔔',
-        title:   opts.title   || '',
-        sub:     opts.sub     || '',
-        shipId:  opts.shipId  || '',
-        printed: opts.printed || false,
-        link:    opts.link    || '',
-        time:    _timeAgo(opts.ts || Date.now()),
-        ts:      opts.ts || Date.now(),
-        read:    false
-      });
-      if(_notifs.length > 20) _notifs.pop();
+      var o = opts || {};
+      var A = _A();
+      if(!A || !o.shipId) return;
+      var ev = A.evento('pedido', _pedido(o.shipId) || {id: o.shipId, name: o.title}, {}, o.ts || Date.now());
+      if(!ev) return;
+      ev.local = true;
+      _locales = A.agregar(_locales, ev).slice(0, 10);
       _render();
     },
 
-    ver: function(idx){
-      var n = _notifs[idx]; if(!n) return;
-      n.read = true;
-      _verShipment(n.shipId);
+    ver: function(id){ _verShipment(id); },
+
+    imprimir: function(id){ _imprimirShipment(id); },
+
+    filtrar: function(f){
+      if(!FILTROS.some(function(x){ return x[0] === f; })) return;
+      _filtro = f;
       _render();
     },
 
-    imprimir: function(idx){
-      var n = _notifs[idx]; if(!n) return;
-      n.read = true;
-      _render();
-      _imprimirShipment(n.shipId, idx);
-    },
-
-    clearAll: function(){
-      _notifs = [];
-      _seenIds = {};
-      _render();
-    },
+    leer: leer,
 
     toggle: function(){
       var panel = document.getElementById('notifyPanel');
       if(!panel) return;
       panel.classList.toggle('open');
       if(panel.classList.contains('open')){
-        _notifs.forEach(function(n){ n.time = _timeAgo(n.ts); });
         _render();
+        leer(true).then(function(){
+          var t = todos();
+          if(t.length) _guardarVisto(t[0].ts);
+          _render();
+        });
       }
     },
 
-    check: _checkNewShipments
+    check: _render,
+    todos: todos,
+    nuevas: nuevas
   };
 
   function init(){
     _inject();
-    var _origRender = window.render;
-    if(typeof _origRender === 'function'){
-      window.render = function(){
-        _origRender.apply(this, arguments);
-        _checkNewShipments();
-      };
-    } else {
-      setTimeout(init, 400);
-      return;
-    }
+    _render();
+    setTimeout(function(){ leer(); }, 4000);
+    clearInterval(_timer);
+    _timer = setInterval(function(){ leer(); }, CADA_MS);
+    document.addEventListener('visibilitychange', function(){ if(!document.hidden) leer(); });
   }
 
   if(document.readyState !== 'complete'){

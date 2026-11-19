@@ -40,7 +40,8 @@ module.exports = async ({bloque, ok}) => {
     ok(/function _docUrl\(d\)/.test(docs) && /if\(!_docUrl\(doc&&doc\.d\)\)\{toast\(/.test(docs) && /a\.href=_docUrl\(doc\.d\)/.test(docs),
        'abrir o descargar un documento valida el link antes');
     ok(/<a href="\$\{escU\(l\.u\)\}" target="_blank"/.test(docs), 'links del formulario de edicion');
-    ok(/'<a href="' \+ escU\(n\.link\) \+ '"/.test(E.leerReal('panel/pedidos/notify.js')), 'links en notificaciones');
+    const nt = E.leerReal('panel/pedidos/notify.js');
+    ok(!/href="'\s*\+/.test(nt) && /_esc\(A\.texto\(vista\)\)/.test(nt) && /_esc\(e\.s\)/.test(nt), 'campana: textos del cliente escapados y sin links armados con datos');
     const DP = require('../functions/docsPublicos.js');
     ok(DP.linkHttps({links: [{u: 'javascript:alert(1)'}, {u: 'http://x.example'}, {u: 'https://ok.example/b.pdf'}]}) === 'https://ok.example/b.pdf' &&
        DP.linkHttps({links: [{u: 'https://x.example/"onmouseover=1'}]}) === '', 'seguimiento del cliente: solo links https (los elige el servidor)');

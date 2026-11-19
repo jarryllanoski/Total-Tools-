@@ -47,13 +47,14 @@ function servidor(tokens, opciones) {
   };
   // eslint-disable-next-line no-new-func
   const handleCreate = new Function('db', 'agencias', 'enlace', 'reniecPublico', 'nroComp',
-      'checkRateLimit', 'appCheckOk', 'pedidoForm', 'TOK_COL', 'SHIP_COL', 'CFG_DOC', '_conMts', 'SYNC_V',
+      'checkRateLimit', 'appCheckOk', 'pedidoForm', 'TOK_COL', 'SHIP_COL', 'CFG_DOC', '_conMts', 'SYNC_V', '_anotar',
       campos + create + ';return handleCreate;',
   )(db, require('../functions/agencias.js'), require('../functions/enlaceSeguimiento.js'),
       {normalizar: () => ''}, require('../functions/nroComprobante.js'),
       async (n) => { frenos.push(n); return o.freno !== false; },
       async () => o.appCheck !== false, require('../functions/pedidoForm.js'),
-      'panel/tokens/items', 'panel/shipments/items', 'panel/config', (x) => x, 1);
+      'panel/tokens/items', 'panel/shipments/items', 'panel/config', (x) => x, 1,
+      globalThis.__anotar || (async () => false));
   const llamar = async (body) => {
     const r = {code: 200, body: null};
     r.status = (c) => { r.code = c; return r; };
