@@ -91,7 +91,12 @@ module.exports = async ({bloque, ok}) => {
         .map((x) => x.slice(5)))];
     ok(leidos.length > 10, 'se encontraron los campos que lee la página (' +
        leidos.length + ')');
-    const faltan = leidos.filter((k) => P.CAMPOS.indexOf(k) < 0);
+    const faltan = leidos.filter((k) => P.CAMPOS.indexOf(k) < 0 && P.CALCULADOS.indexOf(k) < 0);
+    ok(P.CALCULADOS.every((k) => P.CAMPOS.indexOf(k) < 0) &&
+       P.proyectar({docs: {boleta: 'archivo'}, name: 'A'}).docs === undefined,
+       'lo que calcula el servidor (docs) no se copia del pedido: un campo «docs» guardado no puede colarse');
+    ok(/safe\.docs = docsPublicos\.disponibles\(order, getStorage\(\)\.bucket\(\)\.name\);/.test(E.leer('functions/index.js')),
+       'y docs lo arma el servidor en cada consulta');
     ok(faltan.length === 0,
        'todos los campos que el link del cliente lee están permitidos — si no, ' +
        'el cliente vería huecos en blanco' +

@@ -20,6 +20,8 @@
     "trackingStatus", "trackingMessage", "trackingLastUpdate",
   ];
 
+  const CALCULADOS = ["docs"];
+
   const SECRETOS = [
     "shalomClave",
     "privateNote", "shalomGuiasAnteriores",
@@ -96,6 +98,6 @@
       Object.prototype.hasOwnProperty.call(obj, k));
   }
 
-  return {CAMPOS, SECRETOS, ENMASCARAR, proyectar, secretosEn,
+  return {CAMPOS, CALCULADOS, SECRETOS, ENMASCARAR, proyectar, secretosEn,
     recortarDoc, taparClave, minimizarViejo, DIAS_MINIMO};
 });

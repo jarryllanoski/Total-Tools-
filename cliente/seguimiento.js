@@ -163,6 +163,7 @@ async function buscarPedido(token, silent){
     const resp = await _api('track', {token: t});
     if(resp && resp.status === 'ok' && resp.order){
       if(window.TTLoader) TTLoader.done();
+      window._segTok = t;
       renderTrackResult(resp.order, resp.order.code);
       if(resp.order.frozen){
         clearTrackRefresh();
@@ -397,6 +398,75 @@ function _segVer(cual){
   try{ window.scrollTo({top: 0, behavior: 'smooth'}); }catch(_){ window.scrollTo(0, 0); }
 }
 
+var _SEG_DOCS = [
+  ['boleta', '🧾', 'Boleta / factura', 'Tu comprobante de pago'],
+  ['paquete', '📦', 'Foto del paquete', 'Así salió tu pedido de la tienda'],
+  ['guia', '🚚', 'Guía de envío', 'Tu ticket de la agencia']
+];
+var _segDocCache = {};
+var _segDocsDe = {};
+
+function _docsListos(docs){
+  return _SEG_DOCS.filter(function(d){ return docs && docs[d[0]]; }).length;
+}
+
+function _docsHtml(docs, minimo){
+  if(minimo) return '<div class="seg-vacio">🔒 Por tu privacidad, los documentos de un pedido entregado hace tiempo ya no se muestran. Si los necesitas, escríbenos.</div>';
+  return _SEG_DOCS.map(function(d){
+    var hay = docs && docs[d[0]];
+    if(!hay) return '<div class="seg-doc no"><span class="seg-doc-ic">' + d[1] + '</span><span class="seg-doc-t">' + d[2] + '<small>Aún no disponible</small></span></div>';
+    return '<button type="button" class="seg-doc" onclick="abrirDocSeg(\'' + d[0] + '\')"><span class="seg-doc-ic">' + d[1] + '</span>'
+      + '<span class="seg-doc-t">' + d[2] + '<small>' + (hay === 'link' ? 'Toca para abrir tu comprobante' : d[3] + ' · toca para ver') + '</small></span>'
+      + '<span class="seg-doc-ir">→</span></button>';
+  }).join('') + '<div class="seg-doc-msg" id="segDocMsg" role="status"></div>';
+}
+
+function _docMsg(t){ var m = $('segDocMsg'); if(m) m.textContent = t || ''; }
+
+function _verDoc(cual, url, mime, nombre){
+  var ov = document.getElementById('segVisor');
+  if(!ov){ ov = document.createElement('div'); ov.id = 'segVisor'; ov.className = 'seg-visor'; document.body.appendChild(ov); }
+  var esPdf = mime === 'application/pdf';
+  ov.innerHTML = '<div class="seg-visor-caja" role="dialog" aria-modal="true" aria-label="' + esc(nombre) + '">'
+    + (esPdf ? '<div class="seg-visor-pdf">📄<b>' + esc(nombre) + '</b><span>Documento PDF listo</span></div>'
+             : '<img src="' + url + '" alt="' + esc(nombre) + '">')
+    + '<div class="seg-visor-btns">'
+    + (esPdf ? '<a class="seg-visor-si" href="' + url + '" target="_blank" rel="noopener">Abrir</a>' : '')
+    + '<a class="seg-visor-si" href="' + url + '" download="' + esc(nombre) + '">⬇ Descargar</a>'
+    + '<button type="button" class="seg-visor-no" onclick="cerrarDocSeg()">Cerrar</button></div></div>';
+  ov.onclick = function(e){ if(e.target === ov) cerrarDocSeg(); };
+  ov.style.display = 'flex';
+}
+
+function cerrarDocSeg(){
+  var ov = document.getElementById('segVisor');
+  if(ov){ ov.style.display = 'none'; ov.innerHTML = ''; }
+}
+
+async function abrirDocSeg(cual){
+  var docs = _segDocsDe || {};
+  if(docs[cual] === 'link' && docs.link){ window.open(docs.link, '_blank', 'noopener'); return; }
+  if(docs[cual] !== 'archivo' || !window._segTok) return;
+  var c = _segDocCache[cual];
+  if(c){ _verDoc(cual, c.url, c.mime, c.nombre); return; }
+  _docMsg('⏳ Cargando tu documento…');
+  try{
+    var r = await fetch(FORM_API + '?action=doc&tipo=' + encodeURIComponent(cual) + '&token=' + encodeURIComponent(window._segTok));
+    if(r.status === 429){ _docMsg('⏳ Muchas consultas seguidas. Espera un minuto e intenta de nuevo.'); return; }
+    if(!r.ok){ _docMsg('Este documento ya no está disponible. Escríbenos y te lo enviamos.'); return; }
+    var mime = (r.headers.get('Content-Type') || '').split(';')[0].trim().toLowerCase();
+    if(!/^(image\/(png|jpe?g|webp|gif|heic|heif)|application\/pdf)$/.test(mime)){ _docMsg('No pudimos abrir este documento. Escríbenos.'); return; }
+    var disp = r.headers.get('Content-Disposition') || '';
+    var nombre = (/filename="([A-Za-z0-9._-]{1,60})"/.exec(disp) || [])[1] || (cual + (mime === 'application/pdf' ? '.pdf' : '.jpg'));
+    var url = URL.createObjectURL(await r.blob());
+    _segDocCache[cual] = {url: url, mime: mime, nombre: nombre};
+    _docMsg('');
+    _verDoc(cual, url, mime, nombre);
+  }catch(e){
+    _docMsg('Sin conexión. Revisa tu internet e intenta de nuevo.');
+  }
+}
+
 function _segNavHtml(){
   return '<nav class="seg-nav" aria-label="Secciones">'
     + '<button type="button" data-ir="inicio" onclick="_segVer(\'inicio\')">🏠<span>Inicio</span></button>'
@@ -439,10 +509,9 @@ function renderTrackResult(ship, code){
   const waConsultUrl = bizPhone
     ? `https://wa.me/51${bizPhone}?text=${encodeURIComponent('Hola, tengo una consulta sobre mi pedido #'+tc)}`
     : '';
-  const links = (ship.links||[]).filter(l=>l&&/^https:\/\//i.test(String(l.u||'').trim()));
-  const docsHtml = links.length
-    ? links.map(l=>`<a class="seg-doc" href="${esc(String(l.u).trim())}" target="_blank" rel="noopener"><span class="seg-doc-ic">🧾</span><span class="seg-doc-t">Boleta / factura<small>Toca para ver tu documento</small></span><span class="seg-doc-ir">→</span></a>`).join('')
-    : '<div class="seg-vacio">📄 Aquí aparecerán tus documentos cuando los subamos.</div>';
+  _segDocsDe = ship.docs || {};
+  const listos = _docsListos(ship.docs);
+  const docsHtml = _docsHtml(ship.docs, !!ship.minimo);
 
   setTrackContent(`
     <div class="seg-hola">
@@ -480,6 +549,7 @@ function renderTrackResult(ship, code){
         ${ship.minimo?`<div class="tk-row"><span class="tk-row-val" style="color:var(--text2);font-size:12px">🔒 Por tu privacidad, los datos de un pedido entregado hace tiempo ya no se muestran aquí. Si necesitas algo, escríbenos.</span></div>`:''}
       </div>
     </div>
+    ${listos?`<button type="button" class="seg-docs-atajo" onclick="_segVer('docs')"><span><b>📄 Tus ${listos === 1 ? 'documento' : listos + ' documentos'}</b><small>Boleta, foto del paquete y guía, siempre a la mano</small></span><span class="seg-tienda-ir">Ver →</span></button>`:''}
     ${waConsultUrl?`<a class="btn-wa seg-wa" href="${waConsultUrl}" target="_blank" rel="noopener">💬 Consultar por WhatsApp</a>`:''}
     <a class="seg-tienda" href="https://www.totaltoolspe.com/" target="_blank" rel="noopener">
       <span><b>🛍️ ¿Quieres ver más productos y ofertas?</b><small>Visita nuestra tienda online</small></span>
@@ -511,6 +581,8 @@ window.abrirAyudaTrack = abrirAyudaTrack;
 window._copyGuia       = _copyGuia;
 window._copyTrack      = _copyTrack;
 window._segVer         = _segVer;
+window.abrirDocSeg     = abrirDocSeg;
+window.cerrarDocSeg    = cerrarDocSeg;
 window.cerrarAyudaForm = cerrarAyudaForm;
 
 init();

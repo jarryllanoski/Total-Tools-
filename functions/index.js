@@ -33,6 +33,7 @@ const reniecPublico = require("./reniecPublico");
 const credenciales = require("./credenciales");
 const ipCliente = require("./ipCliente");
 const pedidoForm = require("./pedidoForm");
+const docsPublicos = require("./docsPublicos");
 
 setGlobalOptions({maxInstances: 10});
 initializeApp();
@@ -255,6 +256,7 @@ exports.formApi = onRequest(
         else if (action === "config") await handleConfig(req, res);
         else if (action === "formcfg") await handleFormCfg(req, res);
         else if (action === "track") await handleTrack(req, res);
+        else if (action === "doc") await handleDoc(req, res);
         else if (action === "client") await handleClient(req, res);
         else if (action === "reniec") await handleReniec(req, res);
         else {
@@ -709,23 +711,8 @@ async function handleTrack(req, res) {
     return;
   }
 
-  let snap = null;
-  if (tipo === "legado") {
-    snap = await db.doc(`${SHIP_COL}/${trackToken}`).get();
-    if (!snap.exists) snap = null;
-  } else {
-    const q = await db.collection(SHIP_COL)
-        .where("trackToken", "==", trackToken).limit(1).get();
-    snap = q.empty ? null : q.docs[0];
-  }
-  if (!snap) {
-    res.json({status: "not_found"});
-    return;
-  }
-
-  const order = snap.data();
-
-  if (tipo === "legado" && !enlace.aceptaLegado(order)) {
+  const order = await _pedidoDelEnlace(trackToken, tipo);
+  if (!order) {
     res.json({status: "not_found"});
     return;
   }
@@ -743,7 +730,82 @@ async function handleTrack(req, res) {
           .forEach((k) => delete safe[k]);
     }
   }
+  if (!safe.minimo) {
+    safe.docs = docsPublicos.disponibles(order, getStorage().bucket().name);
+  }
   res.json({status: "ok", order: safe});
+}
+
+async function _pedidoDelEnlace(token, tipo) {
+  let snap = null;
+  if (tipo === "legado") {
+    snap = await db.doc(`${SHIP_COL}/${token}`).get();
+    if (!snap.exists) snap = null;
+  } else {
+    const q = await db.collection(SHIP_COL)
+        .where("trackToken", "==", token).limit(1).get();
+    snap = q.empty ? null : q.docs[0];
+  }
+  if (!snap) return null;
+  const order = snap.data();
+  if (tipo === "legado" && !enlace.aceptaLegado(order)) return null;
+  return order;
+}
+
+async function handleDoc(req, res) {
+  res.set("Cache-Control", "private, no-store");
+  const noHay = () => res.status(404).json({status: "not_found"});
+  const token = _texto(req.query.token);
+  const cual = _texto(req.query.tipo);
+  const tipo = enlace.tipoDe(token);
+  const def = Object.prototype.hasOwnProperty.call(docsPublicos.TIPOS, cual) ?
+    docsPublicos.TIPOS[cual] : null;
+  if (tipo === "invalido" || !def) return noHay();
+  const freno = !(await checkRateLimit("formApi_doc", req)) ||
+    (tipo === "legado" && !(await checkRateLimit("formApi_track_legado", req)));
+  if (freno) {
+    res.status(429).json({status: "rate_limited"});
+    return;
+  }
+  const order = await _pedidoDelEnlace(token, tipo);
+  if (!order) return noHay();
+  const viejo = pedidoPublico.minimizarViejo({}, order, Date.now());
+  if (viejo.minimo) return noHay();
+  const bucket = getStorage().bucket();
+  const org = docsPublicos.origen(order[def.campo], order.id, bucket.name);
+  if (!org) return noHay();
+  let bytes;
+  let mime;
+  if (org.tipo === "base64") {
+    bytes = Buffer.from(org.datos, "base64");
+    mime = org.mime;
+  } else {
+    const file = bucket.file(org.ruta);
+    let meta;
+    try {
+      [meta] = await file.getMetadata();
+    } catch (e) {
+      return noHay();
+    }
+    mime = String(meta.contentType || "").toLowerCase();
+    if (!docsPublicos.MIME.test(mime) ||
+        Number(meta.size) > docsPublicos.MAX_BYTES) {
+      return noHay();
+    }
+    [bytes] = await file.download();
+  }
+  if (!docsPublicos.MIME.test(mime) || bytes.length > docsPublicos.MAX_BYTES) {
+    return noHay();
+  }
+  const ext = mime === "application/pdf" ? "pdf" :
+    mime.split("/")[1].replace("jpeg", "jpg");
+  const codigo = (order.id || "").slice(-4).toUpperCase();
+  res.set("Content-Type", mime);
+  res.set("X-Content-Type-Options", "nosniff");
+  res.set("Access-Control-Expose-Headers", "Content-Disposition");
+  res.set("Content-Disposition", "inline; filename=\"" + def.nombre + "-" +
+    codigo + "." + ext + "\"");
+  res.status(200).send(bytes);
 }
 
 const RATE_LIMITS = {
@@ -752,6 +814,7 @@ const RATE_LIMITS = {
   formApi_client: {windowMs: 60000, max: 20, memoria: true},
   formApi_track: {windowMs: 60000, max: 120, memoria: true},
   formApi_track_legado: {windowMs: 60000, max: 20, memoria: true},
+  formApi_doc: {windowMs: 60000, max: 20, memoria: true},
   formApi_token: {windowMs: 60000, max: 30, memoria: true},
   formApi_config: {windowMs: 60000, max: 60, memoria: true},
   formApi_reniec: {windowMs: 60000, max: 10},

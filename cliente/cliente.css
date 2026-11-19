@@ -371,3 +371,13 @@ body.seg:not(.seg-quieto) .seg-conf-ic{animation:segPop .5s .2s cubic-bezier(.2,
 @keyframes segPop{from{transform:scale(.4);opacity:0}to{transform:none;opacity:1}}
 @keyframes segLatido{0%{opacity:.6;transform:scale(.85)}70%,100%{opacity:0;transform:scale(1.35)}}
 @media(prefers-reduced-motion:reduce){body.seg *,body.seg *:after{animation:none!important}}
+button.seg-doc{width:100%;font:inherit;text-align:left;cursor:pointer}.seg-doc.no{opacity:.55}
+.seg-doc-msg{margin-top:10px;font-size:13px;color:var(--text2);min-height:18px}
+.seg-docs-atajo{width:100%;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 16px;margin-bottom:12px;border-radius:16px;background:var(--card);border:1px solid var(--bd);font:inherit;text-align:left;color:var(--text);cursor:pointer}
+.seg-docs-atajo b{display:block;font-size:14px}.seg-docs-atajo small{display:block;font-size:12px;color:var(--text2);margin-top:2px}
+.seg-visor{position:fixed;inset:0;z-index:9500;display:none;align-items:center;justify-content:center;background:rgba(8,14,18,.82);padding:16px}
+.seg-visor-caja{width:100%;max-width:480px;max-height:92vh;display:flex;flex-direction:column;gap:12px;background:#fff;border-radius:18px;padding:12px;animation:segEntra .25s ease both}
+.seg-visor-caja img{width:100%;max-height:70vh;object-fit:contain;border-radius:12px;background:#f3f6f7}
+.seg-visor-pdf{display:flex;flex-direction:column;align-items:center;gap:4px;padding:28px 12px;font-size:40px;color:#0e1a1f}.seg-visor-pdf b{font-size:15px}.seg-visor-pdf span{font-size:13px;color:#55656c}
+.seg-visor-btns{display:flex;gap:8px}.seg-visor-si,.seg-visor-no{flex:1;display:flex;align-items:center;justify-content:center;min-height:46px;border-radius:12px;font:inherit;font-weight:800;font-size:14px;text-decoration:none;cursor:pointer}
+.seg-visor-si{background:#02787c;color:#fff;border:none}.seg-visor-no{background:#eef1f2;color:#0e1a1f;border:none}

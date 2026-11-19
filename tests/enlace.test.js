@@ -513,9 +513,9 @@ module.exports = async ({bloque, ok}) => {
   {
     const fidx = E.leer('functions/index.js');
     const track = fidx.slice(fidx.indexOf('async function handleTrack'),
-        fidx.indexOf('const RATE_LIMITS = {'));
-    ok(!/\.set\(|\.update\(|\.create\(/.test(track),
-       'handleTrack no escribe NADA: mirar un pedido no lo modifica, ni para ' +
+        fidx.indexOf('const RATE_LIMITS = {')).replace(/res\.set\(/g, '');
+    ok(!/\.set\(|\.update\(|\.create\(|\.save\(|\.delete\(/.test(track),
+       'handleTrack y handleDoc no escriben NADA: mirar un pedido o un documento no lo modifica, ni para ' +
        'ponerle un token que no tenia');
   }
 
@@ -544,9 +544,11 @@ module.exports = async ({bloque, ok}) => {
     const frenos = {};
     let limiteLegado = 1000;
     // eslint-disable-next-line no-new-func
-    const handleTrack = new Function('db', 'enlace', 'checkRateLimit', 'pedidoPublico', 'SHIP_COL', 'CFG_DOC', T + ';return handleTrack;')(
+    const handleTrack = new Function('db', 'enlace', 'checkRateLimit', 'pedidoPublico', 'SHIP_COL', 'CFG_DOC', 'docsPublicos', 'getStorage',
+        T + ';return handleTrack;')(
         db, L, async (n) => { frenos[n] = (frenos[n] || 0) + 1; return n !== 'formApi_track_legado' || frenos[n] <= limiteLegado; },
-        require('../functions/pedidoPublico.js'), 'panel/shipments/items', 'panel/config');
+        require('../functions/pedidoPublico.js'), 'panel/shipments/items', 'panel/config',
+        require('../functions/docsPublicos.js'), () => ({bucket: () => ({name: 'b.appspot.com'})}));
     const ver = async (t) => {
       const r = {code: 200, body: null};
       r.status = (c) => { r.code = c; return r; };

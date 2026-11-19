@@ -41,7 +41,9 @@ module.exports = async ({bloque, ok}) => {
        'abrir o descargar un documento valida el link antes');
     ok(/<a href="\$\{escU\(l\.u\)\}" target="_blank"/.test(docs), 'links del formulario de edicion');
     ok(/'<a href="' \+ escU\(n\.link\) \+ '"/.test(E.leerReal('panel/pedidos/notify.js')), 'links en notificaciones');
-    ok(/const links = \(ship\.links\|\|\[\]\)\.filter\(l=>l&&\/\^https:\\\/\\\/\/i\.test/.test(E.leerReal('cliente/seguimiento.js')), 'seguimiento del cliente: solo links https');
+    const DP = require('../functions/docsPublicos.js');
+    ok(DP.linkHttps({links: [{u: 'javascript:alert(1)'}, {u: 'http://x.example'}, {u: 'https://ok.example/b.pdf'}]}) === 'https://ok.example/b.pdf' &&
+       DP.linkHttps({links: [{u: 'https://x.example/"onmouseover=1'}]}) === '', 'seguimiento del cliente: solo links https (los elige el servidor)');
   }
 
   bloque('Todos los limpiadores escapan comillas y apostrofos');
