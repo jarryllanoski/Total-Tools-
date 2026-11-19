@@ -43,7 +43,7 @@ function goPage(id){
   document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
   $('page-'+id).classList.add('active');
   ['envios','compartir','configurar'].forEach((n,i)=>{if(n===id)document.querySelectorAll('.tab')[i].classList.add('active')});
-  if(id==='configurar') loadCfgUI();
+  if(id==='configurar'){ loadCfgUI(); if(window.Vitrina) Vitrina.abrir(); }
   if(id==='compartir') { updateShareLink(); loadTokenList();
     if(typeof _pintarLinkSel === 'function') _pintarLinkSel(); }
   if(id==='recursos') recRender();

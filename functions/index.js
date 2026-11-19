@@ -34,6 +34,7 @@ const credenciales = require("./credenciales");
 const ipCliente = require("./ipCliente");
 const pedidoForm = require("./pedidoForm");
 const docsPublicos = require("./docsPublicos");
+const vitrina = require("./vitrina");
 
 setGlobalOptions({maxInstances: 10});
 initializeApp();
@@ -733,7 +734,27 @@ async function handleTrack(req, res) {
   if (!safe.minimo) {
     safe.docs = docsPublicos.disponibles(order, getStorage().bucket().name);
   }
-  res.json({status: "ok", order: safe});
+  const out = {status: "ok", order: safe};
+  const vit = await _vitrinaPublica();
+  if (vit) out.vitrina = vit;
+  res.json(out);
+}
+
+const VITRINA_DOC = "panel/vitrina";
+const VITRINA_FRESCA_MS = 60000;
+let _vitrina = {doc: null, ts: 0};
+
+async function _vitrinaPublica() {
+  const ahora = Date.now();
+  if (!_vitrina.ts || ahora - _vitrina.ts >= VITRINA_FRESCA_MS) {
+    try {
+      const snap = await db.doc(VITRINA_DOC).get();
+      _vitrina = {doc: snap.exists ? snap.data() : null, ts: ahora};
+    } catch (e) {
+      _vitrina = {doc: _vitrina.doc, ts: ahora};
+    }
+  }
+  return vitrina.publica(_vitrina.doc, ahora, getStorage().bucket().name);
 }
 
 async function _pedidoDelEnlace(token, tipo) {

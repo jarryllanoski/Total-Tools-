@@ -99,8 +99,8 @@ module.exports = async ({bloque, ok}) => {
   bloque('Sin token, el seguimiento manda al formulario');
 
   {
-    ok(/if\(segTok\)\{ loadCfgThenTrack\(segTok\); return; \}\s*location\.replace\('formulario\.html' \+ location\.hash\);/.test(sj),
-       'seguimiento.html sin ?seg= → formulario.html');
+    ok(/if\(\/\^\[A-Za-z0-9_-\]\{2,64\}\$\/\.test\(guardado\)\)\{ loadCfgThenTrack\(guardado\); return; \}\s*location\.replace\('formulario\.html' \+ location\.hash\);/.test(sj),
+       'seguimiento.html sin ?seg= → el último pedido abierto en ese celular (app instalada) o, si no hay, formulario.html');
   }
 
   bloque('Delfi habla cuando el pedido ya está en Shalom (11/11/2026)');

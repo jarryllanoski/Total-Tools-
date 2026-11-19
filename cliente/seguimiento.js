@@ -164,6 +164,7 @@ async function buscarPedido(token, silent){
     if(resp && resp.status === 'ok' && resp.order){
       if(window.TTLoader) TTLoader.done();
       window._segTok = t;
+      window._segVitrina = resp.vitrina || null;
       renderTrackResult(resp.order, resp.order.code);
       if(resp.order.frozen){
         clearTrackRefresh();
@@ -467,6 +468,86 @@ async function abrirDocSeg(cual){
   }
 }
 
+var _segInstalar = null;
+
+function _esperarInstalar(){
+  window.addEventListener('beforeinstallprompt', function(e){
+    e.preventDefault();
+    _segInstalar = e;
+  });
+}
+
+function _soles(n){
+  var v = Number(n) || 0;
+  return 'S/ ' + (Number.isInteger(v) ? String(v) : v.toFixed(2));
+}
+
+function _fechaCorta(iso){
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(String(iso || ''))) return '';
+  return new Date(iso + 'T12:00:00').toLocaleDateString('es-PE', {day: 'numeric', month: 'short'});
+}
+
+function _nautiHtml(vit, bizPhone){
+  if(!vit || (!(vit.promos || []).length && !vit.sorteo)) return '';
+  var promos = (vit.promos || []).filter(function(p){ return p && /^https:\/\/firebasestorage\.googleapis\.com\//.test(String(p.img || '')) && p.titulo; });
+  var dice = promos.length
+    ? (vit.sorteo ? 'Con mis tentáculos jalé las promos de hoy y un sorteo para ti.' : 'Con mis tentáculos jalé las promos de hoy para ti.')
+    : 'Con mis tentáculos jalé un sorteo para ti.';
+  var tarjetas = promos.map(function(p, i){
+    var msg = 'Hola, vi la promo «' + p.titulo + '»' + (p.precio ? ' a ' + _soles(p.precio) : '') + ' en mi seguimiento. ¿Está disponible?';
+    var wa = bizPhone ? 'https://wa.me/51' + bizPhone + '?text=' + encodeURIComponent(msg) : '';
+    return '<article class="seg-promo" style="--i:' + i + '">'
+      + '<img src="' + esc(p.img) + '" alt="' + esc(p.titulo) + '" width="160" height="160" loading="lazy" decoding="async">'
+      + '<div class="seg-promo-t">' + esc(p.titulo) + '</div>'
+      + (p.precio ? '<div class="seg-promo-p">' + (p.antes ? '<s>' + esc(_soles(p.antes)) + '</s> ' : '') + '<b>' + esc(_soles(p.precio)) + '</b></div>' : '')
+      + (wa ? '<a class="seg-promo-wa" href="' + esc(wa) + '" target="_blank" rel="noopener">Lo quiero</a>' : '')
+      + '</article>';
+  }).join('');
+  var s = vit.sorteo;
+  var sorteo = (s && /^https:\/\//i.test(String(s.link || '')) && s.titulo)
+    ? '<a class="seg-sorteo" href="' + esc(s.link) + '" target="_blank" rel="noopener noreferrer">'
+      + '<span class="seg-sorteo-ic" aria-hidden="true">🎉</span>'
+      + '<span class="seg-sorteo-t"><b>' + esc(s.titulo) + '</b>' + (s.texto ? '<small>' + esc(s.texto) + '</small>' : '')
+      + (_fechaCorta(s.hasta) ? '<small class="seg-sorteo-h">Hasta el ' + esc(_fechaCorta(s.hasta)) + '</small>' : '') + '</span>'
+      + '<span class="seg-sorteo-ir">Participar →</span></a>'
+    : '';
+  return '<section class="seg-nauti" aria-label="Promos y sorteos">'
+    + '<div class="seg-nauti-cab"><img class="seg-nauti-av" src="narrador/load-nauti.webp?v=3" alt="" width="56" height="56" decoding="async">'
+    + '<div class="seg-nauti-bub"><span class="seg-nauti-quien">Nauti · Cazador de ofertas</span>' + esc(dice) + '</div></div>'
+    + (tarjetas ? '<div class="seg-promos">' + tarjetas + '</div>' : '')
+    + sorteo
+    + '</section>';
+}
+
+function _esApp(){
+  try{ return window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true; }catch(e){ return false; }
+}
+
+function _instalarHtml(){
+  if(_esApp()) return '';
+  return '<div class="seg-instalar" id="segInstalarBox">'
+    + '<span class="seg-instalar-ic" aria-hidden="true">📲</span>'
+    + '<span class="seg-instalar-t"><b>Guarda tu pedido en tu celular</b><small>Ábrelo con un toque, sin buscar el link.</small></span>'
+    + '<button type="button" onclick="instalarSeg()">Guardar</button></div>';
+}
+
+async function instalarSeg(){
+  if(_segInstalar){
+    _segInstalar.prompt();
+    try{ await _segInstalar.userChoice; }catch(e){}
+    _segInstalar = null;
+    return;
+  }
+  var ios = /iphone|ipad|ipod/i.test(navigator.userAgent || '');
+  var ov = _ayudaHoja();
+  ov.innerHTML = '<div class="ay-sheet">'
+    + _toby(ios ? 'En iPhone: toca <b>Compartir</b> (el cuadrado con la flecha) y luego <b>Agregar a inicio</b>.'
+                : 'Toca el menú <b>⋮</b> de tu navegador y luego <b>Agregar a la pantalla principal</b> o <b>Instalar app</b>.', 'Guardar en tu celular')
+    + '<div class="ay-btns"><button class="ay-x" onclick="cerrarAyudaForm()">Entendido</button></div></div>';
+  ov.style.display = 'flex';
+  document.body.classList.add('tt-ayuda-on');
+}
+
 function _segNavHtml(){
   return '<nav class="seg-nav" aria-label="Secciones">'
     + '<button type="button" data-ir="inicio" onclick="_segVer(\'inicio\')">🏠<span>Inicio</span></button>'
@@ -550,6 +631,7 @@ function renderTrackResult(ship, code){
       </div>
     </div>
     ${listos?`<button type="button" class="seg-docs-atajo" onclick="_segVer('docs')"><span><b>📄 Tus ${listos === 1 ? 'documento' : listos + ' documentos'}</b><small>Boleta, foto del paquete y guía, siempre a la mano</small></span><span class="seg-tienda-ir">Ver →</span></button>`:''}
+    ${_nautiHtml(window._segVitrina, bizPhone)}
     ${waConsultUrl?`<a class="btn-wa seg-wa" href="${waConsultUrl}" target="_blank" rel="noopener">💬 Consultar por WhatsApp</a>`:''}
     <a class="seg-tienda" href="https://www.totaltoolspe.com/" target="_blank" rel="noopener">
       <span><b>🛍️ ¿Quieres ver más productos y ofertas?</b><small>Visita nuestra tienda online</small></span>
@@ -563,6 +645,7 @@ function renderTrackResult(ship, code){
         ${docsHtml}
       </div>
     </section>
+    ${_instalarHtml()}
     <div class="refresh-row" id="refreshRow"><span class="refresh-lbl">🔄 Se actualiza automáticamente</span></div>
     ${_segNavHtml()}
   `);
@@ -570,9 +653,19 @@ function renderTrackResult(ship, code){
   if(primera) setTimeout(function(){ document.body.classList.add('seg-quieto'); }, 1600);
 }
 
+const SEG_GUARDADO = 'tt_seg';
+
 function init(){
+  _esperarInstalar();
   const segTok = new URLSearchParams(location.search).get('seg');
-  if(segTok){ loadCfgThenTrack(segTok); return; }
+  if(segTok){
+    if(/^[A-Za-z0-9_-]{2,64}$/.test(segTok)){ try{ localStorage.setItem(SEG_GUARDADO, segTok); }catch(e){} }
+    loadCfgThenTrack(segTok);
+    return;
+  }
+  let guardado = '';
+  try{ guardado = localStorage.getItem(SEG_GUARDADO) || ''; }catch(e){}
+  if(/^[A-Za-z0-9_-]{2,64}$/.test(guardado)){ loadCfgThenTrack(guardado); return; }
   location.replace('formulario.html' + location.hash);
 }
 
@@ -582,6 +675,7 @@ window._copyGuia       = _copyGuia;
 window._copyTrack      = _copyTrack;
 window._segVer         = _segVer;
 window.abrirDocSeg     = abrirDocSeg;
+window.instalarSeg     = instalarSeg;
 window.cerrarDocSeg    = cerrarDocSeg;
 window.cerrarAyudaForm = cerrarAyudaForm;
 

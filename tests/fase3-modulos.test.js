@@ -140,7 +140,7 @@ module.exports = async ({bloque, ok}) => {
       shalom: ['shalom-registro.js', 'shalom-origen.js', 'shalom-ajustes.js', 'shalom-cuenta.js', 'shalom.js', 'tracking.js',
         'qrtracking.js', 'ticket.js', 'guias.js', 'agencias-extractor.js'],
       compartir: ['links-tokens.js', 'excel.js', 'xlsx.js'],
-      config: ['configuracion.js', 'recursos-ui.js', 'proveedores.js', 'recursos.js', 'cotizacion.js']};
+      config: ['configuracion.js', 'recursos-ui.js', 'proveedores.js', 'recursos.js', 'cotizacion.js', 'vitrina.js']};
     ok(fs.readdirSync(E.RAIZ).filter((f) => /\.js$/.test(f)).sort().join() ===
        'appcheck.js,auth.js,firebase-config.js,loading-screen.js,medir-registro.js',
        'en la raíz solo quedan los compartidos con las páginas del cliente y la infraestructura');

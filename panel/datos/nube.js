@@ -531,6 +531,8 @@
 
   window._fbLeerBarrido = () => fsGet(`${RAIZ}/barrido`).catch(() => null);
   window._fbLeerAvisos = () => fsGet(`${RAIZ}/webhook`).catch(() => null);
+  window._fbLeerVitrina = () => fsGet(`${RAIZ}/vitrina`);
+  window._fbGuardarVitrina = (doc) => fsPatch(`${RAIZ}/vitrina`, doc);
 
   window._fbEncenderPuerta = (on) =>
     fsPatch(shalomPath(), {encendida: !!on, ultimoCambio: Date.now()});
